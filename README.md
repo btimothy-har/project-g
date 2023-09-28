@@ -1,1 +1,1 @@
-# project-g
+# Project G

@@ -1,0 +1,19 @@
+{
+    "author": ["bakkutteh"],
+    "description": "Provides a full suite of Clash of Clans commands for various tasks. Commands are split up into separate cogs to better facilitate maintenance.",
+    "install_msg": "This cog is dependent on the `coc_client` and `coc_data` cogs. Both must be loaded for this cog to work properly.",
+    "short": "Clash of Clans Commands",
+    "end_user_data_statement": "This cog does not collect or store any data.",
+    "min_bot_version": "3.5.2",
+    "min_python_version": [3,11,3],
+    "hidden": false,
+    "disabled": false,
+    "required_cogs": {},
+    "requirements": [
+        "coc.py"
+        ],
+    "tags": [
+        "clash of clans",
+        "api"
+        ]
+}

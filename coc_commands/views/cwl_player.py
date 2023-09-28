@@ -1,0 +1,823 @@
+import discord
+
+from typing import *
+
+from redbot.core import commands
+from redbot.core.utils import AsyncIter
+
+
+from coc_data.objects.players.player import aPlayer
+from coc_data.objects.season.season import aClashSeason
+from coc_data.objects.discord.member import aMember
+from coc_data.objects.events.clan_war_leagues import WarLeaguePlayer
+
+from coc_data.utilities.components import *
+
+from coc_data.constants.ui_emojis import *
+from coc_data.constants.coc_emojis import *
+from coc_data.constants.coc_constants import *
+
+from coc_data.exceptions import *
+
+class CWLPlayerMenu(DefaultView):
+    def __init__(self,
+        context:Union[commands.Context,discord.Interaction],
+        season:aClashSeason,
+        member:aMember):
+
+        self.season = season
+        self.member = member      
+
+        self._ph_save_button = None        
+        self.user_registration = {}
+        self.show_account_stats = None
+
+        self.live_cwl_accounts = []
+        
+        super().__init__(context=context,timeout=300)
+
+    ##################################################
+    ### OVERRIDE BUILT IN METHODS
+    ##################################################
+    async def on_timeout(self):
+        timeout_embed = await clash_embed(
+            context=self.ctx,
+            message="Player Clan War League menu timed out.",
+            success=False
+            )
+        if self.message:
+            await self.message.edit(embed=timeout_embed,view=None)
+        self.stop_menu()
+    
+    async def _close(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        close_embed = await clash_embed(
+            context=self.ctx,
+            message="Player Clan War League menu closed. Goodbye!",
+            )
+        await interaction.edit_original_response(embed=close_embed,view=None)
+        self.stop_menu()
+    
+    ####################################################################################################
+    #####
+    ##### PRE-CWL: SIGNUPS
+    #####
+    ####################################################################################################
+
+    ##################################################
+    ### START SIGNUP
+    ##################################################
+    async def start_signup(self):
+        # if not self.season.cwl_signup_status:
+        #     embed = await clash_embed(
+        #         context=self.ctx,
+        #         message=f"**CWL Signups for {self.season.description} are not open.**"
+        #             + "\n\nIf you believe this is in error, please contact a Leader.",
+        #         success=False)
+        #     if isinstance(self.ctx,discord.Interaction):
+        #         await self.ctx.edit_original_response(embed=embed, view=None)
+        #     else:
+        #         await self.ctx.reply(embed=embed, view=None)
+        #     return self.stop_menu()
+        
+        self.is_active = True
+        self.signup_main_menu()
+        embeds = await self.signup_embed()
+
+        if isinstance(self.ctx,discord.Interaction):
+            await self.ctx.edit_original_response(embeds=embeds, view=self)
+            self.message = await self.ctx.original_response()
+        else:
+            try:
+                self.message = await self.ctx.reply(embeds=embeds, view=self)
+            except discord.HTTPException:
+                self.message = await self.ctx.send(embeds=embeds, view=self)
+    
+    ##################################################
+    ### SIGNUP CALLBACKS
+    ##################################################
+    async def _add_signups(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer(ephemeral=True)
+        
+        self.add_signup_menu()
+        self._ph_save_button.reference = 'add'
+        embeds = await self.signup_embed()
+        signup_embed = await self.signup_instruction_embed()
+        
+        await interaction.edit_original_response(embeds=embeds,view=self)
+        await interaction.followup.send(embed=signup_embed,ephemeral=True)
+    
+    async def _remove_signups(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer(ephemeral=True)
+        
+        self.remove_signup_menu()
+        self._ph_save_button.reference = 'remove'
+        embeds = await self.signup_embed()
+        remove_embed = await self.unregister_instruction_embed()
+
+        await interaction.edit_original_response(embeds=embeds,view=self)
+        await interaction.followup.send(embed=remove_embed,ephemeral=True)
+    
+    async def _reset_signups(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+
+        self.user_registration = {}
+        self.signup_main_menu()
+        embed = await self.signup_embed()
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    async def _callback_group_signup(self,interaction:discord.Interaction,select:DiscordSelectMenu):
+        await interaction.response.defer()
+        
+        if len(select.values) > 0:
+            for player_tag in select.values:
+                player = await aPlayer.create(player_tag)
+                self.user_registration[player_tag] = {}
+                self.user_registration[player_tag]["account"] = player.cwl_player(self.season)
+                self.user_registration[player_tag]["league"] = select.reference
+
+        self.add_signup_menu()
+        self._ph_save_button.reference = 'add'
+        embed = await self.signup_embed()
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    async def _callback_group_unregister(self,interaction:discord.Interaction,select:DiscordSelectMenu):
+        await interaction.response.defer()
+        select.disabled = True
+
+        if len(select.values) > 0:
+            for player_tag in select.values:
+                player = await aPlayer.create(player_tag)
+                self.user_registration[player_tag] = {}
+                self.user_registration[player_tag]["account"] = player.cwl_player(self.season)
+                self.user_registration[player_tag]["league"] = None
+        
+        if len(WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)) == 0:
+            self.signup_main_menu()
+            embeds = await self.signup_embed()
+            await interaction.edit_original_response(embeds=embeds,view=self)
+        else:
+            self.remove_signup_menu()
+            self._ph_save_button.reference = 'remove'
+            embeds = await self.signup_embed()
+            select.disabled = False
+            await interaction.edit_original_response(embeds=embeds,view=self)
+    
+    async def _save_signups(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+
+        for item in self.children:
+            item.disabled = True
+
+        for player in list(self.user_registration.values()):
+            if player['league']:
+                player['account'].signup(self.member.user_id,player['league'])
+            else:
+                player['account'].unregister()
+            player['account'].save()
+        
+        self.user_registration = {}
+        
+        if button.reference == 'add':
+            self.add_signup_menu()
+        elif button.reference == 'remove':
+            self.remove_signup_menu()
+        
+        for item in self.children:
+            item.disabled = False
+
+        self._ph_save_button.label = "Saved!"
+        self._ph_save_button.disabled = True
+        embeds = await self.signup_embed()
+        await interaction.edit_original_response(embeds=embeds,view=self)
+    
+    ##################################################
+    ### SIGNUP MENUS
+    ##################################################
+    def _save_signup_button(self):
+        return DiscordButton(
+            function=self._save_signups,
+            label="Save",
+            emoji=EmojisUI.YES,
+            style=discord.ButtonStyle.secondary,
+            row=0
+            )
+    def _help_button(self):
+        return DiscordButton(
+            function=self._display_help,
+            label="Help",
+            emoji=EmojisUI.HELP,
+            style=discord.ButtonStyle.green,
+            row=0
+            )
+    def _close_button(self):
+        return DiscordButton(
+            function=self._close,
+            emoji=EmojisUI.EXIT,
+            style=discord.ButtonStyle.red,
+            row=0
+            )
+    
+    def signup_main_menu(self):
+        self.clear_items()
+        
+        self.add_item(self._help_button())
+        self.add_item(self._close_button())
+
+        _add_signups_button = DiscordButton(
+            function=self._add_signups,
+            label="Register for CWL",
+            emoji=EmojisUI.ADD,
+            style=discord.ButtonStyle.secondary,
+            row=1
+            )
+        _remove_signups_button = DiscordButton(
+            function=self._remove_signups,
+            label="Cancel CWL Registration",
+            emoji=EmojisUI.DELETE,
+            style=discord.ButtonStyle.secondary,
+            row=1
+            )
+        if not self.season.cwl_signup_status:
+            _add_signups_button.disabled = True
+            _add_signups_button.label = "CWL Closed"
+        
+        self.add_item(_add_signups_button)
+
+        if self.season.cwl_signup_status:
+            if len(WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)) == 0:
+                _remove_signups_button.disabled = True
+            self.add_item(_remove_signups_button)
+
+    def add_signup_menu(self):
+        self.clear_items()
+
+        back_button = DiscordButton(
+            function=self._reset_signups,
+            label="Back",
+            emoji=EmojisUI.GREEN_FIRST,
+            style=discord.ButtonStyle.secondary,
+            row=0
+            )
+        self.add_item(back_button)
+
+        self._ph_save_button = self._save_signup_button()
+        self.add_item(self._ph_save_button)
+        self.add_item(self._close_button())
+
+        group_1_accounts = [discord.SelectOption(
+            label=str(account),
+            value=account.tag,
+            emoji=account.town_hall.emoji,
+            description=account.member_description_no_emoji,
+            default=False)
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 14 and i <=25]
+        
+        group_2_accounts = [discord.SelectOption(
+            label=str(account),
+            value=account.tag,
+            emoji=account.town_hall.emoji,
+            description=account.member_description_no_emoji,
+            default=False)
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 12 and i <=25]
+        
+        group_3_accounts = [discord.SelectOption(
+            label=str(account),
+            value=account.tag,
+            emoji=account.town_hall.emoji,
+            description=account.member_description_no_emoji,
+            default=False)
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 10 and i <=25]
+
+        group_4_accounts = [discord.SelectOption(
+            label=str(account),
+            value=account.tag,
+            emoji=account.town_hall.emoji,
+            description=account.member_description_no_emoji,
+            default=False)
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 4 and i <=25]
+        
+        if len(group_1_accounts) > 0:
+            group_1_selector = DiscordSelectMenu(
+                function=self._callback_group_signup,
+                options=group_1_accounts,
+                placeholder=f"Group A: Up to Champion I (TH14+)",
+                min_values=0,
+                max_values=len(group_1_accounts),
+                row=1,
+                reference=1
+                )
+            self.add_item(group_1_selector)
+        
+        if len(group_2_accounts) > 0:
+            group_2_selector = DiscordSelectMenu(
+                function=self._callback_group_signup,
+                options=group_2_accounts,
+                placeholder=f"Group B: Up to Master II (TH12+)",
+                min_values=0,
+                max_values=len(group_2_accounts),
+                row=2,
+                reference=2
+                )
+            self.add_item(group_2_selector)
+        
+        if len(group_3_accounts) > 0:
+            group_3_selector = DiscordSelectMenu(
+                function=self._callback_group_signup,
+                options=group_3_accounts,
+                placeholder=f"Group C: Up to Crystal II (TH10+)",
+                min_values=0,
+                max_values=len(group_3_accounts),
+                row=3,
+                reference=9
+                )
+            self.add_item(group_3_selector)
+        
+        if len(group_4_accounts) > 0:
+            group_4_selector = DiscordSelectMenu(
+                function=self._callback_group_signup,
+                options=group_4_accounts,
+                placeholder=f"Group D: Lazy CWL (TH6+)",
+                min_values=0,
+                max_values=len(group_4_accounts),
+                row=4,
+                reference=99
+                )
+            self.add_item(group_4_selector)
+    
+    def remove_signup_menu(self):
+        self.clear_items()
+        back_button = DiscordButton(
+            function=self._reset_signups,
+            label="Back",
+            emoji=EmojisUI.GREEN_FIRST,
+            style=discord.ButtonStyle.secondary,
+            row=0
+            )
+        self.add_item(back_button)
+        self._ph_save_button = self._save_signup_button()
+        self.add_item(self._ph_save_button)
+        self.add_item(self._close_button())
+
+        registered_accounts = [discord.SelectOption(
+            label=str(cwl_player.player),
+            value=cwl_player.tag,
+            emoji=cwl_player.player.town_hall.emoji,
+            description=cwl_player.player.member_description_no_emoji,
+            default=False)
+            for cwl_player in WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
+            if getattr(cwl_player.roster_clan,'roster_open',True)
+            ]
+        if len(registered_accounts) > 0:
+            unregister_selector = DiscordSelectMenu(
+                function=self._callback_group_unregister,
+                options=registered_accounts,
+                placeholder=f"Select Accounts to Unregister.",
+                min_values=0,
+                max_values=len(registered_accounts),
+                row=1,
+                reference=1
+                )
+            self.add_item(unregister_selector)
+    
+    ##################################################
+    ### SIGNUP CONTENT HELPERS
+    ##################################################
+    async def signup_embed(self):
+        embed_1_ct = 0
+        embed_2_ct = 0
+        embed = await clash_embed(
+            context=self.ctx,
+            title=f"Your CWL Registration: {self.season.description}",
+            message=f"**CWL Starts**: <t:{self.season.cwl_start.int_timestamp}:f>"
+                + f"\n**CWL Ends**: <t:{self.season.cwl_end.int_timestamp}:f>"
+                + f"\n\nIf you don't see your account in the list below, ensure it is linked through `/profile` (or `$profile`)."
+                + f"\n\n*For non-registered accounts, only {EmojisTownHall.TH10} TH10+ are shown.\nAccounts {EmojisTownHall.TH6} TH6 and up can be registered for Lazy CWL via the drop-down menu.*"
+                + "\n\u200b",
+                )
+        embed_2 = await clash_embed(
+            context=self.ctx,
+            message=f"*Accounts 11-20 are shown below.\nIf you have more than 20 accounts, these may not be reflected.*",
+            show_author=False
+            )
+        
+        registered_accounts = WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
+        for cwl_player in registered_accounts:
+            if cwl_player.tag not in self.user_registration:
+                if embed_1_ct < 10:
+                    embed.add_field(
+                        name=f"**{cwl_player.player.title}**",
+                        value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
+                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
+                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != cwl_player.player.clan.tag else "")
+                            + f"\n{cwl_player.player.hero_description}"
+                            + "\n\u200b",
+                        inline=False
+                        )
+                    embed_1_ct += 1
+                elif embed_2_ct < 10:
+                    embed_2.add_field(
+                        name=f"**{cwl_player.player.title}**",
+                        value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
+                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
+                            + f"\n{cwl_player.player.hero_description}"
+                            + "\n\u200b",
+                        inline=False
+                        )
+                    embed_2_ct += 1
+                else:
+                    break
+
+        for account in self.member.accounts:
+            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in registered_accounts] and account.town_hall.level >= 10:
+                if embed_1_ct < 10:
+                    embed.add_field(
+                        name=f"**{account.title}**",
+                        value=f"Not Registered"
+                            + (f"(Previously registered by <@{account.cwl_player(self.season).discord_user}>)" if account.cwl_player(self.season).discord_user and account.cwl_player(self.season).is_registered else "")
+                            + f"\n{account.hero_description}"
+                            + "\n\u200b",
+                        inline=False
+                        )
+                    embed_1_ct += 1
+                elif embed_2_ct < 10:
+                    embed_2.add_field(
+                        name=f"**{account.title}**",
+                        value=f"Not Registered"
+                            + (f"(Previously registered by <@{account.cwl_player(self.season).discord_user}>)" if account.cwl_player(self.season).discord_user and account.cwl_player(self.season).is_registered else "")
+                            + f"\n{account.hero_description}"
+                            + "\n\u200b",
+                        inline=False
+                        )
+                    embed_2_ct += 1
+                else:
+                    break
+        
+        change_embed = await clash_embed(
+            context=self.ctx,
+            title=f"**Unsaved Changes**",
+            message=f"Click the {EmojisUI.YES} **SAVE** button to save your changes below.\n"
+                + f"Pressing {EmojisUI.GREEN_FIRST} **BACK** will discard the below changes.\n\u200b",
+            show_author=False
+            )
+        for m_account in list(self.user_registration.values()):
+            change_embed.add_field(
+                name=f"**{m_account['account'].player.title}**",
+                value=f"{CWLLeagueGroups.get_description(m_account['league']) if m_account['league'] else 'Registration Removed'}"
+                    + f"\n{m_account['account'].player.hero_description}"
+                    + "\n\u200b",
+                inline=False
+                )
+        
+        r_embed = []
+        r_embed.append(embed)
+        if embed_2_ct > 0:
+            r_embed.append(embed_2)
+        if len(self.user_registration) > 0:
+            r_embed.append(change_embed)
+        return r_embed
+
+    async def signup_instruction_embed(self):
+        embed = await clash_embed(
+            context=self.ctx,
+            message="**Use the dropdowns above to register accounts to the respective League Groups.**"
+                + f"\n\nFor more information on League Groups, use `/cwl info`."
+                + "\nRemember to **`SAVE`** your registration when you are done.\nGoing **`BACK`** will discard any changes."
+                + "\n\nIf an account is already registered:"
+                + "\n> **Re-registering** it below will update the current registration."
+                + "\n> **Doing nothing** will not change the current registration."
+                + "\n\n**If you have more than 25 accounts, please contact a Leader.**",
+            show_author=False
+            )
+        return embed
+
+    async def unregister_instruction_embed(self):
+        embed = await clash_embed(
+            context=self.ctx,
+            message="**Select an account from the dropdown above to unregister from CWL.**"
+                + "\nRemember to **`SAVE`** your registration when you are done.\nGoing **`BACK`** will discard any changes."
+                + "\n\nAccounts that have already been finalized into a CWL Roster **cannot** be unregistered.",
+            show_author=False
+            )
+        return embed
+
+    async def _display_help(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer(ephemeral=True)
+
+        embed = await clash_embed(
+            context=self.ctx,
+            title="CWL Registration Help",
+            message=f"- You may modify your registration options at any time through this menu."
+                + f"\n- Changes to your registration **cannot** be made once registration is closed."
+                + f"\n- Once a CWL Roster has been finalized, you cannot withdraw your registration."
+                + f"\n\u200b"
+            )
+        embed.add_field(
+            name="**About League Groups**",
+            value="When registering for CWL, you are required to register individual accounts to a **League Group**."
+                + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
+                + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
+                + "\n\nThere are currently 4 League Groups available:"
+                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH14} TH14+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH12} TH12+)"
+                + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
+                + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
+                + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
+            name="**Example: How League Groups Work**",
+            value="If you sign up for League Group B (Master League II):\n"
+                + "\n> You will **not** be rostered in a Champion League III clan."
+                + "\n> You **can** be rostered for a Crystal League III clan."
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
+            name="**Account Linking**",
+            value="To link or unlink accounts, use the `/profile` command."
+                + "\n\nNote: Your Discord User is captured at the time of registration. Unlinking your accounts will **not** change your CWL registration."
+                + "\n- If you wish to cancel your registration, use the `Unregister` button."
+                + "\n- If you wish to transfer your registration to another player, the other player should link the account to their profile, and re-register for CWL."
+                + "\n\u200b",
+            inline=False
+            )
+        await interaction.followup.send(embed=embed,ephemeral=True)
+    
+    ####################################################################################################
+    #####
+    ##### DURING CWL: STATS
+    #####
+    ####################################################################################################
+
+    ##################################################
+    ### START LIVE CWL
+    ##################################################
+    async def show_live_cwl(self):
+        cwl_accounts = [r for r in 
+            WarLeaguePlayer.get_by_user(
+                season=self.season,
+                user_id=self.member.user_id,
+                only_registered=True
+                )
+                if r.roster_clan or r.league_clan
+                ]
+        #sort cwl accounts by clan league, then clan name
+        self.live_cwl_accounts = sorted(cwl_accounts,key=lambda x:(multiplayer_leagues.index(x.league),getattr(x.league_or_roster_clan,'name','')),reverse=True)
+        
+        if len(self.live_cwl_accounts) == 0:
+            embed = await clash_embed(
+                context=self.ctx,
+                message="Oops! You don't seem to be participating in CWL this season. Please contact a Leader if you believe this is in error.",
+                success=False
+                )
+            if isinstance(self.ctx,discord.Interaction):
+                await self.ctx.edit_original_response(embed=embed, view=None)
+                self.message = await self.ctx.original_response()
+            else:
+                try:
+                    self.message = await self.ctx.reply(embed=embed, view=None)
+                except discord.HTTPException:
+                    self.message = await self.ctx.send(embed=embed, view=None)
+            return self.stop_menu()
+
+        self.is_active = True
+        self.stats_menu()
+        embed = await self.player_cwl_stats_by_account()
+        
+        if isinstance(self.ctx,discord.Interaction):
+            await self.ctx.edit_original_response(embeds=embed, view=self)
+            self.message = await self.ctx.original_response()
+        else:
+            try:
+                self.message = await self.ctx.reply(embeds=embed, view=self)
+            except discord.HTTPException:
+                self.message = await self.ctx.send(embeds=embed, view=self)
+    
+    ##################################################
+    ### LIVE CWL CALLBACKS
+    ##################################################
+    async def _callback_live_cwl_home(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.show_account_stats = None
+        embed = await self.player_cwl_stats_by_account()        
+        self.stats_menu(current_page=0)
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    async def _callback_live_cwl_hitrate(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.show_account_stats = None
+        embed = await self.player_cwl_stats_overall()
+        self.stats_menu(current_page=1)
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    async def _callback_view_account_stats(self,interaction:discord.Interaction,select:DiscordSelectMenu):
+        await interaction.response.defer()
+
+        player_tag = select.values[0]
+        self.show_account_stats = WarLeaguePlayer(player_tag,self.season)
+        embed = await self.player_cwl_stats_warlog()
+        
+        self.stats_menu(current_page=9)
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    ##################################################
+    ### MENU HELPERS
+    ##################################################
+    def stats_menu(self,current_page=None):
+        self.clear_items()
+        #stats_toggle
+
+        home_button = DiscordButton(
+            function=self._callback_live_cwl_home,
+            label="My CWL",
+            emoji=EmojisClash.WARLEAGUES,
+            style=discord.ButtonStyle.blurple,
+            row=0
+            )
+        if current_page == 0 or current_page == None:
+            home_button.disabled = True
+        self.add_item(home_button)
+
+        hitrate_button = DiscordButton(
+            function=self._callback_live_cwl_hitrate,
+            label="My Stats",
+            emoji=EmojisClash.THREESTARS,
+            style=discord.ButtonStyle.secondary,
+            row=0
+            )
+        if current_page == 1:
+            hitrate_button.disabled = True
+        self.add_item(hitrate_button)
+        self.add_item(self._close_button())
+        
+        #dropdown stats per account
+        cwl_accounts = [discord.SelectOption(
+            label=str(cwl_player.player),
+            value=cwl_player.tag,
+            emoji=cwl_player.player.town_hall.emoji,
+            description=f"{cwl_player.league_clan.name} {cwl_player.league_clan.tag}" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}",
+            default=cwl_player.tag == getattr(self.show_account_stats,'tag',None))
+            for cwl_player in self.live_cwl_accounts
+            ]
+        if len(cwl_accounts) > 0:
+            stats_selector = DiscordSelectMenu(
+                function=self._callback_view_account_stats,
+                options=cwl_accounts,
+                placeholder=f"Select an Account to view war log.",
+                min_values=1,
+                max_values=1,
+                row=1
+                )
+            self.add_item(stats_selector)
+    
+    ##################################################
+    ### CONTENT HELPERS
+    ##################################################
+    async def player_cwl_stats_by_account(self):
+        embed = await clash_embed(
+            context=self.ctx,
+            title=f"Your CWL: {self.season.description}",
+            message=f"**CWL Starts**: <t:{self.season.cwl_start.int_timestamp}:f>"
+                + f"\n**CWL Ends**: <t:{self.season.cwl_end.int_timestamp}:f>"
+                + f"\n\n*Overall stats are not live and may be delayed.*"
+                + "\n\u200b",
+                )
+        embed_2 = await clash_embed(
+                context=self.ctx,
+                message=f"*Accounts 11-20 are shown below.\nIf you have more than 20 accounts, these may not be reflected.*",
+                show_author=False)
+        
+        ct = 0
+        for cwl_player in self.live_cwl_accounts:
+            ct += 1
+            e = embed
+            if ct > 10:
+                e = embed_2
+            clan = cwl_player.league_clan if cwl_player.league_clan else cwl_player.roster_clan
+
+            e.add_field(
+                name=f"**{cwl_player.player.title}**",
+                value=f"CWL Clan: **{EmojisLeagues.get(clan.league)} [{clan.name} {clan.tag}]({clan.clan.share_link})**"
+                    + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if clan.tag != cwl_player.player.clan.tag else "")
+                    + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
+                    + (f"\n\u200b" if not cwl_player.league_clan else ""),
+                inline=False
+                )                
+            if cwl_player.league_clan:
+                current_war = cwl_player.league_clan.current_war
+                war_player = current_war.get_member(cwl_player.tag) if current_war else None
+                e.add_field(
+                    name=f"**Current War (Round: {cwl_player.league_clan.current_round})**",
+                    value=(f"**War Ends In**: <t:{current_war.end_time.int_timestamp}:R>" if current_war and current_war.state == 'inWar' else f"**War Starts In**: <t:{current_war.start_time.int_timestamp}:R>" if current_war and current_war.state == 'preparation' else "War Ended" if current_war and current_war.state == 'warEnded' else "")
+                        + ("Not In War" if not war_player else "")
+                        + (f"\n{EmojisClash.ATTACK} `{str(len(war_player.attacks)) + ' / ' + str(current_war.attacks_per_member):^5}`" if war_player else "")
+                        + (f"\n{EmojisClash.STAR} `{war_player.total_stars:^5}`" if war_player else "")
+                        + (f"\u3000{EmojisClash.DESTRUCTION} `{str(war_player.total_destruction)+'%':^5}` " if war_player else "")
+                        + "\n\u200b",
+                    inline=True
+                    )
+                e.add_field(
+                    name=f"**Overall Stats**",
+                    value=f"{EmojisClash.ATTACK} `{str(cwl_player.war_stats.attack_count) + ' / ' + str(cwl_player.war_stats.attack_count + cwl_player.war_stats.unused_attacks):^5}`"
+                        + f"\n{EmojisClash.THREESTARS} `{cwl_player.war_stats.triples:^5}`"
+                        + f"\n{EmojisClash.STAR} `{cwl_player.war_stats.offense_stars:^5}`"
+                        + f"\n{EmojisClash.DESTRUCTION} `{str(cwl_player.war_stats.offense_destruction)+'%':^5}`"
+                        + "\n\u200b",
+                    inline=True
+                    )
+        if ct > 10:
+            return [embed,embed_2]
+        return [embed]
+    
+    async def player_cwl_stats_overall(self):        
+        total_wars = sum([a.war_stats.wars_participated for a in self.live_cwl_accounts])
+        total_attacks = sum([a.war_stats.attack_count for a in self.live_cwl_accounts])
+        unused_attacks = sum([a.war_stats.unused_attacks for a in self.live_cwl_accounts])
+        total_triples = sum([a.war_stats.triples for a in self.live_cwl_accounts])
+        total_stars = sum([a.war_stats.offense_stars for a in self.live_cwl_accounts])
+        total_destruction = sum([a.war_stats.offense_destruction for a in self.live_cwl_accounts])
+
+        embed = await clash_embed(
+            context=self.ctx,
+            title=f"Your CWL: {self.season.description}",
+            message=f"**CWL Starts**: <t:{self.season.cwl_start.int_timestamp}:f>"
+                + f"\n**CWL Ends**: <t:{self.season.cwl_end.int_timestamp}:f>"
+                + f"\n\n*Overall stats are not live and may be delayed.*"
+                + "\n"
+                + f"{EmojisClash.WARLEAGUES} `{total_wars:^3}`\u3000"
+                + f"{EmojisClash.THREESTARS} `{total_triples:^3}`\u3000"
+                + f"{EmojisClash.UNUSEDATTACK} `{unused_attacks:^3}`\n"
+                + f"{EmojisClash.STAR} `{total_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{total_destruction:>5}%`"
+                + "\n\u200b",
+                )
+        
+        overall_hit_rate = {}
+        for a in self.live_cwl_accounts:
+            for hit_rate in list(a.war_stats.hit_rate.values()):
+                th = f"{hit_rate['attacker']}v{hit_rate['defender']}"
+                if th not in overall_hit_rate:
+                    overall_hit_rate[th] = {
+                        'attacker':hit_rate['attacker'],
+                        'defender':hit_rate['defender'],
+                        'total':0,
+                        'stars':0,
+                        'destruction':0,
+                        'triples':0
+                        }
+                overall_hit_rate[th]['total'] += hit_rate['total']
+                overall_hit_rate[th]['stars'] += hit_rate['stars']
+                overall_hit_rate[th]['destruction'] += hit_rate['destruction']
+                overall_hit_rate[th]['triples'] += hit_rate['triples']
+        
+        for hr in list(overall_hit_rate.values()):
+            embed.add_field(
+                name=f"{EmojisTownHall.get(int(hr['attacker']))} TH{hr['attacker']} vs {EmojisTownHall.get(int(hr['defender']))} TH{hr['defender']}",
+                value=f"{EmojisClash.ATTACK} `{hr['total']:^3}`\u3000"
+                    + f"{EmojisClash.STAR} `{hr['stars']:^3}`\u3000"
+                    + f"{EmojisClash.DESTRUCTION} `{hr['destruction']:^5}%`"
+                    + f"\nHit Rate: {hr['triples']/hr['total']*100:.0f}% ({hr['triples']} {EmojisClash.THREESTARS} / {hr['total']} {EmojisClash.ATTACK})"
+                    + f"\nAverage: {EmojisClash.STAR} {hr['stars']/hr['total']:.2f}\u3000{EmojisClash.DESTRUCTION} {hr['destruction']/hr['total']:.2f}%",
+                inline=False
+                )
+        return [embed]
+
+    async def player_cwl_stats_warlog(self):
+        clan = self.show_account_stats.league_clan if self.show_account_stats.league_clan else self.show_account_stats.roster_clan
+
+        embed = await clash_embed(
+            context=self.ctx,
+            title=f"CWL Warlog: {self.show_account_stats.player.title}",
+            message=f"**Stats for: CWL {self.season.season_description} ({EmojisLeagues.get(clan.league)} {clan.name})**"
+                + f"\n*Overall stats are not live and may be delayed.*"
+                + f"\n\n{EmojisClash.WARLEAGUES} `{self.show_account_stats.war_stats.wars_participated:^3}`\u3000"
+                + f"{EmojisClash.THREESTARS} `{self.show_account_stats.war_stats.triples:^3}`\u3000"
+                + f"{EmojisClash.UNUSEDATTACK} `{self.show_account_stats.war_stats.unused_attacks:^3}`\n"
+                + f"{EmojisClash.ATTACK}\u3000{EmojisClash.STAR} `{self.show_account_stats.war_stats.offense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{self.show_account_stats.war_stats.offense_destruction:>3}%`\n"
+                + f"{EmojisClash.DEFENSE}\u3000{EmojisClash.STAR} `{self.show_account_stats.war_stats.defense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{self.show_account_stats.war_stats.defense_destruction:>3}%`\n"
+                + "\u200b",
+                )
+        if self.show_account_stats.war_log:
+            async for war in AsyncIter(self.show_account_stats.war_log):
+                war_member = war.get_member(self.show_account_stats.tag)
+                war_attacks = sorted(war_member.attacks,key=lambda x:(x.order))
+                war_defenses = sorted(war_member.defenses,key=lambda x:(x.order))
+                attack_str = "\n".join(
+                    [f"{EmojisClash.ATTACK}\u3000{EmojisTownHall.get(att.attacker.town_hall)} vs {EmojisTownHall.get(att.defender.town_hall)}\u3000{EmojisClash.STAR} `{att.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{att.destruction:>3}%`"
+                    for att in war_attacks]
+                    )
+                defense_str = "\n".join(
+                    [f"{EmojisClash.DEFENSE}\u3000{EmojisTownHall.get(defe.attacker.town_hall)} vs {EmojisTownHall.get(defe.defender.town_hall)}\u3000{EmojisClash.STAR} `{defe.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{defe.destruction:>3}%`"
+                    for defe in war_defenses]
+                    )
+                embed.add_field(
+                    name=f"R{self.show_account_stats.league_clan.league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
+                    value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
+                        + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
+                        + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
+                        + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
+                        + "\u200b",
+                    inline=False
+                    )
+        return [embed]

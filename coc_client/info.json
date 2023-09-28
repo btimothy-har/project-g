@@ -1,0 +1,19 @@
+{
+    "author": ["bakkutteh"],
+    "description": "Connects Red with the Clash of Clans API using coc.py.",
+    "install_msg": "Before loading this cog, set your COC API username and password with `[p]set api clashapi`. Valid tokens: `username`, `password`, `keys`. You can register for an account at https://developer.clashofclans.com.",
+    "short": "Clash of Clans API",
+    "end_user_data_statement": "This cog does not collect or store any data.",
+    "min_bot_version": "3.5.2",
+    "min_python_version": [3,11,3],
+    "hidden": false,
+    "disabled": false,
+    "required_cogs": {},
+    "requirements": [
+        "coc.py"
+        ],
+    "tags": [
+        "clash of clans",
+        "api"
+        ]
+}
