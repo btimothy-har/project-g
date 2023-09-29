@@ -222,8 +222,9 @@ class aPlayerSeason():
     
     @property
     def war_stats(self):
+        if not hasattr(self,'_war_stats'):
+            self._war_stats = aSummaryWarStats(war_log=[])
         return self._war_stats
-        
         
     async def compute_war_stats(self):
         self._war_stats = await aSummaryWarStats.for_player(
@@ -236,7 +237,7 @@ class aPlayerSeason():
         return self._raid_stats
         
     async def compute_raid_stats(self):
-        self._raid_stats = aSummaryRaidStats(
+        self._raid_stats = await aSummaryRaidStats.for_player(
             player_tag=self.tag,
             raid_log=aRaidWeekend.for_player(self.tag,self.season)
             )
@@ -345,10 +346,10 @@ class aPlayerSeason():
                 asyncio.create_task(bank_cog.capital_contribution_rewards(player,cap_contri))            
             await self.client.cog.capital_contribution_feed(player,cap_contri)
         
-        if not hasattr(self,'_war_stats') or (self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600):
+        if self.war_stats.wars_participated == 0 or (self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600):
             await self.compute_war_stats()
         
-        if not hasattr(self,'_raid_stats') or self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
+        if self.raid_stats.raids_participated == 0 or self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
             await self.compute_raid_stats()        
 
         return updated
