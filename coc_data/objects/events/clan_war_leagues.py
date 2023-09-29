@@ -396,9 +396,10 @@ class WarLeagueClan():
         return self._war_stats
     @cached_property
     def _war_stats(self):
-        return aSummaryWarStats(
-            war_log=self.all_wars if self.all_wars else [],
-            clan=self.tag)
+        return aSummaryWarStats.for_clan(
+            clan_tag=self.tag,
+            war_log=self.all_wars if self.all_wars else []
+            )
     
     ##################################################
     ### ATTRIBUTES
@@ -665,7 +666,10 @@ class WarLeaguePlayer():
         return self._war_stats
     @cached_property
     def _war_stats(self):
-        return aSummaryWarStats(war_log=self.war_log,player=self.tag)
+        return aSummaryWarStats.sfor_player(
+            player_tag=self.tag,
+            war_log=self.war_log if self.war_log else []
+            )
     
     ##################################################
     ### ATTRIBUTES

@@ -31,7 +31,7 @@ class DataCache():
         return list(self.cache.values())
     def get(self,key):
         return self.cache.get(key,None)    
-    def set(self,key,value):
+    async def set(self,key,value):
         self.cache[key] = value
     def delete(self,key):
         if key in self.cache:
@@ -57,6 +57,7 @@ class BotClashClient():
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._is_initialized = False
+            cls._instance._api_logged_in = False
         return cls._instance
     
     def __init__(self,bot=None):
@@ -122,6 +123,18 @@ class BotClashClient():
             available_clients.append(f'clashapi{i}')
 
         keys = []
+
+        # clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
+
+        # self.bot.coc_client = coc.EventsClient(
+        #     key_count=int(clashapi_login.get("keys",1)),
+        #     key_names='Created for Project G, from coc.py',
+        #     load_game_data=coc.LoadGameData(always=True),
+        #     throttle_limit=30,
+        #     timeout=30,
+        #     cache_max_size=None
+        #     )
+        # await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
         
         async for client in AsyncIter(available_clients):
             clashapi_login = await self.bot.get_shared_api_tokens(client)
@@ -141,8 +154,6 @@ class BotClashClient():
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='Created for Project G, from coc.py',
                 load_game_data=coc.LoadGameData(always=True),
-                throttle_limit=10,
-                timeout=30,
                 )
             await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
             keys.extend(client.http._keys)
@@ -151,13 +162,11 @@ class BotClashClient():
         if len(keys) == 0:
             raise LoginNotSet(f"No Clash API keys were found.")
         
-        client = coc.EventsClient(
+        self.bot.coc_client = coc.EventsClient(
             load_game_data=coc.LoadGameData(always=True),
-            throttle_limit=10,
-            timeout=30
             )
-        await client.login_with_tokens(*keys)
-        self.bot.coc_client = client
+        await self.bot.coc_client.login_with_tokens(*keys)
+        self._api_logged_in = True
     
     async def api_logout(self):
         await self.bot.coc_client.close()

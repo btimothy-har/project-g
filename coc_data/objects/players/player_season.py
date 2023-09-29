@@ -58,6 +58,20 @@ class aPlayerSeason():
     _cache = {}
 
     @classmethod
+    async def fetch_all_for_player(cls,player_tag:str):
+        client = BotClashClient()
+        stats = db_PlayerStats.objects(tag=player_tag)
+        ret = []
+        async for p_season in AsyncIter(stats):
+            season = aClashSeason(p_season.season)
+            try:
+                player = client.cog.get_player(player_tag)
+            except:
+                continue            
+            ret.append(aPlayerSeason(player,season))
+        return ret
+
+    @classmethod
     async def clan_games_participants(cls,season:aClashSeason,clan:aClan) -> List['aPlayerSeason']:
         query = db_PlayerStats.objects(
             season=season.id,
@@ -72,9 +86,9 @@ class aPlayerSeason():
         client = BotClashClient()
         try:
             player = client.cog.get_player(player_tag)
-        except InvalidTag:
+        except:
             return None
-        return cls(player,season)
+        return aPlayerSeason(player,season)
 
     def __new__(cls,player,season):
         if (player.tag,season.id) not in cls._cache:
@@ -182,8 +196,8 @@ class aPlayerSeason():
                 dict_value=stats.get('clangames',{})
                 )
             
-            self.compute_war_stats()
-            self.compute_raid_stats()
+            #self.compute_war_stats()
+            #self.compute_raid_stats()
 
             self.player = player
             
@@ -208,21 +222,20 @@ class aPlayerSeason():
     
     @property
     def war_stats(self):
-        if self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600:
-            self.compute_war_stats()
         return self._war_stats
-    def compute_war_stats(self):
-        self._war_stats = aSummaryWarStats.for_player(
+        
+        
+    async def compute_war_stats(self):
+        self._war_stats = await aSummaryWarStats.for_player(
             player_tag=self.tag,
             war_log=aClanWar.for_player(self.tag,self.season)
             )
     
     @property
     def raid_stats(self):
-        if self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
-            self.compute_raid_stats()
         return self._raid_stats
-    def compute_raid_stats(self):
+        
+    async def compute_raid_stats(self):
         self._raid_stats = aSummaryRaidStats(
             player_tag=self.tag,
             raid_log=aRaidWeekend.for_player(self.tag,self.season)
@@ -331,6 +344,12 @@ class aPlayerSeason():
             if bank_cog and getattr(player.clan,'is_alliance_clan',False):
                 asyncio.create_task(bank_cog.capital_contribution_rewards(player,cap_contri))            
             await self.client.cog.capital_contribution_feed(player,cap_contri)
+        
+        if not hasattr(self,'_war_stats') or (self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600):
+            await self.compute_war_stats()
+        
+        if not hasattr(self,'_raid_stats') or self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
+            await self.compute_raid_stats()        
 
         return updated
     

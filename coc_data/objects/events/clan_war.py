@@ -10,6 +10,7 @@ from functools import cached_property
 
 from coc_client.api_client import BotClashClient
 
+from redbot.core.utils import AsyncIter
 from .clan_war_summary import aSummaryWarStats
 from .clan_war_leagues import WarLeagueGroup
 
@@ -54,10 +55,12 @@ class aClanWar():
     _cache = {}
 
     @classmethod
-    def load_all(cls):
+    async def load_all(cls):
         query = db_ClanWar.objects()
-        ret_wars = [cls(war_id=war.war_id) for war in query]
-        return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
+        ret = []
+        async for war in AsyncIter(query):
+            ret.append(cls(war_id=war.war_id))
+        return sorted(ret, key=lambda w:(w.preparation_start_time),reverse=True)
 
     @classmethod
     def for_player(cls,player_tag:str,season:aClashSeason):

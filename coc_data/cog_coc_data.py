@@ -19,11 +19,9 @@ from coc_client.api_client import BotClashClient
 from mongoengine import DoesNotExist
 
 from .objects.season.season import dSeason, aClashSeason
-from .objects.players.player import aPlayer
-from .objects.players.player_attributes import db_Player
+from .objects.players.player import aPlayer, db_Player, _PlayerAttributes
 from .objects.players.player_season import db_PlayerStats
-from .objects.clans.clan import aClan
-from .objects.clans.clan_attributes import db_Clan, db_AllianceClan
+from .objects.clans.clan import aClan, db_Clan, db_AllianceClan
 from .objects.clans.clan_cwl_attributes import db_WarLeagueClanSetup
 from .objects.events.clan_war_leagues import WarLeagueGroup
 from .objects.events.clan_war import db_ClanWar, aClanWar
@@ -162,12 +160,7 @@ class ClashOfClansData(commands.Cog):
         
         asyncio.create_task(self.cog_start_up())
     
-    async def cog_start_up(self):
-        while True:
-            if isinstance(getattr(self.bot,'coc_client',None),coc.EventsClient):
-                break
-            await asyncio.sleep(1)
-            
+    async def cog_start_up(self):            
         clash_database = await self.bot.get_shared_api_tokens("clash_db")
         if clash_database.get("dbprimary") is None:
             raise LoginNotSet(f"Clash of Clans Database Name not set.")
@@ -185,28 +178,36 @@ class ClashOfClansData(commands.Cog):
             )
 
         asyncio.create_task(self.start_recruiting_loop())
-        
+
+        players_tasks = asyncio.create_task(_PlayerAttributes.load_from_database())
+        war_tasks = asyncio.create_task(aClanWar.load_all())
+        raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
+
+        wars = await war_tasks        
+        self.coc_main_log.info(
+            f"Loaded {len(wars):,} Clan Wars from database."
+            )
+        raids = await raid_tasks
+        self.coc_main_log.info(
+            f"Loaded {len(raids):,} Capital Raids from database."
+            )
+        players = await players_tasks
         clans_in_database = [c.tag for c in db_Clan.objects().only('tag')]
+
+        while True:
+            if isinstance(getattr(self.bot,'coc_client',None),coc.EventsClient):
+                if self.bot.coc_state._api_logged_in:
+                    break
+            await asyncio.sleep(1)
+        
         self.clan_cache.queue.extend(clans_in_database)
         self.coc_main_log.info(
             f"Found {len(clans_in_database):,} clans in database."
             )
-        
-        players_in_database = [p.tag for p in db_Player.objects().only('tag')]
-        self.player_cache.queue.extend(players_in_database)
+        self.player_cache.queue.extend(p.tag for p in players)
         self.coc_main_log.info(
-            f"Found {len(players_in_database):,} players in database."
-            )
-
-        wars = aClanWar.load_all()
-        self.coc_main_log.info(
-            f"Loaded {len(wars):,} Clan Wars from database."
-            )
-        raids = aRaidWeekend.load_all()
-        self.coc_main_log.info(
-            f"Loaded {len(raids):,} Capital Raids from database."
-            )
-        
+            f"Found {len(players):,} players in database."
+            )        
         async with self.clash_task_lock:
             self.clash_data_loop.start()        
         self.bot_status_update_loop.start()
@@ -303,13 +304,15 @@ class ClashOfClansData(commands.Cog):
 
             async for p in AsyncIter(player_queue):
                 if p not in PlayerLoop.keys():
-                    await self.create_player_task(p)
-                self.player_cache.remove_from_queue(p)
+                    rp = await self.create_player_task(p)
+                    if p == rp:
+                        self.player_cache.remove_from_queue(p)
 
             async for c in AsyncIter(clan_queue):
                 if c not in ClanLoop.keys():
-                    await self.create_clan_task(c)
-                self.clan_cache.remove_from_queue(c)
+                    rc = await self.create_clan_task(c)
+                    if c == rc:
+                        self.clan_cache.remove_from_queue(c)
             
             await self._season_check()                
 
@@ -637,23 +640,33 @@ class ClashOfClansData(commands.Cog):
     ##################################################   
     async def create_player_task(self,player_tag):
         loop = PlayerLoop(self.bot,player_tag)
-        await loop.start()
+        if not loop.loop_active:
+            await loop.start()
+            return player_tag
     
     async def create_clan_task(self,clan_tag):
         loop = ClanLoop(self.bot,clan_tag)
-        await loop.start()
+        if not loop.loop_active:
+            await loop.start()
+            return clan_tag
     
     async def create_war_task(self,clan_tag):
         loop = ClanWarLoop(self.bot,clan_tag)
-        await loop.start()
+        if not loop.loop_active:
+            await loop.start()
+            return clan_tag
     
     async def create_raid_task(self,clan_tag):
         loop = ClanRaidLoop(self.bot,clan_tag)
-        await loop.start()
+        if not loop.loop_active:
+            await loop.start()
+            return clan_tag
     
     async def create_guild_task(self,guild_id):
         loop = DiscordGuildLoop(self.bot,guild_id)
-        await loop.start()
+        if not loop.loop_active:
+            await loop.start()
+            return guild_id
     
     async def _season_check(self):
         season = aClashSeason.get_current_season()
@@ -717,8 +730,9 @@ class ClashOfClansData(commands.Cog):
         elif not season.is_current and not clan:
             query = db_PlayerStats.objects(is_member=True,season=season.id).only('tag')
         
-        ret_players = [aPlayer.from_cache(p.tag) for p in query]
-        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
+        #ret_players = [aPlayer.from_cache(p.tag) for p in query]
+        #return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
+        return []
 
     async def fetch_player(self,tag:str) -> aPlayer:
         return await aPlayer.create(tag=tag)

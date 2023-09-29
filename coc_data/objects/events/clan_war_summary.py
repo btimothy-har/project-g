@@ -1,6 +1,7 @@
 import pendulum
 
 from typing import *
+from redbot.core.utils import AsyncIter
 
 from ...utilities.utils import *
 
@@ -24,7 +25,82 @@ class aSummaryWarStats():
         self.hit_rate = {}
     
     @classmethod
-    def for_player(cls,player_tag:str,war_log):
+    async def for_player(cls,player_tag:str,war_log):
+        instance = cls(war_log)
+
+        instance.player_tag = player_tag
+        instance.clan_tag = None
+
+        if instance.wars_participated > 0:
+            instance.attack_count = sum(
+                [len(war.get_member(instance.player_tag).attacks)
+                for war in war_log]
+                )
+            instance.offense_stars = sum(
+                [sum([attack.stars for attack in war.get_member(instance.player_tag).attacks])
+                for war in war_log]
+                )
+            instance.offense_destruction = sum(
+                [sum([attack.destruction for attack in war.get_member(instance.player_tag).attacks])
+                for war in war_log]
+                )
+            instance.defense_count = sum(
+                [war.get_member(instance.player_tag).defense_count
+                for war in war_log]
+                )
+            instance.defense_stars = sum(
+                [getattr(war.get_member(instance.player_tag).best_opponent_attack,'stars',0)
+                for war in war_log]
+                )
+            instance.defense_destruction = sum(
+                [getattr(war.get_member(instance.player_tag).best_opponent_attack,'destruction',0)
+                for war in war_log]
+                )
+            instance.triples = sum(
+                [len([attack for attack in war.get_member(instance.player_tag).attacks if attack.is_triple])
+                for war in war_log]
+                )
+            instance.unused_attacks = sum(
+                [war.get_member(instance.player_tag).unused_attacks
+                for war in war_log]
+                )
+            
+            total_duration = 0
+            duration_count = 0
+            total_new_star = 0
+            new_star_count = 0
+
+            async for war in AsyncIter(war_log):
+                for a in war.get_member(instance.player_tag).attacks:
+                    if a.duration <= 180: 
+                        total_duration += a.duration
+                        duration_count += 1
+                    total_new_star += a.new_stars
+                    new_star_count += 1
+            
+                    th = f"{a.attacker.town_hall}v{a.defender.town_hall}"
+                    if th not in instance.hit_rate:
+                        instance.hit_rate[th] = {
+                            'attacker':a.attacker.town_hall,
+                            'defender':a.defender.town_hall,
+                            'total':0,
+                            'stars':0,
+                            'destruction':0,
+                            'triples':0
+                            }
+                    instance.hit_rate[th]['total'] += 1
+                    instance.hit_rate[th]['stars'] += a.stars
+                    instance.hit_rate[th]['destruction'] += a.destruction
+                    instance.hit_rate[th]['triples'] += 1 if a.is_triple else 0
+            
+            if duration_count > 0:
+                instance.average_attack_duration = total_duration / duration_count
+            if new_star_count > 0:
+                instance.average_new_stars = total_new_star / new_star_count        
+        return instance
+    
+    @classmethod
+    def sfor_player(cls,player_tag:str,war_log):
         instance = cls(war_log)
 
         instance.player_tag = player_tag

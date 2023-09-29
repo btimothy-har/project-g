@@ -42,7 +42,7 @@ class ClanLoop(TaskLoop):
     @property
     def sleep_time(self):
         if not self.cached_clan:
-            sleep = 300
+            sleep = 60
         elif self.api_error:
             sleep = 600
             self.api_error = False
@@ -59,7 +59,68 @@ class ClanLoop(TaskLoop):
     ##################################################
     async def _loop_task(self):
         try:
-            await self._single_loop()
+            while self.loop_active:
+                try:
+                    st = pendulum.now()
+                    if not self.loop_active:
+                        raise asyncio.CancelledError
+                    
+                    if self.clash_task_lock.locked():
+                        async with self.clash_task_lock:
+                            await asyncio.sleep(0)
+                    
+                    async with self.clash_semaphore:
+                        st = pendulum.now()
+                        try:
+                            clan = await aClan.create(self.tag,no_cache=True,bot=self.bot)
+                        except InvalidTag as exc:
+                            raise asyncio.CancelledError from exc
+
+                        api_end = pendulum.now()
+
+                        if clan.is_alliance_clan or clan.is_registered_clan or clan.cwl_config.is_cwl_clan or len(clan.member_feed) > 0:
+                            if not self.cached_clan:
+                                self.client.cog.player_cache.queue.extend([m.tag for m in clan.members])
+                                        
+                            else:
+                                members_joined = [m for m in clan.members if m.tag not in [n.tag for n in self.cached_clan.members]]
+                                members_left = [m for m in self.cached_clan.members if m.tag not in [n.tag for n in clan.members]]
+
+                                if len(members_joined) > 0:
+                                    [asyncio.create_task(ClanMemberFeed.member_join(clan,m.tag)) for m in members_joined]
+                                if len(members_left) > 0:
+                                    [asyncio.create_task(ClanMemberFeed.member_join(clan,m.tag)) for m in members_left]
+                        
+                                await ClanDonationFeed.start_feed(clan,self.cached_clan)
+                        self.cached_clan = clan
+                        
+                except ClashAPIError as exc:                
+                    self.api_error = True
+
+                except asyncio.CancelledError:
+                    await self.stop()
+
+                finally:
+                    if not self.loop_active:
+                        return                
+                    et = pendulum.now()
+
+                    try:
+                        api_time = api_end.int_timestamp-st.int_timestamp
+                        self.api_time.append(api_time)
+                    except:
+                        pass
+
+                    try:
+                        run_time = et.int_timestamp-st.int_timestamp
+                        self.run_time.append(run_time)
+                    except:
+                        pass
+
+                    self.main_log.debug(
+                        f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time} seconds."
+                        )
+                    await asyncio.sleep(self.sleep_time)
 
         except asyncio.CancelledError:
             await self.stop()
@@ -76,67 +137,3 @@ class ClanLoop(TaskLoop):
             await self.stop()
             await asyncio.sleep(300)
             await self.start()
-        
-    async def _single_loop(self):
-        while self.loop_active:
-            try:
-                st = pendulum.now()
-                if not self.loop_active:
-                    raise asyncio.CancelledError
-                
-                if self.clash_task_lock.locked():
-                    async with self.clash_task_lock:
-                        await asyncio.sleep(0)
-                
-                async with self.clash_semaphore:
-                    st = pendulum.now()
-                    try:
-                        clan = await aClan.create(self.tag,no_cache=True,bot=self.bot)
-                    except InvalidTag as exc:
-                        raise asyncio.CancelledError from exc
-
-                    api_end = pendulum.now()
-
-                    if clan.is_alliance_clan or clan.is_registered_clan or clan.cwl_config.is_cwl_clan or len(clan.member_feed) > 0:
-                        if not self.cached_clan:
-                            self.client.cog.player_cache.queue.extend([m.tag for m in clan.members])
-                                    
-                        else:
-                            members_joined = [m for m in clan.members if m.tag not in [n.tag for n in self.cached_clan.members]]
-                            members_left = [m for m in self.cached_clan.members if m.tag not in [n.tag for n in clan.members]]
-
-                            if len(members_joined) > 0:
-                                [asyncio.create_task(ClanMemberFeed.member_join(clan,m.tag)) for m in members_joined]
-                            if len(members_left) > 0:
-                                [asyncio.create_task(ClanMemberFeed.member_join(clan,m.tag)) for m in members_left]
-                    
-                            await ClanDonationFeed.start_feed(clan,self.cached_clan)
-                    self.cached_clan = clan
-                    
-            except ClashAPIError as exc:                
-                self.api_error = True
-
-            except asyncio.CancelledError:
-                await self.stop()
-
-            finally:
-                if not self.loop_active:
-                    return                
-                et = pendulum.now()
-
-                try:
-                    api_time = api_end.int_timestamp-st.int_timestamp
-                    self.api_time.append(api_time)
-                except:
-                    pass
-
-                try:
-                    run_time = et.int_timestamp-st.int_timestamp
-                    self.run_time.append(run_time)
-                except:
-                    pass
-
-                self.main_log.debug(
-                    f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time} seconds."
-                    )
-                await asyncio.sleep(self.sleep_time)

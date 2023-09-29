@@ -11,10 +11,8 @@ from redbot.core.utils import AsyncIter
 from coc_client.api_client import BotClashClient
 
 from .guild import aGuild
-from ..players.player import aPlayer
-from ..players.player_attributes import db_Player
-from ..clans.clan import aClan
-from ..clans.clan_attributes import db_AllianceClan
+from ..players.player import aPlayer, db_Player
+from ..clans.clan import aClan, db_AllianceClan
 from ..discord.clan_link import ClanGuildLink
 
 from ...constants.coc_constants import *

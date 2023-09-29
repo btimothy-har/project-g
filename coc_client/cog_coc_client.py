@@ -55,6 +55,7 @@ class ClashOfClansClient(commands.Cog):
     ##################################################
     async def cog_load(self):
         self.client = await BotClashClient.initialize(self.bot)
+        self.bot.coc_state = self.client
     
     ##################################################
     ### COG LOAD
