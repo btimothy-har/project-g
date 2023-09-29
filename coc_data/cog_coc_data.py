@@ -282,6 +282,9 @@ class ClashOfClansData(commands.Cog):
         def predicate_player_not_in_loop(player):
             return player.tag not in [i.tag for i in PlayerLoop.loops() if i.loop_active]
         
+        if not hasattr(self,'clash_semaphore'):
+            return
+        
         try:            
             clans = AsyncIter(self.clan_cache.values)
             async for clan in clans.filter(predicate_clan_not_in_loop):
