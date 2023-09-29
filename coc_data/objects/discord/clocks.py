@@ -331,7 +331,7 @@ class aGuildClocks():
         
         if clangames_season.clangames_start.subtract(days=14) < now < clangames_season.clangames_start:
             await self.create_scheduled_event(
-                name=f"Clan Games - {clangames_season.description}",
+                name=f"Clan Games - {clangames_season.short_description}",
                 start_time=clangames_season.clangames_start,
                 end_time=clangames_season.clangames_end,
                 image="https://i.imgur.com/PwRPVYP.jpg"
@@ -423,7 +423,7 @@ class aGuildClocks():
         
         if warleague_season.cwl_start.subtract(days=14) < now < warleague_season.cwl_start:
            await self.create_scheduled_event(
-                name=f"Clan War Leagues - {warleague_season.description}",
+                name=f"Clan War Leagues - {warleague_season.short_description}",
                 start_time=warleague_season.cwl_start,
                 end_time=warleague_season.cwl_end,
                 image="https://i.imgur.com/NYmlLJz.jpg"

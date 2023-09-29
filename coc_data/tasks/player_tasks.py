@@ -99,8 +99,7 @@ class PlayerLoop(TaskLoop):
 
             finally:
                 if not self.loop_active:
-                    return
-                
+                    return                
                 et = pendulum.now()
 
                 try:
@@ -115,14 +114,9 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
 
-                if self.tag == '#LJC8V0GCJ':
-                    self.main_log.info(
-                        f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time} seconds."
-                        )
-                else:
-                    self.main_log.debug(
-                        f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time} seconds."
-                        )
+                self.main_log.debug(
+                    f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time} seconds."
+                    )
                 await asyncio.sleep(self.sleep_time)
     
     ##################################################
