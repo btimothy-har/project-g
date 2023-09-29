@@ -36,7 +36,7 @@ class Clans(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -123,19 +123,20 @@ class Clans(commands.Cog):
     #####
     ##### COMMAND DIRECTORY
     ##### - Clan
+    ##### - Clan-Export
+    ##### - Clan-Compo
+    ##### - Clan-Strength
+    ##### - Clan-Donations
+    ##### - Clan-Members
+    ##### - Clan-Games
+    ##### - ClanData / War Log** [under construction]
+    ##### - ClanData / Raid Log** [under construction]
     ##### - ClanSet / Register
     ##### - ClanSet / Delete
     ##### - ClanSet / Link
     ##### - ClanSet / Unlink
     ##### - ClanSet / SetLeader
     ##### - ClanSet / Config    
-    ##### - ClanData / Export
-    ##### - ClanData / Compo
-    ##### - ClanData / Strength
-    ##### - ClanData / Donations
-    ##### - ClanData / Members
-    ##### - ClanData / War Log** [under construction]
-    ##### - ClanData / Raid Log** [under construction]
     #####
     ############################################################
     ############################################################
@@ -143,6 +144,23 @@ class Clans(commands.Cog):
     ##################################################
     ### PARENT COMMAND GROUPS
     ##################################################
+    @commands.group(name="clan")
+    @commands.guild_only()
+    async def command_group_clan(self,ctx):
+        """
+        Group for Clan-related commands.
+
+        **This is a command group. To use the sub-commands below, follow the syntax: `$clan [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    app_command_group_clan = app_commands.Group(
+        name="clan",
+        description="Group for Clan Data. Equivalent to [p]clandata.",
+        guild_only=True
+        )
+    
     @commands.group(name="clanset")
     @commands.guild_only()
     async def command_group_clanset(self,ctx):
@@ -160,27 +178,62 @@ class Clans(commands.Cog):
         guild_only=True
         )
     
-    @commands.group(name="clandata")
+    ##################################################
+    ### FIND-CLAN (ALIAS: CLAN INFO)
+    ##################################################
+    @commands.command(name="findclan")
     @commands.guild_only()
-    async def command_group_clandata(self,ctx):
+    async def command_find_clan(self,ctx:commands.Context,clan_tag:str):
         """
-        Group for Clan Data.
+        Gets information about an in-game Clan.
 
-        **This is a command group. To use the sub-commands below, follow the syntax: `$clandata [sub-command]`.**
+        This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p]abbreviation` instead.
         """
-        if not ctx.invoked_subcommand:
-            pass
 
-    app_command_group_clandata = app_commands.Group(
-        name="clan-data",
-        description="Group for Clan Data. Equivalent to [p]clandata.",
-        guild_only=True
-        )
+        clan = await aClan.create(clan_tag)
+
+        if not clan:
+            embed = await clash_embed(
+            context=ctx,
+            message=f"I couldn't find a Clan with the tag `{clan_tag}`.",
+            )
+            return await ctx.reply(embed=embed)
+
+        view = ClanLinkMenu([clan])
+        embed = await clash_embed(
+            context=ctx,
+            title=f"{clan.title}",
+            message=f"{clan.long_description}"
+                + (f"\n\n> **Recruiting:** {clan.recruitment_level_emojis}" if clan.is_alliance_clan else "")
+                + f"\n\n{clan.c_description}",
+            thumbnail=clan.badge,
+            show_author=False,
+            )
+        return await ctx.reply(embed=embed,view=view)
+        
+    @app_commands.command(
+        name="find-clan",
+        description="Get information about a Clan.")
+    @app_commands.guild_only()
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(clan="Select a Clan or manually enter a Tag.")
+    async def app_command_find_clan(self,interaction:discord.Interaction,clan:str):
+
+        await interaction.response.defer()
+        clan = await aClan.create(clan)
+
+        view = ClanLinkMenu([clan])
+        embed = await clash_embed(
+            context=interaction,
+            title=f"{clan.title}",
+            message=f"{clan.long_description}"
+                + (f"\n\n**Recruiting:** {clan.recruitment_level_emojis}" if len(clan.recruitment_level) > 0 else "")
+                + f"\n\n>>> {clan.c_description}",
+            thumbnail=clan.badge,
+            )
+        await interaction.edit_original_response(embed=embed,view=view)
     
-    ##################################################
-    ### CLAN
-    ##################################################
-    @commands.command(name="clan")
+    @command_group_clan.command(name="info")
     @commands.guild_only()
     async def command_get_clan_information(self,ctx:commands.Context,clan_tag:str):
         """
@@ -210,12 +263,11 @@ class Clans(commands.Cog):
             )
         return await ctx.reply(embed=embed,view=view)
         
-    @app_commands.command(
-        name="clan",
+    @app_command_group_clan.command(
+        name="info",
         description="Get information about a Clan.")
-    @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(clan="Select a Clan.")
+    @app_commands.describe(clan="Select a Clan or manually enter a Tag.")
     async def app_command_clan_information(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
@@ -233,17 +285,345 @@ class Clans(commands.Cog):
         await interaction.edit_original_response(embed=embed,view=view)
     
     ##################################################
+    ### CLANDATA / EXPORT
+    ##################################################
+    @command_group_clan.command(name="export")
+    @commands.guild_only()
+    @commands.check(is_coleader)
+    async def command_export_clan_data(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        Exports a Clan's data to Excel.
+
+        Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
+        """
+
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+
+        if not clan.is_alliance_clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"Only Alliance Clans can be exported.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)        
+
+        wait_msg = await ctx.reply("Exporting Clan Data... please wait.")
+        
+        season = self.client.cog.current_season
+        rp_file = await ClanExcelExport.generate_report(clan,season)
+
+        await wait_msg.delete()
+        await ctx.reply(
+            content=f"Here is the Clan data for {clan} as you requested.",
+            file=discord.File(rp_file))
+
+    @app_command_group_clan.command(name="export",
+        description="Export seasonal Clan Data to an Excel file.")
+    @app_commands.check(is_coleader)
+    @app_commands.autocomplete(
+        clan=autocomplete_clans_coleader,
+        season=autocomplete_seasons)
+    @app_commands.describe(
+        clan="Select a Clan. Only Alliance Clans can be selected.",
+        season="Select a Season to export.")
+    async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
+        
+        await interaction.response.defer()
+        
+        clan = await aClan.create(clan)
+        if not clan.is_alliance_clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Only Alliance Clans can be exported.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)
+        
+        season = aClashSeason(season)
+        rp_file = await ClanExcelExport.generate_report(clan,season)
+
+        await interaction.followup.send(
+            content=f"Here is the Clan data for {clan} as you requested.",
+            file=discord.File(rp_file))
+    
+    ##################################################
+    ### CLANDATA / COMPO
+    ##################################################
+    @command_group_clan.command(name="compo")
+    @commands.guild_only()
+    async def command_clan_composition(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View a Clan's Town Hall composition.
+
+        For registered Alliance clans, returns registered and in-game compositions.
+        """
+     
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+        
+        embed = await clan_composition_embed(ctx,clan)            
+        return await ctx.reply(embed=embed)
+
+    @app_command_group_clan.command(
+        name="compo",
+        description="View a Clan's Townhall composition.")
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(clan="Select a Clan.")
+    async def app_command_clan_composition(self,interaction:discord.Interaction,clan:str):
+
+        await interaction.response.defer()
+
+        clan = await aClan.create(clan)
+        if not clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"I couldn't find a Clan with the input `{clan}`.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)
+        
+        embed = await clan_composition_embed(interaction,clan)
+        return await interaction.edit_original_response(embed=embed)
+
+    ##################################################
+    ### CLANDATA / STRENGTH
+    ##################################################
+    @command_group_clan.command(name="strength")
+    @commands.guild_only()
+    async def subcommand_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View a Clan's overall Offensive Strength.
+
+        For registered Alliance clans, returns only registered members.
+        """
+
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+
+        embed = await clan_strength_embed(ctx,clan)
+        return await ctx.reply(embed=embed)
+    
+    @app_command_group_clan.command(
+        name="strength",
+        description="View a Clan's Offensive strength.")
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(clan="Select a Clan.")
+    async def app_command_clan_strength(self,interaction:discord.Interaction,clan:str):
+
+        await interaction.response.defer()
+
+        clan = await aClan.create(clan)            
+        if not clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"I couldn't find a Clan with the input `{clan}`.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)            
+
+        embed = await clan_strength_embed(interaction,clan)
+        return await interaction.edit_original_response(embed=embed)
+
+    ##################################################
+    ### CLANDATA / DONATIONS
+    ##################################################
+    @command_group_clan.command(name="donations")
+    @commands.guild_only()
+    async def subcommand_clan_donations(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View a Clan's Donation Stats for the current season.
+
+        For registered Alliance Clans, this will retrieve stats for registered members. For all other clans, this will return what is available via in-game.
+        """
+        
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+        
+        embed = await clan_donations_embed(ctx,clan)
+        await ctx.reply(embed=embed)
+    
+    @app_command_group_clan.command(name="donations",
+        description="View a Clan's Donation stats.")
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(clan="Select a Clan.")
+    async def app_command_clanstats_donations(self,interaction:discord.Interaction,clan:str):
+   
+        await interaction.response.defer()
+
+        clan = await aClan.create(clan)
+        if not clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"I couldn't find a Clan with the input `{clan}`.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)
+        
+        embed = await clan_donations_embed(interaction,clan)
+        await interaction.edit_original_response(embed=embed)
+    
+    ##################################################
+    ### CLAN / MEMBERS
+    ##################################################
+    @command_group_clan.command(name="members")
+    @commands.guild_only()
+    async def subcommand_clan_membersummary(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        Display info on a Clan's Members.
+
+        Contains menus for Discord Links, Rank Status, and War Opt-Ins.
+
+        By default, this shows all in-game members. For Alliance Clans, this will also return registered members who are not in the in-game clan.
+        """
+  
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+        
+        menu = ClanMembersMenu(ctx,clan)
+        await menu.start()
+
+    @app_command_group_clan.command(name="members",
+        description="View Clan Member information.")
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(
+        clan="Select a Clan.") 
+    async def app_command_clan_membersummary(self,interaction:discord.Interaction,clan:str):
+
+        await interaction.response.defer()
+
+        clan = await aClan.create(clan)
+        if not clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"I couldn't find a Clan with the input `{clan}`.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)
+
+        menu = ClanMembersMenu(interaction,clan)
+        await menu.start()
+    
+    ##################################################
+    ### CLAN GAMES
+    ##################################################
+    @commands.command(name="clangames",aliases=["cg"])
+    @commands.guild_only()
+    async def command_clan_games(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View the Clan Games leaderboard for a Clan.
+
+        Defaults to the last completed Clan Games. If viewing non-Alliance clans, data may not be completed.
+        """
+  
+        try:
+            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await aClan.create(clan_tag_or_abbreviation)
+
+        if not clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+
+        last_completed_clangames = self.client.cog.current_season if pendulum.now() >= self.client.cog.current_season.clangames_start else self.client.cog.current_season.previous_season()
+
+        embed = await clan_games_data(ctx,clan,last_completed_clangames)
+        await ctx.reply(embed=embed)
+
+    @app_commands.command(name="clan-games",
+        description="View Clan Games information. Defaults to the last completed Clan Games.")
+    @app_commands.autocomplete(
+        clan=autocomplete_clans,
+        season=autocomplete_seasons)
+    @app_commands.describe(
+        clan="Select a Clan. If viewing non-Alliance clans, data may not be completed.",
+        season="Select a Season to view for.")
+    async def app_command_clan_games(self,interaction:discord.Interaction,clan:str,season:str):
+
+        await interaction.response.defer()
+
+        clan = await aClan.create(clan)
+        if not clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"I couldn't find a Clan with the input `{clan}`.",
+                success=False,
+                )
+            return await interaction.edit_original_response(embed=embed)
+        
+        last_completed_clangames = self.client.cog.current_season if pendulum.now() >= self.client.cog.current_season.clangames_start else self.client.cog.current_season.previous_season()
+
+        embed = await clan_games_data(interaction,clan,last_completed_clangames)
+        await interaction.edit_original_response(embed=embed)
+    
+    ##################################################
     ### CLANSET / REGISTER
     ##################################################
     async def helper_register_clan(self,
         context:Union[commands.Context,discord.Interaction],
         clan_tag:str,
         emoji:str,
+        unicode_emoji:str,
         abbreviation:str):
 
         clan = await aClan.create(clan_tag)
         clan.abbreviation = abbreviation
         clan.emoji = emoji
+        clan.unicode_emoji = unicode_emoji
 
         embed = await clash_embed(
             context=context,
@@ -257,7 +637,7 @@ class Clans(commands.Cog):
     @command_group_clanset.command(name="register")
     @commands.guild_only()
     @commands.admin()
-    async def subcommand_register_clan(self,ctx:commands.Context,clan_tag:str,emoji:str,abbreviation:str):
+    async def subcommand_register_clan(self,ctx:commands.Context,clan_tag:str,emoji:str,unicode_emoji:str,abbreviation:str):
         """
         [Admin-only] Register an in-game Clan to the bot.
 
@@ -266,7 +646,7 @@ class Clans(commands.Cog):
         > - Clan Abbreviation
         """
         
-        embed = await self.helper_register_clan(ctx,clan_tag,emoji,abbreviation)
+        embed = await self.helper_register_clan(ctx,clan_tag,emoji,unicode_emoji,abbreviation)
         await ctx.reply(embed=embed)
     
     @app_command_group_clanset.command(
@@ -274,14 +654,19 @@ class Clans(commands.Cog):
         description="[Admin-only] Register an in-game Clan to the bot.")
     @app_commands.check(is_admin)
     @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(clan="Select a Clan.")
+    @app_commands.describe(
+        clan="Select a Clan, or enter a Clan Tag.",
+        emoji="Provide the Emoji to use for the Clan.",
+        unicode_emoji="Provide the Unicode Emoji to use for the Clan.",
+        abbreviation="Provide the Clan's abbreviation.")
     async def app_subcommand_register_clan(self,interaction:discord.Interaction,
         clan:str,
         emoji:str,
+        unicode_emoji:str,
         abbreviation:str):
         
         await interaction.response.defer()
-        embed = await self.helper_register_clan(interaction,clan,emoji,abbreviation)
+        embed = await self.helper_register_clan(interaction,clan,emoji,unicode_emoji,abbreviation)
         await interaction.followup.send(embed=embed)
     
     ##################################################
@@ -677,274 +1062,4 @@ class Clans(commands.Cog):
         await interaction.response.defer()
         clan = await aClan.create(clan)
         menu = ClanSettingsMenu(interaction,clan)
-        await menu.start()
-    
-    ##################################################
-    ### CLANDATA / EXPORT
-    ##################################################
-    @command_group_clandata.command(name="export")
-    @commands.guild_only()
-    @commands.check(is_coleader)
-    async def subcommand_export_clan_data(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        Exports a Clan's data to Excel.
-
-        Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
-        """
-
-        try:
-            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await aClan.create(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-
-        if not clan.is_alliance_clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Only Alliance Clans can be exported.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)        
-
-        wait_msg = await ctx.reply("Exporting Clan Data... please wait.")
-        
-        season = self.client.cog.current_season
-        rp_file = await ClanExcelExport.generate_report(clan,season)
-
-        await wait_msg.delete()
-        await ctx.reply(
-            content=f"Here is the Clan data for {clan} as you requested.",
-            file=discord.File(rp_file))
-
-    @app_command_group_clandata.command(name="export",
-        description="Export seasonal Clan Data to an Excel file.")
-    @app_commands.check(is_coleader)
-    @app_commands.autocomplete(
-        clan=autocomplete_clans_coleader,
-        season=autocomplete_seasons)
-    @app_commands.describe(
-        clan="Select a Clan. Only Alliance Clans can be selected.",
-        season="Select a Season to export.")
-    async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
-        
-        await interaction.response.defer()
-        
-        clan = await aClan.create(clan)
-        if not clan.is_alliance_clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Only Alliance Clans can be exported.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        season = aClashSeason(season)
-        rp_file = await ClanExcelExport.generate_report(clan,season)
-
-        await interaction.followup.send(
-            content=f"Here is the Clan data for {clan} as you requested.",
-            file=discord.File(rp_file))
-    
-    ##################################################
-    ### CLANDATA / COMPO
-    ##################################################
-    @command_group_clandata.command(name="compo")
-    @commands.guild_only()
-    async def subcommand_clan_composition(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        View a Clan's Town Hall composition.
-
-        For registered Alliance clans, returns registered and in-game compositions.
-        """
-     
-        try:
-            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await aClan.create(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-        
-        embed = await clan_composition_embed(ctx,clan)            
-        return await ctx.reply(embed=embed)
-
-    @app_command_group_clandata.command(
-        name="compo",
-        description="View a Clan's Townhall composition.")
-    @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clan_composition(self,interaction:discord.Interaction,clan:str):
-
-        await interaction.response.defer()
-
-        clan = await aClan.create(clan)
-        if not clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        embed = await clan_composition_embed(interaction,clan)
-        return await interaction.edit_original_response(embed=embed)
-
-    ##################################################
-    ### CLANDATA / STRENGTH
-    ##################################################
-    @command_group_clandata.command(name="strength")
-    @commands.guild_only()
-    async def subcommand_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        View a Clan's overall Offensive Strength.
-
-        For registered Alliance clans, returns only registered members.
-        """
-
-        try:
-            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await aClan.create(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-
-        embed = await clan_strength_embed(ctx,clan)
-        return await ctx.reply(embed=embed)
-    
-    @app_command_group_clandata.command(
-        name="strength",
-        description="View a Clan's Offensive strength.")
-    @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clan_strength(self,interaction:discord.Interaction,clan:str):
-
-        await interaction.response.defer()
-
-        clan = await aClan.create(clan)            
-        if not clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)            
-
-        embed = await clan_strength_embed(interaction,clan)
-        return await interaction.edit_original_response(embed=embed)
-
-    ##################################################
-    ### CLANDATA / DONATIONS
-    ##################################################
-    @command_group_clandata.command(name="donations")
-    @commands.guild_only()
-    async def subcommand_clan_donations(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        View a Clan's Donation Stats for the current season.
-
-        For registered Alliance Clans, this will retrieve stats for registered members. For all other clans, this will return what is available via in-game.
-        """
-        
-        try:
-            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await aClan.create(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-        
-        embed = await clan_donations_embed(ctx,clan)
-        await ctx.reply(embed=embed)
-    
-    @app_command_group_clandata.command(name="donations",
-        description="View a Clan's Donation stats.")
-    @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clanstats_donations(self,interaction:discord.Interaction,clan:str):
-   
-        await interaction.response.defer()
-
-        clan = await aClan.create(clan)
-        if not clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        embed = await clan_donations_embed(interaction,clan)
-        await interaction.edit_original_response(embed=embed)
-    
-    ##################################################
-    ### CLAN / MEMBERS
-    ##################################################
-    @command_group_clandata.command(name="members")
-    @commands.guild_only()
-    async def subcommand_clan_membersummary(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        Display info on a Clan's Members.
-
-        Contains menus for Discord Links, Rank Status, and War Opt-Ins.
-
-        By default, this shows all in-game members. For Alliance Clans, this will also return registered members who are not in the in-game clan.
-        """
-  
-        try:
-            clan = await aClan.from_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await aClan.create(clan_tag_or_abbreviation)
-
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-        
-        menu = ClanMembersMenu(ctx,clan)
-        await menu.start()
-
-    @app_command_group_clandata.command(name="members",
-        description="View Clan Member information.")
-    @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(
-        clan="Select a Clan.") 
-    async def app_command_clan_membersummary(self,interaction:discord.Interaction,clan:str):
-
-        await interaction.response.defer()
-
-        clan = await aClan.create(clan)
-        if not clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-
-        menu = ClanMembersMenu(interaction,clan)
         await menu.start()

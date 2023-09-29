@@ -22,6 +22,8 @@ from coc_data.constants.ui_emojis import *
 
 from .leaderboard_player import ClanWarLeaderboardPlayer, ResourceLootLeaderboardPlayer, DonationsLeaderboardPlayer, ClanGamesLeaderboardPlayer
 
+from ..exceptions import *
+
 leaderboard_types = {
     1: "Clan War Triples",
     2: "Capital Contribution",
@@ -96,8 +98,7 @@ class LeaderboardView(discord.ui.View):
 ##### DISCORD LEADERBOARD HOLDER
 #####
 ##################################################
-class DiscordLeaderboard():
-    
+class DiscordLeaderboard():    
     @staticmethod
     def get_leaderboard_seasons():
         client = BotClashClient()
@@ -193,6 +194,14 @@ class DiscordLeaderboard():
     
     @classmethod
     async def create(cls,leaderboard_type:int,is_global:bool,guild:discord.Guild,channel:discord.TextChannel):
+        existing_db = db_Leaderboard(
+            type = leaderboard_type,
+            is_global = is_global,
+            guild_id = guild.id,
+            )
+        if existing_db:
+            raise LeaderboardExists(f"{leaderboard_types.get(leaderboard_type,'Unknown Leaderboard')} already exists for {guild.name}.")
+
         if leaderboard_type == 5:
             is_global = False
 
@@ -235,11 +244,22 @@ class DiscordLeaderboard():
                         archived_lb = db_Leaderboard_Archive.objects.get(
                             type = lb.type,
                             is_global = lb.is_global,
-                            guild_id = lb.guild_id
+                            guild_id = lb.guild_id,
+                            season = season.id
                             )
                     except DoesNotExist:
                         calculate = True
                         archive = True
+                    except MultipleObjectsReturned:
+                        lb.client.cog.coc_main_log.warning(f"Multiple {lb.lb_type} Leaderboards found for {season.description} in {lb.guild.name}.")
+                        calculate = True
+                        archive = True
+                        db_Leaderboard_Archive.objects(
+                            type = lb.type,
+                            is_global = lb.is_global,
+                            guild_id = lb.guild_id,
+                            season = season.id
+                            ).delete()
                 
                 else:
                     calculate = True

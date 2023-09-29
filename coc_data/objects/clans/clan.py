@@ -121,6 +121,13 @@ class aClan(coc.Clan):
     @emoji.setter
     def emoji(self,new_emoji:str):
         self._attributes.emoji = new_emoji
+    
+    @property
+    def unicode_emoji(self) -> str:
+        return self._attributes.unicode_emoji
+    @unicode_emoji.setter
+    def unicode_emoji(self,new_emoji:str):
+        self._attributes.unicode_emoji = new_emoji
 
     @property
     def is_alliance_clan(self):

@@ -20,6 +20,7 @@ class db_Clan(Document):
     tag = StringField(primary_key=True,required=True)
     abbreviation = StringField(default="")
     emoji = StringField(default="")
+    unicode_emoji = StringField(default="")
 
 class db_AllianceClan(Document):
     tag = StringField(primary_key=True,required=True)
@@ -71,6 +72,7 @@ class _ClanAttributes():
         self._is_registered_clan = False
         self._abbreviation = ""
         self._emoji = ""
+        self._unicode_emoji = ""
 
         self._is_alliance_clan = False
         self._description = ""
@@ -95,6 +97,7 @@ class _ClanAttributes():
             self._is_registered_clan = True
             self._abbreviation = db_clan.get('abbreviation','')
             self._emoji = db_clan.get('emoji','')
+            self._unicode_emoji = db_clan.get('unicode_emoji','')
         
         try:
             db_alliance_clan = db_AllianceClan.objects.get(tag=self.tag).to_mongo().to_dict()
@@ -118,6 +121,7 @@ class _ClanAttributes():
         
         db_clan.abbreviation = self._abbreviation
         db_clan.emoji = self._emoji
+        db_clan.unicode_emoji = self._unicode_emoji
         db_clan.save()
     
     def save_alliance_clan(self):      
@@ -155,6 +159,16 @@ class _ClanAttributes():
     def emoji(self,new_emoji:str):
         self._emoji = new_emoji
         self.client.cog.coc_data_log.info(f"Clan {self}: emoji changed to {new_emoji}.")
+        self.save_attributes()
+        self.load()
+    
+    @property
+    def unicode_emoji(self) -> str:
+        return self._unicode_emoji
+    @unicode_emoji.setter
+    def unicode_emoji(self,new_emoji:str):
+        self._unicode_emoji = new_emoji
+        self.client.cog.coc_data_log.info(f"Clan {self}: unicode_emoji changed to {new_emoji}.")
         self.save_attributes()
         self.load()
     

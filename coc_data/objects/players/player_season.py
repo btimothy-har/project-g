@@ -8,6 +8,7 @@ from redbot.core.utils import AsyncIter, deduplicate_iterables
 
 from coc_client.api_client import BotClashClient
 
+from ..season.season import aClashSeason
 from ..clans.clan import aClan
 from ..events.clan_war import aClanWar
 from ..events.clan_war_summary import aSummaryWarStats
@@ -18,6 +19,7 @@ from .value_playerstats import aPlayerStat
 from .value_clangames import aPlayerClanGames
 
 from ...constants.coc_constants import *
+from ...exceptions import *
 
 ##################################################
 #####
@@ -54,6 +56,25 @@ class db_PlayerStats(Document):
 ##################################################
 class aPlayerSeason():
     _cache = {}
+
+    @classmethod
+    async def clan_games_participants(cls,season:aClashSeason,clan:aClan) -> List['aPlayerSeason']:
+        query = db_PlayerStats.objects(
+            season=season.id,
+            clangames__clan=clan.tag,
+            clangames__score__gt=0
+            )
+        p = [cls.from_database(db_player.tag,season) for db_player in query]
+        return sorted([player for player in p if isinstance(player,aPlayerSeason)],key=lambda p: (p.clangames.score,(p.clangames.completion_seconds*-1)),reverse=True)
+    
+    @classmethod
+    def from_database(cls,player_tag:str,season:aClashSeason):
+        client = BotClashClient()
+        try:
+            player = client.cog.get_player(player_tag)
+        except InvalidTag:
+            return None
+        return cls(player,season)
 
     def __new__(cls,player,season):
         if (player.tag,season.id) not in cls._cache:
@@ -180,7 +201,10 @@ class aPlayerSeason():
         return self.season.is_current
     @property
     def home_clan(self):
-        return aClan.from_cache(self.home_clan_tag)
+        try:
+            return aClan.from_cache(self.home_clan_tag)
+        except InvalidTag:
+            return aClan()
     
     @property
     def war_stats(self):

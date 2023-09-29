@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
 
     def __init__(self,bot):
         self.bot = bot
@@ -572,7 +572,23 @@ class ClashOfClansData(commands.Cog):
                         
         application.ticket_channel = channel.id
         application.save()
-                    
+
+        channel_name = ""
+        if channel.name.startswith('ticket-'):
+            channel_name += f"{re.split('-', channel.name)[1]}-"
+        else:
+            channel_name += f"{re.split('📝', channel.name)[0]}"
+        
+        for c in clans:
+            if c.unicode_emoji:
+                channel_name += f"{c.unicode_emoji}"
+            else:
+                channel_name += f"-{c.abbreviation}"
+        
+        for th in accounts_townhalls:
+            channel_name += f"-th{th}"
+        
+        await channel.edit(name=channel_name.lower())                    
         await channel.send(embed=application_embed)
         await channel.send(embed=accounts_embed)        
         await channel.set_permissions(member.discord_member,read_messages=True)
@@ -670,10 +686,7 @@ class ClashOfClansData(commands.Cog):
     ### PLAYER HELPERS
     ##################################################
     def get_player(self,tag:str) -> aPlayer:
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)
-        
+        n_tag = coc.utils.correct_tag(tag)        
         player = self.player_cache.get(n_tag)
         if player:
             return player        
@@ -752,10 +765,7 @@ class ClashOfClansData(commands.Cog):
     ### CLAN HELPERS
     ##################################################
     def get_clan(self,tag:str) -> aClan:
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)
-        
+        n_tag = coc.utils.correct_tag(tag)        
         clan = self.clan_cache.get(n_tag)
         if clan:
             return clan        
@@ -892,14 +902,17 @@ class ClashOfClansData(commands.Cog):
         return raid_weekend
     
     ##################################################
-    ### DISCORD MEMBER HELPERS
+    ### DISCORD HELPERS
     ##################################################
     def get_member(self,user_id:int,guild_id:int):
         return aMember(
             user_id=user_id,
             guild_id=guild_id
             )
-
+    def get_guild(self,guild_id:int):
+        return aGuild(
+            guild_id=guild_id
+            )
     ##################################################
     ### TASK HELPERS
     ##################################################
@@ -971,8 +984,7 @@ class ClashOfClansData(commands.Cog):
                 + f"\n{'[Runtime]':<15} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True
-            )
-        
+            )        
         embed.add_field(
             name="**Discord Guilds**",
             value="```ini"

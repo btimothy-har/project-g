@@ -394,6 +394,15 @@ class ClanApplyMenuUser(DefaultView):
                 accounts.append(a)                
                 if a.discord_user == 0:
                     a.discord_user = self.member.user_id
+        
+        if len(self.clans) == 0:
+            eligible_townhalls = set([a.town_hall.level for a in accounts])
+            guild_clans = self.client.cog.get_guild.clans
+
+            async for clan in AsyncIter(guild_clans):
+                recruiting_ths = set(clan.recruitment_level)
+                if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
+                    self.clans.append(clan)
 
         new_application = db_ClanApplication(
             applicant_id = self.member.user_id,

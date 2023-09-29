@@ -69,6 +69,12 @@ class aPlayerClanGames():
         else:
             return None
     @property
+    def completion_seconds(self) -> int:
+        if self.ending_time:
+            return self.completion.in_seconds()
+        else:
+            return 0
+    @property
     def time_to_completion(self):
         if self.ending_time:
             if self.ending_time.int_timestamp - self.games_start.int_timestamp <= 50:

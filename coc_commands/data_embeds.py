@@ -8,7 +8,11 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
+from coc_client.api_client import BotClashClient
+
+from coc_data.objects.season.season import aClashSeason
 from coc_data.objects.players.player import aPlayer
+from coc_data.objects.players.player_season import aPlayerSeason
 from coc_data.objects.clans.clan import aClan
 from coc_data.utilities.components import *
 from coc_data.utilities.utils import *
@@ -149,4 +153,24 @@ async def clan_donations_embed(context:Union[commands.Context,discord.Interactio
                 + stats_text,
             thumbnail=clan.badge,
             )
+    return embed
+
+async def clan_games_data(context:Union[commands.Context,discord.Interaction],clan:aClan,season:aClashSeason):
+
+    participants = await aPlayerSeason.clan_games_participants(season,clan)
+
+    embed = await clash_embed(
+        context=context,
+        title=f"{clan.title}: Clan Games",
+        message=f"**Showing stats for: {season.description}**\n\n"
+            + f"{EmojisUI.MEMBERS} Total Participants: {len(participants)}\n"
+            + f"{EmojisClash.CLANGAMES} Total Score: {sum([p.clangames.score for p in participants]):,}\n\n"
+            + f"*{EmojisUI.LOGOUT} denotes a member who is not registered to this Clan.*\n"
+            + f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
+            + f"\n".join([
+                f"`{i+1:<3}{p.clangames.score:>6,}{'':>2}{p.clangames.time_to_completion:>13}`\u3000{EmojisUI.EXIT if p.home_clan.tag != clan.tag else EmojisUI.SPACER}{EmojisTownHall.get(p.town_hall)} {re.sub('[_*/]','',p.name)}"
+                for i, p in enumerate(participants)
+                ]),
+        thumbnail=clan.badge,
+        )
     return embed
