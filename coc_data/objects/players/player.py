@@ -45,6 +45,7 @@ class aPlayer(coc.Player):
         self.town_hall = aTownHall(level=self.town_hall,weapon=self.town_hall_weapon)
         self.clan_castle = sum([a.value for a in self.achievements if a.name=='Empire Builder'])
         self.clan_tag = getattr(self.clan,'tag',None)
+        del self.clan
 
         hero_ph = []
         for hero_name in HeroAvailability.return_all_unlocked(self.town_hall.level):
@@ -154,13 +155,13 @@ class aPlayer(coc.Player):
     @classmethod
     async def create(cls,tag,no_cache=False):
         client = BotClashClient()
-        
+
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
         
         try:
-            cached = self.player_cache.get(n_tag)
+            cached = client.player_cache.get(n_tag)
         except:
             cached = None
 
@@ -171,7 +172,7 @@ class aPlayer(coc.Player):
                 return cached
 
         try:
-            player = await self.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=self.bot)
+            player = await client.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=client.bot)
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
@@ -179,19 +180,15 @@ class aPlayer(coc.Player):
                 return cached
             else:
                 raise ClashAPIError(exc) from exc
-                
-        player.clan = await aClan.create(tag=getattr(player.clan,'tag',None))
+            
+        if player.clan_tag:
+            client.clan_cache.add_to_queue(player.clan_tag)
 
         if player._attributes._new_player:
             player.first_seen = pendulum.now()
-            self.coc_data_log.info(f"Player {player}: New Player Detected")
+            client.cog.coc_data_log.info(f"Player {player}: New Player Detected")
         
-        self.player_cache.set(player.tag,player)
-        return player
-    
-
-        client = BotClashClient()
-        player = await client.cog.fetch_player(tag)
+        client.player_cache.set(player.tag,player)
         return player
     
     def cwl_player(self,season:aClashSeason):
@@ -200,6 +197,10 @@ class aPlayer(coc.Player):
     ##################################################
     ### PLAYER ATTRIBUTES
     ##################################################
+    @property
+    def clan(self) -> aClan:
+        return aClan.from_cache(self.clan_tag) if self.clan_tag else aClan()
+    
     @property
     def _attributes(self) -> _PlayerAttributes:
         return _PlayerAttributes(self)

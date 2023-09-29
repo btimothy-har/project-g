@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.2.0"
+    __version__ = "1.2.1"
 
     def __init__(self,bot):
         self.bot = bot
@@ -721,7 +721,7 @@ class ClashOfClansData(commands.Cog):
         return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
 
     async def fetch_player(self,tag:str) -> aPlayer:
-        return await aPlayer.create(tag)
+        return await aPlayer.create(tag=tag)
 
     ##################################################
     ### CLAN HELPERS
