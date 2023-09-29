@@ -5,6 +5,7 @@ import random
 from redbot.core.utils import AsyncIter
 
 from .default import TaskLoop
+from ..objects.clans.clan import aClan
 from ..feeds.donations import ClanDonationFeed
 from ..feeds.member_movement import ClanMemberFeed
 from ..exceptions import *
@@ -90,7 +91,7 @@ class ClanLoop(TaskLoop):
                 async with self.clash_semaphore:
                     st = pendulum.now()
                     try:
-                        clan = await self.client.cog.fetch_clan(self.tag,no_cache=True)
+                        clan = await aClan.create(self.tag,no_cache=True)
                     except InvalidTag as exc:
                         raise asyncio.CancelledError from exc
 
@@ -110,7 +111,6 @@ class ClanLoop(TaskLoop):
                                 [asyncio.create_task(ClanMemberFeed.member_join(clan,m.tag)) for m in members_left]
                     
                             await ClanDonationFeed.start_feed(clan,self.cached_clan)
-
                     self.cached_clan = clan
                     
             except ClashAPIError as exc:                

@@ -15,6 +15,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 from coc_client.api_client import BotClashClient
 
+from ..clans.clan import aClan
+
 from ..season.season import aClashSeason
 
 from ...constants.coc_constants import *
@@ -175,7 +177,7 @@ class aRaidWeekend():
 
         raid_weekend = cls(raid_id=raid_id)
 
-        clan = await raid_weekend.client.cog.fetch_clan(clan_tag)
+        clan = await aClan.create(clan_tag)
             
         raid_weekend.clan_tag = clan_tag
         raid_weekend.clan_name = clan.name

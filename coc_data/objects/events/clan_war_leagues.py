@@ -10,6 +10,7 @@ from functools import cached_property
 from mongoengine import *
 
 from coc_client.api_client import BotClashClient
+
 from redbot.core.utils import AsyncIter
 
 from ..season.season import aClashSeason
@@ -272,6 +273,7 @@ class WarLeagueClan():
         cwl_id = {'season':league_group.season.id,'tag':api_data.tag}
 
         await client.cog.fetch_clan(api_data.tag)
+    
         try:
             db_clan = db_WarLeagueClan.objects.get(cwl_id=cwl_id)
         except DoesNotExist:

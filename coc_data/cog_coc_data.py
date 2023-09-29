@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.1.3"
+    __version__ = "1.2.0"
 
     def __init__(self,bot):
         self.bot = bot
@@ -687,14 +687,7 @@ class ClashOfClansData(commands.Cog):
     ### PLAYER HELPERS
     ##################################################
     def get_player(self,tag:str) -> aPlayer:
-        n_tag = coc.utils.correct_tag(tag)        
-        player = self.player_cache.get(n_tag)
-        if player:
-            return player        
-        self.player_cache.add_to_queue(tag)
-        self.coc_data_log.warning(f"Player {tag} not found in cache."
-            + (f" Already in queue." if tag in self.player_cache.queue else " Added to queue."))
-        raise CacheNotReady
+        return aPlayer.from_cache(tag)
     
     def count_members_by_season(self,clan:Optional[aClan]=None, season:Optional[aClashSeason]=None):
         if not season or season.id not in [s.id for s in self.tracked_seasons]:
@@ -724,84 +717,20 @@ class ClashOfClansData(commands.Cog):
         elif not season.is_current and not clan:
             query = db_PlayerStats.objects(is_member=True,season=season.id).only('tag')
         
-        ret_players = [self.get_player(p.tag) for p in query]
+        ret_players = [aPlayer.from_cache(p.tag) for p in query]
         return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
 
-    async def fetch_player(self,tag:str,no_cache=False) -> aPlayer:
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)
-        
-        try:
-            cached = self.player_cache.get(n_tag)
-        except:
-            cached = None
-
-        if no_cache:
-            pass
-        elif isinstance(cached,aPlayer):
-            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
-                return cached
-
-        try:
-            player = await self.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=self.bot)
-        except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
-        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
-            if cached:
-                return cached
-            else:
-                raise ClashAPIError(exc) from exc
-                
-        player.clan = await aClan.create(tag=getattr(player.clan,'tag',None))
-
-        if player._attributes._new_player:
-            player.first_seen = pendulum.now()
-            self.coc_data_log.info(f"Player {player}: New Player Detected")
-        
-        self.player_cache.set(player.tag,player)
-        return player
+    async def fetch_player(self,tag:str) -> aPlayer:
+        return await aPlayer.create(tag)
 
     ##################################################
     ### CLAN HELPERS
     ##################################################
     def get_clan(self,tag:str) -> aClan:
-        n_tag = coc.utils.correct_tag(tag)        
-        clan = self.clan_cache.get(n_tag)
-        if clan:
-            return clan        
-        self.clan_cache.add_to_queue(tag)
-        self.coc_data_log.warning(f"Clan {tag} not found in cache."
-            + (f" Already in queue." if tag in self.player_cache.queue else " Added to queue."))
-        raise CacheNotReady
+        return aClan.from_cache(tag)
     
-    async def fetch_clan(self,tag:str,no_cache=False) -> aClan:
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)
-
-        try:
-            cached = self.clan_cache.get(n_tag)
-        except:
-            cached = None
-        if no_cache:
-            pass        
-        elif isinstance(cached,aClan):
-            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
-                return cached
-
-        try:
-            clan = await self.bot.coc_client.get_clan(tag,cls=aClan,bot=self.bot)
-        except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
-        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
-            if cached:
-                return cached
-            else:
-                raise ClashAPIError(exc) from exc
-        
-        self.clan_cache.set(clan.tag,clan)
-        return clan
+    async def fetch_clan(self,tag:str) -> aClan:
+        return await aClan.create(tag)
     
     def get_alliance_clans(self):
         ret_clans = [self.get_clan(c.tag) for c in db_AllianceClan.objects().only('tag')]

@@ -39,7 +39,7 @@ class EventReminders():
         return reminder_text
     
     async def add_account(self,player_tag:str):
-        player = await self.client.cog.fetch_player(player_tag)
+        player = await aPlayer.create(player_tag)
         try:
             member = await self.bot.get_or_fetch_member(self.guild,player.discord_user)
         except (discord.Forbidden,discord.NotFound):

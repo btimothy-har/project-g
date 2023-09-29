@@ -75,7 +75,14 @@ class aClan(coc.Clan):
     @classmethod
     def from_cache(cls,tag):
         client = BotClashClient()
-        return client.cog.get_clan(tag)
+        n_tag = coc.utils.correct_tag(tag)        
+        clan = client.clan_cache.get(n_tag)
+        if clan:
+            return clan        
+        client.clan_cache.add_to_queue(tag)
+        client.cog.coc_data_log.warning(f"Clan {tag} not found in cache."
+            + (f" Already in queue." if tag in client.clan_cache.queue else " Added to queue."))
+        raise CacheNotReady    
             
     @classmethod
     async def from_abbreviation(cls,abbreviation:str):
@@ -85,16 +92,40 @@ class aClan(coc.Clan):
         except (DoesNotExist,MultipleObjectsReturned):
             raise InvalidAbbreviation(abbreviation.upper())
         
-        clan = await client.cog.fetch_clan(get_clan.tag)
+        clan = await cls.create(get_clan.tag)
         return clan
     
     @classmethod
-    async def create(cls,tag:Optional[str]=None,**kwargs):
+    async def create(cls,tag:Optional[str]=None,no_cache:bool=False):
         if not tag:
             return aClan()
         
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(tag):
+            raise InvalidTag(tag)
+
         client = BotClashClient()
-        clan = await client.cog.fetch_clan(tag)
+        try:
+            cached = client.clan_cache.get(n_tag)
+        except:
+            cached = None
+        if no_cache:
+            pass        
+        elif isinstance(cached,aClan):
+            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
+                return cached
+
+        try:
+            clan = await client.bot.coc_client.get_clan(tag,cls=aClan,bot=client.bot)
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
+            if cached:
+                return cached
+            else:
+                raise ClashAPIError(exc) from exc
+        
+        client.clan_cache.set(clan.tag,clan)
         return clan
     
     ##################################################

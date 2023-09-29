@@ -6,6 +6,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_client.api_client import BotClashClient
 
+from ..objects.players.player import aPlayer
 from ..objects.clans.clan import db_ClanDataFeed, aClan
 from ..constants.coc_emojis import *
 
@@ -34,7 +35,7 @@ class ClanMemberFeed():
         self.player = None
     
     async def fetch_player(self):
-        self.player = await self.client.cog.fetch_player(self.player_tag,no_cache=True)
+        self.player = await aPlayer.create(self.player_tag,no_cache=True)
 
     @classmethod
     async def member_join(cls,clan:aClan,player_tag:str):

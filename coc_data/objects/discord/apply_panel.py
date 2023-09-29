@@ -328,7 +328,7 @@ class ClanApplyMenuUser(DefaultView):
 
         async for a in AsyncIter(self.member.account_tags[:20]):
             try:
-                player = await self.client.cog.fetch_player(tag=a)
+                player = await aPlayer.create(tag=a)
             except Exception:
                 pass
             else:
@@ -380,7 +380,7 @@ class ClanApplyMenuUser(DefaultView):
         tags = re.split('[^a-zA-Z0-9]', q_tags.value)
 
         accounts_task = [asyncio.create_task(
-            self.client.cog.fetch_player(tag=a) for a in tags
+            aPlayer.create(tag=a) for a in tags
             )]
 
         q1 = modal.children[1] if len(modal.children) > 1 else None

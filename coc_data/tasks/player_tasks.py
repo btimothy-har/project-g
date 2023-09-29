@@ -6,6 +6,7 @@ import random
 from .default import TaskLoop
 from ..exceptions import *
 
+from ..objects.players.player import aPlayer
 from ..objects.players.player_attributes import db_Player
 from ..objects.players.player_season import db_PlayerStats
 from ..objects.events.clan_war_leagues import db_WarLeaguePlayer
@@ -80,7 +81,7 @@ class PlayerLoop(TaskLoop):
                         return
 
                     try:
-                        self.cached_player = await self.client.cog.fetch_player(self.tag,no_cache=True)
+                        self.cached_player = await aPlayer.create(self.tag,no_cache=True)
                     except InvalidTag as exc:
                         db_Player.objects(tag=self.tag).delete()
                         db_PlayerStats.objects(tag=self.tag).delete()

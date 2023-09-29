@@ -142,10 +142,54 @@ class aPlayer(coc.Player):
     @classmethod
     def from_cache(cls,tag):
         client = BotClashClient()
-        return client.cog.get_player(tag)
+        n_tag = coc.utils.correct_tag(tag)        
+        player = client.player_cache.get(n_tag)
+        if player:
+            return player        
+        client.player_cache.add_to_queue(tag)
+        client.cog.coc_data_log.warning(f"Player {tag} not found in cache."
+            + (f" Already in queue." if tag in client.player_cache.queue else " Added to queue."))
+        raise CacheNotReady
         
     @classmethod
-    async def create(cls,tag,**kwargs):        
+    async def create(cls,tag,no_cache=False):
+        client = BotClashClient()
+        
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(tag):
+            raise InvalidTag(tag)
+        
+        try:
+            cached = self.player_cache.get(n_tag)
+        except:
+            cached = None
+
+        if no_cache:
+            pass
+        elif isinstance(cached,aPlayer):
+            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
+                return cached
+
+        try:
+            player = await self.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=self.bot)
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
+            if cached:
+                return cached
+            else:
+                raise ClashAPIError(exc) from exc
+                
+        player.clan = await aClan.create(tag=getattr(player.clan,'tag',None))
+
+        if player._attributes._new_player:
+            player.first_seen = pendulum.now()
+            self.coc_data_log.info(f"Player {player}: New Player Detected")
+        
+        self.player_cache.set(player.tag,player)
+        return player
+    
+
         client = BotClashClient()
         player = await client.cog.fetch_player(tag)
         return player

@@ -125,7 +125,8 @@ class ClanRaidLoop(TaskLoop):
                         
                         #Raid Ended
                         if current_raid.state in ['ended']:
-                            self.clan = await self.client.cog.fetch_clan(self.tag,no_cache=True)
+                            self.clan = await aClan.create(self.tag,no_cache=True)
+                            
                             current_raid.ending_trophies = self.clan.capital_points
                             current_raid.save_raid_to_db()
 
