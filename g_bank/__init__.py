@@ -4,7 +4,7 @@ from redbot.core.bot import Red
 from .cog_bank import Bank as bank
 
 try_limit = 60
-sleep_time = 5
+sleep_time = 1
 
 async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1031240380487831664]:

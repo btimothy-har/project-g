@@ -9,7 +9,7 @@ from .cog_cwl_commands import ClanWarLeagues as cwl_commands
 from .cog_config_commands import ClashServerConfig as config_commands
 
 try_limit = 60
-sleep_time = 5
+sleep_time = 1
 
 async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1031240380487831664]:

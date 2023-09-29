@@ -195,7 +195,7 @@ class ClashOfClansData(commands.Cog):
                     break
             await asyncio.sleep(1)
 
-        self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*20))
+        self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*10))
         self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
 
         self.coc_main_log.info(f"Found {len(self.bot.coc_client.http._keys):,} API Keys, setting semaphore limit at {self.clash_semaphore_limit:,}.")
