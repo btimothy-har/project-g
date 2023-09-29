@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.1"
+    __version__ = "1.1.0"
 
     def __init__(self,bot):
         self.bot = bot
@@ -883,7 +883,7 @@ class ClashOfClansData(commands.Cog):
     async def get_raid_weekend(self,tag:str) -> aClanWar:
         api_raid = None
         try:
-            raidloggen = await self.bot.coc_client.get_raidlog(clan_tag=tag,page=False,limit=1)
+            raidloggen = await self.bot.coc_client.get_raid_log(clan_tag=tag,page=False,limit=1)
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
