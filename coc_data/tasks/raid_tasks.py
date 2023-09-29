@@ -94,7 +94,7 @@ class ClanRaidLoop(TaskLoop):
                     return
                 
                 try:
-                    self.clan = self.client.cog.get_clan(self.tag)
+                    self.clan = await aClan.create(self.tag,no_cache=False,bot=self.bot)
                 except CacheNotReady:
                     return
                 
@@ -103,7 +103,7 @@ class ClanRaidLoop(TaskLoop):
 
                 async with self.clash_semaphore:
                     st = pendulum.now()
-                    current_raid = await self.client.cog.get_raid_weekend(self.tag)
+                    current_raid = await self.clan.get_raid_weekend()
                     api_end = pendulum.now()
                     if not current_raid:
                         return None
@@ -148,10 +148,7 @@ class ClanRaidLoop(TaskLoop):
                         await asyncio.gather(*reward_task)
             
             except ClashAPIError as exc:
-                if hasattr(self.bot,'coc_client_alt'):
-                    self.switch_api_client()
-                else:
-                    self.api_error = True
+                self.api_error = True
 
             except asyncio.CancelledError:
                 await self.stop()

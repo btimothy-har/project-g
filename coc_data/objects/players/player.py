@@ -152,14 +152,17 @@ class aPlayer(coc.Player):
         raise CacheNotReady
         
     @classmethod
-    async def create(cls,tag,no_cache=False,bot=None):
-        client = BotClashClient()
+    async def create(cls,tag,no_cache=False,bot=None):        
 
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
         
-        if not bot:
+        if bot:
+            bot = bot
+            client = bot.get_cog("ClashOfClansClient").client
+        else:
+            client = BotClashClient()
             bot = client.bot
         
         try:
@@ -174,7 +177,7 @@ class aPlayer(coc.Player):
                 return cached
 
         try:
-            player = await client.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=client.bot)
+            player = await client.bot.coc_client.get_player(n_tag,cls=aPlayer,bot=bot)
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:

@@ -91,7 +91,7 @@ class ClanLoop(TaskLoop):
                 async with self.clash_semaphore:
                     st = pendulum.now()
                     try:
-                        clan = await aClan.create(self.tag,no_cache=True)
+                        clan = await aClan.create(self.tag,no_cache=True,bot=self.bot)
                     except InvalidTag as exc:
                         raise asyncio.CancelledError from exc
 

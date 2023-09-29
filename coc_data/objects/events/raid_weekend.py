@@ -15,8 +15,6 @@ from PIL import Image, ImageDraw, ImageFont
 
 from coc_client.api_client import BotClashClient
 
-from ..clans.clan import aClan
-
 from ..season.season import aClashSeason
 
 from ...constants.coc_constants import *
@@ -171,15 +169,14 @@ class aRaidWeekend():
                 self._last_save = pendulum.from_timestamp(raid_data.get('last_save',0)) if raid_data.get('last_save',0) > 0 else None
     
     @classmethod
-    async def create_from_api(cls,clan_tag:str,data:coc.RaidLogEntry):
-        base_raid_id = clan_tag + str(pendulum.instance(data.start_time.time).int_timestamp)
+    async def create_from_api(cls,clan,data:coc.RaidLogEntry):
+        base_raid_id = clan.tag + str(pendulum.instance(data.start_time.time).int_timestamp)
         raid_id = hashlib.sha256(base_raid_id.encode()).hexdigest()
 
         raid_weekend = cls(raid_id=raid_id)
 
-        clan = await aClan.create(clan_tag)
             
-        raid_weekend.clan_tag = clan_tag
+        raid_weekend.clan_tag = clan.tag
         raid_weekend.clan_name = clan.name
         raid_weekend.clan_badge = clan.badge
         raid_weekend.clan_level = clan.level

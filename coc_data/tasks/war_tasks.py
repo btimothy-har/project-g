@@ -89,7 +89,7 @@ class ClanWarLoop(TaskLoop):
                         await asyncio.sleep(0)
 
                 try:
-                    self.clan = self.client.cog.get_clan(self.tag)
+                    self.clan = aClan.create(self.tag,no_cache=False,bot=self.bot)
                 except CacheNotReady:
                     return
                     
@@ -144,10 +144,7 @@ class ClanWarLoop(TaskLoop):
                         await asyncio.gather(*reward_task)
             
             except ClashAPIError as exc:
-                if hasattr(self.bot,'coc_client_alt'):
-                    self.switch_api_client()
-                else:
-                    self.api_error = True
+                self.api_error = True
 
             except asyncio.CancelledError:
                 await self.stop()

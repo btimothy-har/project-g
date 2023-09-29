@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.2.2"
+    __version__ = "1.2.3"
 
     def __init__(self,bot):
         self.bot = bot
@@ -810,26 +810,10 @@ class ClashOfClansData(commands.Cog):
     def get_raids_by_player(self,player_tag:str,season:Optional[aClashSeason] = None):
         return aRaidWeekend.for_player(player_tag,season=season)
     
-    async def get_raid_weekend(self,tag:str) -> aClanWar:
-        api_raid = None
-        try:
-            raidloggen = await self.bot.coc_client.get_raid_log(clan_tag=tag,page=False,limit=1)
-        except coc.PrivateWarLog:
-            return None
-        except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            raise ClashAPIError(exc) from exc
+    async def get_raid_weekend(self,tag:str) -> aRaidWeekend:
+        clan = await aClan.create(tag)
+        return clan.get_raid_weekend()        
         
-        if len(raidloggen) == 0:
-            return None
-        api_raid = raidloggen[0]
-
-        if not api_raid:
-            return None
-        
-        raid_weekend = await aRaidWeekend.create_from_api(tag,api_raid)
-        return raid_weekend
     
     ##################################################
     ### DISCORD HELPERS

@@ -14,6 +14,7 @@ from ..discord.clan_link import ClanGuildLink
 
 from ..season.season import aClashSeason
 from ..events.clan_war_leagues import WarLeagueGroup, WarLeagueClan
+from ..events.raid_weekend import aRaidWeekend
 
 from ...constants.coc_emojis import *
 from ...constants.ui_emojis import *
@@ -96,15 +97,21 @@ class aClan(coc.Clan):
         return clan
     
     @classmethod
-    async def create(cls,tag:Optional[str]=None,no_cache:bool=False):
+    async def create(cls,tag:Optional[str]=None,no_cache:bool=False,bot=None):
         if not tag:
             return aClan()
         
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
+        
+        if bot:
+            bot = bot
+            client = bot.get_cog("ClashOfClansClient").client
+        else:
+            client = BotClashClient()
+            bot = client.bot
 
-        client = BotClashClient()
         try:
             cached = client.clan_cache.get(n_tag)
         except:
@@ -116,7 +123,7 @@ class aClan(coc.Clan):
                 return cached
 
         try:
-            clan = await client.bot.coc_client.get_clan(tag,cls=aClan,bot=client.bot)
+            clan = await client.bot.coc_client.get_clan(tag,cls=aClan,bot=bot)
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
@@ -448,3 +455,24 @@ class aClan(coc.Clan):
             league_clan = league_group.get_clan(self.clan.tag)
             current_war = league_clan.current_war        
         return current_war
+
+    async def get_raid_weekend(self):
+        api_raid = None
+        try:
+            raidloggen = await self.bot.coc_client.get_raid_log(clan_tag=self.tag,page=False,limit=1)
+        except coc.PrivateWarLog:
+            return None
+        except coc.NotFound as exc:
+            raise InvalidTag(self.tag) from exc
+        except (coc.Maintenance,coc.GatewayError) as exc:
+            raise ClashAPIError(exc) from exc
+        
+        if len(raidloggen) == 0:
+            return None
+        api_raid = raidloggen[0]
+
+        if not api_raid:
+            return None
+        
+        raid_weekend = await aRaidWeekend.create_from_api(self.tag,api_raid)
+        return raid_weekend

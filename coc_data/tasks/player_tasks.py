@@ -81,7 +81,7 @@ class PlayerLoop(TaskLoop):
                         return
 
                     try:
-                        self.cached_player = await aPlayer.create(self.tag,no_cache=True)
+                        self.cached_player = await aPlayer.create(self.tag,no_cache=True,bot=self.bot)
                     except InvalidTag as exc:
                         db_Player.objects(tag=self.tag).delete()
                         db_PlayerStats.objects(tag=self.tag).delete()
