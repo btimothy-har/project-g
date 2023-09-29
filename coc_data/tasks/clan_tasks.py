@@ -47,7 +47,7 @@ class ClanLoop(TaskLoop):
             sleep = 600
             self.api_error = False
         elif self.cached_clan.is_alliance_clan:
-            sleep = 120 # 2 minute
+            sleep = 300 # 2 minute
         elif self.cached_clan.is_registered_clan or self.cached_clan.cwl_config.is_cwl_clan:
             sleep = 300 # 5 minutes
         else:
