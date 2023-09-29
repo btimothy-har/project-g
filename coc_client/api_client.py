@@ -163,8 +163,7 @@ class BotClashClient():
             raise LoginNotSet(f"No Clash API keys were found.")
         
         self.bot.coc_client = coc.EventsClient(
-            load_game_data=coc.LoadGameData(always=True),
-            throttle_limit=30,
+            load_game_data=coc.LoadGameData(always=True)
             )
         await self.bot.coc_client.login_with_tokens(*keys)
         self._api_logged_in = True

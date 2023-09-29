@@ -70,6 +70,7 @@ class ClanRaidLoop(TaskLoop):
                     if self.clash_task_lock.locked():
                         async with self.clash_task_lock:
                             await asyncio.sleep(0)
+                    st = pendulum.now()
                     
                     if self.clan and st.day_of_week not in [5,6,7,1]:
                         return
@@ -81,52 +82,50 @@ class ClanRaidLoop(TaskLoop):
                     
                     if not self.loop_active:
                         return
-
-                    async with self.clash_semaphore:
-                        st = pendulum.now()
-                        current_raid = await self.clan.get_raid_weekend()
-                        api_end = pendulum.now()
-                        if not current_raid:
-                            return None
-                        if current_raid.do_i_save:
-                            current_raid.save_raid_to_db()
                     
-                        #Current Raid Management
-                        if current_raid.state in ['ongoing','ended'] and pendulum.now() < current_raid.end_time.add(hours=2):
+                    current_raid = await self.clan.get_raid_weekend()
+                    api_end = pendulum.now()
+                    if not current_raid:
+                        return None
+                    if current_raid.do_i_save:
+                        current_raid.save_raid_to_db()
+                
+                    #Current Raid Management
+                    if current_raid.state in ['ongoing','ended'] and pendulum.now() < current_raid.end_time.add(hours=2):
 
-                            if current_raid.state in ['ongoing']:
-                                reminder_tasks = [asyncio.create_task(self._setup_raid_reminder(current_raid,r)) for r in self.clan.raid_reminders]
-                                
-                        #Raid State Changes
-                        if self.cached_raid and current_raid.state != self.cached_raid.state:
-                            #Raid Started
-                            if current_raid.state in ['ongoing'] and current_raid.start_time != self.cached_raid.start_time:
-                                current_raid.starting_trophies = self.clan.capital_points
-                                current_raid.save_raid_to_db()
+                        if current_raid.state in ['ongoing']:
+                            reminder_tasks = [asyncio.create_task(self._setup_raid_reminder(current_raid,r)) for r in self.clan.raid_reminders]
                             
-                            #Raid Ended
-                            if current_raid.state in ['ended']:
-                                self.clan = await aClan.create(self.tag,no_cache=True)
+                    #Raid State Changes
+                    if self.cached_raid and current_raid.state != self.cached_raid.state:
+                        #Raid Started
+                        if current_raid.state in ['ongoing'] and current_raid.start_time != self.cached_raid.start_time:
+                            current_raid.starting_trophies = self.clan.capital_points
+                            current_raid.save_raid_to_db()
+                        
+                        #Raid Ended
+                        if current_raid.state in ['ended']:
+                            self.clan = await aClan.create(self.tag,no_cache=True)
 
-                                current_raid.ending_trophies = self.clan.capital_points
-                                current_raid.save_raid_to_db()
+                            current_raid.ending_trophies = self.clan.capital_points
+                            current_raid.save_raid_to_db()
 
-                                if current_raid.attack_count > 0:
-                                    results_image = await current_raid.get_results_image()
-                                    result_tasks = [asyncio.create_task(RaidResultsFeed.send_results(self.clan,f,results_image)) for f in self.clan.raid_result_feed]
-                                
-                                if self.clan.is_alliance_clan:
-                                    bank_cog = self.bot.get_cog("Bank")
-                                    reward_task = [asyncio.create_task(bank_cog.raid_bank_rewards(m)) for m in current_raid.members]
+                            if current_raid.attack_count > 0:
+                                results_image = await current_raid.get_results_image()
+                                result_tasks = [asyncio.create_task(RaidResultsFeed.send_results(self.clan,f,results_image)) for f in self.clan.raid_result_feed]
+                            
+                            if self.clan.is_alliance_clan:
+                                bank_cog = self.bot.get_cog("Bank")
+                                reward_task = [asyncio.create_task(bank_cog.raid_bank_rewards(m)) for m in current_raid.members]
 
-                        self.cached_raid = current_raid
+                    self.cached_raid = current_raid
 
-                        if reminder_tasks:
-                            await asyncio.gather(*reminder_tasks)                    
-                        if result_tasks:
-                            await asyncio.gather(*result_tasks)                    
-                        if reward_task:
-                            await asyncio.gather(*reward_task)
+                    if reminder_tasks:
+                        await asyncio.gather(*reminder_tasks)                    
+                    if result_tasks:
+                        await asyncio.gather(*result_tasks)                    
+                    if reward_task:
+                        await asyncio.gather(*reward_task)
                 
                 except ClashAPIError as exc:
                     self.api_error = True

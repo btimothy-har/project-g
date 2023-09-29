@@ -68,6 +68,7 @@ class ClanLoop(TaskLoop):
                     if self.clash_task_lock.locked():
                         async with self.clash_task_lock:
                             await asyncio.sleep(0)
+                    st = pendulum.now()
                     
                     async with self.clash_semaphore:
                         try:
