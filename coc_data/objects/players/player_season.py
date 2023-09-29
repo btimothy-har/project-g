@@ -195,10 +195,10 @@ class aPlayerSeason():
                 api_value=getattr(player.get_achievement('Games Champion'),'value',0),
                 dict_value=stats.get('clangames',{})
                 )
-            
-            #self.compute_war_stats()
-            #self.compute_raid_stats()
-
+            self._war_stats = aSummaryWarStats(war_log=[])
+            asyncio.create_task(self.compute_war_stats())
+            self._raid_stats = aSummaryRaidStats(player_tag=self.tag,raid_log=[])
+            asyncio.create_task(self.compute_raid_stats())
             self.player = player
             
         self._is_new = False
@@ -221,9 +221,7 @@ class aPlayerSeason():
             return aClan()
     
     @property
-    def war_stats(self):
-        if not hasattr(self,'_war_stats'):
-            self._war_stats = aSummaryWarStats(war_log=[])
+    def war_stats(self):            
         return self._war_stats
         
     async def compute_war_stats(self):
@@ -234,8 +232,6 @@ class aPlayerSeason():
     
     @property
     def raid_stats(self):
-        if not hasattr(self,'_war_stats'):
-            self._raid_stats = aSummaryRaidStats(player_tag=self.tag,raid_log=[])
         return self._raid_stats
         
     async def compute_raid_stats(self):
