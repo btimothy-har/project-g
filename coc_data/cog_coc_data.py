@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.1.0"
+    __version__ = "1.1.1"
 
     def __init__(self,bot):
         self.bot = bot
@@ -161,7 +161,6 @@ class ClashOfClansData(commands.Cog):
             )
         
         asyncio.create_task(self.cog_start_up())
-        asyncio.create_task(self.start_recruiting_loop())
     
     async def cog_start_up(self):
         while True:
@@ -184,6 +183,8 @@ class ClashOfClansData(commands.Cog):
             password=clash_database.get("password"),
             uuidRepresentation="pythonLegacy"
             )
+
+        asyncio.create_task(self.start_recruiting_loop())
         
         clans_in_database = [c.tag for c in db_Clan.objects().only('tag')]
         self.clan_cache.queue.extend(clans_in_database)
