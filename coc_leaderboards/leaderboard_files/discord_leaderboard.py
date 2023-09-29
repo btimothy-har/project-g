@@ -213,54 +213,52 @@ class DiscordLeaderboard():
         return lb
 
     @classmethod
-    async def update_leaderboards(cls):
-        
+    async def update_leaderboards(cls):        
         seasons = cls.get_leaderboard_seasons()
         async for db_lb in AsyncIter(db_Leaderboard.objects):
-            lb = cls(db_lb)
 
-            async for season in AsyncIter(seasons):
-                calculate = False
-                archive = False
+            try:
+                lb = cls(db_lb)
+                async for season in AsyncIter(seasons):
+                    calculate = False
+                    archive = False
 
-                if not lb.is_season_current(season):
-                    try:
-                        archived_lb = db_Leaderboard_Archive.objects.get(
-                            type = lb.type,
-                            is_global = lb.is_global,
-                            guild_id = lb.guild_id,
-                            season = season.id
-                            )
-                    except DoesNotExist:
-                        calculate = True
-                        archive = True
+                    if not lb.is_season_current(season):
+                        try:
+                            archived_lb = db_Leaderboard_Archive.objects.get(
+                                type = lb.type,
+                                is_global = lb.is_global,
+                                guild_id = lb.guild_id,
+                                season = season.id
+                                )
+                        except DoesNotExist:
+                            calculate = True
+                            archive = True
 
-                elif lb.type == 5 and lb.is_season_current(season) and pendulum.now() >= season.clangames_end:
-                    try:
-                        archived_lb = db_Leaderboard_Archive.objects.get(
-                            type = lb.type,
-                            is_global = lb.is_global,
-                            guild_id = lb.guild_id,
-                            season = season.id
-                            )
-                    except DoesNotExist:
+                    elif lb.type == 5 and lb.is_season_current(season) and pendulum.now() >= season.clangames_end:
+                        try:
+                            archived_lb = db_Leaderboard_Archive.objects.get(
+                                type = lb.type,
+                                is_global = lb.is_global,
+                                guild_id = lb.guild_id,
+                                season = season.id
+                                )
+                        except DoesNotExist:
+                            calculate = True
+                            archive = True
+                        except MultipleObjectsReturned:
+                            lb.client.cog.coc_main_log.warning(f"Multiple {lb.lb_type} Leaderboards found for {season.description} in {lb.guild.name}.")
+                            calculate = True
+                            archive = True
+                            db_Leaderboard_Archive.objects(
+                                type = lb.type,
+                                is_global = lb.is_global,
+                                guild_id = lb.guild_id,
+                                season = season.id
+                                ).delete()                    
+                    else:
                         calculate = True
-                        archive = True
-                    except MultipleObjectsReturned:
-                        lb.client.cog.coc_main_log.warning(f"Multiple {lb.lb_type} Leaderboards found for {season.description} in {lb.guild.name}.")
-                        calculate = True
-                        archive = True
-                        db_Leaderboard_Archive.objects(
-                            type = lb.type,
-                            is_global = lb.is_global,
-                            guild_id = lb.guild_id,
-                            season = season.id
-                            ).delete()
-                
-                else:
-                    calculate = True
-                
-                try:
+
                     if calculate:
                         if lb.type == 1:
                             data = await ClanWarLeaderboard.calculate(lb,season)
@@ -272,12 +270,14 @@ class DiscordLeaderboard():
                             data = await ClanGamesLeaderboard.calculate(lb,season)                
                     else:
                         data = discord.Embed.from_dict(archived_lb.embed)
-                except CacheNotReady:
-                    return
 
-                await lb.consolidate_data(season,data,archive)
-
-            await lb.send_to_discord()
+                    await lb.consolidate_data(season,data,archive)
+                await lb.send_to_discord()
+            except CacheNotReady:
+                continue
+            except Exception as ex:
+                lb.client.cog.coc_main_log.exception(f"Error updating {lb.lb_type} Leaderboard for {lb.guild.name}.")
+                await lb.client.bot.send_to_owners(f"Error updating {lb.lb_type} Leaderboard for {lb.guild.name}.\n```{ex}```")
     
     async def fetch_message(self):
         if self.channel:
@@ -479,7 +479,7 @@ class ResourceLootLeaderboard():
                 embed.add_field(
                     name=f"**TH{lb_th}**",
                     value="\n".join([
-                        f"{EmojisTownHall.get(lb_th)}{p.stats.home_clan.emoji}`{'':<2}{p.loot_darkelixir:>7}{'':<3}{p.loot_gold:>7}{'':<3}{p.loot_elixir:>7}{'':<2}`\u3000{re.sub('[_*/]','',p.name)}"
+                        f"{EmojisTownHall.get(lb_th)}{p.stats.home_clan.emoji}`{'':<2}{numerize.numerize(p.loot_darkelixir,2):>7}{'':<3}{p.loot_gold:>7}{'':<3}{p.loot_elixir:>7}{'':<2}`\u3000{re.sub('[_*/]','',p.name)}"
                         for p in wl_players[:5]]),
                     inline=False
                     )

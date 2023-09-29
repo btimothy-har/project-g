@@ -45,7 +45,7 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.2"
+    __version__ = "1.0.3"
 
     def __init__(self,bot):        
         self.bot = bot 

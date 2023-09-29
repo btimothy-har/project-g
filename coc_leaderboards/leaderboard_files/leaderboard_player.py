@@ -70,7 +70,7 @@ class ResourceLootLeaderboardPlayer():
         self.name = player_season.name
         self.for_th = leaderboard_th
 
-        self._loot_darkelixir = self.stats.loot_darkelixir
+        self.loot_darkelixir = self.stats.loot_darkelixir.season_total
         self._loot_elixir = self.stats.loot_elixir
         self._loot_gold = self.stats.loot_gold
     
@@ -78,11 +78,7 @@ class ResourceLootLeaderboardPlayer():
     async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int):        
         lb_player = cls(player_season,leaderboard_th)
         return lb_player
-    
-    @property
-    def loot_darkelixir(self):
-        return str(self._loot_darkelixir)
-    
+  
     @property
     def loot_elixir(self):
         return str(self._loot_elixir)
