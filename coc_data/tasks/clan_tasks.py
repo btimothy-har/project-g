@@ -70,7 +70,6 @@ class ClanLoop(TaskLoop):
                             await asyncio.sleep(0)
                     
                     async with self.clash_semaphore:
-                        st = pendulum.now()
                         try:
                             clan = await aClan.create(self.tag,no_cache=True,bot=self.bot)
                         except InvalidTag as exc:
@@ -120,7 +119,7 @@ class ClanLoop(TaskLoop):
                     self.main_log.debug(
                         f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time} seconds."
                         )
-                    await asyncio.sleep(self.sleep_time)
+                    await asyncio.sleep(max(TaskLoop.degraded_sleep_time(self.sleep_time),self.sleep_time))
 
         except asyncio.CancelledError:
             await self.stop()

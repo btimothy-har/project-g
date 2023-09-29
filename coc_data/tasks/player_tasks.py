@@ -55,7 +55,6 @@ class PlayerLoop(TaskLoop):
                             await asyncio.sleep(0)
                     
                     async with self.clash_semaphore:
-                        st = pendulum.now()
 
                         if not self.loop_active:
                             return
@@ -68,8 +67,7 @@ class PlayerLoop(TaskLoop):
                             db_WarLeaguePlayer.objects(tag=self.tag).delete()
                             raise asyncio.CancelledError from exc
 
-                        api_end = pendulum.now()
-                        
+                        api_end = pendulum.now()                        
                         await self.cached_player.stat_update()
                         
                 except ClashAPIError as exc:
@@ -98,7 +96,7 @@ class PlayerLoop(TaskLoop):
                     self.main_log.debug(
                         f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time} seconds."
                         )
-                    await asyncio.sleep(self.sleep_time)
+                    await asyncio.sleep(max(TaskLoop.degraded_sleep_time(self.sleep_time),self.sleep_time))
 
         except asyncio.CancelledError:
             await self.stop()
@@ -122,7 +120,7 @@ class PlayerLoop(TaskLoop):
     @property
     def sleep_time(self):
         if not self.cached_player:
-            sleep = 300
+            sleep = 60
         elif self.api_error:
             sleep = 600
             self.api_error = False

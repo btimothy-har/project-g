@@ -174,14 +174,12 @@ class aPlayer(coc.Player):
         except:
             cached = None
 
-        if no_cache:
-            pass
-        elif isinstance(cached,aPlayer):
+        if not no_cache and isinstance(cached,aPlayer):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
 
         try:
-            player = await bot.coc_client.get_player(n_tag,cls=aPlayer,bot=bot)
+            player = await bot.coc_client.get_player(n_tag,cls=aPlayer,bot=bot)           
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
@@ -193,19 +191,8 @@ class aPlayer(coc.Player):
         if player._attributes._new_player:
             player.first_seen = pendulum.now()
             client.cog.coc_data_log.info(f"Player {player}: New Player Detected")
-        else:
-            asyncio.create_task(player.fetch_season_data())
 
-        if player.clan_tag:
-            await client.cog.create_clan_task(player.clan_tag)
-            while True:
-                c = client.clan_cache.get(player.clan_tag)
-                if c:
-                    player.clan = c
-                    break
-                await asyncio.sleep(0)
-        else:
-            player.clan = aClan()
+        player.clan = await aClan.create(player.clan_tag) if player.clan_tag else aClan()
         
         await client.player_cache.set(player.tag,player)        
         return player
@@ -669,40 +656,21 @@ class aSpell():
 class _PlayerAttributes():
     _cache = {}
 
-    @classmethod
-    async def load_from_database(cls):
-        query = db_Player.objects.all()
-        ret = []
-        async for player in AsyncIter(query):
-            ret.append(cls(tag=player.tag,name=player.name))        
-        return ret
-
-    def __new__(cls,**kwargs):
-        player = kwargs.get('player',None)
-        if player:
-            tag = player.tag
-        else:
-            tag = kwargs.get('tag',None)
-        if not tag:
-            raise ValueError("Player tag not provided.")
-        
-        if tag not in cls._cache:
+    def __new__(cls,player:aPlayer):        
+        if player.tag not in cls._cache:
             instance = super().__new__(cls)
             instance._is_new = True
-            cls._cache[tag] = instance
-        return cls._cache[tag]
+            cls._cache[player.tag] = instance
+        return cls._cache[player.tag]
     
-    def __init__(self,**kwargs):
+    def __init__(self,player:aPlayer):
         self.client = BotClashClient()
         self.bot = self.client.bot
 
-        self.player = kwargs.get('player',None)
-        if self.player:
-            self.tag = self.player.tag
-            self.name = self.player.name
-        else:
-            self.tag = kwargs.get('tag',None)
-            self.name = kwargs.get('name',None)
+        self.player = player
+
+        self.tag = self.player.tag
+        self.name = self.player.name
 
         if self._is_new:
             player_database = None
@@ -713,7 +681,7 @@ class _PlayerAttributes():
                 self._discord_user = 0
                 self._is_member = False
                 self._home_clan_tag = None
-                self._first_seen = player.timestamp.int_timestamp
+                self._first_seen = self.player.timestamp.int_timestamp
                 self._last_joined = None
                 self._last_removed = None
             else:

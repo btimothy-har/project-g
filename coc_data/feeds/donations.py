@@ -36,7 +36,7 @@ class ClanDonationFeed():
     async def embed(self):
         embed = await clash_embed(
             context=self.bot,
-            title=f"**{self.clan.name}** ({self.tag})",
+            title=f"**{self.clan.name}** ({self.clan.tag})",
             show_author=False,
             embed_color=discord.Colour.default(),
             thumbnail=self.clan.badge,

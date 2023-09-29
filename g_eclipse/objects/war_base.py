@@ -32,14 +32,15 @@ class eWarBase():
         bases = []
         async for base in AsyncIter(dbWarBase.objects(claims__in=[user_id])):
             bases.append(await cls.from_base_id(base.base_id))
-        return bases
+        
+        return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
         bases = []
         async for base in AsyncIter(dbWarBase.objects(townhall=townhall)):
             bases.append(await cls.from_base_id(base.base_id))
-        return bases
+        return sorted(bases,key=lambda x: x.added_on,reverse=True)
 
     def __new__(cls,base_link,defensive_cc_link):
         link_parse = urllib.parse.urlparse(base_link)

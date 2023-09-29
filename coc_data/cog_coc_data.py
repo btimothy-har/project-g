@@ -91,7 +91,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.2.3"
+    __version__ = "1.3.0"
 
     def __init__(self,bot):
         self.bot = bot
@@ -127,9 +127,6 @@ class ClashOfClansData(commands.Cog):
 
         self.last_refresh_loop = None
         self.last_error_report = None
-        
-        self.clash_semaphore_limit = 10000000
-        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
 
         self.clash_task_lock = asyncio.Lock()
         self.recruiting_task_lock = asyncio.Lock()
@@ -178,8 +175,6 @@ class ClashOfClansData(commands.Cog):
             )
 
         asyncio.create_task(self.start_recruiting_loop())
-
-        players_tasks = asyncio.create_task(_PlayerAttributes.load_from_database())
         war_tasks = asyncio.create_task(aClanWar.load_all())
         raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
 
@@ -191,7 +186,7 @@ class ClashOfClansData(commands.Cog):
         self.coc_main_log.info(
             f"Loaded {len(raids):,} Capital Raids from database."
             )
-        players = await players_tasks
+        players = [p.tag for p in db_Player.objects().only('tag')]
         clans_in_database = [c.tag for c in db_Clan.objects().only('tag')]
 
         while True:
@@ -199,12 +194,17 @@ class ClashOfClansData(commands.Cog):
                 if self.bot.coc_state._api_logged_in:
                     break
             await asyncio.sleep(1)
+
+        self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*20))
+        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
+
+        self.coc_main_log.info(f"Found {len(self.bot.coc_client.http._keys):,} API Keys, setting semaphore limit at {self.clash_semaphore_limit:,}.")
         
         self.clan_cache.queue.extend(clans_in_database)
         self.coc_main_log.info(
             f"Found {len(clans_in_database):,} clans in database."
             )
-        self.player_cache.queue.extend(p.tag for p in players)
+        self.player_cache.queue.extend(players)
         self.coc_main_log.info(
             f"Found {len(players):,} players in database."
             )        
@@ -302,17 +302,25 @@ class ClashOfClansData(commands.Cog):
             player_queue = self.player_cache.queue.copy()
             clan_queue = self.clan_cache.queue.copy()
 
-            async for p in AsyncIter(player_queue):
+            batch_limit = self.clash_semaphore_limit
+            c_count = 0
+            async for c in AsyncIter(clan_queue[:batch_limit]):
+                if c not in ClanLoop.keys():
+                    c_count += 1
+                    rc = await self.create_clan_task(c)
+                    if c == rc:
+                        self.clan_cache.remove_from_queue(c)
+                else:
+                    self.clan_cache.remove_from_queue(c)
+
+            p_limit = batch_limit - c_count
+            async for p in AsyncIter(player_queue[:p_limit]):
                 if p not in PlayerLoop.keys():
                     rp = await self.create_player_task(p)
                     if p == rp:
                         self.player_cache.remove_from_queue(p)
 
-            async for c in AsyncIter(clan_queue):
-                if c not in ClanLoop.keys():
-                    rc = await self.create_clan_task(c)
-                    if c == rc:
-                        self.clan_cache.remove_from_queue(c)
+            
             
             await self._season_check()                
 
@@ -871,7 +879,7 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Master]':<15} {'Locked' if self.clash_task_lock.locked() else 'Unlocked'}"
                 + (f" (API Maintenance)" if self.api_maintenance else "")
-                + f"\n{'[Running]':<15} {self.clash_semaphore_limit - self.clash_semaphore._value:,}"
+                + f"\n{'[Semaphore]':<15} {self.clash_semaphore._value:,} / {self.clash_semaphore_limit:,} (Waiting: {len(self.clash_semaphore._waiters) if self.clash_semaphore._waiters else 0:,})"
                 + f"\n{'[Keys]':<15} {len(self.bot.coc_client.http._keys)}"
                 + "```",
             inline=False
@@ -955,11 +963,13 @@ class ClashOfClansData(commands.Cog):
         current_data_level = self.coc_data_log.level
 
         if current_data_level == logging.INFO:
+            self.coc_main_log.setLevel(logging.DEBUG)
             self.coc_data_log.setLevel(logging.DEBUG)
-            self.coc_data_log.debug("Clash Data Stream enabled.")
+            self.coc_main_log.debug("Clash Data Stream enabled.")
             await ctx.reply("Clash Data Stream enabled.")
         
         else:
+            self.coc_main_log.setLevel(logging.INFO)
             self.coc_data_log.setLevel(logging.INFO)
-            self.coc_data_log.info("Clash Data Stream disabled.")
+            self.coc_main_log.info("Clash Data Stream disabled.")
             await ctx.reply("Clash Data Stream disabled.")

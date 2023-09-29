@@ -111,8 +111,8 @@ class aClan(coc.Clan):
         if clan:
             return clan        
         client.clan_cache.add_to_queue(tag)
-        client.cog.coc_data_log.warning(f"Clan {tag} not found in cache."
-            + (f" Already in queue." if tag in client.clan_cache.queue else " Added to queue."))
+        # client.cog.coc_data_log.warning(f"Clan {tag} not found in cache."
+        #     + (f" Already in queue." if tag in client.clan_cache.queue else " Added to queue."))
         raise CacheNotReady    
             
     @classmethod
@@ -126,7 +126,7 @@ class aClan(coc.Clan):
         return clan
     
     @classmethod
-    async def create(cls,tag:str,no_cache:bool=False,bot=None,i=0):
+    async def create(cls,tag:str,no_cache:bool=False,bot=None):
         if not tag:
             return aClan()
         
@@ -152,14 +152,7 @@ class aClan(coc.Clan):
                 return cached
 
         try:
-            #client.cog.coc_main_log.info(f"{i} fetching clan {n_tag}")
-            async for c in bot.coc_client.get_clans([n_tag],cls=aClan):
-                #client.cog.coc_main_log.info(f"{i} fetching2 clan {n_tag}")
-                clan = c
-                #client.cog.coc_main_log.info(f"retrieved clan {n_tag}")
-            
-        # clan = await client.bot.coc_client.get_clan(n_tag)
-        # client.cog.coc_main_log.info(f"retrieved clan {n_tag}")
+            clan = await client.bot.coc_client.get_clan(n_tag,cls=aClan)
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
