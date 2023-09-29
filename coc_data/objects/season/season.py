@@ -153,7 +153,7 @@ class aClashSeason():
         return self.season_description    
     @property
     def short_description(self):
-        return self.season_start.format('MMM YY')
+        return self.season_start.format('MMM YYYY')
     
     def previous_season(self):
         return aClashSeason(self.season_start.subtract(months=1).format('M-YYYY'))

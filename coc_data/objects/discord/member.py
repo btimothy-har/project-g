@@ -352,7 +352,7 @@ class aMember():
                 return pendulum.from_timestamp(max([a.last_joined for a in ex_member_accounts]))
 
     async def fetch_user_links(self):
-        linked_accounts = await self.bot.coc_discordlinks.get_linked_players(self.user_id)
+        linked_accounts = await self.client.get_linked_players(self.user_id)
         async for tag in AsyncIter(linked_accounts):
             try:
                 player = await aPlayer.create(tag)

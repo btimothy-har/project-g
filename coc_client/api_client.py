@@ -154,8 +154,7 @@ class BotClashClient():
         client = coc.EventsClient(
             load_game_data=coc.LoadGameData(always=True),
             throttle_limit=10,
-            timeout=30,
-            cache_max_size=None
+            timeout=30
             )
         await client.login_with_tokens(*keys)
         self.bot.coc_client = client
