@@ -234,6 +234,8 @@ class aPlayerSeason():
     
     @property
     def raid_stats(self):
+        if not hasattr(self,'_war_stats'):
+            self._raid_stats = aSummaryRaidStats(player_tag=self.tag,raid_log=[])
         return self._raid_stats
         
     async def compute_raid_stats(self):
