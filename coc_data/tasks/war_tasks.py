@@ -48,8 +48,8 @@ class ClanWarLoop(TaskLoop):
             return 1800
         if self.api_error:
             self.api_error = False
-            return 900
-        return 600 if getattr(self.cached_war,'type',None) == 'cwl' else 300
+            return 1200
+        return 900 if getattr(self.cached_war,'type',None) == 'cwl' else 600
     
     ##################################################
     ### PRIMARY TASK LOOP

@@ -319,17 +319,15 @@ class ClashOfClansData(commands.Cog):
                     rp = await self.create_player_task(p)
                     if p == rp:
                         self.player_cache.remove_from_queue(p)
-
-            
             
             await self._season_check()                
 
-        except Exception:
-            await self.bot.send_to_owners(f"An error occured during Clash Data loop. Check logs for details.")
+        except Exception as exc:
+            await self.bot.send_to_owners(f"An error occured during Clash Data loop. Check logs for details."
+                + f"```{exc}```")
             self.coc_main_log.exception(
                 f"Error in Clash Data Loop"
-                )
-        
+                )        
         finally:
             self.last_refresh_loop = pendulum.now()
     

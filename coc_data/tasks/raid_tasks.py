@@ -49,8 +49,8 @@ class ClanRaidLoop(TaskLoop):
             return 3600
         elif self.api_error:
             self.api_error = False
-            return 900
-        return 300
+            return 1800
+        return 900
     
     ##################################################
     ### PRIMARY TASK LOOP

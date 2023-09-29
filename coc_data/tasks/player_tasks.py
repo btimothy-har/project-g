@@ -129,7 +129,7 @@ class PlayerLoop(TaskLoop):
         elif self.cached_player.clan.is_alliance_clan or self.cached_player.clan.is_registered_clan or self.cached_player.clan.cwl_config.is_cwl_clan:
             sleep = 60
         elif self.cached_player.discord_user in [u.id for u in self.bot.users]:
-            sleep = 120
-        else:
             sleep = 180
+        else:
+            sleep = 300
         return sleep
