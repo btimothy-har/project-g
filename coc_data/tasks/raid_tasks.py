@@ -126,7 +126,7 @@ class ClanRaidLoop(TaskLoop):
                         #Raid Ended
                         if current_raid.state in ['ended']:
                             self.clan = await aClan.create(self.tag,no_cache=True)
-                            
+
                             current_raid.ending_trophies = self.clan.capital_points
                             current_raid.save_raid_to_db()
 
@@ -188,7 +188,7 @@ class ClanRaidLoop(TaskLoop):
                     channel = self.bot.get_channel(reminder.channel_id)
 
                     if channel:        
-                        event_reminder = EventReminders()
+                        event_reminder = EventReminders(channel_id=reminder.channel_id)
 
                         remind_members = [m for m in current_raid.members if m.attack_count < 6]
 

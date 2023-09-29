@@ -187,7 +187,7 @@ class ClanWarLoop(TaskLoop):
                     reminder_clan = current_war.get_clan(self.clan.tag)
                     
                     if channel and reminder_clan:        
-                        event_reminder = EventReminders()
+                        event_reminder = EventReminders(channel_id=reminder.channel_id)
 
                         remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
                         

@@ -4,7 +4,6 @@ from typing import *
 from redbot.core import commands
 
 from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
 from coc_data.objects.discord.member import aMember
 
 from coc_data.utilities.components import *

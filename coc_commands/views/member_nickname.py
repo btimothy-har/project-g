@@ -28,9 +28,11 @@ class MemberNicknameMenu(DefaultView):
         self.member = aMember(member.id,self.guild.id)
         self.for_self = self.user.id == self.member.user_id
     
-    ##################################################
-    ### OVERRIDE BUILT IN METHODS
-    ##################################################
+    ####################################################################################################
+    #####
+    ##### OVERRIDE BUILT IN
+    #####
+    ####################################################################################################
     async def on_timeout(self):
         if self.for_self:
             embed = await clash_embed(
@@ -50,9 +52,11 @@ class MemberNicknameMenu(DefaultView):
             await self.message.edit(embed=embed,view=None,delete_after=60)
         self.stop_menu()
     
-    ##################################################
-    ### START / STOP
-    ##################################################    
+    ####################################################################################################
+    #####
+    ##### START
+    #####
+    ####################################################################################################  
     async def start(self):
         self.is_active = True        
         embed = await clash_embed(context=self.ctx,message=f"{EmojisUI.LOADING} Loading...")

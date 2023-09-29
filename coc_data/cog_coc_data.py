@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.2.1"
+    __version__ = "1.2.2"
 
     def __init__(self,bot):
         self.bot = bot
@@ -860,6 +860,9 @@ class ClashOfClansData(commands.Cog):
     @commands.is_owner()
     async def subcommand_clash_data_status(self,ctx):
         """Clash of Clans Data Status."""
+
+        if not hasattr(self.bot,'coc_client'):
+            return await ctx.reply("Clash of Clans API Client not yet initialized.")
         
         embed = await clash_embed(ctx,
             title="**Clash of Clans Data Report**",
