@@ -12,18 +12,18 @@ from ..constants.coc_emojis import *
 class DiscordGuildLoop(TaskLoop):
     _loops = {}
 
-    def __new__(cls,guild_id:int):
+    def __new__(cls,bot,guild_id:int):
         if guild_id not in cls._loops:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._loops[guild_id] = instance
         return cls._loops[guild_id]
 
-    def __init__(self,guild_id:int):
+    def __init__(self,bot,guild_id:int):
         self.guild_id = guild_id
         
         if self._is_new:
-            super().__init__()
+            super().__init__(bot=bot)
             self._is_new = False
     
     async def start(self):

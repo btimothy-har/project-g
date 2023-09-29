@@ -382,7 +382,7 @@ class ClashOfClansData(commands.Cog):
                     select_event = 'default'                    
         
         except Exception:
-            await self.bot.send_to_owners(f"An error occured during the Bot Status Update Loop. Check logs for details.")
+            #await self.bot.send_to_owners(f"An error occured during the Bot Status Update Loop. Check logs for details.")
             self.coc_main_log.exception(
                 f"Error in Bot Status Loop"
                 )
@@ -636,23 +636,23 @@ class ClashOfClansData(commands.Cog):
     ### TASK HELPERS
     ##################################################   
     async def create_player_task(self,player_tag):
-        loop = PlayerLoop(player_tag)
+        loop = PlayerLoop(self.bot,player_tag)
         await loop.start()
     
     async def create_clan_task(self,clan_tag):
-        loop = ClanLoop(clan_tag)
+        loop = ClanLoop(self.bot,clan_tag)
         await loop.start()
     
     async def create_war_task(self,clan_tag):
-        loop = ClanWarLoop(clan_tag)
+        loop = ClanWarLoop(self.bot,clan_tag)
         await loop.start()
     
     async def create_raid_task(self,clan_tag):
-        loop = ClanRaidLoop(clan_tag)
+        loop = ClanRaidLoop(self.bot,clan_tag)
         await loop.start()
     
     async def create_guild_task(self,guild_id):
-        loop = DiscordGuildLoop(guild_id)
+        loop = DiscordGuildLoop(self.bot,guild_id)
         await loop.start()
     
     async def _season_check(self):

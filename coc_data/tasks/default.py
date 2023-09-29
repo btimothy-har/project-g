@@ -15,8 +15,9 @@ from coc_client.api_client import BotClashClient
 ############################################################
 ############################################################
 class TaskLoop():
-    def __init__(self):
+    def __init__(self,bot):
         self.client = BotClashClient() 
+        self.bot = bot
 
         self.task = None
         self._active = False
@@ -37,10 +38,6 @@ class TaskLoop():
     ##################################################
     ### MAIN LOOP HELPERS
     ##################################################
-    @property
-    def bot(self):
-        return self.client.bot
-
     @property
     def main_log(self):
         return self.client.cog.coc_main_log
@@ -115,9 +112,7 @@ class TaskLoop():
             return sum([i.api_time[-1] for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0]) / len([i for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
         except ZeroDivisionError:
             return 0
-    
-    
-    
+        
     @classmethod
     def degraded_count(cls):
         return len([i for i in cls._loops.values() if i.is_degraded])

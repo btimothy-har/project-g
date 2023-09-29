@@ -13,18 +13,18 @@ from ..exceptions import *
 class ClanLoop(TaskLoop):
     _loops = {}
 
-    def __new__(cls,clan_tag:str):
+    def __new__(cls,bot,clan_tag:str):
         if clan_tag not in cls._loops:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._loops[clan_tag] = instance
         return cls._loops[clan_tag]
 
-    def __init__(self,clan_tag:str):
+    def __init__(self,bot,clan_tag:str):
         self.tag = clan_tag
         
         if self._is_new:
-            super().__init__()
+            super().__init__(bot=bot)
             self.cached_clan = None
             self._is_new = False
     

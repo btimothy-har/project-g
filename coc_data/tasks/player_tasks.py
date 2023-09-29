@@ -14,18 +14,18 @@ from ..objects.events.clan_war_leagues import db_WarLeaguePlayer
 class PlayerLoop(TaskLoop):
     _loops = {}
 
-    def __new__(cls,player_tag:str):
+    def __new__(cls,bot,player_tag:str):
         if player_tag not in cls._loops:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._loops[player_tag] = instance
         return cls._loops[player_tag]
 
-    def __init__(self,player_tag:str):
+    def __init__(self,bot,player_tag:str):
         self.tag = player_tag
         
         if self._is_new:
-            super().__init__()
+            super().__init__(bot=bot)
             self._is_new = False
             self.cached_player = None
 

@@ -45,7 +45,6 @@ class aPlayer(coc.Player):
         self.town_hall = aTownHall(level=self.town_hall,weapon=self.town_hall_weapon)
         self.clan_castle = sum([a.value for a in self.achievements if a.name=='Empire Builder'])
         self.clan_tag = getattr(self.clan,'tag',None)
-        del self.clan
 
         hero_ph = []
         for hero_name in HeroAvailability.return_all_unlocked(self.town_hall.level):
@@ -153,12 +152,15 @@ class aPlayer(coc.Player):
         raise CacheNotReady
         
     @classmethod
-    async def create(cls,tag,no_cache=False):
+    async def create(cls,tag,no_cache=False,bot=None):
         client = BotClashClient()
 
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
+        
+        if not bot:
+            bot = client.bot
         
         try:
             cached = client.player_cache.get(n_tag)
@@ -180,9 +182,8 @@ class aPlayer(coc.Player):
                 return cached
             else:
                 raise ClashAPIError(exc) from exc
-            
-        if player.clan_tag:
-            client.clan_cache.add_to_queue(player.clan_tag)
+        
+        player.clan = await aClan.create(player.clan_tag) if player.clan_tag else aClan()
 
         if player._attributes._new_player:
             player.first_seen = pendulum.now()
@@ -197,10 +198,6 @@ class aPlayer(coc.Player):
     ##################################################
     ### PLAYER ATTRIBUTES
     ##################################################
-    @property
-    def clan(self) -> aClan:
-        return aClan.from_cache(self.clan_tag) if self.clan_tag else aClan()
-    
     @property
     def _attributes(self) -> _PlayerAttributes:
         return _PlayerAttributes(self)
