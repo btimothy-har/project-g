@@ -125,9 +125,9 @@ class PlayerLoop(TaskLoop):
             sleep = 600
             self.api_error = False
         elif self.cached_player.is_member:
-            sleep = 120 #2min
+            sleep = 60 #1min
         elif self.cached_player.clan.is_alliance_clan or self.cached_player.clan.is_registered_clan or self.cached_player.clan.cwl_config.is_cwl_clan:
-            sleep = 120 
+            sleep = 60 #1min
         elif self.cached_player.discord_user in [u.id for u in self.bot.users]:
             sleep = 180 #3min
         else:

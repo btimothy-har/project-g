@@ -532,7 +532,7 @@ class _ClanAttributes():
         self._is_new = False
     
     def __str__(self):
-        return str(self.clan)
+        return f"Clan {self.tag} {self.name}"
     
     def load(self):
         self._is_registered_clan = False

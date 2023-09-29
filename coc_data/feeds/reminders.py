@@ -33,6 +33,7 @@ class EventReminders():
     
     @property
     def reminder_text(self):
+        reminder_text = ""
         for r_member in list(self.member_reminders.values()):
             account_str = [f"\n{a.title}" for a in r_member.accounts]
             reminder_text += f"{r_member.member.mention}" +', '.join(account_str) + '\n\n'

@@ -45,11 +45,12 @@ class ClanWarLoop(TaskLoop):
     @property
     def sleep_time(self):
         if not self.clan.public_war_log:
-            return 1800
+            return 1800 #30mins
         if self.api_error:
             self.api_error = False
             return 1200
-        return 900 if getattr(self.cached_war,'type',None) == 'cwl' else 600
+        #return 600 if getattr(self.cached_war,'type',None) == 'cwl' else 600 #10mins
+        return 600
     
     ##################################################
     ### PRIMARY TASK LOOP

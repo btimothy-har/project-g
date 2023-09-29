@@ -194,12 +194,8 @@ class DiscordLeaderboard():
     
     @classmethod
     async def create(cls,leaderboard_type:int,is_global:bool,guild:discord.Guild,channel:discord.TextChannel):
-        existing_db = db_Leaderboard(
-            type = leaderboard_type,
-            is_global = is_global,
-            guild_id = guild.id,
-            )
-        if existing_db:
+        existing_db = db_Leaderboard.objects(type=leaderboard_type,is_global=is_global,guild_id=guild.id)
+        if len(existing_db) > 0:
             raise LeaderboardExists(f"{leaderboard_types.get(leaderboard_type,'Unknown Leaderboard')} already exists for {guild.name}.")
 
         if leaderboard_type == 5:

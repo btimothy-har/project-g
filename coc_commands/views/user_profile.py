@@ -215,16 +215,16 @@ class AddLinkMenu(DefaultView):
                 raise ClashAPIError(exc) from exc
 
         try:
-            self.add_link_account = await aPlayer.create(tag)
-        except InvalidTag:
+            self.add_link_account = aPlayer.from_cache(tag)
+        except CacheNotReady as exc:
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The tag {tag.upper()} doesn't seem to be valid.",
+                message=f"{exc.message}",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
-        
-        if self.add_link_account.is_member:
+
+        if self.add_link_account and self.add_link_account.is_member:
             verify = False
             embed = await clash_embed(
                 context=self.ctx,
@@ -239,13 +239,14 @@ class AddLinkMenu(DefaultView):
             return self.stop_menu()
 
         if verify:
-            self.add_link_account.discord_user = self.user.id
+            aPlayer.add_link(tag,interaction.user.id)
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account **{self.add_link_account.title}** is now linked to your Discord account!",
+                message=f"The account **{tag}** is now linked to your Discord account!",
                 success=True
                 )
             await interaction.edit_original_response(embed=embed,view=None)
+            self.client.coc_state.player_cache.add_to_queue(tag)
         else:
             embed = await clash_embed(
                 context=self.ctx,

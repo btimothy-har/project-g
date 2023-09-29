@@ -1,4 +1,5 @@
 import discord
+import logging
 
 from redbot.core import commands, app_commands
 from redbot.core.utils import AsyncIter
@@ -177,7 +178,6 @@ class Clans(commands.Cog):
         description="Group for Clan Settings. Equivalent to [p]clanset.",
         guild_only=True
         )
-    
     ##################################################
     ### FIND-CLAN (ALIAS: CLAN INFO)
     ##################################################

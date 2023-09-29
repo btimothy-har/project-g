@@ -91,7 +91,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.3.0"
+    __version__ = "1.4.0"
 
     def __init__(self,bot):
         self.bot = bot
@@ -127,6 +127,10 @@ class ClashOfClansData(commands.Cog):
 
         self.last_refresh_loop = None
         self.last_error_report = None
+
+        #self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*10))
+        self.clash_semaphore_limit = 1000000
+        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
 
         self.clash_task_lock = asyncio.Lock()
         self.recruiting_task_lock = asyncio.Lock()
@@ -195,9 +199,6 @@ class ClashOfClansData(commands.Cog):
                     break
             await asyncio.sleep(1)
 
-        self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*10))
-        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
-
         self.coc_main_log.info(f"Found {len(self.bot.coc_client.http._keys):,} API Keys, setting semaphore limit at {self.clash_semaphore_limit:,}.")
         
         self.clan_cache.queue.extend(clans_in_database)
@@ -209,8 +210,9 @@ class ClashOfClansData(commands.Cog):
             f"Found {len(players):,} players in database."
             )        
         async with self.clash_task_lock:
-            self.clash_data_loop.start()        
+            self.clash_data_loop.start()
         self.bot_status_update_loop.start()
+        self.clash_data_loop_reset.start()
         
         self.bot.coc_client.add_events(
             self.clash_maintenance_start,
@@ -245,6 +247,7 @@ class ClashOfClansData(commands.Cog):
         self.clash_data_loop.cancel()
         self.refresh_recruiting_reminders.cancel()
         self.bot_status_update_loop.cancel()
+        self.clash_data_loop_reset.cancel()
 
         self.coc_main_log.info(f"Stopped Clash Data Loop.")
 
@@ -333,6 +336,14 @@ class ClashOfClansData(commands.Cog):
                 )        
         finally:
             self.last_refresh_loop = pendulum.now()
+        
+    @tasks.loop(seconds=3.0)
+    async def clash_data_loop_reset(self):
+        if self.clash_task_lock.locked():
+            return
+        async with self.clash_task_lock:
+            while self.clash_semaphore._value < self.clash_semaphore_limit:
+                await asyncio.sleep(0)
     
     @tasks.loop(minutes=5.0)
     async def refresh_recruiting_reminders(self):
@@ -739,9 +750,8 @@ class ClashOfClansData(commands.Cog):
         elif not season.is_current and not clan:
             query = db_PlayerStats.objects(is_member=True,season=season.id).only('tag')
         
-        #ret_players = [aPlayer.from_cache(p.tag) for p in query]
-        #return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
-        return []
+        ret_players = [aPlayer.from_cache(p.tag) for p in query]
+        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
 
     async def fetch_player(self,tag:str) -> aPlayer:
         return await aPlayer.create(tag=tag)
@@ -880,7 +890,7 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Master]':<15} {'Locked' if self.clash_task_lock.locked() else 'Unlocked'}"
                 + (f" (API Maintenance)" if self.api_maintenance else "")
-                + f"\n{'[Semaphore]':<15} {self.clash_semaphore._value:,} / {self.clash_semaphore_limit:,} (Waiting: {len(self.clash_semaphore._waiters) if self.clash_semaphore._waiters else 0:,})"
+                + f"\n{'[Running]':<15} {self.clash_semaphore_limit - self.clash_semaphore._value:,}"
                 + f"\n{'[Keys]':<15} {len(self.bot.coc_client.http._keys)}"
                 + "```",
             inline=False
@@ -974,3 +984,17 @@ class ClashOfClansData(commands.Cog):
             self.coc_data_log.setLevel(logging.INFO)
             self.coc_main_log.info("Clash Data Stream disabled.")
             await ctx.reply("Clash Data Stream disabled.")
+    
+    @command_group_clash_data.command(name="httplog")
+    @commands.is_owner()
+    async def command_httplog(self,ctx:commands.Context):
+        """
+        Turns on HTTP logging for the Clash of Clans API.
+        """
+        current = logging.getLogger("coc.http").level
+        if current == logging.DEBUG:
+            logging.getLogger("coc.http").setLevel(logging.INFO)
+            await ctx.tick()
+        else:
+            logging.getLogger("coc.http").setLevel(logging.DEBUG)
+            await ctx.tick()

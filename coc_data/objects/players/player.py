@@ -29,7 +29,7 @@ from ...exceptions import *
 ##################################################
 class db_Player(Document):
     tag = StringField(primary_key=True,required=True)
-    name = StringField(default="",required=True)
+    name = StringField(default="")
     discord_user = IntField(default=0)
     is_member = BooleanField(default=False)
     home_clan = StringField(default="")
@@ -38,6 +38,14 @@ class db_Player(Document):
     last_removed = IntField(default=0)
 
 class aPlayer(coc.Player):
+    @classmethod
+    def add_link(cls,tag,discord_user:int):
+        player = cls.from_cache(tag)
+        if player:
+            player.discord_user = discord_user
+        else:
+            db_Player(tag=tag,discord_user=discord_user).save()
+
     def __init__(self,**kwargs):
         self.bot = kwargs.get('bot',None)
         self.client = BotClashClient()
@@ -149,11 +157,12 @@ class aPlayer(coc.Player):
         n_tag = coc.utils.correct_tag(tag)        
         player = client.player_cache.get(n_tag)
         if player:
-            return player        
+            return player
+        if tag in [c.tag for c in db_Player.objects().only('tag')]:
+            raise CacheNotReady
         client.player_cache.add_to_queue(tag)
         #client.cog.coc_data_log.warning(f"Player {tag} not found in cache."
-        #    + (f" Already in queue." if tag in client.player_cache.queue else " Added to queue."))
-        raise CacheNotReady
+        #    + (f" Already in queue." if tag in client.player_cache.queue else " Added to queue."))        
         
     @classmethod
     async def create(cls,tag,no_cache=False,bot=None):        
@@ -695,6 +704,10 @@ class _PlayerAttributes():
                 self._first_seen = player_database.get('first_seen',0)
                 self._last_joined = player_database.get('last_joined',0)
                 self._last_removed = player_database.get('last_removed',0)
+
+                if self._first_seen == 0 and len(player_database.get('Name','')) == 0:
+                    self._new_player = True
+                    self._first_seen = self.player.timestamp.int_timestamp
         
             self._is_new = False
     

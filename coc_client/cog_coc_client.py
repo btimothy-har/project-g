@@ -22,8 +22,6 @@ class ClashOfClansClient(commands.Cog):
     - `password` : API Password
     - `keys` : Number of keys to use. Defaults to 1.
 
-    You may also define (optional) alternate API credentials for use in background tasks by creating credentials for services clashapi1, clashapi2, clashapi3, etc. Up to 9 credentials can be provided.
-
     You can register for a Username and Password at https://developer.clashofclans.com.
 
     This cog also includes support for the Clash DiscordLinks service. If you have a username and password, set them with `[p]set api clashlinks` (parameters: `username` and `password`).
@@ -32,7 +30,7 @@ class ClashOfClansClient(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.1"
+    __version__ = "1.1.0"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -55,7 +53,7 @@ class ClashOfClansClient(commands.Cog):
     ##################################################
     async def cog_load(self):
         self.client = await BotClashClient.initialize(self.bot)
-        self.bot.coc_state = self.client
+        self.bot.coc_state = self.client 
     
     ##################################################
     ### COG LOAD

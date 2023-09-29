@@ -53,6 +53,7 @@ class ClanDonationFeed():
             value="\n".join([f"{EmojisClash.DONATIONSRCVD} `{m.received_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.received_chg > 0]),
             inline=False
             )
+        return embed
 
     @classmethod
     async def start_feed(cls,clan:aClan,cached_clan:aClan):

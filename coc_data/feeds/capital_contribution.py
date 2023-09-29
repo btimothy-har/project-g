@@ -29,6 +29,7 @@ class CapitalContributionFeed():
             text=f"{self.player.clan.name} ({self.player.clan.tag})",
             icon_url=self.player.clan.badge
             )
+        return embed
     
     @classmethod
     async def send_feed_update(cls,player:aPlayer,amount:int):
