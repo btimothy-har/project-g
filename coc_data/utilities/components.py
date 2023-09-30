@@ -115,10 +115,7 @@ async def clash_embed(
     if image:
         embed.set_image(url=image)
     
-    if getattr(context,"guild",None):
-        embed.set_footer(text=f"{context.guild.name}",icon_url=context.guild.icon.url)
-    else:
-        embed.set_footer(text=f"{bot.user.display_name}",icon_url=bot.user.display_avatar.url)
+    embed.set_footer(text=f"{bot.user.display_name}",icon_url=bot.user.display_avatar.url)
     return embed
 
 ####################################################################################################
