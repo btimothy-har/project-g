@@ -59,8 +59,5 @@ async def eclipse_embed(
     if image:
         embed.set_image(url=image)
         
-    if getattr(context,"guild",None):
-        embed.set_footer(text=f"{context.guild.name}")
-    else:
-        embed.set_footer(text=f"{bot.user.display_name}")
+    embed.set_footer(text=f"{bot.user.display_name}")
     return embed
