@@ -215,9 +215,9 @@ class aPlayerSeason():
         return self.season.is_current
     @property
     def home_clan(self):
-        try:
+        if self.home_clan_tag:
             return aClan.from_cache(self.home_clan_tag)
-        except InvalidTag:
+        else:
             return aClan()
     
     @property

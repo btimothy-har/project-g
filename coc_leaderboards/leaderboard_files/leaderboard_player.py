@@ -8,6 +8,7 @@ from redbot.core.utils import AsyncIter
 from coc_data.objects.players.player_season import aPlayerSeason
 from coc_data.objects.clans.clan import aClan
 from coc_data.objects.events.clan_war import aClanWar, aWarAttack
+from coc_data.objects.events.clan_war_summary import aSummaryWarStats
 
 from coc_data.constants.coc_constants import *
 from coc_data.constants.coc_emojis import *
@@ -42,7 +43,12 @@ class ClanWarLeaderboardPlayer():
             
         lb_player = cls(player_season,leaderboard_th)
 
-        participated_wars = AsyncIter(player_season.war_stats.war_log)
+        war_stats = await aSummaryWarStats.for_player(
+            player_season.tag,
+            war_log=aClanWar.for_player(player_season.tag,player_season.season)
+            )
+
+        participated_wars = AsyncIter(war_stats.war_log)
         async for war in participated_wars.filter(predicate_war):
 
             war_member = war.get_member(lb_player.tag)

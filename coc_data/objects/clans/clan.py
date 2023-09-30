@@ -106,14 +106,18 @@ class aClan(coc.Clan):
     @classmethod
     def from_cache(cls,tag):
         client = BotClashClient()
-        n_tag = coc.utils.correct_tag(tag)        
+        n_tag = coc.utils.correct_tag(tag)
+        
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
+        
         clan = client.clan_cache.get(n_tag)
         if clan:
-            return clan        
+            return clan
         client.clan_cache.add_to_queue(tag)
+        raise CacheNotReady       
         # client.cog.coc_data_log.warning(f"Clan {tag} not found in cache."
         #     + (f" Already in queue." if tag in client.clan_cache.queue else " Added to queue."))
-        raise CacheNotReady    
             
     @classmethod
     async def from_abbreviation(cls,abbreviation:str):

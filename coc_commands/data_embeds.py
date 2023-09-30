@@ -168,7 +168,7 @@ async def clan_games_data(context:Union[commands.Context,discord.Interaction],cl
             + f"*{EmojisUI.LOGOUT} denotes a member who is not registered to this Clan.*\n"
             + f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
             + f"\n".join([
-                f"`{i+1:<3}{p.clangames.score:>6,}{'':>2}{p.clangames.time_to_completion:>13}`\u3000{EmojisUI.EXIT if p.home_clan.tag != clan.tag else EmojisUI.SPACER}{EmojisTownHall.get(p.town_hall)} {re.sub('[_*/]','',p.name)}"
+                f"`{i+1:<3}{p.clangames.score:>6,}{'':>2}{p.clangames.time_to_completion:>13}`\u3000{EmojisUI.LOGOUT if p.home_clan_tag != clan.tag else EmojisUI.SPACER}{EmojisTownHall.get(p.town_hall)} {re.sub('[_*/]','',p.name)}"
                 for i, p in enumerate(participants)
                 ]),
         thumbnail=clan.badge,
