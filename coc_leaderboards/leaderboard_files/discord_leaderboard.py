@@ -269,9 +269,12 @@ class DiscordLeaderboard():
                     data = discord.Embed.from_dict(archived_lb.embed)
 
                 await self.consolidate_data(season,data,archive)
+
             await self.send_to_discord()
         except CacheNotReady:
-            return
+            self.client.cog.coc_main_log.exception(
+                f"Encountered CacheNotReady error while updating {self.lb_type} Leaderboard for {self.guild.name}."
+                )
         except Exception as ex:
             self.client.cog.coc_main_log.exception(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.")
             await self.client.bot.send_to_owners(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.\n```{ex}```")
