@@ -34,7 +34,7 @@ class ClanWarLeaderboardPlayer():
     async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int,eligible_clans:Optional[List[str]]=None):
         def predicate_war(clan_war:aClanWar):
             if eligible_clans:
-                return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan.tag in eligible_clans or clan_war.opponent.tag in eligible_clans)
+                return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan_1.tag in eligible_clans or clan_war.clan_2.tag in eligible_clans)
             else:
                 return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False)
         

@@ -38,8 +38,8 @@ class aGuild():
         self._panel_message = 0
         self.blocklist = []
         
-        if self.guild.owner.id != 644530507505336330 and self.guild.owner.id not in self.blocklist:
-            self.blocklist.append(self.guild.owner.id)
+        # if self.guild.owner.id != 644530507505336330 and self.guild.owner.id not in self.blocklist:
+        #     self.blocklist.append(self.guild.owner.id)
     
     ##################################################
     ### DISCORD GUILD ATTRIBUTES

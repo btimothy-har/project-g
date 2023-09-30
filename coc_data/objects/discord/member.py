@@ -167,25 +167,27 @@ class aMember():
                  Q(coleaders__in=[self.user_id]) |
                  Q(leader=self.user_id))
                 ))
-            member_accounts = db_Player.objects(
-                discord_user=self.user_id,
-                is_member=True,
-                home_clan__in=[c.tag for c in elder_clans]
-                )
-            if len(list(member_accounts)) > 0:
-                return True
+            if len(list(elder_clans)) > 0:
+                member_accounts = db_Player.objects(
+                    discord_user=self.user_id,
+                    is_member=True,
+                    home_clan__in=[c.tag for c in elder_clans]
+                    )
+                if len(list(member_accounts)) > 0:
+                    return True
         else:
             elder_clans = db_AllianceClan.objects(
                  Q(elders__in=[self.user_id]) | 
                  Q(coleaders__in=[self.user_id]) |
                  Q(leader=self.user_id))
-            member_accounts = db_Player.objects(
-                discord_user=self.user_id,
-                is_member=True,
-                home_clan__in=[c.tag for c in elder_clans]
-                )
-            if len(list(member_accounts)) > 0:
-                return True
+            if len(list(elder_clans)) > 0:
+                member_accounts = db_Player.objects(
+                    discord_user=self.user_id,
+                    is_member=True,
+                    home_clan__in=[c.tag for c in elder_clans]
+                    )
+                if len(list(member_accounts)) > 0:
+                    return True
         return False
 
     @property
@@ -197,24 +199,26 @@ class aMember():
                  Q(coleaders__in=[self.user_id]) |
                  Q(leader=self.user_id))
                 ))
-            member_accounts = db_Player.objects(
-                discord_user=self.user_id,
-                is_member=True,
-                home_clan__in=[c.tag for c in coleader_clans]
-                )
-            if len(list(member_accounts)) > 0:
-                return True
+            if len(list(coleader_clans)) > 0:
+                member_accounts = db_Player.objects(
+                    discord_user=self.user_id,
+                    is_member=True,
+                    home_clan__in=[c.tag for c in coleader_clans]
+                    )
+                if len(list(member_accounts)) > 0:
+                    return True
         else:
             coleader_clans = db_AllianceClan.objects(
                  Q(coleaders__in=[self.user_id]) |
                  Q(leader=self.user_id))
-            member_accounts = db_Player.objects(
-                discord_user=self.user_id,
-                is_member=True,
-                home_clan__in=[c.tag for c in coleader_clans]
-                )
-            if len(list(member_accounts)) > 0:
-                return True
+            if len(list(coleader_clans)) > 0:
+                member_accounts = db_Player.objects(
+                    discord_user=self.user_id,
+                    is_member=True,
+                    home_clan__in=[c.tag for c in coleader_clans]
+                    )
+                if len(list(member_accounts)) > 0:
+                    return True
         return False
     
     @property
