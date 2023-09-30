@@ -1,3 +1,4 @@
+import asyncio
 import discord
 import pendulum
 
@@ -45,10 +46,11 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.4"
+    __version__ = "1.1.0"
 
     def __init__(self,bot):        
         self.bot = bot 
+        self.leaderboard_lock = asyncio.Lock()
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -363,5 +365,17 @@ class Leaderboards(commands.Cog):
     
     @tasks.loop(minutes=15.0)
     async def update_leaderboards(self):
+        if self.leaderboard_lock.locked():
+            return
 
-        await DiscordLeaderboard.update_leaderboards()
+        async with self.leaderboard_lock:
+            st = pendulum.now()
+            self.client.cog.coc_main_log.info("Updating Leaderboards...")
+            tasks = []
+            for guild in self.bot.guilds:
+                guild_leaderboards = DiscordLeaderboard.get_guild_leaderboards(guild.id)
+                tasks.extend([asyncio.create_task(lb.update_leaderboard()) for lb in guild_leaderboards])
+            
+            await asyncio.gather(*tasks)
+            et = pendulum.now()
+            self.client.cog.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")
