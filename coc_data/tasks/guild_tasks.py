@@ -83,9 +83,9 @@ class DiscordGuildLoop(TaskLoop):
                 discord_tasks.append(asyncio.create_task(
                     aGuild.update_clocks(self.guild_id))
                     )
-                discord_tasks.append(asyncio.create_task(
-                    aGuild.update_clan_panels(self.guild_id))
-                    )
+                # discord_tasks.append(asyncio.create_task(
+                #     aGuild.update_clan_panels(self.guild_id))
+                #     )
                 discord_tasks.append(asyncio.create_task(
                     aGuild.update_apply_panels(self.guild_id))
                     )

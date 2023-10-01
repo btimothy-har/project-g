@@ -129,7 +129,7 @@ class GuildClanPanel():
 
             message_ids_master = []
             existing_messages = len(self.long_message_ids)
-
+            
             #iterate through embeds up to len existing messages
             for i,send_message in enumerate(embeds[:existing_messages]):
                 link_button = ClanLinkMenu([send_message['clan']])

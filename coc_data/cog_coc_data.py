@@ -271,7 +271,7 @@ class ClashOfClansData(commands.Cog):
     ##################################################
     ### TASK REFRESH LOOP
     ##################################################
-    @tasks.loop(minutes=1.0)
+    @tasks.loop(seconds=60)
     async def clash_data_loop(self):
         def predicate_clan_not_in_loop(clan):
             if clan.tag not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
@@ -308,23 +308,17 @@ class ClashOfClansData(commands.Cog):
             player_queue = self.player_cache.queue.copy()
             clan_queue = self.clan_cache.queue.copy()
 
-            batch_limit = self.clash_semaphore_limit
+            batch_limit = 1000
             c_count = 0
             async for c in AsyncIter(clan_queue[:batch_limit]):
-                if c not in ClanLoop.keys():
-                    c_count += 1
-                    rc = await self.create_clan_task(c)
-                    if c == rc:
-                        self.clan_cache.remove_from_queue(c)
-                else:
-                    self.clan_cache.remove_from_queue(c)
+                c_count += 1
+                await self.create_clan_task(c)
+                self.clan_cache.remove_from_queue(c)
 
             p_limit = batch_limit - c_count
             async for p in AsyncIter(player_queue[:p_limit]):
-                if p not in PlayerLoop.keys():
-                    rp = await self.create_player_task(p)
-                    if p == rp:
-                        self.player_cache.remove_from_queue(p)
+                await self.create_player_task(p)
+                self.player_cache.remove_from_queue(p)
             
             await self._season_check()                
 
