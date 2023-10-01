@@ -117,6 +117,7 @@ class ClanGamesLeaderboardPlayer():
         self.score = self.stats.clangames.score
         self.clangames_clan_tag = self.stats.clangames.clan_tag
         self.time_to_completion = self.stats.clangames.time_to_completion
+        self.completion_seconds = self.stats.clangames.completion_seconds
     
     @classmethod
     async def calculate(cls,player_season:aPlayerSeason):

@@ -617,7 +617,7 @@ class ClanGamesLeaderboard():
                 )
         if self.parent.is_global:
             wl_players = self.leaderboard_players.get('global',[])
-            wl_players.sort(key=lambda x: (getattr(x,'score',0)),reverse=True)
+            wl_players.sort(key=lambda x: (x.score,(x.completion_seconds * -1)),reverse=True)
 
             leaderboard_text = f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`"
 
@@ -629,7 +629,7 @@ class ClanGamesLeaderboard():
         else:
             async for lb_clan in AsyncIter(self.parent.lb_clans):
                 wl_players = self.leaderboard_players.get(lb_clan.tag,[])
-                wl_players.sort(key=lambda x: (getattr(x,'score',0)),reverse=True)
+                wl_players.sort(key=lambda x: (x.score,(x.completion_seconds * -1)),reverse=True)
 
                 if len(wl_players) > 0:
                     embed.add_field(
