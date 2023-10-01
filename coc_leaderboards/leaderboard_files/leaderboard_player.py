@@ -109,17 +109,16 @@ class DonationsLeaderboardPlayer():
         return lb_player
 
 class ClanGamesLeaderboardPlayer():
-    def __init__(self,player_season:aPlayerSeason,leaderboard_clan:aClan):
+    def __init__(self,player_season:aPlayerSeason):
         self.stats = player_season
         self.tag = player_season.tag
         self.name = player_season.name
-        self.for_clan = leaderboard_clan
 
         self.score = self.stats.clangames.score
         self.clangames_clan_tag = self.stats.clangames.clan_tag
         self.time_to_completion = self.stats.clangames.time_to_completion
     
     @classmethod
-    async def calculate(cls,player_season:aPlayerSeason,leaderboard_clan:aClan):
-        lb_player = cls(player_season,leaderboard_clan)
+    async def calculate(cls,player_season:aPlayerSeason):
+        lb_player = cls(player_season)
         return lb_player

@@ -11,6 +11,7 @@ from coc_client.api_client import BotClashClient
 
 from coc_data.objects.season.season import aClashSeason
 from coc_data.objects.players.player import aPlayer
+from coc_data.objects.clans.clan import aClan
 from coc_data.objects.players.player_season import aPlayerSeason
 from coc_data.objects.discord.guild import aGuild
 from coc_data.exceptions import CacheNotReady
@@ -177,11 +178,14 @@ class DiscordLeaderboard():
         return self.bot.get_guild(self.guild_id)
     
     @property
-    def linked_clans(self):
-        if not self.guild:
+    def lb_clans(self):
+        if self.is_global:
+            return self.client.cog.get_alliance_clans()
+        elif self.guild:
+            guild = aGuild(self.guild.id)
+            return guild.clans
+        else:
             return []
-        guild = aGuild(self.guild.id)
-        return guild.clans
 
     @property
     def channel(self):
@@ -198,9 +202,6 @@ class DiscordLeaderboard():
         existing_db = db_Leaderboard.objects(type=leaderboard_type,is_global=is_global,guild_id=guild.id)
         if len(existing_db) > 0:
             raise LeaderboardExists(f"{leaderboard_types.get(leaderboard_type,'Unknown Leaderboard')} already exists for {guild.name}.")
-
-        if leaderboard_type == 5:
-            is_global = False
 
         db_entry = db_Leaderboard(
             type = leaderboard_type,
@@ -355,7 +356,6 @@ class ClanWarLeaderboard():
 
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
-
         leaderboard = cls(parent,season)
         all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
 
@@ -366,7 +366,7 @@ class ClanWarLeaderboard():
                 if lb_th not in leaderboard.leaderboard_players:
                     leaderboard.leaderboard_players[lb_th] = []
 
-                lb_player = await ClanWarLeaderboardPlayer.calculate(stats,lb_th) if parent.is_global else await ClanWarLeaderboardPlayer.calculate(stats,lb_th,[c.tag for c in parent.linked_clans])
+                lb_player = await ClanWarLeaderboardPlayer.calculate(stats,lb_th) if parent.is_global else await ClanWarLeaderboardPlayer.calculate(stats,lb_th,[c.tag for c in parent.lb_clans])
                 if lb_player.wars_participated > 0:
                     leaderboard.leaderboard_players[lb_th].append(lb_player)
         
@@ -420,7 +420,6 @@ class ResourceLootLeaderboard():
         self.parent = parent
 
         self.leaderboard_players = {}
-
         self.timestamp = None
 
     @classmethod
@@ -431,7 +430,7 @@ class ResourceLootLeaderboard():
             if parent.is_global:
                 return stats.attacks.season_total > 0
             else:
-                return stats.attacks.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.linked_clans]
+                return stats.attacks.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
         all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
@@ -497,7 +496,6 @@ class DonationsLeaderboard():
         self.parent = parent
 
         self.leaderboard_players = {}
-
         self.timestamp = None
 
     @classmethod
@@ -508,7 +506,7 @@ class DonationsLeaderboard():
             if parent.is_global:
                 return stats.donations_sent.season_total > 0
             else:
-                return stats.donations_sent.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.linked_clans]
+                return stats.donations_sent.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
         all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
@@ -525,7 +523,6 @@ class DonationsLeaderboard():
                     leaderboard.leaderboard_players[lb_th].append(lb_player)
         
         leaderboard.timestamp = pendulum.now()
-
         return await leaderboard.get_embed()
     
     async def get_embed(self):
@@ -572,10 +569,7 @@ class ClanGamesLeaderboard():
         self.season = season
         self.parent = parent
 
-        self.lb_clans = parent.linked_clans
-
         self.leaderboard_players = {}
-
         self.timestamp = None
 
     @classmethod
@@ -583,24 +577,30 @@ class ClanGamesLeaderboard():
 
         def predicate_leaderboard(player:aPlayer):
             stats = player.get_season_stats(season)
-            return stats.clangames.score > 0 and stats.home_clan.tag in [c.tag for c in leaderboard.lb_clans] and stats.home_clan.tag == stats.clangames.clan_tag
+            return stats.clangames.score > 0 and stats.clangames.clan_tag in [c.tag for c in parent.lb_clans] and stats.home_clan.tag == stats.clangames.clan_tag
 
         leaderboard = cls(parent,season)
         all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
 
+        leaderboard.leaderboard_players['global'] = []
+
         async for p in all_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
-            async for lb_clan in AsyncIter(leaderboard.lb_clans):
-                if lb_clan.tag not in leaderboard.leaderboard_players:
-                    leaderboard.leaderboard_players[lb_clan.tag] = []
-                
-                if stats.clangames.clan_tag == lb_clan.tag:
-                    lb_player = await ClanGamesLeaderboardPlayer.calculate(stats,lb_clan)
-                    leaderboard.leaderboard_players[lb_clan.tag].append(lb_player)
+            if parent.is_global:
+                lb_player = await ClanGamesLeaderboardPlayer.calculate(stats)
+                leaderboard.leaderboard_players['global'].append(lb_player)
+            
+            else:
+                async for lb_clan in AsyncIter(leaderboard.lb_clans):
+                    if lb_clan.tag not in leaderboard.leaderboard_players:
+                        leaderboard.leaderboard_players[lb_clan.tag] = []
+                    
+                    if stats.clangames.clan_tag == lb_clan.tag:
+                        lb_player = await ClanGamesLeaderboardPlayer.calculate(stats,lb_clan)
+                        leaderboard.leaderboard_players[lb_clan.tag].append(lb_player)
         
         leaderboard.timestamp = pendulum.now()
-
         return await leaderboard.get_embed()
     
     async def get_embed(self):
@@ -610,28 +610,40 @@ class ClanGamesLeaderboard():
             message=f"***Ranks players by Clan Games score & completion time.***"
                 + (f"\nLast Refreshed: <t:{getattr(self.timestamp,'int_timestamp',0)}:R>" if self.season.is_current and self.timestamp else "")
                 + f"\n\n"
-                + f"- Only Clans linked to this Server are included."
-                + f"\n- You must have started Clan Games in your assigned Home Clan to be eligible."
+                + (f"- Only Clans linked to this Server are included.\n" if not self.parent.is_global else "")
+                + f"- You must have started Clan Games in your assigned Home Clan to be eligible."
                 + f"\n- Completion Time is measured from the global start of Clan Games."
                 + f"\n\u200b"
                 )
-        async for lb_clan in AsyncIter(self.lb_clans):
-            wl_players = self.leaderboard_players.get(lb_clan.tag,[])
+        if self.parent.is_global:
+            wl_players = self.leaderboard_players.get('global',[])
             wl_players.sort(key=lambda x: (getattr(x,'score',0)),reverse=True)
 
-            if len(wl_players) > 0:
-                embed.add_field(
-                    name=f"{lb_clan.emoji} **{lb_clan.name}**",
-                    value=f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
-                        + "\n".join([
-                        f"`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.name)}"
-                        for i,p in enumerate(wl_players[:5],start=1)]),
-                    inline=False
-                    )
-            else:
-                embed.add_field(
-                    name=f"{lb_clan.emoji} **{lb_clan.name}**",
-                    value=f"{EmojisUI.SPACER}<a:barbarian_bored:1156458893900267520> *It's a little lonely... there's no one participating :(.*",
-                    inline=False
-                    )
+            leaderboard_text = f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`"
+
+            async for i,p in AsyncIter(enumerate(wl_players[:30],start=1)):
+                clan = await aClan.create(p.clangames_clan_tag)
+                leaderboard_text += f"\n`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{clan.emoji}{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.name)}"
+            embed.description += leaderboard_text
+        
+        else:
+            async for lb_clan in AsyncIter(self.lb_clans):
+                wl_players = self.leaderboard_players.get(lb_clan.tag,[])
+                wl_players.sort(key=lambda x: (getattr(x,'score',0)),reverse=True)
+
+                if len(wl_players) > 0:
+                    embed.add_field(
+                        name=f"{lb_clan.emoji} **{lb_clan.name}**",
+                        value=f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
+                            + "\n".join([
+                            f"`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.name)}"
+                            for i,p in enumerate(wl_players[:5],start=1)]),
+                        inline=False
+                        )
+                else:
+                    embed.add_field(
+                        name=f"{lb_clan.emoji} **{lb_clan.name}**",
+                        value=f"{EmojisUI.SPACER}<a:barbarian_bored:1156458893900267520> *It's a little lonely... there's no one participating :(.*",
+                        inline=False
+                        )
         return embed
