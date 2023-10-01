@@ -106,7 +106,7 @@ class DiscordGuildLoop(TaskLoop):
                 self.main_log.debug(
                     f"{self.guild_id}: Guild loop for {self.guild.name} completed. Runtime: {run_time} seconds."
                     )
-                await asyncio.sleep(400)
+                await asyncio.sleep(600)
     
     @property
     def is_degraded(self):

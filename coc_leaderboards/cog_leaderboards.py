@@ -7,6 +7,7 @@ from discord.ext import tasks
 from redbot.core import commands, app_commands
 from redbot.core.data_manager import cog_data_path
 from coc_client.api_client import BotClashClient
+from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive
 
 from coc_data.utilities.utils import *
 from coc_data.utilities.components import *
@@ -46,7 +47,7 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.1.0"
+    __version__ = "1.1.1"
 
     def __init__(self,bot):        
         self.bot = bot 
@@ -122,10 +123,21 @@ class Leaderboards(commands.Cog):
         description="Group to set up Clash Leaderboards.",
         guild_only=True
         )
+    
+    ##################################################
+    ### LEADERBOARD / DELETE-ARCHIVE
+    ##################################################
+    @command_group_clash_leaderboards.command(name="delete-archive")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_list_delete_lb_archive(self,ctx):
+
+        db_Leaderboard_Archive.objects.delete()
+        await ctx.tick()
 
     ##################################################
     ### LEADERBOARD / LIST
-    ##################################################    
+    ##################################################
     @command_group_clash_leaderboards.command(name="list")
     @commands.guild_only()
     @commands.admin()

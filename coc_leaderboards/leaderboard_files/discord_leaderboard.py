@@ -11,6 +11,7 @@ from coc_client.api_client import BotClashClient
 
 from coc_data.objects.season.season import aClashSeason
 from coc_data.objects.players.player import aPlayer
+from coc_data.objects.players.player_season import aPlayerSeason
 from coc_data.objects.discord.guild import aGuild
 from coc_data.exceptions import CacheNotReady
 
@@ -355,17 +356,10 @@ class ClanWarLeaderboard():
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
 
-        def predicate_leaderboard(player:aPlayer):
-            stats = player.get_season_stats(season)
-            if parent.is_global:
-                return stats.war_stats.wars_participated > 0
-            else:
-                return stats.war_stats.wars_participated > 0 and stats.home_clan.tag in [c.tag for c in parent.linked_clans]
-
         leaderboard = cls(parent,season)
         all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
 
-        async for p in all_players.filter(predicate_leaderboard):
+        async for p in all_players:
             stats = p.get_season_stats(season)
 
             async for lb_th in AsyncIter(eligible_townhalls):

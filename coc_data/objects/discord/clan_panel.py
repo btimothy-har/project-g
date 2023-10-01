@@ -170,6 +170,6 @@ class GuildClanPanel():
             self.long_message_ids = message_ids_master
             self.save()
         except Exception as exc:
-            self.client.coc_main_log.exception(
+            self.client.cog.coc_main_log.exception(
                 f"Error sending Clan Panel to Discord: {self.guild.name} {getattr(self.channel,'name','Unknown Channel')}. {exc}"
                 )

@@ -91,7 +91,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.4.1"
+    __version__ = "1.4.2"
 
     def __init__(self,bot):
         self.bot = bot
@@ -337,7 +337,7 @@ class ClashOfClansData(commands.Cog):
         finally:
             self.last_refresh_loop = pendulum.now()
         
-    @tasks.loop(seconds=3.0)
+    @tasks.loop(seconds=2.0)
     async def clash_data_loop_reset(self):
         if self.clash_task_lock.locked():
             return
@@ -900,8 +900,8 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(self.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(self.player_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[API Time]':<15} {round(PlayerLoop.api_avg())}s (min: {round(PlayerLoop.api_min())}s, max: {round(PlayerLoop.api_max())}s)"
-                + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg())}s (min: {round(PlayerLoop.runtime_min())}s, max: {round(PlayerLoop.runtime_max())}s)"
+                + f"\n{'[Work Time]':<15} {round(PlayerLoop.api_avg())}s (min: {round(PlayerLoop.api_min())}s, max: {round(PlayerLoop.api_max())}s)"
+                + f"\n{'[Run Time]':<15} {round(PlayerLoop.runtime_avg())}s (min: {round(PlayerLoop.runtime_min())}s, max: {round(PlayerLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
@@ -910,8 +910,8 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(self.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(self.clan_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[API Time]':<15} {round(ClanLoop.api_avg())}s (min: {round(ClanLoop.api_min())}s, max: {round(ClanLoop.api_max())}s)"
-                + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg())}s (min: {round(ClanLoop.runtime_min())}s, max: {round(ClanLoop.runtime_max())}s)"
+                + f"\n{'[Work Time]':<15} {round(ClanLoop.api_avg())}s (min: {round(ClanLoop.api_min())}s, max: {round(ClanLoop.api_max())}s)"
+                + f"\n{'[Run Time]':<15} {round(ClanLoop.runtime_avg())}s (min: {round(ClanLoop.runtime_min())}s, max: {round(ClanLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
@@ -920,8 +920,8 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_ClanWar.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanWarLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[API Time]':<15} {round(ClanWarLoop.api_avg())}s"
-                + f"\n{'[Runtime]':<15} {round(ClanWarLoop.runtime_avg())}s"
+                + f"\n{'[Work Time]':<15} {round(ClanWarLoop.api_avg())}s"
+                + f"\n{'[Run Time]':<15} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
@@ -930,8 +930,8 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_RaidWeekend.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanRaidLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[API Time]':<15} {round(ClanRaidLoop.api_avg())}s"
-                + f"\n{'[Runtime]':<15} {round(ClanRaidLoop.runtime_avg())}s"
+                + f"\n{'[Work Time]':<15} {round(ClanRaidLoop.api_avg())}s"
+                + f"\n{'[Run Time]':<15} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )        
@@ -940,7 +940,7 @@ class ClashOfClansData(commands.Cog):
             value="```ini"
                 + f"\n{'[Available]':<15} {len(self.bot.guilds):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in DiscordGuildLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Runtime]':<15} {round(DiscordGuildLoop.runtime_avg())}s"
+                + f"\n{'[Run Time]':<15} {round(DiscordGuildLoop.runtime_avg())}s"
                 + "```",
             inline=False
             )

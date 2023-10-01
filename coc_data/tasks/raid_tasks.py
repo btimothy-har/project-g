@@ -70,21 +70,19 @@ class ClanRaidLoop(TaskLoop):
                     if self.clash_task_lock.locked():
                         async with self.clash_task_lock:
                             await asyncio.sleep(0)
-                    st = pendulum.now()
-                    
-                    if self.clan and st.day_of_week not in [5,6,7,1]:
-                        return
-                    
-                    try:
-                        self.clan = await aClan.create(self.tag,no_cache=False,bot=self.bot)
-                    except CacheNotReady:
-                        return
                     
                     if not self.loop_active:
                         return
                     
+                    work_start = pendulum.now()
+                    if self.clan and st.day_of_week not in [5,6,7,1]:
+                        return
+                    try:
+                        self.clan = await aClan.create(self.tag,no_cache=False,bot=self.bot)
+                    except CacheNotReady:
+                        return
+
                     current_raid = await self.clan.get_raid_weekend()
-                    api_end = pendulum.now()
                     if not current_raid:
                         return None
                     if current_raid.do_i_save:
@@ -139,7 +137,7 @@ class ClanRaidLoop(TaskLoop):
                     et = pendulum.now()
 
                     try:
-                        api_time = api_end.int_timestamp-st.int_timestamp
+                        api_time = et.int_timestamp-work_start.int_timestamp
                         self.api_time.append(api_time)
                     except:
                         pass

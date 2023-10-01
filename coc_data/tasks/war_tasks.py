@@ -69,20 +69,20 @@ class ClanWarLoop(TaskLoop):
                     if self.clash_task_lock.locked():
                         async with self.clash_task_lock:
                             await asyncio.sleep(0)
-                    st = pendulum.now()
-
+                    
+                    if not self.loop_active:
+                        return
+                    
+                    work_start = pendulum.now()
                     try:
                         self.clan = await aClan.create(self.tag,no_cache=False,bot=self.bot)
                     except CacheNotReady:
                         return
-                        
-                    if not self.loop_active:
-                        return
+                    
                     if not self.clan.public_war_log:
                         return
                         
                     current_war = await self.clan.get_current_war()
-                    api_end = pendulum.now()
                     if not current_war:
                         return            
                     if current_war.do_i_save:
@@ -135,7 +135,7 @@ class ClanWarLoop(TaskLoop):
                         return                
                     et = pendulum.now()
                     try:
-                        api_time = api_end.int_timestamp-st.int_timestamp
+                        api_time = et.int_timestamp-work_start.int_timestamp
                         self.api_time.append(api_time)
                     except:
                         pass
