@@ -43,7 +43,7 @@ class Bank(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
 
     def __init__(self,bot):
         self.bot = bot
@@ -131,9 +131,9 @@ class Bank(commands.Cog):
                     amount=current_balance * 0.1,
                     user_id=self.bot.user.id,
                     comment="EOS from Current Account."
-                    )                
-                await self.current_account.withdraw(
-                    amount=current_balance,
+                    )
+                await self.current_account.admin_adjust(
+                    amount=current_balance * -1,
                     user_id=self.bot.user.id,
                     comment="EOS to Sweep & Reserve Accounts."
                     )
@@ -147,7 +147,7 @@ class Bank(commands.Cog):
             else:
                 break
         sweep_balance = self.sweep_account.balance
-        available_for_distribution = sweep_balance * 0.7      
+        available_for_distribution = sweep_balance * 0.7
         async for clan in AsyncIter(alliance_clans):
             if not clan.bank_account:
                 continue
@@ -155,12 +155,12 @@ class Bank(commands.Cog):
             clan_balance = clan.balance
             if clan_balance > 0:
                 await self.reserve_account.deposit(
-                    amount=clan_balance * 0.1,
+                    amount=round(clan_balance * 0.1),
                     user_id=self.bot.user.id,
                     comment=f"EOS from {clan.tag} {clan.name}."
                     )
                 await clan.bank_account.withdraw(
-                    amount=clan_balance * 0.1,
+                    amount=round(clan_balance * 0.1),
                     user_id=self.bot.user.id,
                     comment=f"EOS to Reserve Account."
                     )                

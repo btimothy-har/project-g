@@ -174,7 +174,7 @@ class ClanWarLoop(TaskLoop):
             time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
 
             if len(reminder.interval_tracker) > 0:
-                next_reminder = max(reminder.interval_tracker) > 0
+                next_reminder = max(reminder.interval_tracker)
 
                 if time_remaining < (next_reminder * 3600):
                     channel = self.bot.get_channel(reminder.channel_id)

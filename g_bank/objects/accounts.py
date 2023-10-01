@@ -42,6 +42,17 @@ class BankAccount():
             transaction.save()
             self._balance = 0
     
+    async def admin_adjust(self,amount:int,user_id:int=None,comment:str=None):
+        transaction = db_BankTransaction(
+            account=self.id,
+            amount=amount,
+            timestamp=pendulum.now().int_timestamp,
+            user=user_id if user_id else 99,
+            comment=comment
+            )
+        transaction.save()
+        self._balance = 0
+    
     async def export(self):
         cut_off = pendulum.now().subtract(months=3).int_timestamp
         transactions = db_BankTransaction.objects(

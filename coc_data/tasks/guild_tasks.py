@@ -46,7 +46,13 @@ class DiscordGuildLoop(TaskLoop):
 
     async def _loop_task(self):
         try:
-            await self._single_loop()
+            tasks = []
+            tasks.append(asyncio.create_task(self._save_member_roles()))
+            tasks.append(asyncio.create_task(self._update_clocks()))
+            tasks.append(asyncio.create_task(self._update_clan_panels()))
+            tasks.append(asyncio.create_task(self._update_application_panels()))
+
+            await asyncio.gather(*tasks)
 
         except asyncio.CancelledError:
             await self.stop()
@@ -64,32 +70,19 @@ class DiscordGuildLoop(TaskLoop):
             await asyncio.sleep(600)
             await self.start()
     
-    async def _single_loop(self):
+    async def _save_member_roles(self):
         while self.loop_active:
             try:
-                st = pendulum.now()
                 if not self.loop_active:
-                    raise asyncio.CancelledError
-                
+                    raise asyncio.CancelledError                
                 if not self.guild:
                     raise asyncio.CancelledError
                 
-                discord_tasks = []
-                
-                discord_tasks.extend([asyncio.create_task(
+                member_tasks = [asyncio.create_task(
                     aMember.save_user_roles(member.id,self.guild_id))
                     for member in self.guild.members if not member.bot
-                    ])
-                discord_tasks.append(asyncio.create_task(
-                    aGuild.update_clocks(self.guild_id))
-                    )
-                # discord_tasks.append(asyncio.create_task(
-                #     aGuild.update_clan_panels(self.guild_id))
-                #     )
-                discord_tasks.append(asyncio.create_task(
-                    aGuild.update_apply_panels(self.guild_id))
-                    )
-                await asyncio.gather(*discord_tasks)
+                    ]
+                await asyncio.gather(*member_tasks)
             
             except asyncio.CancelledError:
                 await self.stop()
@@ -97,16 +90,74 @@ class DiscordGuildLoop(TaskLoop):
             finally:
                 if not self.loop_active:
                     return
-                
-                et = pendulum.now()
-
-                run_time = et.int_timestamp-st.int_timestamp
-
-                self.run_time.append(run_time)
                 self.main_log.debug(
-                    f"{self.guild_id}: Guild loop for {self.guild.name} completed. Runtime: {run_time} seconds."
+                    f"{self.guild_id}: Member Roles in {self.guild.name} saved."
                     )
-                await asyncio.sleep(600)
+                await asyncio.sleep(300)
+    
+    async def _update_clocks(self):
+        while self.loop_active:
+            try:
+                if not self.loop_active:
+                    raise asyncio.CancelledError
+                
+                if not self.guild:
+                    raise asyncio.CancelledError
+                
+                await aGuild.update_clocks(self.guild_id)
+            
+            except asyncio.CancelledError:
+                await self.stop()
+
+            finally:
+                if not self.loop_active:
+                    return               
+                self.main_log.debug(
+                    f"{self.guild_id}: Clocks in {self.guild.name} updated."
+                    )
+                await asyncio.sleep(400)
+    
+    async def _update_clan_panels(self):
+        while self.loop_active:
+            try:
+                if not self.loop_active:
+                    raise asyncio.CancelledError                
+                if not self.guild:
+                    raise asyncio.CancelledError
+                
+                await aGuild.update_clan_panels(self.guild_id)
+            
+            except asyncio.CancelledError:
+                await self.stop()
+
+            finally:
+                if not self.loop_active:
+                    return               
+                self.main_log.debug(
+                    f"{self.guild_id}: Clan Panels in {self.guild.name} updated."
+                    )                
+                await asyncio.sleep(1800) #30minutes
+    
+    async def _update_application_panels(self):
+        while self.loop_active:
+            try:
+                if not self.loop_active:
+                    raise asyncio.CancelledError                
+                if not self.guild:
+                    raise asyncio.CancelledError
+                
+                await aGuild.update_apply_panels(self.guild_id)
+            
+            except asyncio.CancelledError:
+                await self.stop()
+
+            finally:
+                if not self.loop_active:
+                    return               
+                self.main_log.debug(
+                    f"{self.guild_id}: Application Panels in {self.guild.name} updated."
+                    )                
+                await asyncio.sleep(1800) #30minutes
     
     @property
     def is_degraded(self):

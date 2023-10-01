@@ -154,7 +154,11 @@ class aPlayer(coc.Player):
     @classmethod
     def from_cache(cls,tag):
         client = BotClashClient()
-        n_tag = coc.utils.correct_tag(tag)        
+        n_tag = coc.utils.correct_tag(tag)
+
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
+        
         player = client.player_cache.get(n_tag)
         if player:
             return player

@@ -91,7 +91,6 @@ class aClashSeason():
     def get_current_season(cls):
         now = pendulum.now()
         season = aClashSeason(now.format('M-YYYY'))
-
         if now < season.season_start:
             season = aClashSeason(now.subtract(months=1).format('M-YYYY'))
         return season
@@ -172,14 +171,14 @@ class aClashSeason():
     ##################################################        
     @property
     def is_current(self):
-        if pendulum.now().int_timestamp >= self.season_end.int_timestamp:
-            self.load()
         return self._is_current
     @is_current.setter
     def is_current(self,boolean:bool):
         if boolean:
             for current_season in dSeason.objects(s_is_current=True):
                 current_season.s_is_current = False
+                s = aClashSeason(current_season.s_id)
+                s.load()
                 current_season.save()
         self._is_current = boolean
         self.save_season_to_db()

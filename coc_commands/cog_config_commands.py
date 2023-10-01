@@ -11,7 +11,7 @@ from coc_data.objects.discord.clan_link import ClanGuildLink
 from coc_data.objects.discord.recruiting_reminder import RecruitingReminder
 from coc_data.objects.discord.clan_panel import GuildClanPanel
 from coc_data.objects.discord.apply_panel import GuildApplicationPanel
-from coc_data.objects.season.season import aClashSeason
+from coc_data.objects.season.season import dSeason, aClashSeason
 
 from coc_data.utilities.utils import *
 from coc_data.utilities.components import *
@@ -101,7 +101,7 @@ class ClashServerConfig(commands.Cog):
     #####
     ############################################################
     ############################################################
-
+    
     ##################################################
     ### PARENT COMMAND GROUPS
     ##################################################

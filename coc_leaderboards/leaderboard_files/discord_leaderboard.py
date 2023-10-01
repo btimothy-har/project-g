@@ -627,7 +627,7 @@ class ClanGamesLeaderboard():
             embed.description += leaderboard_text
         
         else:
-            async for lb_clan in AsyncIter(self.lb_clans):
+            async for lb_clan in AsyncIter(self.parent.lb_clans):
                 wl_players = self.leaderboard_players.get(lb_clan.tag,[])
                 wl_players.sort(key=lambda x: (getattr(x,'score',0)),reverse=True)
 

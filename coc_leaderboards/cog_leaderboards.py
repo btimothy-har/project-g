@@ -47,7 +47,7 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.1.2"
+    __version__ = "1.1.3"
 
     def __init__(self,bot):        
         self.bot = bot 
@@ -375,7 +375,7 @@ class Leaderboards(commands.Cog):
             )
         await interaction.edit_original_response(embed=embed,view=None)
     
-    @tasks.loop(minutes=15.0)
+    @tasks.loop(minutes=20.0)
     async def update_leaderboards(self):
         if self.leaderboard_lock.locked():
             return
