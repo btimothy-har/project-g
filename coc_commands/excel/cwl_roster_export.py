@@ -92,7 +92,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
             col += 1
     
     participating_clans = WarLeagueClan.participating_by_season(season=season)    
-    for cwl_clan in AsyncIter(participating_clans):
+    async for cwl_clan in AsyncIter(participating_clans):
         clan_ws = workbook.add_worksheet(cwl_clan.name)
 
         row = 0
