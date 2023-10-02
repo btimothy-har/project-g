@@ -483,7 +483,7 @@ class aClan(coc.Clan):
             league_group = await self.client.cog.get_league_group(self.tag)        
         
         if not current_war and league_group:
-            league_clan = league_group.get_clan(self.clan.tag)
+            league_clan = league_group.get_clan(self.tag)
             current_war = league_clan.current_war        
         return current_war
 
