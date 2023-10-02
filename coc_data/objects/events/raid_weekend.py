@@ -351,12 +351,8 @@ class aRaidWeekend():
         draw.text((550, 370), f"{self.offensive_reward * 6}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke,stroke_fill=(0, 0, 0), font=split_medal_font)
         draw.text((1245, 370), f"{self.defensive_reward}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=split_medal_font)
 
-        def save_im(background):
-            fpdir = self.bot.get_cog('ClashOfClans').resource_path + '/raid_results'
-            if not os.path.exists(fpdir):
-                os.makedirs(fpdir)
-
-            fp = fpdir + f"{self.clan_name} - {self.start_time.format('DD MMM YYYY')}.png"
+        def save_im(background):            
+            fp = self.client.bot.coc_imggen_path + f"{self.clan_name} - {self.start_time.format('DD MMM YYYY')}.png"
             background.save(fp, format="png", compress_level=1)
             file = discord.File(fp,filename="raid_image.png")
             return file

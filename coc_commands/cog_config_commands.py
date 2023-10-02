@@ -101,7 +101,19 @@ class ClashServerConfig(commands.Cog):
     #####
     ############################################################
     ############################################################
-    
+
+    @commands.command(name="debugraids")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_debug_raids(self,ctx):
+
+        await ctx.send("Debugging Raids")
+        clan = await aClan.create('#92G9J8CG')
+        current_raid = await clan.get_raid_weekend()
+
+        image = await current_raid.get_results_image()
+        await ctx.send(file=image)
+
     ##################################################
     ### PARENT COMMAND GROUPS
     ##################################################
