@@ -43,6 +43,10 @@ class ClashOfClansClient(commands.Cog):
         self.bot.coc_report_path = f"{cog_data_path(self)}/reports"
         if not os.path.exists(self.bot.coc_report_path):
             os.makedirs(self.bot.coc_report_path)
+        
+        self.bot.coc_imggen_path = f"{cog_data_path(self)}/imggen"
+        if not os.path.exists(self.bot.coc_imggen_path):
+            os.makedirs(self.bot.coc_imggen_path)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
