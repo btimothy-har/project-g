@@ -29,7 +29,7 @@ from .objects.events.raid_weekend import db_RaidWeekend, aRaidWeekend
 
 from .objects.discord.member import aMember
 from .objects.discord.guild import aGuild
-from .objects.discord.apply_panel import db_ClanApplication, account_recruiting_summary
+from .objects.discord.apply_panel import db_ClanApplication, GuildApplicationPanel, account_recruiting_summary
 from .objects.discord.recruiting_reminder import RecruitingReminder
 from .objects.discord.clan_link import ClanGuildLink
 
@@ -93,7 +93,7 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.1"
+    __version__ = "2023.10.2"
 
     def __init__(self,bot):
         self.bot = bot
@@ -516,7 +516,8 @@ class ClashOfClansData(commands.Cog):
         await asyncio.sleep(2)        
         
         guild = aGuild(channel.guild.id)
-        if len(guild.apply_panels) == 0:
+        application_panels = await GuildApplicationPanel.get_guild_panels(guild.id) 
+        if len(application_panels) == 0:
             return
         
         async for message in channel.history(limit=1,oldest_first=True):
