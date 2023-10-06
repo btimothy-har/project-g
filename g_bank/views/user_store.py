@@ -147,7 +147,7 @@ class UserStore(DefaultView):
                 message=f"### **Welcome to the Guild Store!**"
                     + f"\nYou have: {bal:,} {await bank.get_currency_name()}"
                     + "\n\nThere are no items available in the Store at this time.",
-                thumbnail=self.guild.icon_url
+                thumbnail=self.guild.icon.url
                 )        
         elif len(self.store_categories) > 1:
             embed = await clash_embed(
