@@ -12,6 +12,8 @@ from ..utilities.utils import *
 from ..utilities.components import *
 from ..constants.coc_emojis import *
 
+bot_client = BotClashClient()
+
 class MemberDonationDelta():
     def __init__(self,member,cached_member=None):
         self.member = member
@@ -27,15 +29,13 @@ class MemberDonationDelta():
 
 class ClanDonationFeed():
     def __init__(self,clan:aClan,cached_clan:aClan):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
         self.clan = clan
         self.cached_clan = cached_clan
         self.raw_data = None
     
     async def embed(self):
         embed = await clash_embed(
-            context=self.bot,
+            context=bot_client.bot,
             title=f"**{self.clan.name}** ({self.clan.tag})",
             show_author=False,
             embed_color=discord.Colour.default(),
@@ -43,16 +43,13 @@ class ClanDonationFeed():
             url=self.clan.share_link,
             timestamp=pendulum.now()
             )
-        embed.add_field(
-            name="Donated",
-            value="\n".join([f"{EmojisClash.DONATIONSOUT} `{m.donated_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.donated_chg > 0]),
-            inline=False
-            )
-        embed.add_field(
-            name="Received",
-            value="\n".join([f"{EmojisClash.DONATIONSRCVD} `{m.received_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.received_chg > 0]),
-            inline=False
-            )
+        if len(m for m in self.raw_data if m.donated_chg > 0):
+            embed.description += "\n**Donated**"
+            embed.description += "\n".join([f"{EmojisClash.DONATIONSOUT} `{m.donated_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.donated_chg > 0])
+
+        if len(m for m in self.raw_data if m.received_chg > 0):
+            embed.description += "\n**Received**"
+            embed.description += "\n".join([f"{EmojisClash.DONATIONSRCVD} `{m.received_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.received_chg > 0])
         return embed
 
     @classmethod
@@ -71,13 +68,12 @@ class ClanDonationFeed():
 
         if len([m for m in feed.raw_data if (m.donated_chg + m.received_chg) > 0]) > 0:
             embed = await feed.embed()
-            send_tasks = [asyncio.create_task(feed.send_to_discord(embed,feed_data)) for feed_data in feed.clan.donation_feed]
-            await asyncio.gather(*send_tasks)
+            await asyncio.gather(*(feed.send_to_discord(embed,feed_data) for feed_data in feed.clan.donation_feed))
     
     async def send_to_discord(self,embed,data_feed:db_ClanDataFeed):
-        channel = self.bot.get_channel(data_feed.channel_id)
+        channel = bot_client.bot.get_channel(data_feed.channel_id)
         if channel:
-            webhook = await get_bot_webhook(self.bot,channel)
+            webhook = await get_bot_webhook(bot_client.bot,channel)
             if isinstance(channel,discord.Thread):
                 await webhook.send(
                     username=self.clan.name,

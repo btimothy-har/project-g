@@ -1,6 +1,7 @@
 import asyncio
 import discord
 import pendulum
+import re
 
 from typing import *
 from mongoengine import *
@@ -19,6 +20,8 @@ from ...constants.coc_constants import *
 from ...constants.coc_emojis import *
 from ...constants.ui_emojis import *
 from ...exceptions import *
+
+bot_client = BotClashClient()
 
 ##################################################
 #####
@@ -74,20 +77,17 @@ class GuildApplicationPanel():
 
     @staticmethod
     async def start_rtd_onboarding(interaction:discord.Interaction):
-        rtd_clan = await aClan.create(tag='#2L90QPRL9')
+        rtd_clan = await bot_client.cog.fetch_clan(tag='#2L90QPRL9')
         view = ClanApplyMenuUser(interaction,[rtd_clan])
         await view.rtd_onboarding()
 
     @staticmethod
     async def start_user_application(interaction:discord.Interaction,clan_tags:Optional[list[str]]=[]):
-        clans = [await aClan.create(tag=tag) for tag in clan_tags]
+        clans = [await bot_client.cog.fetch_clan(tag=tag) for tag in clan_tags]
         view = ClanApplyMenuUser(interaction,clans)
         await view.start()
 
-    def __init__(self,database_entry:db_GuildApplyPanel):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-        
+    def __init__(self,database_entry:db_GuildApplyPanel):        
         self.id = database_entry.panel_id
         
         self.guild_id = database_entry.server_id
@@ -143,7 +143,7 @@ class GuildApplicationPanel():
         return cls(panel)
 
     @classmethod
-    def get_guild_panels(cls,guild_id:int):
+    async def get_guild_panels(cls,guild_id:int):
         return [cls(link) for link in db_GuildApplyPanel.objects(server_id=guild_id)]
     
     @classmethod
@@ -176,20 +176,20 @@ class GuildApplicationPanel():
         return cls(panel)
 
     @property
-    def guild(self):
-        return self.bot.get_guild(self.guild_id)
+    def guild(self) -> Optional[discord.Guild]:
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
-    def channel(self):
+    def channel(self) -> Optional[discord.TextChannel]:
         if not self.guild:
             return None
         return self.guild.get_channel(self.channel_id)
 
     @property
-    def listener_channel(self):
+    def listener_channel(self) -> Optional[discord.TextChannel]:
         return self.guild.get_channel(self._tickettool_channel)
     
-    async def fetch_message(self):
+    async def fetch_message(self) -> Optional[discord.Message]:
         if self.channel:
             try:
                 return await self.channel.fetch_message(self.message_id)
@@ -213,7 +213,7 @@ class GuildApplicationPanel():
                 message = await message.edit(embed=embed,view=apply_view)
         
         except Exception as exc:
-            self.client.cog.coc_main_log.exception(
+            bot_client.cog.coc_main_log.exception(
                 f"Error sending Application Panel to Discord: {self.guild.name} {getattr(self.channel,'name','Unknown Channel')}. {exc}"
                 )
 
@@ -295,8 +295,6 @@ class ClanApplyMenuUser(DefaultView):
         context:discord.Interaction,
         apply_clans:Optional[list[aClan]]):
 
-        self.client = BotClashClient()
-
         try:
             self.panel = GuildApplicationPanel.get_panel(
                 guild_id=context.guild.id,
@@ -304,8 +302,8 @@ class ClanApplyMenuUser(DefaultView):
                 )
         except DoesNotExist:
             self.panel = None
-        self.member = self.client.cog.get_member(context.user.id,context.guild.id)
-        self.clans = apply_clans        
+        self.member = bot_client.cog.get_member(context.user.id,context.guild.id)
+        self.clans = apply_clans
 
         super().__init__(context,timeout=300)
     
@@ -328,7 +326,7 @@ class ClanApplyMenuUser(DefaultView):
 
         async for a in AsyncIter(self.member.account_tags[:20]):
             try:
-                player = await aPlayer.create(tag=a)
+                player = await bot_client.cog.fetch_player(tag=a)
             except Exception:
                 pass
             else:
@@ -376,28 +374,33 @@ class ClanApplyMenuUser(DefaultView):
         await interaction.response.defer(ephemeral=True)
 
         accounts = []
-        q_tags = modal.children[0]
+        q_tags = [q for q in modal.children if q.label == "Your Clash Player Tags, separated by spaces."][0]
         tags = re.split('[^a-zA-Z0-9]', q_tags.value)
-
-        accounts_task = [asyncio.create_task(
-            aPlayer.create(tag=a) for a in tags
-            )]
 
         q1 = modal.children[1] if len(modal.children) > 1 else None
         q2 = modal.children[2] if len(modal.children) > 2 else None
         q3 = modal.children[3] if len(modal.children) > 3 else None
         q4 = modal.children[4] if len(modal.children) > 4 else None
 
-        accounts_return = await asyncio.gather(*accounts_task,return_exceptions=True)        
-        async for a in AsyncIter(accounts_return):
-            if isinstance(a,aPlayer):
-                accounts.append(a)                
-                if a.discord_user == 0:
-                    a.discord_user = self.member.user_id
+        tags_chk = []
+        async for a in AsyncIter(tags):
+            if not coc.utils.is_valid_tag(a):
+                continue
+            ntag = coc.utils.correct_tag(a)
+            try:
+                player = await bot_client.cog.fetch_player(tag=ntag)
+            except InvalidTag:
+                pass
+            except ClashAPIError:
+                tags_chk.append(ntag)
+            else:
+                tags_chk.append(player.tag)
+                if player.discord_user == 0:
+                    player.discord_user = self.member.user_id
         
         if len(self.clans) == 0:
             eligible_townhalls = set([a.town_hall.level for a in accounts])
-            guild_clans = self.client.cog.get_guild.clans
+            guild_clans = [await c.get_full_clan() for c in bot_client.cog.get_guild(interaction.guild.id).clans]
 
             async for clan in AsyncIter(guild_clans):
                 recruiting_ths = set(clan.recruitment_level)
@@ -408,7 +411,7 @@ class ClanApplyMenuUser(DefaultView):
             applicant_id = self.member.user_id,
             guild_id = self.member.guild_id,
             created = pendulum.now().int_timestamp,
-            tags = [a.tag for a in accounts],
+            tags = tags_chk,
             clans = [c.tag for c in self.clans],
             answer_q1 = [getattr(q1,'label',''),getattr(q1,'value','')],
             answer_q2 = [getattr(q2,'label',''),getattr(q2,'value','')],
@@ -420,6 +423,10 @@ class ClanApplyMenuUser(DefaultView):
         app_id = str(application.pk)
 
         await self.panel.listener_channel.send(f"{self.panel.tickettool_prefix}ticket {app_id} {self.member.user_id}")
+        if interaction.guild.id == 680798075685699691:
+            await self.panel.listener_channel.send(
+                f"Tags: {tags_chk}"
+                )
 
         now = pendulum.now()
         while True:
@@ -535,7 +542,7 @@ class ClanApplyMenuUser(DefaultView):
 
         async for tag in AsyncIter(tags):
             try:
-                player = await aPlayer.create(tag=tag)
+                player = await bot_client.cog.fetch_player(tag=tag)
             except:
                 continue
             else:
@@ -551,7 +558,7 @@ class ClanApplyMenuUser(DefaultView):
             message += f"\n{player.title}"
         await interaction.edit_original_response(content=message,view=None)
 
-        member = self.client.cog.get_member(interaction.user.id,interaction.guild.id)
+        member = bot_client.cog.get_member(interaction.user.id,interaction.guild.id)
         await member.sync_clan_roles()
 
 def account_recruiting_summary(account:aPlayer):

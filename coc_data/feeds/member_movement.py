@@ -13,6 +13,8 @@ from ..constants.coc_emojis import *
 from ..utilities.utils import *
 from ..utilities.components import *
 
+bot_client = BotClashClient()
+
 class MemberDonationDelta():
     def __init__(self,member,cached_member=None):
         self.member = member
@@ -28,14 +30,12 @@ class MemberDonationDelta():
 
 class ClanMemberFeed():
     def __init__(self,clan:aClan,player_tag:str):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
         self.clan = clan
         self.player_tag = player_tag
         self.player = None
     
     async def fetch_player(self):
-        self.player = await aPlayer.create(self.player_tag,no_cache=True)
+        self.player = await bot_client.cog.fetch_player(self.player_tag,no_cache=True)
 
     @classmethod
     async def member_join(cls,clan:aClan,player_tag:str):
@@ -46,12 +46,11 @@ class ClanMemberFeed():
         await feed.fetch_player()
         embed = await feed.join_embed()
 
-        send_tasks = [asyncio.create_task(feed.send_to_discord(embed,feed_data)) for feed_data in clan.member_feed]
-        await asyncio.gather(*send_tasks)
+        await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
     
     async def join_embed(self):
         embed = await clash_embed(
-            context=self.bot,
+            context=bot_client.bot,
             title=f"**{self.player.name}** ({self.player.tag})",
             message=(f"{self.player.discord_user_str}\n" if self.player.discord_user else "")
                 + (f"{self.player.member_description}\n" if self.player.is_member else "")
@@ -77,8 +76,7 @@ class ClanMemberFeed():
         await feed.fetch_player()
         embed = await feed.leave_embed()
 
-        send_tasks = [asyncio.create_task(feed.send_to_discord(embed,feed_data)) for feed_data in clan.member_feed]
-        await asyncio.gather(*send_tasks)
+        await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
     
     async def leave_embed(self):
         embed = await clash_embed(

@@ -13,6 +13,8 @@ from coc_client.api_client import BotClashClient
 #3 Random
 #4 Cash
 
+bot_client = BotClashClient()
+
 class db_ShopItem(Document):
     guild_id = IntField(required=True)
     type = StringField(required=True)
@@ -52,8 +54,7 @@ class ShopItem():
         items = db_ShopItem.objects(guild_id=guild_id,category=category,disabled=False)
         return [cls(item) for item in items]
 
-    def __init__(self,database_entry:db_ShopItem):
-        self.client = BotClashClient()        
+    def __init__(self,database_entry:db_ShopItem):      
         self.id = str(database_entry.id)
 
         self.guild_id = database_entry.guild_id
@@ -117,7 +118,7 @@ class ShopItem():
 
     @property
     def guild(self):
-        return self.client.bot.get_guild(self.guild_id)
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
     def stock(self):

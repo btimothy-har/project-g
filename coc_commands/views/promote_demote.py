@@ -3,7 +3,9 @@ import discord
 from typing import *
 from redbot.core import commands
 
-from coc_data.objects.clans.clan import aClan
+from coc_client.api_client import BotClashClient
+
+from coc_data.objects.clans.clan import *
 from coc_data.objects.discord.member import aMember
 
 from coc_data.utilities.components import *
@@ -15,6 +17,8 @@ from coc_data.exceptions import *
 
 from ..helpers.components import *
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 ###################################################################################################
 #####
@@ -73,7 +77,7 @@ class MemberRankMenu():
                 context=self.ctx,
                 message=f"You don't seem to have permission to promote {self.member.mention} in any of their clans."
                     + f"\n\n> - Only Leaders or Co-Leaders of a Clan can promote elders/members."
-                    + f"\n> - Leaders and Co-Leaders cannot be promoted further. To change a Clan Leader, please contact <@644530507505336330>.",
+                    + f"\n> - Leaders and Co-Leaders cannot be promoted further. Only the current Leader of a Clan can assign a new Leader.",
                 success=False
                 )
             if isinstance(self.ctx,discord.Interaction):
@@ -162,7 +166,7 @@ class MemberRankMenu():
             embed.add_field(
                 name=f"{clan.title}",
                 value=f"Current Rank: {self.get_current_rank(clan)}"
-                    + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.accounts if a.home_clan == clan])
+                    + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.member_accounts if a.home_clan.tag == clan.tag])
                     + "\n\u200b",
                 inline=False
                 )
@@ -190,7 +194,7 @@ class MemberRankMenu():
             context=self.ctx,
             message=f"**Please confirm you want to __{self.rank_action_text}__ {self.member.mention} in {target_clan}.**"
                 + f"\n\nCurrent Rank: {self.get_current_rank(target_clan)}"
-                + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.accounts if a.home_clan == target_clan]),
+                + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.member_accounts if a.home_clan.tag == target_clan.tag]),
             thumbnail=self.member.display_avatar,
             )
         confirmation_view = MenuConfirmation(self.ctx)
@@ -222,12 +226,21 @@ class MemberRankMenu():
     async def _apply_rank_changes(self,target_clan:str):
         report_output = ""
 
-        clan = await aClan.create(target_clan)
+        clan = await bot_client.cog.fetch_clan(target_clan)
         current_rank_int = ClanRanks.get_number(self.get_current_rank(clan))
         new_rank = ClanRanks.get_rank(current_rank_int + self.rank_action)
 
         if new_rank:
-            await clan.update_member_rank(self.member.user_id,new_rank)
+            if new_rank == "Member":
+                await clan.remove_coleader(self.member.user_id)
+                await clan.remove_elder(self.member.user_id)
+            
+            if new_rank == "Elder":
+                await clan.new_elder(self.member.user_id)
+            
+            if new_rank == "Co-Leader":
+                await clan.new_coleader(self.member.user_id)
+
             report_output += f"{EmojisUI.TASK_CHECK} {self.member.mention} is now a **{new_rank}** in {clan.title}.\n"
 
             roles_added, roles_removed = await self.member.sync_clan_roles(self.ctx)
@@ -255,7 +268,7 @@ class MemberRankMenu():
     ##################################################
     ### HELPERS
     ##################################################
-    def _predicate_is_eligible_clan(self,clan:aClan):
+    def _predicate_is_eligible_clan(self,clan:BasicClan):
         if self.member.user_id == clan.leader:
             return False
         elif self.member.user_id in clan.coleaders:
@@ -288,7 +301,7 @@ class MemberRankMenu():
             else:
                 return False
     
-    def get_current_rank(self,clan:aClan):
+    def get_current_rank(self,clan:BasicClan):
         if self.member.user_id in clan.coleaders:
             current_rank = "Co-Leader"
         elif self.member.user_id in clan.elders:

@@ -5,6 +5,8 @@ from coc_client.api_client import BotClashClient
 
 from ..season.season import aClashSeason
 
+bot_client = BotClashClient()
+
 class aPlayerStat():
     def __init__(self,
         tag:str,
@@ -69,7 +71,7 @@ class aPlayerStat():
         if player.timestamp >= self.season.cwl_end and getattr(player.clan,'is_alliance_clan',False):
             self.season_only_clan += stat_increment        
         if stat_increment > 0:
-            self.client.cog.coc_data_log.debug(
+            bot_client.cog.coc_data_log.debug(
                 f"{self.tag} {self.season.description}: {self.description} updated to {self.season_only_clan} / {self.season_total} ({stat_increment}). Received: {new_value} vs {self.last_update}."
                 )
 

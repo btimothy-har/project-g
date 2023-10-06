@@ -6,7 +6,7 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
-from coc_data.objects.clans.clan import feed_description, aClan
+from coc_data.objects.clans.clan import aClan, feed_description
 from coc_data.utilities.components import *
 
 from coc_data.constants.ui_emojis import *
@@ -19,8 +19,12 @@ class ClanSettingsMenu(DefaultView):
         context:Union[commands.Context,discord.Interaction],
         clan:aClan):
         
-        self.clan = clan        
-        self.main_menu_options = ['Recruiting','Discord Feed','War Reminders','Raid Reminders']
+        self.clan = clan
+        if self.clan.is_alliance_clan:
+            self.main_menu_options = ['Recruiting']
+        else:
+            self.main_menu_options = []
+        self.main_menu_options.extend(['Discord Feed','War Reminders','Raid Reminders'])
             
         super().__init__(context)
     
@@ -63,7 +67,6 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             message=f"**Menu closed**")
         await interaction.response.edit_message(embed=embed,view=None,delete_after=60)
-
     
     def home_button(self):
         return DiscordButton(
@@ -150,12 +153,13 @@ class ClanSettingsMenu(DefaultView):
                 + f"\n\n**To change Clan Settings, select an option from the dropdown below.**"
                 + f"\n\u200b",
             thumbnail=self.clan.badge
-            )        
-        embed.add_field(
-            name="__**Recruiting**__",
-            value=f"Configure a Clan's Recruiting Configuration, such as the recruiting TH Levels, the custom Description and Recruiting instructions.\n\u200b",
-            inline=False
-            )        
+            )
+        if self.clan.is_alliance_clan:
+            embed.add_field(
+                name="__**Recruiting**__",
+                value=f"Configure a Clan's Recruiting Configuration, such as the recruiting TH Levels, the custom Description and Recruiting instructions.\n\u200b",
+                inline=False
+                )
         embed.add_field(
             name="__**Discord Feed**__",
             value=f"Configure the automated bot feed in Discord, such as the Donation and Join/Leave log.\n\u200b",
@@ -215,7 +219,7 @@ class ClanSettingsMenu(DefaultView):
             if response_msg.content.lower() == "cancel":
                 pass
             else:
-                self.clan.c_description = response_msg.content
+                await self.clan.change_description(response_msg.content)
             await response_msg.delete()
         finally:
             self.waiting_for = False
@@ -306,7 +310,7 @@ class ClanSettingsMenu(DefaultView):
             message=f"**TH Levels:** {self.clan.recruitment_level_emojis}"
                 + f"\n*To change the Recruiting THs, select values from the dropdown.*"
                 + f"\n\n**Clan Description**"
-                + f"\n{self.clan.c_description}"
+                + f"\n{self.clan.description}"
                 + f"\n\n**Recruiting Instruction**"
                 + f"\n{self.clan.recruitment_info}"
                 ,
@@ -422,9 +426,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete Feed",
             row=0
             )        
-        if len(self.clan.member_feed) + len(self.clan.donation_feed) >= 20:
+        if len(self.clan.discord_feeds) >= 20:
             add_feed_button.disabled = True        
-        if len(self.clan.member_feed) + len(self.clan.donation_feed) == 0:
+        if len(self.clan.discord_feeds) == 0:
             delete_feed_button.disabled = True
 
         self.add_item(self.home_button())
@@ -499,12 +503,22 @@ class ClanSettingsMenu(DefaultView):
             value=str(feed.pk))
             for feed in self.clan.donation_feed if feed.guild_id == self.guild.id
             ]
-        options = clan_member_feed_options + clan_donation_feed_options
+        clan_capital_raid_feed_options = [discord.SelectOption(
+            label=f"Raid Results: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
+            value=str(feed.pk))
+            for feed in self.clan.capital_raid_results_feed if feed.guild_id == self.guild.id
+            ]
+        capital_contribution_options = [discord.SelectOption(
+            label=f"Capital Gold Contribution: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
+            value=str(feed.pk))
+            for feed in self.clan.capital_contribution_feed if feed.guild_id == self.guild.id
+            ]
+        options = clan_member_feed_options + clan_donation_feed_options + clan_capital_raid_feed_options + capital_contribution_options
         
         if len(options) > 0:            
             select_feed_type = DiscordSelectMenu(
                 function=self._callback_delete_feed,
-                options=clan_member_feed_options,
+                options=options,
                 placeholder="Select a Feed to Delete.",
                 min_values=1,
                 max_values=len(options),
@@ -662,9 +676,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete War Reminder",
             row=0
             )
-        if len(self.clan.war_reminders) >= 20:
+        if len(self.clan.clan_war_reminders) >= 20:
             add_reminder_button.disabled = True
-        if len(self.clan.war_reminders) == 0:
+        if len(self.clan.clan_war_reminders) == 0:
             delete_reminder_button.disabled = True
         self.add_item(self.home_button())
         self.add_item(add_reminder_button)
@@ -758,7 +772,7 @@ class ClanSettingsMenu(DefaultView):
             value=str(reminder.pk),
             description=f"Type: {chat.humanize_list(reminder.sub_type)}"
             )
-            for reminder in self.clan.war_reminders if reminder.guild_id == self.guild.id
+            for reminder in self.clan.clan_war_reminders if reminder.guild_id == self.guild.id
             ]
         
         if len(clan_war_reminder_options) > 0:            
@@ -780,11 +794,11 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             title=f"War Reminders: {self.clan.title}",
             message=f"**Only Reminders for the current Server are displayed below.**"
-                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.war_reminders if r.guild_id == self.guild.id])}** available (max 20)"
+                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.clan_war_reminders if r.guild_id == self.guild.id])}** available (max 20)"
                 + "\n\u200b",
             thumbnail=self.clan.badge
             )
-        async for reminder in AsyncIter(self.clan.war_reminders):
+        async for reminder in AsyncIter(self.clan.clan_war_reminders):
             if reminder.guild_id != self.guild.id:
                 continue
             channel = self.bot.get_channel(reminder.channel_id)
@@ -792,7 +806,8 @@ class ClanSettingsMenu(DefaultView):
                 name=f"{getattr(channel,'name','Unknown Channel')}",
                 value=(f"Channel: {getattr(channel,'mention','')}\n" if channel else "")
                     + f"War Types: {chat.humanize_list(reminder.sub_type)}"
-                    + f"\nInterval: {chat.humanize_list(sorted(reminder.reminder_interval,reverse=True))} hour(s)",
+                    + f"\nInterval: {chat.humanize_list(sorted(reminder.reminder_interval,reverse=True))} hour(s)"
+                    + f"\nCurrent: {chat.humanize_list(reminder.interval_tracker)} hour(s)",
                 inline=False
                 )        
         return embed
@@ -910,9 +925,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete Raid Reminder",
             row=0
             )
-        if len(self.clan.raid_reminders) >= 20:
+        if len(self.clan.capital_raid_reminders) >= 20:
             add_reminder_button.disabled = True
-        if len(self.clan.raid_reminders) == 0:
+        if len(self.clan.capital_raid_reminders) == 0:
             delete_reminder_button.disabled = True
         self.add_item(self.home_button())
         
@@ -982,7 +997,7 @@ class ClanSettingsMenu(DefaultView):
             label=f"Raid Reminder: {getattr(self.bot.get_channel(reminder.channel_id),'name','Unknown Channel')}",
             value=str(reminder.pk),
             )
-            for reminder in self.clan.raid_reminders if reminder.guild_id == self.guild.id
+            for reminder in self.clan.capital_raid_reminders if reminder.guild_id == self.guild.id
             ]
         if len(clan_raid_reminder_options) > 0:            
             select_reminder_delete = DiscordSelectMenu(
@@ -1003,18 +1018,19 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             title=f"Raid Reminders: {self.clan.title}",
             message=f"**Only Reminders for the current Server are displayed below.**"
-                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.raid_reminders if r.guild_id == self.guild.id])}** available (max 20)"
+                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.capital_raid_reminders if r.guild_id == self.guild.id])}** available (max 20)"
                 + "\n\u200b",
             thumbnail=self.clan.badge
             )
-        async for reminder in AsyncIter(self.clan.raid_reminders):
+        async for reminder in AsyncIter(self.clan.capital_raid_reminders):
             if reminder.guild_id != self.guild.id:
                 continue
             channel = self.bot.get_channel(reminder.channel_id)
             embed.add_field(
                 name=f"{getattr(channel,'name','Unknown Channel')}",
                 value=(f"Channel: {getattr(channel,'mention','')}\n" if channel else "")
-                    + f"Interval: {chat.humanize_list(reminder.reminder_interval)} hour(s)",
+                    + f"Interval: {chat.humanize_list(reminder.reminder_interval)} hour(s)"
+                    + f"\nCurrent: {chat.humanize_list(reminder.interval_tracker)} hour(s)",
                 inline=False
                 )        
         return embed

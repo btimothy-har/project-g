@@ -11,10 +11,13 @@ from functools import cached_property
 from coc_client.api_client import BotClashClient
 
 from redbot.core.utils import AsyncIter
-from .clan_war_summary import aSummaryWarStats
+
 from .clan_war_leagues import WarLeagueGroup
+from .war_summary import aSummaryWarStats
 
 from ..season.season import aClashSeason
+from ..clans.base_clan import BasicClan
+from ..players.base_player import BasicPlayer
 
 from ...utilities.utils import *
 from ...utilities.components import *
@@ -73,8 +76,7 @@ class aClanWar():
         else:
             query = db_ClanWar.objects(
                 Q(members__tag=player_tag)
-                ).only('war_id')
-        
+                ).only('war_id')        
         ret_wars = [cls(war_id=war.war_id) for war in query]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
@@ -89,8 +91,7 @@ class aClanWar():
         else:
             query = db_ClanWar.objects(
                 Q(clans__tag=clan_tag)
-                ).only('raid_id')
-        
+                ).only('raid_id')        
         ret_war = [cls(war_id=war.war_id) for war in query]
         return sorted(ret_war, key=lambda w:(w.preparation_start_time),reverse=True)
 
@@ -189,25 +190,10 @@ class aClanWar():
             clan_war.is_alliance_war = False
         
         if clan_war.do_i_save:
-            clan_war.save_war_to_db()
-
+            clan_war.save_to_database()
         return clan_war
 
-    @property
-    def do_i_save(self):
-        if not self._found_in_db:
-            return True
-        if self.state == 'inWar':
-            if not self._last_save:
-                return True
-            if self._last_save.diff().in_minutes() > 60:
-                return True
-        if self.end_time <= pendulum.now() <= self.end_time.add(hours=2):
-            return True
-        return False
-
-    def save_war_to_db(self):
-        #self.bot.clash_state.data.add_to_cache(clan_war)
+    def save_to_database(self):
         self._last_save = pendulum.now()
         db_war = db_ClanWar(
             war_id=self.war_id,
@@ -227,6 +213,20 @@ class aClanWar():
             last_save=self._last_save.int_timestamp
             )
         db_war.save()
+    
+    @property
+    def do_i_save(self):
+        now = pendulum.now()
+        if not self._found_in_db:
+            return True
+        if self.state == 'inWar':
+            if not self._last_save:
+                return True
+            if now.int_timestamp - getattr(self._last_save,'int_timestamp',0) > 60:
+                return True
+        if self.end_time <= pendulum.now() <= self.end_time.add(hours=2):
+            return True
+        return False
 
     ##################################################
     ##### DATA FORMATTERS
@@ -342,18 +342,20 @@ class aClanWar():
                 )
         return embed
 
-class aWarClan():
+class aWarClan(BasicClan):
     def __init__(self,war,**kwargs):
         self.war = war
 
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
 
+        BasicClan.__init__(self)
+
         self.exp_earned = 0
 
         if json_data:
             self.tag = json_data['tag']
-            self._name = json_data['name']
+            self.name = json_data['name']
             self.badge = json_data.get('badge',None)
             self.level = json_data.get('level',None)
             self.stars = json_data['stars']
@@ -366,18 +368,9 @@ class aWarClan():
             else:
                 self.attacks_used = json_data['total_attacks']
 
-            try:
-                self.is_alliance_clan = json_data['is_alliance_clan']
-            except KeyError:
-                clan = self.war.client.cog.get_clan(self.tag)
-                if clan and clan.tag:
-                    self.is_alliance_clan = clan.is_alliance_clan
-                else:
-                    self.is_alliance_clan = False
-
         if game_data:
             self.tag = game_data.tag
-            self._name = game_data.name
+            self.name = game_data.name
             self.badge = game_data.badge.url
             self.level = game_data.level
             self.stars = game_data.stars
@@ -385,25 +378,22 @@ class aWarClan():
             self.average_attack_duration = game_data.average_attack_duration
             self.attacks_used = game_data.attacks_used
 
-            try:
-                clan = self.war.client.cog.get_clan(self.tag)
-            except CacheNotReady:
-                self.is_alliance_clan = False
-            else:
-                if clan and clan.tag:
-                    self.is_alliance_clan = clan.is_alliance_clan
-                else:
-                    self.is_alliance_clan = False
-
         self.max_stars = self.war.team_size * self.war.attacks_per_member
         self._result = None
-    
-    @property
-    def name(self):
-        if check_rtl(self._name):
-            return '\u200F' + self._name + '\u200E'
-        return self._name
-    
+
+    def to_json(self):
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'badge': self.badge,
+            'level': self.level,
+            'stars': self.stars,
+            'destruction': self.destruction,
+            'average_attack_duration': self.average_attack_duration,
+            'exp_earned': self.exp_earned,
+            'attacks_used': self.attacks_used
+            }
+        
     @property
     def lineup(self):
         th_levels = defaultdict(int)        
@@ -418,12 +408,11 @@ class aWarClan():
             if player.unused_attacks > 0:
                 th_levels[player.town_hall] += player.unused_attacks
         return th_levels
+    
     @property
     def average_townhall(self):
         return round(sum([player.town_hall for player in self.members]) / len(self.members),2)    
-    @property
-    def clan(self):
-        return self.war.client.cog.get_clan(self.tag)
+    
     @property
     def emoji(self):
         if self.war.type == ClanWarType.CWL:
@@ -432,7 +421,7 @@ class aWarClan():
             return EmojisUI.HANDSHAKE
         elif self.war.type == ClanWarType.RANDOM:
             if self.is_alliance_clan:
-                return self.clan.emoji
+                return self._emoji
             else:
                 return EmojisClash.CLANWAR    
     @property
@@ -440,15 +429,19 @@ class aWarClan():
         if self._result is None or pendulum.now() < self.war.end_time:
             self.compute_result()
         return self._result
+    
     @property
     def members(self):
         return [m for m in self.war.members if m.clan_tag == self.tag]
+    
     @property
     def attacks(self):
         return [a for a in self.war.attacks if a.attacker.clan_tag == self.tag]
+    
     @property
     def unused_attacks(self):
         return sum([player.unused_attacks for player in self.members])
+    
     @property
     def defenses(self):
         return [a for a in self.war.attacks if a.defender.clan_tag == self.tag]
@@ -459,11 +452,12 @@ class aWarClan():
             if pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp > 3600:
                 del self._war_stats
         return self._war_stats
+    
     @cached_property
     def _war_stats(self):
-        return aSummaryWarStats(
-            war_log=[self.war],
-            clan=self.tag,
+        return aSummaryWarStats.for_clan(
+            clan_tag=self.tag,
+            war_log=[self.war]
             )
 
     def compute_result(self):
@@ -483,24 +477,11 @@ class aWarClan():
         else:
             self._result = WarResult.ended(WarResult.TIED) if pendulum.now() > self.war.end_time else WarResult.ongoing(WarResult.TIED)
 
-    def to_json(self):
-        clanJson = {
-            'tag': self.tag,
-            'name': self.name,
-            'is_alliance_clan': self.is_alliance_clan,
-            'badge': self.badge,
-            'level': self.level,
-            'stars': self.stars,
-            'destruction': self.destruction,
-            'average_attack_duration': self.average_attack_duration,
-            'exp_earned': self.exp_earned,
-            'attacks_used': self.attacks_used
-            }
-        return clanJson
-
-class aWarPlayer():
+class aWarPlayer(BasicPlayer):
     def __init__(self,war,**kwargs):
         self.war = war
+
+        BasicPlayer.__init__(self)
 
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
@@ -521,12 +502,21 @@ class aWarPlayer():
             self.map_position = game_data.map_position
             self.clan_tag = game_data.clan.tag
     
+    def to_json(self):
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'town_hall': self.town_hall,
+            'map_position': self.map_position,
+            'clan_tag': self.clan_tag
+            }
+    
     @property
-    def clan(self):
-        return self.war.get_clan(self.clan_tag)
+    def clan(self) -> aWarClan:
+        return self.war.get_clan(self.clan_tag)    
     @property
-    def opponent(self):
-        return self.war.get_opponent(self.clan_tag)
+    def opponent(self) -> aWarClan:
+        return self.war.get_opponent(self.clan_tag)    
     @property
     def attacks(self):
         return sorted([att for att in self.war.attacks if att.attacker_tag == self.tag],key=lambda x:x.order)
@@ -554,16 +544,6 @@ class aWarPlayer():
         if len(best_defense) > 0:
             return best_defense[0]
         return None
-
-    def to_json(self):
-        playerJson = {
-            'tag': self.tag,
-            'name': self.name,
-            'town_hall': self.town_hall,
-            'map_position': self.map_position,
-            'clan_tag': self.clan_tag
-            }
-        return playerJson
 
 class aWarAttack():
     def __init__(self,war,**kwargs):
@@ -607,29 +587,48 @@ class aWarAttack():
         self._new_stars = None
         self._new_destruction = None
     
+    def to_json(self):
+        if self.order:
+            return {
+                'warID': self.war.war_id,
+                'order': self.order,
+                'stars': self.stars,
+                'destruction': self.destruction,
+                'duration': self.duration,
+                'attacker_tag': self.attacker_tag,
+                'defender_tag': self.defender_tag,
+                'is_fresh_attack': self.is_fresh_attack
+                }
+        return None
+    
     @property
-    def attacker(self):
+    def attacker(self) -> aWarPlayer:
         return self.war.get_member(self.attacker_tag)
+    
     @property
-    def defender(self):
+    def defender(self) -> aWarPlayer:
         return self.war.get_member(self.defender_tag)
+    
     @property
-    def is_triple(self):
+    def is_triple(self) -> bool:
         if self.war.type == 'cwl':
             return self.stars==3
         return self.stars==3 and self.attacker.town_hall <= self.defender.town_hall
+    
     @property
-    def is_best_attack(self):
+    def is_best_attack(self) -> bool:
         if len(self.defender.defenses) == 0:
             return False
         return self.defender.best_opponent_attack.order == self.order
+    
     @property
-    def new_stars(self):
+    def new_stars(self) -> int:
         if pendulum.now() < self.war.end_time or self._new_stars is None:
             self.compute_attack_stats()
         return self._new_stars
+    
     @property
-    def new_destruction(self):
+    def new_destruction(self) -> float:
         if pendulum.now() < self.war.end_time or self._new_destruction is None:
             self.compute_attack_stats()
         return self._new_destruction
@@ -644,19 +643,3 @@ class aWarAttack():
                 base_destruction = attack.destruction
         self._new_stars = max(0,self.stars - base_stars)
         self._new_destruction = max(0,self.destruction - base_destruction)
-
-    def to_json(self):
-        if self.order:
-            attackJson = {
-                'warID': self.war.war_id,
-                'order': self.order,
-                'stars': self.stars,
-                'destruction': self.destruction,
-                'duration': self.duration,
-                'attacker_tag': self.attacker_tag,
-                'defender_tag': self.defender_tag,
-                'is_fresh_attack': self.is_fresh_attack
-                }
-            return attackJson
-        else:
-            return None

@@ -1,7 +1,6 @@
 import discord
 from typing import *
-from redbot.core import Config, commands, app_commands, bank
-from redbot.core.utils import AsyncIter
+from redbot.core import commands, bank
 from ..objects.item import ShopItem
 from ..objects.inventory import UserInventory
 

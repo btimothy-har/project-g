@@ -1,6 +1,5 @@
 from .checks import *
 
-from .objects.accounts import MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
 from .objects.item import ShopItem
 
@@ -8,19 +7,20 @@ from coc_client.api_client import BotClashClient
 from coc_data.objects.discord.member import aMember
 from coc_data.exceptions import CacheNotReady
 
+bot_client = BotClashClient()
+
 async def autocomplete_eligible_accounts(interaction:discord.Interaction,current:str):
     eligible_accounts = []
     if is_bank_admin(interaction):
         eligible_accounts.extend(['current','sweep','reserve'])
 
-    client = BotClashClient()
-
-    member = aMember(interaction.user.id)
+    
 
     try:
         if is_bank_admin(interaction):
-            eligible_clans = client.cog.get_alliance_clans()
+            eligible_clans = bot_client.cog.get_alliance_clans()
         else:
+            member = aMember(interaction.user.id)
             eligible_clans = member.coleader_clans
     except CacheNotReady:
         eligible_clans = []

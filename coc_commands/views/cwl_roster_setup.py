@@ -7,6 +7,8 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
+from coc_client.api_client import BotClashClient
+
 from coc_data.objects.season.season import aClashSeason
 from coc_data.objects.players.player import aPlayer
 from coc_data.objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
@@ -20,6 +22,8 @@ from coc_data.constants.coc_constants import *
 from coc_data.exceptions import *
 
 from ..helpers.components import *
+
+bot_client = BotClashClient()
 
 class CWLRosterMenu(DefaultView):
     def __init__(self,
@@ -72,7 +76,7 @@ class CWLRosterMenu(DefaultView):
     ##################################################
     async def setup_roster(self):        
         self.is_active = True
-        self.add_main_menu()
+        await self.add_main_menu()
         embeds = await self.clan_embed()
 
         if isinstance(self.ctx,discord.Interaction):
@@ -89,7 +93,7 @@ class CWLRosterMenu(DefaultView):
             await interaction.response.defer()
 
         embeds = await self.clan_embed()
-        self.add_main_menu()
+        await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     async def _callback_main_help(self,interaction:discord.Interaction,button:DiscordButton):
@@ -124,7 +128,7 @@ class CWLRosterMenu(DefaultView):
         for cwl_player in self.modified_to_save:
             cwl_player.save()
 
-        self.add_main_menu()
+        await self.add_main_menu()
 
         self._ph_save_button.label = "Saved!"
         self._ph_save_button.disabled = True
@@ -138,7 +142,7 @@ class CWLRosterMenu(DefaultView):
         for cwl_player in self.modified_to_save:
             cwl_player.load()
         
-        self.add_main_menu()
+        await self.add_main_menu()
         
         self._ph_reset_button.label = "Roster Reset"
         self._ph_reset_button.disabled = True
@@ -165,7 +169,7 @@ class CWLRosterMenu(DefaultView):
             cwl_player.save()
         await self.clan.finalize_roster()
 
-        self.add_main_menu()
+        await self.add_main_menu()
         embeds = await self.clan_embed()
         await interaction.edit_original_response(embeds=embeds,view=self)
         
@@ -183,7 +187,7 @@ class CWLRosterMenu(DefaultView):
         await interaction.response.defer()
         
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("Oops! No one seems to have signed up for CWL yet.",ephemeral=True)
             return await self._callback_home(interaction,button)
@@ -197,14 +201,15 @@ class CWLRosterMenu(DefaultView):
             group=CWLLeagueGroups.from_league_name(self.clan.league)
             )
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
-        async for p in AsyncIter(sorted(participants_not_rostered,key=lambda p:(p.player.town_hall.level,p.player.hero_strength),reverse=True)):
+        unrostered_players = await asyncio.gather(*(p.get_full_player() for p in participants_not_rostered))
+        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
             p.roster_clan = self.clan
             self.modified_to_save.append(p)
             if len(self.clan.participants) >= 15:
                 break
         
         embeds = await self.clan_embed()
-        self.add_main_menu()
+        await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)        
     
     async def _callback_autofill_30(self,interaction:discord.Interaction,button:DiscordButton):
@@ -215,14 +220,15 @@ class CWLRosterMenu(DefaultView):
             group=CWLLeagueGroups.from_league_name(self.clan.league)
             ) 
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
-        async for p in AsyncIter(sorted(participants_not_rostered,key=lambda p:(p.player.town_hall.level,p.player.hero_strength),reverse=True)):
+        unrostered_players = await asyncio.gather(*(p.get_full_player() for p in participants_not_rostered))
+        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
             p.roster_clan = self.clan
             self.modified_to_save.append(p)
             if len(self.clan.participants) >= 30:
                 break
         
         embeds = await self.clan_embed()
-        self.add_main_menu()
+        await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
 
     async def _callback_remove_player(self,interaction:discord.Interaction,list:DiscordSelectMenu):
@@ -233,7 +239,7 @@ class CWLRosterMenu(DefaultView):
             self.modified_to_save.append(player)
        
         embeds = await self.clan_embed()
-        self.add_main_menu()
+        await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)    
 
     ##################################################
@@ -250,7 +256,7 @@ class CWLRosterMenu(DefaultView):
             player.roster_clan = self.clan
        
         embeds = await self.clan_embed()
-        self.add_player_menu()            
+        await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)    
     
     async def _callback_filter_members(self,interaction:discord.Interaction,button:DiscordButton):
@@ -379,7 +385,7 @@ class CWLRosterMenu(DefaultView):
     ##################################################
     ### MENU HELPERS
     ##################################################
-    def add_main_menu(self):
+    async def add_main_menu(self):
         self.clear_items()
         #row 1
 
@@ -443,18 +449,21 @@ class CWLRosterMenu(DefaultView):
                 autofill_button_30.disabled = True
             self.add_item(autofill_button_30)
             #row3
+
             #remove player
             if len(self.clan.participants) > 0:
-                select_participants = [discord.SelectOption(
-                    label=str(cwl_player.player),
-                    value=cwl_player.tag,
-                    emoji=cwl_player.player.town_hall.emoji,
-                    description=f"{round((cwl_player.player.hero_strength/cwl_player.player.max_hero_strength)*100)}% "
-                        + f"| {round((cwl_player.player.troop_strength/cwl_player.player.max_troop_strength)*100)}% "
-                        + f"| {round((cwl_player.player.spell_strength/cwl_player.player.max_spell_strength)*100)}% "
-                        + (f"| Current Roster: {cwl_player.roster_clan.clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
-                    default=False)
-                    for cwl_player in self.clan.participants]
+                select_participants = []
+                async for cwl_player in AsyncIter(self.clan.participants):
+                    player = await cwl_player.get_full_player()
+                    select_participants.append(discord.SelectOption(
+                        label=str(player),
+                        value=player.tag,
+                        emoji=player.town_hall.emoji,
+                        description=f"{round((player.hero_strength/player.max_hero_strength)*100)}% "
+                            + f"| {round((player.troop_strength/player.max_troop_strength)*100)}% "
+                            + f"| {round((player.spell_strength/player.max_spell_strength)*100)}% "
+                            + (f"| Current Roster: {cwl_player.roster_clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
+                        default=False))
                 
                 self.add_item(DiscordSelectMenu(
                     function=self._callback_remove_player,
@@ -473,6 +482,7 @@ class CWLRosterMenu(DefaultView):
                         max_values=len(select_participants[15:35]),
                         row=3
                         ))
+                    
         self._ph_finalize_button = DiscordButton(
             function=self._callback_finalize,
             label="Finalize",
@@ -502,22 +512,28 @@ class CWLRosterMenu(DefaultView):
             row=4
             ))
     
-    def add_player_menu(self):
+    async def add_player_menu(self):
         self.clear_items()
-        all_participants, eligible_participants = self.get_eligible_participants()
-        select_participants = [discord.SelectOption(
-            label=str(cwl_player.player),
-            value=cwl_player.tag,
-            emoji=cwl_player.player.town_hall.emoji,
-            description=(f"{round((cwl_player.player.hero_strength/cwl_player.player.max_hero_strength)*100)}% " if cwl_player.player.max_hero_strength > 0 else "0% ")
-                + f"| " + (f"{round((cwl_player.player.troop_strength/cwl_player.player.max_troop_strength)*100)}% " if cwl_player.player.max_troop_strength > 0 else "0% ")
-                + f"| " + (f"{round((cwl_player.player.spell_strength/cwl_player.player.max_spell_strength)*100)}% " if cwl_player.player.max_spell_strength > 0 else "0% ")
-                + (f"| Current Roster: {cwl_player.roster_clan.clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
-            default=False)
-            for cwl_player in sorted(random.sample(eligible_participants,min(25,len(eligible_participants))),key=lambda x:(x.player.town_hall.level,x.player.hero_strength),reverse=True)
-            ]
+        all_participants, eligible_participants = await self.get_eligible_participants()
+
+        sample = random.sample(eligible_participants,min(25,len(eligible_participants)))
+        sampled_players = await asyncio.gather(*(p.get_full_player() for p in sample))
+
+        select_participants = []
+        async for a in AsyncIter(sorted(sampled_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
+            cwl_player = a.war_league_season(self.season)
+            select_participants.append(discord.SelectOption(
+                label=str(a),
+                value=a.tag,
+                emoji=a.town_hall.emoji,
+                description=(f"{round((a.hero_strength/a.max_hero_strength)*100)}% " if a.max_hero_strength > 0 else "0% ")
+                    + f"| " + (f"{round((a.troop_strength/a.max_troop_strength)*100)}% " if a.max_troop_strength > 0 else "0% ")
+                    + f"| " + (f"{round((a.spell_strength/a.max_spell_strength)*100)}% " if a.max_spell_strength > 0 else "0% ")
+                    + (f"| Current Roster: {cwl_player.roster_clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
+                default=False))
         if len(select_participants) == 0:
             return False
+        
         self.add_item(DiscordSelectMenu(
             function=self._callback_add_player,
             options=select_participants,
@@ -525,8 +541,7 @@ class CWLRosterMenu(DefaultView):
             min_values=0,
             max_values=len(select_participants),
             row=0
-            ))
-        
+            ))        
         #row2
         #filter by th
         select_th = [discord.SelectOption(
@@ -534,7 +549,7 @@ class CWLRosterMenu(DefaultView):
             value=th,
             emoji=EmojisTownHall.get(th),
             default=th in self.th_filter)
-            for th in sorted(list(set([p.player.town_hall.level for p in all_participants])),reverse=True)]
+            for th in sorted(list(set([p.town_hall_level for p in all_participants])),reverse=True)]
         if len(select_th) > 0:
             self.add_item(DiscordSelectMenu(
                 function=self._callback_filter_th,
@@ -629,30 +644,32 @@ class CWLRosterMenu(DefaultView):
                 + f"\n**Group:** {CWLLeagueGroups.get_description(CWLLeagueGroups.from_league_name(self.clan.league))}"
             )
         embed_2 = await clash_embed(
-                context=self.ctx,
-                show_author=False,
-                )
+            context=self.ctx,
+            show_author=False,
+            )
         embed_3 = await clash_embed(
-                context=self.ctx,
-                show_author=False,
-                )
-        for i,p in enumerate(self.clan.participants[:35],1):
+            context=self.ctx,
+            show_author=False,
+            )
+        participants = AsyncIter(self.clan.participants[:35])
+        async for i,p in participants.enumerate(start=1):
+            player = await p.get_full_player()
             if i <= 15:
                 embed_1.add_field(
-                    name=f"{i}\u3000**{p.player.title}**",
-                    value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                    name=f"{i}\u3000**{player.title}**",
+                    value=f"\u200b\u3000\u3000{player.hero_description}",
                     inline=False
                     )
             elif i <= 30:
                 embed_2.add_field(
-                    name=f"{i}\u3000**{p.player.title}**",
-                    value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                    name=f"{i}\u3000**{player.title}**",
+                    value=f"\u200b\u3000\u3000{player.hero_description}",
                     inline=False
                     )
             elif i <= 35:
                 embed_3.add_field(
-                    name=f"{i}\u3000**{p.player.title}**",
-                    value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                    name=f"{i}\u3000**{player.title}**",
+                    value=f"\u200b\u3000\u3000{player.hero_description}",
                     inline=False
                     )
             else:
@@ -673,23 +690,25 @@ class CWLRosterMenu(DefaultView):
                 context=self.ctx,
                 show_author=False,
                 )
-            for i,p in enumerate(self.clan.participants[:35],1):
+            participants = AsyncIter(self.clan.participants[:35])
+            async for i,p in participants.enumerate(start=1):
+                player = await p.get_full_player()
                 if i <= 15:
                     embed_1.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description}",
                         inline=False
                         )
                 elif i <= 30:
                     embed_2.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description}",
                         inline=False
                         )
                 elif i <= 35:
                     embed_3.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description}",
                         inline=False
                         )
                 else:
@@ -710,23 +729,25 @@ class CWLRosterMenu(DefaultView):
                 context=self.ctx,
                 show_author=False,
                 )
-            for i,p in enumerate(self.clan.participants[:35],1):
+            participants = AsyncIter(self.clan.participants[:35])
+            async for i,p in participants.enumerate(start=1):
+                player = await p.get_full_player()
                 if i <= 15:
                     embed_1.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
                         inline=False
                         )
                 elif i <= 30:
                     embed_2.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
                         inline=False
                         )
                 elif i <= 35:
                     embed_3.add_field(
-                        name=f"{i}\u3000TH{p.player.town_hall.level}\u3000**{str(p.player)}**",
-                        value=f"\u200b\u3000\u3000{p.player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
+                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
                         inline=False
                         )
                 else:
@@ -766,9 +787,11 @@ class CWLRosterMenu(DefaultView):
         header_text += f"\n**Status:** {clan.status}"
         header_text += f"\n**League:** {EmojisLeagues.get(clan.league)}{clan.league}"
         if clan.status in ["CWL Started"]:
-            header_text += f"\n\n**Participants:** {len([p for p in clan.master_roster if p.player.clan.tag == clan.tag])} In Clan / {len([p for p in clan.master_roster])} in CWL"
+            roster_players = await asyncio.gather(*(p.get_full_player() for p in clan.master_roster))
+            header_text += f"\n\n**Participants:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.master_roster])} in CWL"
         else:
-            header_text += f"\n\n**Rostered:** {len([p for p in clan.participants if p.player.clan.tag == clan.tag])} In Clan / {len([p for p in clan.participants])} Rostered"
+            roster_players = await asyncio.gather(*(p.get_full_player() for p in clan.participants))
+            header_text += f"\n\n**Rostered:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.participants])} Rostered"
 
         header_text += f"\n"
         header_text += (f"{EmojisUI.YES}: a Rostered CWL Player\n" if clan.status in ["Roster Finalized","Roster Pending"] else "")
@@ -777,71 +800,73 @@ class CWLRosterMenu(DefaultView):
         header_text += f"{EmojisUI.LOGOUT}: this player is not in the in-game Clan.\n\n"
             
         if clan.status in ["CWL Started"]:
-            ref_members = clan.master_roster
+            ref_members = await asyncio.gather(*(m.get_full_player() for m in clan.master_roster))
         else:
-            ref_members = clan.participants
-            mem_in_clan = await asyncio.gather(*[aPlayer.create(tag) for tag in list(clan.clan.members_dict.keys())])
+            ref_members = await asyncio.gather(*(m.get_full_player() for m in clan.participants))
+            full_clan = await clan.get_full_clan()
+            mem_in_clan = await asyncio.gather(*(bot_client.cog.fetch_player(m.tag) for m in full_clan.members))
+                                               
             async for mem in AsyncIter(mem_in_clan):
                 if mem.tag not in [p.tag for p in ref_members]:
-                    ref_members.append(WarLeaguePlayer(mem.tag,clan.season))
+                    ref_members.append(mem)
 
-        chunked_members = list(chunks(ref_members,25))        
-        for i, members_chunk in enumerate(chunked_members,1):
+        chunked_members = list(chunks(ref_members,25))
+        iter_chunks = AsyncIter(chunked_members)
+        async for i, members_chunk in iter_chunks.enumerate(start=1):
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
-                + (f"{EmojisUI.LOGOUT}" if player.player.clan.tag != clan.tag else f"{EmojisUI.SPACER}")
-                + f"{EmojisTownHall.get(player.town_hall)}"
-                + f"`{re.sub('[_*/]','',player.name)[:13]:<13}`\u3000" + f"`{'':^1}{player.tag:<11}`\u3000"
+                + (f"{EmojisUI.LOGOUT}" if player.clan.tag != clan.tag else f"{EmojisUI.SPACER}")
+                + f"{EmojisTownHall.get(player.town_hall.level)}"
+                + f"`{re.sub('[_*/]','',player.clean_name)[:13]:<13}`\u3000" + f"`{'':^1}{player.tag:<11}`\u3000"
                 + (f"`{'':^1}{getattr(ctx.guild.get_member(player.discord_user),'display_name','Not Found')[:12]:<12}`" if player.discord_user else f"`{'':<13}`")
                 for player in members_chunk]
                 )
             embed = await clash_embed(
                 context=ctx,
-                title=f"CWL Roster: {clan.name} ({clan.tag})",
+                title=f"CWL Roster: {clan.clean_name} ({clan.tag})",
                 message=header_text+member_text,
-                thumbnail=clan.clan.badge,
+                thumbnail=clan.badge,
                 )
-            collect_embeds[i] = embed
-        
+            collect_embeds[i] = embed        
         return list(collect_embeds.values())
     
-    def get_eligible_participants(self):
-        def eligible_for_rostering(cwl_player):
-            if not cwl_player.roster_clan or cwl_player.roster_clan.roster_open:
+    async def get_eligible_participants(self):
+        def eligible_for_rostering(player):
+            if not player.war_league_season(self.season).roster_clan or player.war_league_season(self.season).roster_clan.roster_open:
                 return True
             return False
-        def pred_members_only(cwl_player):
+        def pred_members_only(player):
             if self.members_only:
-                return cwl_player.player.is_member
+                return player.is_member
             return True
-        def pred_max_heroes_only(cwl_player):
+        def pred_max_heroes_only(player):
             if self.max_heroes:
-                return cwl_player.player.hero_strength == cwl_player.player.max_hero_strength
+                return player.hero_strength == player.max_hero_strength
             return True
-        def pred_max_offense_only(cwl_player):
+        def pred_max_offense_only(player):
             if self.max_offense:
-                if cwl_player.player.hero_strength != cwl_player.player.max_hero_strength:
+                if player.hero_strength != player.max_hero_strength:
                     return False
-                if cwl_player.player.troop_strength != cwl_player.player.max_troop_strength:
+                if player.troop_strength != player.max_troop_strength:
                     return False
-                if cwl_player.player.spell_strength != cwl_player.player.max_spell_strength:
+                if player.spell_strength != player.max_spell_strength:
                     return False
             return True
-        def pred_not_yet_rostered(cwl_player):
+        def pred_not_yet_rostered(player):
             if self.not_yet_rostered:
-                return not cwl_player.roster_clan
+                return not player.war_league_season(self.season).roster_clan
             return True
-        def pred_townhall_levels(cwl_player):
+        def pred_townhall_levels(player):
             if len(self.th_filter) > 0:
-                return cwl_player.player.town_hall.level in self.th_filter
+                return player.town_hall.level in self.th_filter
             return True
-        def pred_registration_group(cwl_player):
+        def pred_registration_group(player):
             if len(self.group_filter) > 0:
-                return cwl_player.league_group in self.group_filter
+                return player.war_league_season(self.season).league_group in self.group_filter
             return True
         
-        eligible_participants = WarLeaguePlayer.signups_by_season(self.season)
-        return eligible_participants, sorted(
-            [p for p in eligible_participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
-            key=lambda x:(x.player.town_hall.level,x.player.hero_strength),
+        all_participants = asyncio.gather(*(p.get_full_player() for p in WarLeaguePlayer.signups_by_season(self.season)))
+        return [p.war_league_season(self.season) for p in all_participants], sorted(
+            [p.war_league_season(self.season) for p in all_participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
+            key=lambda x:(x.town_hall.level,x.hero_strength),
             reverse=True)

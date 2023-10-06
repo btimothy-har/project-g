@@ -3,15 +3,16 @@ import discord
 from redbot.core import commands, app_commands
 from redbot.core.utils import AsyncIter
 
+from coc_client.api_client import BotClashClient
+
 from coc_client.exceptions import ClashOfClansError
 
 from coc_data.objects.clans.clan import aClan
 from coc_data.objects.discord.guild import aGuild
 from coc_data.objects.discord.clan_link import ClanGuildLink
-from coc_data.objects.discord.recruiting_reminder import RecruitingReminder
 from coc_data.objects.discord.clan_panel import GuildClanPanel
 from coc_data.objects.discord.apply_panel import GuildApplicationPanel
-from coc_data.objects.season.season import dSeason, aClashSeason
+from coc_data.objects.discord.recruiting_reminder import RecruitingReminder
 
 from coc_data.utilities.utils import *
 from coc_data.utilities.components import *
@@ -19,14 +20,14 @@ from coc_data.exceptions import *
 
 from .views.create_application_panel import CreateApplicationMenu
 from .views.create_recruiting_reminder import CreateRecruitingReminder
-from .views.clan_members import ClanMembersMenu
-from .excel.clan_export import ClanExcelExport
 
 from .data_embeds import *
 
 from .helpers.checks import *
 from .helpers.autocomplete import *
 from .helpers.components import *
+
+bot_client = BotClashClient()
 
 ############################################################
 ############################################################
@@ -41,7 +42,7 @@ class ClashServerConfig(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.0"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -102,18 +103,6 @@ class ClashServerConfig(commands.Cog):
     ############################################################
     ############################################################
 
-    @commands.command(name="debugraids")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_debug_raids(self,ctx):
-
-        await ctx.send("Debugging Raids")
-        clan = await aClan.create('#92G9J8CG')
-        current_raid = await clan.get_raid_weekend()
-
-        image = await current_raid.get_results_image()
-        await ctx.send(file=image)
-
     ##################################################
     ### PARENT COMMAND GROUPS
     ##################################################
@@ -154,7 +143,7 @@ class ClashServerConfig(commands.Cog):
             title=f"**Linked Clans: {ctx.guild.name}**"
             )
         async for link in AsyncIter(clan_links):
-            clan = await aClan.create(link.tag)
+            clan = await bot_client.cog.fetch_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
                 value=f"CoLeader Role: {getattr(link.coleader_role,'mention','None')}"
@@ -179,7 +168,7 @@ class ClashServerConfig(commands.Cog):
             title=f"**Linked Clans: {interaction.guild.name}**"
             )
         async for link in AsyncIter(clan_links):
-            clan = await aClan.create(link.tag)
+            clan = await bot_client.cog.fetch_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
                 value=f"CoLeader Role: {getattr(link.coleader_role,'mention','None')}"
@@ -222,13 +211,12 @@ class ClashServerConfig(commands.Cog):
         List all Clan Panels in this Server.
         """
 
-        guild = aGuild(ctx.guild.id)
-        
         embed = await clash_embed(
             context=ctx,
             title="**Clan Panels**"
             )
-        for panel in guild.clan_panels:
+        clan_panels = await GuildClanPanel.get_guild_panels(ctx.guild.id)
+        for panel in clan_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -244,14 +232,13 @@ class ClashServerConfig(commands.Cog):
     async def sub_appcommand_guildpanel_list(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
-
-        guild = aGuild(interaction.guild.id)
         
         embed = await clash_embed(
             context=interaction,
             title="**Clan Panels**"
             )
-        for panel in guild.clan_panels:
+        clan_panels = await GuildClanPanel.get_guild_panels(interaction.guild.id)
+        for panel in clan_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -281,7 +268,8 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
 
-        if channel.id in [panel.channel_id for panel in guild.clan_panels]:
+        clan_panels = await GuildClanPanel.get_guild_panels(ctx.guild.id)
+        if channel.id in [panel.channel_id for panel in clan_panels]:
             embed = await clash_embed(
                 context=ctx,
                 message=f"A Clan Panel already exists for this channel.",
@@ -309,8 +297,9 @@ class ClashServerConfig(commands.Cog):
         await interaction.response.defer()
 
         guild = aGuild(interaction.guild.id)
-
-        if channel.id in [panel.channel_id for panel in guild.clan_panels]:
+        
+        clan_panels = await GuildClanPanel.get_guild_panels(interaction.guild.id)
+        if channel.id in [panel.channel_id for panel in clan_panels]:
             embed = await clash_embed(
                 context=interaction,
                 message=f"A Clan Panel already exists for this channel.",
@@ -348,7 +337,8 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        if channel.id not in [panel.channel_id for panel in guild.clan_panels]:
+        clan_panels = await GuildClanPanel.get_guild_panels(ctx.guild.id)
+        if channel.id not in [panel.channel_id for panel in clan_panels]:
             embed = await clash_embed(
                 context=ctx,
                 message=f"A Guild Panel does not exist for this channel.",
@@ -422,7 +412,8 @@ class ClashServerConfig(commands.Cog):
             context=ctx,
             title="**Application Panels**"
             )
-        for panel in guild.apply_panels:
+        application_panels = await GuildApplicationPanel.get_guild_panels(ctx.guild.id)
+        for panel in application_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"
@@ -460,7 +451,8 @@ class ClashServerConfig(commands.Cog):
             context=interaction,
             title="**Application Panels**"
             )
-        for panel in guild.apply_panels:
+        application_panels = await GuildApplicationPanel.get_guild_panels(interaction.guild.id)
+        for panel in application_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"
@@ -543,7 +535,9 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        if channel.id not in [panel.channel_id for panel in guild.apply_panels]:
+        application_panels = await GuildApplicationPanel.get_guild_panels(ctx.guild.id)
+        
+        if channel.id not in [panel.channel_id for panel in application_panels]:
             embed = await clash_embed(
                 context=ctx,
                 message=f"An Application Panel does not exist for this channel.",

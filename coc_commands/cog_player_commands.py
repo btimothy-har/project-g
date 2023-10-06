@@ -2,6 +2,7 @@ import discord
 
 from redbot.core import commands, app_commands
 
+from coc_client.api_client import BotClashClient
 from coc_client.exceptions import ClashOfClansError
 
 from coc_data.utilities.utils import *
@@ -20,6 +21,8 @@ from .data_embeds import *
 from .helpers.checks import *
 from .helpers.autocomplete import *
 from .helpers.components import *
+
+bot_client = BotClashClient()
 
 ############################################################
 ############################################################
@@ -46,7 +49,7 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
     try:
         await interaction.response.defer()
         member = aMember(member.id,member.guild.id)
-        view_accounts = (member.accounts)
+        view_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()
     except Exception as exc:
@@ -82,8 +85,8 @@ async def context_menu_restore_roles(interaction:discord.Interaction,member:disc
             )
     
     try:
-        member = aMember(member.id,member.guild.id)
-        added, failed = await member.restore_user_roles()
+        amember = aMember(member.id,member.guild.id)
+        added, failed = await amember.restore_user_roles()
 
         embed = await clash_embed(
             context=interaction,
@@ -163,7 +166,7 @@ class Players(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.1"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -171,10 +174,6 @@ class Players(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
-
-    @property
-    def client(self):
-        return self.bot.get_cog("ClashOfClansClient").client
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -274,20 +273,14 @@ class Players(commands.Cog):
     @command_group_member.command(name="remove")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def subcommand_remove_member(self,ctx:commands.Context,discord_member:discord.User):
+    async def subcommand_remove_member(self,ctx:commands.Context,discord_member:discord.Member):
         """
         Remove a Member/Member's Accounts from the Alliance.
 
         Only accepts input by Discord Member. To remove by Clash Account Tag, use the equivalent App/Slash Command instead.
         """
-  
-        member = ctx.guild.get_member(discord_member.id)
 
-        if not member:
-            menu = RemoveMemberMenu(ctx,member=discord_member.id)
-        else:
-            menu = RemoveMemberMenu(ctx,member=member)
-            
+        menu = RemoveMemberMenu(ctx,member=discord_member)            
         await menu.start()
     
     @app_command_group_member.command(name="remove",
@@ -304,13 +297,14 @@ class Players(commands.Cog):
         player:Optional[str]=None,
         discord_id:Optional[str]=None):
         
-        selected_account = None
-        selected_member = None
         await interaction.response.defer()
+
+        selected_account = None
+        selected_member = None        
         discord_id = int(discord_id) if discord_id else None
 
         if player:
-            selected_account = await aPlayer.create(player)
+            selected_account = await bot_client.cog.fetch_player(player)
         selected_member = member if member else discord_id if discord_id else None
 
         menu = RemoveMemberMenu(interaction,member=selected_member,account=selected_account)
@@ -458,12 +452,13 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player_tag:
-            player = await aPlayer.create(player_tag)
+            player = await bot_client.cog.fetch_player(player_tag)
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         else:
             member = aMember(ctx.author.id,ctx.guild.id)
-            view_accounts.extend(member.accounts)
+            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            view_accounts.extend(m_accounts)
         
         menu = PlayerProfileMenu(ctx,view_accounts)
         await menu.start()
@@ -486,18 +481,21 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player:
-            player = await aPlayer.create(player)
+            player = await bot_client.cog.fetch_player(player)
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         if member:
             member = aMember(member.id,interaction.guild.id)
-            view_accounts.extend(member.accounts)
+            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            view_accounts.extend(m_accounts)
         if user_id:
             member = aMember(user_id,interaction.guild.id)
-            view_accounts.extend(member.accounts)
+            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            view_accounts.extend(m_accounts)
         if not (player or member or user_id):
             member = aMember(interaction.user.id,interaction.guild.id)
-            view_accounts.extend(member.accounts)
+            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            view_accounts.extend(m_accounts)
         
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()    

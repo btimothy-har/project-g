@@ -1,10 +1,12 @@
 import discord
+import asyncio
 
 from typing import *
 
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
+from coc_client.api_client import BotClashClient
 
 from coc_data.objects.players.player import aPlayer
 from coc_data.objects.season.season import aClashSeason
@@ -18,6 +20,8 @@ from coc_data.constants.coc_emojis import *
 from coc_data.constants.coc_constants import *
 
 from coc_data.exceptions import *
+
+bot_client = BotClashClient()
 
 class CWLPlayerMenu(DefaultView):
     def __init__(self,
@@ -131,9 +135,9 @@ class CWLPlayerMenu(DefaultView):
         
         if len(select.values) > 0:
             for player_tag in select.values:
-                player = await aPlayer.create(player_tag)
+                player = await bot_client.cog.fetch_player(player_tag)
                 self.user_registration[player_tag] = {}
-                self.user_registration[player_tag]["account"] = player.cwl_player(self.season)
+                self.user_registration[player_tag]["account"] = player.war_league_season(self.season)
                 self.user_registration[player_tag]["league"] = select.reference
 
         self.add_signup_menu()
@@ -147,9 +151,9 @@ class CWLPlayerMenu(DefaultView):
 
         if len(select.values) > 0:
             for player_tag in select.values:
-                player = await aPlayer.create(player_tag)
+                player = await bot_client.cog.fetch_player(player_tag)
                 self.user_registration[player_tag] = {}
-                self.user_registration[player_tag]["account"] = player.cwl_player(self.season)
+                self.user_registration[player_tag]["account"] = player.war_league_season(self.season)
                 self.user_registration[player_tag]["league"] = None
         
         if len(WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)) == 0:
@@ -268,34 +272,34 @@ class CWLPlayerMenu(DefaultView):
         group_1_accounts = [discord.SelectOption(
             label=str(account),
             value=account.tag,
-            emoji=account.town_hall.emoji,
+            emoji=EmojisTownHall.get(account.town_hall_level),
             description=account.member_description_no_emoji,
             default=False)
-            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 14 and i <=25]
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall_level >= 14 and i <=25]
         
         group_2_accounts = [discord.SelectOption(
             label=str(account),
             value=account.tag,
-            emoji=account.town_hall.emoji,
+            emoji=EmojisTownHall.get(account.town_hall_level),
             description=account.member_description_no_emoji,
             default=False)
-            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 12 and i <=25]
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall_level >= 12 and i <=25]
         
         group_3_accounts = [discord.SelectOption(
             label=str(account),
             value=account.tag,
-            emoji=account.town_hall.emoji,
+            emoji=EmojisTownHall.get(account.town_hall_level),
             description=account.member_description_no_emoji,
             default=False)
-            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 10 and i <=25]
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall_level >= 10 and i <=25]
 
         group_4_accounts = [discord.SelectOption(
             label=str(account),
             value=account.tag,
-            emoji=account.town_hall.emoji,
+            emoji=EmojisTownHall.get(account.town_hall_level),
             description=account.member_description_no_emoji,
             default=False)
-            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall.level >= 4 and i <=25]
+            for i,account in enumerate(self.member.accounts,start=1) if account.town_hall_level >= 4 and i <=25]
         
         if len(group_1_accounts) > 0:
             group_1_selector = DiscordSelectMenu(
@@ -362,8 +366,8 @@ class CWLPlayerMenu(DefaultView):
         registered_accounts = [discord.SelectOption(
             label=str(cwl_player.player),
             value=cwl_player.tag,
-            emoji=cwl_player.player.town_hall.emoji,
-            description=cwl_player.player.member_description_no_emoji,
+            emoji=EmojisTownHall.get(cwl_player.town_hall),
+            description=cwl_player.member_description_no_emoji,
             default=False)
             for cwl_player in WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
             if getattr(cwl_player.roster_clan,'roster_open',True)
@@ -402,25 +406,30 @@ class CWLPlayerMenu(DefaultView):
             )
         
         registered_accounts = WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-        for cwl_player in registered_accounts:
-            if cwl_player.tag not in self.user_registration:
+        player_accounts = await asyncio.gather(*(p.get_full_player() for p in registered_accounts))
+
+        async for a in AsyncIter(player_accounts):
+            cwl_player = a.war_league_season(self.season)
+
+            if a.tag not in self.user_registration:
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{cwl_player.player.title}**",
+                        name=f"**{a.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
-                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
-                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != cwl_player.player.clan.tag else "")
-                            + f"\n{cwl_player.player.hero_description}"
+                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
+                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != a.clan.tag else "")
+                            + f"\n{a.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
                     embed_1_ct += 1
+
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{cwl_player.player.title}**",
+                        name=f"**{a.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
-                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
-                            + f"\n{cwl_player.player.hero_description}"
+                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
+                            + f"\n{a.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -428,24 +437,27 @@ class CWLPlayerMenu(DefaultView):
                 else:
                     break
 
-        for account in self.member.accounts:
-            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in registered_accounts] and account.town_hall.level >= 10:
+        async for account in AsyncIter(self.member.accounts):
+            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in registered_accounts] and account.town_hall_level >= 10:
+                player = await account.get_full_player()
+
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{account.title}**",
+                        name=f"**{player.title}**",
                         value=f"Not Registered"
-                            + (f"(Previously registered by <@{account.cwl_player(self.season).discord_user}>)" if account.cwl_player(self.season).discord_user and account.cwl_player(self.season).is_registered else "")
-                            + f"\n{account.hero_description}"
+                            + (f"(Previously registered by <@{player.war_league_season(self.season).discord_user}>)" if player.war_league_season(self.season).discord_user and player.war_league_season(self.season).is_registered else "")
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
                     embed_1_ct += 1
+
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{account.title}**",
+                        name=f"**{player.title}**",
                         value=f"Not Registered"
-                            + (f"(Previously registered by <@{account.cwl_player(self.season).discord_user}>)" if account.cwl_player(self.season).discord_user and account.cwl_player(self.season).is_registered else "")
-                            + f"\n{account.hero_description}"
+                            + (f"(Previously registered by <@{account.war_league_season(self.season).discord_user}>)" if account.war_league_season(self.season).discord_user and account.war_league_season(self.season).is_registered else "")
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -460,11 +472,12 @@ class CWLPlayerMenu(DefaultView):
                 + f"Pressing {EmojisUI.GREEN_FIRST} **BACK** will discard the below changes.\n\u200b",
             show_author=False
             )
-        for m_account in list(self.user_registration.values()):
+        async for m_account in AsyncIter(list(self.user_registration.values())):
+            player = await m_account['account'].get_full_player()
             change_embed.add_field(
-                name=f"**{m_account['account'].player.title}**",
+                name=f"**{player.title}**",
                 value=f"{CWLLeagueGroups.get_description(m_account['league']) if m_account['league'] else 'Registration Removed'}"
-                    + f"\n{m_account['account'].player.hero_description}"
+                    + f"\n{player.hero_description}"
                     + "\n\u200b",
                 inline=False
                 )
@@ -652,11 +665,12 @@ class CWLPlayerMenu(DefaultView):
         self.add_item(hitrate_button)
         self.add_item(self._close_button())
         
+        
         #dropdown stats per account
         cwl_accounts = [discord.SelectOption(
-            label=str(cwl_player.player),
+            label=str(cwl_player.player_str),
             value=cwl_player.tag,
-            emoji=cwl_player.player.town_hall.emoji,
+            emoji=EmojisTownHall.get(cwl_player.town_hall),
             description=f"{cwl_player.league_clan.name} {cwl_player.league_clan.tag}" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}",
             default=cwl_player.tag == getattr(self.show_account_stats,'tag',None))
             for cwl_player in self.live_cwl_accounts
@@ -690,7 +704,9 @@ class CWLPlayerMenu(DefaultView):
                 show_author=False)
         
         ct = 0
-        for cwl_player in self.live_cwl_accounts:
+        async for cwl_player in AsyncIter(self.live_cwl_accounts):
+            player = await cwl_player.get_full_player()
+
             ct += 1
             e = embed
             if ct > 10:
@@ -698,9 +714,9 @@ class CWLPlayerMenu(DefaultView):
             clan = cwl_player.league_clan if cwl_player.league_clan else cwl_player.roster_clan
 
             e.add_field(
-                name=f"**{cwl_player.player.title}**",
-                value=f"CWL Clan: **{EmojisLeagues.get(clan.league)} [{clan.name} {clan.tag}]({clan.clan.share_link})**"
-                    + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if clan.tag != cwl_player.player.clan.tag else "")
+                name=f"**{cwl_player.title}**",
+                value=f"CWL Clan: **{EmojisLeagues.get(clan.league)} [{clan.name} {clan.tag}]({clan.share_link})**"
+                    + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if clan.tag != player.clan.tag else "")
                     + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
                     + (f"\n\u200b" if not cwl_player.league_clan else ""),
                 inline=False

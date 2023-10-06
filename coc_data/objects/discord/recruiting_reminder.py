@@ -12,6 +12,8 @@ from coc_data.utilities.utils import *
 from coc_data.constants.coc_emojis import *
 from coc_data.constants.ui_emojis import *
 
+bot_client = BotClashClient()
+
 class db_RecruitingPost(Document):
     is_active = BooleanField(default=False)
     ad_name = StringField(required=True)
@@ -46,8 +48,6 @@ class RecruitingReminder():
         return cls._cache[str(post_id)]
     
     def __init__(self,post_id):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
         self.id = post_id
         
         if self._is_new:
@@ -104,7 +104,7 @@ class RecruitingReminder():
         async with self.lock:
             try:
                 if self.active_reminder:
-                    webhook = await get_bot_webhook(self.bot,self.channel)
+                    webhook = await get_bot_webhook(bot_client.bot,self.channel)
                     if isinstance(self.channel,discord.Thread):
                         await webhook.delete_message(
                             self.active_reminder,
@@ -123,7 +123,7 @@ class RecruitingReminder():
     ##################################################
     async def embed(self):
         embed = await clash_embed(
-            context=self.client.bot,
+            context=bot_client.bot,
             message=f"**Recruiting Reminder: {self.ad_name}**"
                 + f"\nLink to Ad: {self.ad_link}",
             show_author=False,
@@ -150,11 +150,11 @@ class RecruitingReminder():
                 post_embed = await self.embed()
                 view = RecruitingPostPrompt(self)
 
-                webhook = await get_bot_webhook(self.bot,self.channel)
+                webhook = await get_bot_webhook(bot_client.bot,self.channel)
                 if isinstance(self.channel,discord.Thread):
                     self.active_reminder = await webhook.send(
                         wait=True,
-                        username=self.bot.user.name,
+                        username=bot_client.bot.user.name,
                         content=getattr(self.remind_user,'mention',''),
                         embed=post_embed,
                         view=view,
@@ -163,17 +163,17 @@ class RecruitingReminder():
                 else:
                     self.active_reminder = await webhook.send(
                         wait=True,
-                        username=self.bot.user.name,
+                        username=bot_client.bot.user.name,
                         content=getattr(self.remind_user,'mention',''),
                         embed=post_embed,
                         view=view,
                         )
-                self.client.cog.coc_main_log.info(f"Recruiting Reminder sent for {self.ad_name}.")
+                bot_client.cog.coc_main_log.info(f"Recruiting Reminder sent for {self.ad_name}.")
         
             except asyncio.CancelledError:
                 return None
             except Exception as exc:
-                self.client.cog.coc_main_log.exception(f"Recruiting Reminder failed for {self.ad_name}.")
+                bot_client.cog.coc_main_log.exception(f"Recruiting Reminder failed for {self.ad_name}.")
                 return exc
             else:
                 return self
@@ -190,7 +190,7 @@ class RecruitingReminder():
             
             post_embed = await self.embed()
             view = RecruitingPostPrompt(self)
-            webhook = await get_bot_webhook(self.bot,self.channel)
+            webhook = await get_bot_webhook(bot_client.bot,self.channel)
             if isinstance(self.channel,discord.Thread):
                 self.active_reminder = await webhook.edit_message(
                     message_id=self.active_reminder,
@@ -274,7 +274,7 @@ class RecruitingReminder():
             return None
         if not self.is_active:
             return None
-        if self.bot.user.id == 828838353977868368:
+        if bot_client.bot.user.id == 828838353977868368:
             return self.last_posted.add(minutes=self.interval)
         return self.last_posted.add(hours=self.interval)
     
@@ -290,10 +290,10 @@ class RecruitingReminder():
 
     @property
     def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
-        return self.bot.get_channel(self._channel)
+        return bot_client.bot.get_channel(self._channel)
     @channel.setter
     def channel(self,channel_id:int):
-        channel = self.bot.get_channel(channel_id)
+        channel = bot_client.bot.get_channel(channel_id)
         if isinstance(channel,(discord.TextChannel,discord.Thread)):
             self._channel = channel.id
         else:

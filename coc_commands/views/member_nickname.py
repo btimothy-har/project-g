@@ -1,7 +1,10 @@
 import discord
+import asyncio
 
 from typing import *
 from redbot.core import commands
+
+from coc_client.api_client import BotClashClient
 
 from coc_data.objects.discord.member import aMember
 
@@ -14,6 +17,8 @@ from coc_data.exceptions import *
 
 from ..helpers.components import *
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 class MemberNicknameMenu(DefaultView):
     def __init__(self,
@@ -65,7 +70,7 @@ class MemberNicknameMenu(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=embed,view=self)
 
-        if len(self.member.accounts) > 1:
+        if len(self.member.member_accountsaccounts) > 1:
             await self._select_accounts()
         else:
             await self._change_nickname()
@@ -74,12 +79,14 @@ class MemberNicknameMenu(DefaultView):
     ### STEP 1: SELECT ACCOUNT (IF MEMBER ACCOUNTS > 1)
     ##################################################
     async def _select_accounts(self):
+        player_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.member_accounts))
+
         dropdown_options = [discord.SelectOption(
             label=f"{account.name} | {account.tag}",
             value=account.tag,
             description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
             emoji=account.town_hall.emoji)
-            for account in self.member.accounts[:25]
+            for account in player_accounts[:25]
             ]
         dropdown_menu = DiscordSelectMenu(
             function=self._callback_account_select,
@@ -102,7 +109,7 @@ class MemberNicknameMenu(DefaultView):
                 message=f"**Please select an account to use as the new nickname for {self.member.mention}.**",
                 thumbnail=self.member.display_avatar
                 )
-        for account in self.member.member_accounts:
+        for account in player_accounts[:25]:
             embed.add_field(
                 name=f"**{account.name} ({account.tag})**",
                 value=f"{account.short_description}",

@@ -34,6 +34,8 @@ async def autocomplete_leaderboard_selector(interaction:discord.Interaction,curr
         for lb in guild_leaderboards
         ]
 
+bot_client = BotClashClient()
+
 ############################################################
 ############################################################
 #####
@@ -47,7 +49,7 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.1.3"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):        
         self.bot = bot 
@@ -159,8 +161,7 @@ class Leaderboards(commands.Cog):
                     + f"\nIs Global? `{lb.is_global}`"
                     + f"\n\u200b",
                 inline=True
-                )
-            
+                )            
         await ctx.reply(embed=embed)
     
     @app_command_group_leaderboards.command(name="list",
@@ -382,12 +383,12 @@ class Leaderboards(commands.Cog):
 
         async with self.leaderboard_lock:
             st = pendulum.now()
-            self.client.cog.coc_main_log.info("Updating Leaderboards...")
+            bot_client.cog.coc_main_log.info("Updating Leaderboards...")
             tasks = []
-            for guild in self.bot.guilds:
+            for guild in bot_client.bot.guilds:
                 guild_leaderboards = DiscordLeaderboard.get_guild_leaderboards(guild.id)
                 tasks.extend([asyncio.create_task(lb.update_leaderboard()) for lb in guild_leaderboards])
             
             await asyncio.gather(*tasks)
             et = pendulum.now()
-            self.client.cog.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")
+            bot_client.cog.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")

@@ -40,7 +40,7 @@ class ECLIPSE(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.1"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -102,19 +102,7 @@ class ECLIPSE(commands.Cog):
     async def command_eclipse_base_vault(self,ctx):
         """
         Access the E.C.L.I.P.S.E. Base Vault.
-        """
-
-        member = aMember(ctx.author.id)
-        if ((pendulum.now().int_timestamp - member.member_start.int_timestamp)/86400) < 14:
-            embed = await eclipse_embed(
-                context=ctx,
-                message=f"Sorry, you must be a member for at least 14 days to access the E.C.L.I.P.S.E. Base Vault.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.reply(embed=embed,delete_after=60)
-            return
-    
+        """    
         if isinstance(ctx.channel,discord.Thread):
             embed = await eclipse_embed(
                 context=ctx,
@@ -135,17 +123,6 @@ class ECLIPSE(commands.Cog):
     async def appcommand_eclipse_base_vault(self,interaction:discord.Interaction):
      
         await interaction.response.defer(ephemeral=True)
-
-        member = aMember(interaction.user.id)
-        if ((pendulum.now().int_timestamp - member.member_start.int_timestamp)/86400) < 14:
-            embed = await eclipse_embed(
-                context=interaction,
-                message=f"Sorry, you must be a member of the Alliance for at least 14 days to access the E.C.L.I.P.S.E. Base Vault.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await interaction.followup.send(embed=embed,ephemeral=True)
-            return
     
         if isinstance(interaction.channel,discord.Thread):
             embed = await eclipse_embed(

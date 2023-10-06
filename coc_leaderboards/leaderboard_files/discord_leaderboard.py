@@ -1,3 +1,4 @@
+import asyncio
 import discord
 import pendulum
 
@@ -10,9 +11,8 @@ from redbot.core.utils import AsyncIter
 from coc_client.api_client import BotClashClient
 
 from coc_data.objects.season.season import aClashSeason
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.players.player_season import aPlayerSeason
+from coc_data.objects.players.player import *
+from coc_data.objects.clans.clan import *
 from coc_data.objects.discord.guild import aGuild
 from coc_data.exceptions import CacheNotReady
 
@@ -25,6 +25,8 @@ from coc_data.constants.ui_emojis import *
 from .leaderboard_player import ClanWarLeaderboardPlayer, ResourceLootLeaderboardPlayer, DonationsLeaderboardPlayer, ClanGamesLeaderboardPlayer
 
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 leaderboard_types = {
     1: "Clan War Triples",
@@ -100,11 +102,11 @@ class LeaderboardView(discord.ui.View):
 ##### DISCORD LEADERBOARD HOLDER
 #####
 ##################################################
-class DiscordLeaderboard():    
+class DiscordLeaderboard():  
+
     @staticmethod
     def get_leaderboard_seasons():
-        client = BotClashClient()
-        return [client.cog.current_season] + client.cog.tracked_seasons[:3]
+        return [bot_client.cog.current_season] + bot_client.cog.tracked_seasons[:3]
     
     @classmethod
     def get_by_id(cls,leaderboard_id:str):
@@ -115,9 +117,6 @@ class DiscordLeaderboard():
         return [cls(lb) for lb in db_Leaderboard.objects(guild_id=guild_id)]
 
     def __init__(self,database_entry:db_Leaderboard):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-
         self.id = str(database_entry.pk)
 
         self.type = database_entry.type
@@ -153,7 +152,7 @@ class DiscordLeaderboard():
     
     def is_season_current(self,season):
         if self.type == 5:
-            last_completed_clangames = self.client.cog.current_season if pendulum.now() >= self.client.cog.current_season.clangames_start else self.client.cog.current_season.previous_season()
+            last_completed_clangames = bot_client.cog.current_season if pendulum.now() >= bot_client.cog.current_season.clangames_start else bot_client.cog.current_season.previous_season()
             if season.id == last_completed_clangames.id:
                 return True
         else:
@@ -175,12 +174,12 @@ class DiscordLeaderboard():
 
     @property
     def guild(self):
-        return self.bot.get_guild(self.guild_id)
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
     def lb_clans(self):
         if self.is_global:
-            return self.client.cog.get_alliance_clans()
+            return bot_client.cog.get_alliance_clans()
         elif self.guild:
             guild = aGuild(self.guild.id)
             return guild.clans
@@ -198,7 +197,12 @@ class DiscordLeaderboard():
         return leaderboard_types.get(self.type,"Unknown Leaderboard")
     
     @classmethod
-    async def create(cls,leaderboard_type:int,is_global:bool,guild:discord.Guild,channel:discord.TextChannel):
+    async def create(cls,
+        leaderboard_type:int,
+        is_global:bool,
+        guild:discord.Guild,
+        channel:discord.TextChannel):
+
         existing_db = db_Leaderboard.objects(type=leaderboard_type,is_global=is_global,guild_id=guild.id)
         if len(existing_db) > 0:
             raise LeaderboardExists(f"{leaderboard_types.get(leaderboard_type,'Unknown Leaderboard')} already exists for {guild.name}.")
@@ -246,7 +250,7 @@ class DiscordLeaderboard():
                         calculate = True
                         archive = True
                     except MultipleObjectsReturned:
-                        self.client.cog.coc_main_log.warning(f"Multiple {self.lb_type} Leaderboards found for {season.description} in {self.guild.name}.")
+                        bot_client.cog.coc_main_log.warning(f"Multiple {self.lb_type} Leaderboards found for {season.description} in {self.guild.name}.")
                         calculate = True
                         archive = True
                         db_Leaderboard_Archive.objects(
@@ -274,12 +278,12 @@ class DiscordLeaderboard():
 
             await self.send_to_discord()
         except CacheNotReady:
-            self.client.cog.coc_main_log.exception(
+            bot_client.cog.coc_main_log.exception(
                 f"Encountered CacheNotReady error while updating {self.lb_type} Leaderboard for {self.guild.name}."
                 )
         except Exception as ex:
-            self.client.cog.coc_main_log.exception(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.")
-            await self.client.bot.send_to_owners(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.\n```{ex}```")
+            bot_client.cog.coc_main_log.exception(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.")
+            await bot_client.bot.send_to_owners(f"Error updating {self.lb_type} Leaderboard for {self.guild.name}.\n```{ex}```")
     
     async def fetch_message(self):
         if self.channel:
@@ -290,7 +294,7 @@ class DiscordLeaderboard():
         return None
 
     async def send_blank_lb(self):
-        season = self.client.cog.current_season
+        season = bot_client.cog.current_season
         if self.type == 1:
             data = ClanWarLeaderboard(self,season)
         elif self.type == 3:
@@ -319,7 +323,7 @@ class DiscordLeaderboard():
                 season = season.id,
                 embed = embed.to_dict()
                 ).save()
-            self.client.cog.coc_main_log.info(f"Archived {self.lb_type} Leaderboard for {season.description} in {getattr(self.guild,'name','')} {self.guild_id}.")
+            bot_client.cog.coc_main_log.info(f"Archived {self.lb_type} Leaderboard for {season.description} in {getattr(self.guild,'name','')} {self.guild_id}.")
     
     async def send_to_discord(self):
         if not self.channel:
@@ -337,7 +341,7 @@ class DiscordLeaderboard():
             self.message_id = message.id
             self.save()
         except:
-            self.client.cog.coc_main_log.exception(f"Error sending {self.lb_type} Leaderboard to Discord.")
+            bot_client.cog.coc_main_log.exception(f"Error sending {self.lb_type} Leaderboard to Discord.")
 
 ##################################################
 #####
@@ -346,20 +350,18 @@ class DiscordLeaderboard():
 ##################################################
 class ClanWarLeaderboard():    
     def __init__(self,parent:DiscordLeaderboard,season:aClashSeason):
-        self.client = BotClashClient()
         self.season = season
         self.parent = parent
 
         self.leaderboard_players = {}
-
         self.timestamp = None
 
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
         leaderboard = cls(parent,season)
-        all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
+        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
 
-        async for p in all_players:
+        async for p in AsyncIter(all_players):
             stats = p.get_season_stats(season)
 
             async for lb_th in AsyncIter(eligible_townhalls):
@@ -371,12 +373,11 @@ class ClanWarLeaderboard():
                     leaderboard.leaderboard_players[lb_th].append(lb_player)
         
         leaderboard.timestamp = pendulum.now()
-
         return await leaderboard.get_embed()
     
     async def get_embed(self):
         embed = await clash_embed(
-            context=self.client.bot,
+            context=bot_client.bot,
             title=f"**Clan War Leaderboard: {self.season.description}**",
             message=f"***Ranks players by number of War Triples achieved in the month.***"
                 + (f"\nLast Refreshed: <t:{getattr(self.timestamp,'int_timestamp',0)}:R>" if self.season.is_current and self.timestamp else "")
@@ -415,7 +416,6 @@ class ClanWarLeaderboard():
 ##################################################
 class ResourceLootLeaderboard():    
     def __init__(self,parent:DiscordLeaderboard,season:aClashSeason):
-        self.client = BotClashClient()
         self.season = season
         self.parent = parent
 
@@ -433,9 +433,11 @@ class ResourceLootLeaderboard():
                 return stats.attacks.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
-        all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
+        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
+        
+        iter_players = AsyncIter(all_players)
 
-        async for p in all_players.filter(predicate_leaderboard):
+        async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
             async for lb_th in AsyncIter(eligible_townhalls):
@@ -452,7 +454,7 @@ class ResourceLootLeaderboard():
     
     async def get_embed(self):
         embed = await clash_embed(
-            context=self.client.bot,
+            context=bot_client.bot,
             title=f"**Resource Leaderboard: {self.season.description}**",
             message=f"***Ranks players by amount of Dark Elixir looted in the month.***"
                 + (f"\nLast Refreshed: <t:{getattr(self.timestamp,'int_timestamp',0)}:R>" if self.season.is_current and self.timestamp else "")
@@ -491,7 +493,6 @@ class ResourceLootLeaderboard():
 ##################################################
 class DonationsLeaderboard():    
     def __init__(self,parent:DiscordLeaderboard,season:aClashSeason):
-        self.client = BotClashClient()
         self.season = season
         self.parent = parent
 
@@ -509,9 +510,10 @@ class DonationsLeaderboard():
                 return stats.donations_sent.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
-        all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
+        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
+        iter_players = AsyncIter(all_players)
 
-        async for p in all_players.filter(predicate_leaderboard):
+        async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
             async for lb_th in AsyncIter(eligible_townhalls):
@@ -527,7 +529,7 @@ class DonationsLeaderboard():
     
     async def get_embed(self):
         embed = await clash_embed(
-            context=self.client.bot,
+            context=bot_client.bot,
             title=f"**Donations Leaderboard: {self.season.description}**",
             message=f"***Ranks players by number of Donated Troops/Spells/Sieges in the month.***"
                 + (f"\nLast Refreshed: <t:{getattr(self.timestamp,'int_timestamp',0)}:R>" if self.season.is_current and self.timestamp else "")
@@ -565,7 +567,6 @@ class DonationsLeaderboard():
 ##################################################
 class ClanGamesLeaderboard():    
     def __init__(self,parent:DiscordLeaderboard,season:aClashSeason):
-        self.client = BotClashClient()
         self.season = season
         self.parent = parent
 
@@ -580,11 +581,12 @@ class ClanGamesLeaderboard():
             return stats.clangames.score > 0 and stats.clangames.clan_tag in [c.tag for c in parent.lb_clans] and stats.home_clan.tag == stats.clangames.clan_tag
 
         leaderboard = cls(parent,season)
-        all_players = AsyncIter(leaderboard.client.cog.get_members_by_season(season=season))
+        all_players = AsyncIter(bot_client.cog.get_members_by_season(season=season))
+        iter_players = AsyncIter(all_players)
 
         leaderboard.leaderboard_players['global'] = []
 
-        async for p in all_players.filter(predicate_leaderboard):
+        async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
             if parent.is_global:
@@ -605,7 +607,7 @@ class ClanGamesLeaderboard():
     
     async def get_embed(self):
         embed = await clash_embed(
-            context=self.client.bot,
+            context=bot_client.bot,
             title=f"**Clan Games Leaderboard: {self.season.description}**",
             message=f"***Ranks players by Clan Games score & completion time.***"
                 + (f"\nLast Refreshed: <t:{getattr(self.timestamp,'int_timestamp',0)}:R>" if self.season.is_current and self.timestamp else "")

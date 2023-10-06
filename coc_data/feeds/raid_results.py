@@ -18,17 +18,16 @@ from ..constants.coc_emojis import *
 from ..utilities.utils import *
 from ..utilities.components import *
 
+bot_client = BotClashClient()
+
 class RaidResultsFeed():
     def __init__(self,clan:aClan,feed:db_ClanDataFeed):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-
         self.clan = clan
         self.feed = feed
     
     @property
     def channel(self):
-        return self.bot.get_channel(self.feed.channel_id)
+        return bot_client.bot.get_channel(self.feed.channel_id)
     
     @classmethod
     async def send_results(cls,clan:aClan,feed:db_ClanDataFeed,results_image):
@@ -37,7 +36,7 @@ class RaidResultsFeed():
         if a.channel is None:
             return
         
-        webhook = await get_bot_webhook(a.bot,a.channel)
+        webhook = await get_bot_webhook(bot_client.bot,a.channel)
         if isinstance(a.channel,discord.Thread):
             await webhook.send(
                 username=a.clan.name,

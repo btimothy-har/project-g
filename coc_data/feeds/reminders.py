@@ -11,6 +11,8 @@ from ..objects.events.raid_weekend import aRaidWeekend
 from ..utilities.utils import *
 from ..utilities.components import *
 
+bot_client = BotClashClient()
+
 class MemberReminder():
     def __init__(self,member:discord.Member):
         self.member = member
@@ -21,10 +23,7 @@ class MemberReminder():
 
 class EventReminders():
     def __init__(self,channel_id:int):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-
-        self.channel = self.bot.get_channel(channel_id)
+        self.channel = bot_client.bot.get_channel(channel_id)
         self.guild = getattr(self.channel,'guild',None)
         self.member_reminders = {}
 
@@ -40,18 +39,21 @@ class EventReminders():
         return reminder_text
     
     async def add_account(self,player_tag:str):
-        player = await aPlayer.create(player_tag)
         try:
-            member = await self.bot.get_or_fetch_member(self.guild,player.discord_user)
-        except (discord.Forbidden,discord.NotFound):
-            member = None
+            player = await bot_client.cog.fetch_player(player_tag)
+            try:
+                member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
+            except (discord.Forbidden,discord.NotFound):
+                member = None
 
-        if not member:
-            return
-        
-        if not self.member_reminders.get(member.id):
-            self.member_reminders[member.id] = MemberReminder(member)        
-        self.member_reminders[member.id].add_account(player)
+            if not member:
+                return
+            
+            if not self.member_reminders.get(member.id):
+                self.member_reminders[member.id] = MemberReminder(member)        
+            self.member_reminders[member.id].add_account(player)
+        except:
+            bot_client.cog.coc_main_log.exception(f"Error adding account {player_tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
     
     async def send_war_reminders(self,clan:aClan,clan_war:aClanWar):
         if len(self) == 0:
@@ -69,7 +71,7 @@ class EventReminders():
         reminder_text = f"You have **NOT** used all of your War Attacks. Clan War ends in **{remain_str}**(<t:{clan_war.end_time.int_timestamp}:f>)\n\n"
         reminder_text += self.reminder_text
 
-        webhook = await get_bot_webhook(self.bot,self.channel)
+        webhook = await get_bot_webhook(bot_client.bot,self.channel)
         if isinstance(self.channel,discord.Thread):
             r_msg = await webhook.send(
                 username=clan.name,
@@ -85,7 +87,7 @@ class EventReminders():
                 content=reminder_text,
                 wait=True
                 )
-        self.client.cog.coc_main_log.info(f"Clan {clan}: Sent War Reminders to {len(self)} players. Reminder ID: {r_msg.id}")
+        bot_client.cog.coc_main_log.info(f"Clan {clan}: Sent War Reminders to {len(self)} players. Reminder ID: {r_msg.id}")
     
     async def send_raid_reminders(self,clan:aClan,raid_weekend:aRaidWeekend):
         if len(self) == 0:
@@ -103,7 +105,7 @@ class EventReminders():
         reminder_text = f"You started your Raid Weekend but **HAVE NOT** used all your Raid Attacks. Raid Weekend ends in **{remain_str}**(<t:{raid_weekend.end_time.int_timestamp}:f>).\n\n"
         reminder_text += self.reminder_text
 
-        webhook = await get_bot_webhook(self.bot,self.channel)
+        webhook = await get_bot_webhook(bot_client.bot,self.channel)
 
         if isinstance(self.channel,discord.Thread):
             await webhook.send(
@@ -118,4 +120,4 @@ class EventReminders():
                 avatar_url=clan.badge,
                 content=reminder_text,
                 )
-        self.client.cog.coc_main_log.info(f"Clan {clan}: Sent Raid Reminders to {len(self)} players.")
+        bot_client.cog.coc_main_log.info(f"Clan {clan}: Sent Raid Reminders to {len(self)} players.")

@@ -16,6 +16,8 @@ from ...constants.coc_constants import *
 from ...constants.coc_emojis import *
 from ...exceptions import *
 
+bot_client = BotClashClient()
+
 ##################################################
 #####
 ##### ATTRIBUTES
@@ -40,11 +42,20 @@ class db_ClockConfig(Document):
 #####
 ##################################################
 class aGuildClocks():
-    def __init__(self,guild_id):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-        
+    def __init__(self,guild_id):        
         self.id = guild_id
+    
+    @property
+    def guild_db(self):
+        try:
+            db = db_ClockConfig.objects.get(s_id=self.id)
+        except DoesNotExist:
+            db = db_ClockConfig(s_id=self.id)
+        return db
+
+    @property
+    def guild(self):
+        return bot_client.bot.get_guild(self.id)
     
     async def create_clock_channel(self):
         default_permissions = {
@@ -60,7 +71,7 @@ class aGuildClocks():
             name='🕐',
             overwrites=default_permissions
             )
-        self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Clock Channel: {clock_channel.id}.")
+        bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Clock Channel: {clock_channel.id}.")
         return clock_channel
     
     async def create_scheduled_event(self,
@@ -96,20 +107,8 @@ class aGuildClocks():
             image=image_bytes,
             location="In-Game"
             )
-        self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Scheduled Event: {event.name} {event.id}.")
-        return event
-
-    @property
-    def guild_db(self):
-        try:
-            db = db_ClockConfig.objects.get(s_id=self.id)
-        except DoesNotExist:
-            db = db_ClockConfig(s_id=self.id)
-        return db
-
-    @property
-    def guild(self):
-        return self.bot.get_guild(self.id)
+        bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Scheduled Event: {event.name} {event.id}.")
+        return event    
 
     ##################################################
     ### CONFIGURATION
@@ -154,8 +153,8 @@ class aGuildClocks():
             await new_channel.edit(position=0)
             self.season_channel = new_channel.id
     
-        season_ch_name = f"📅 {self.client.cog.current_season.description} "
-        time_to_end = self.client.cog.current_season.time_to_end(now)
+        season_ch_name = f"📅 {bot_client.cog.current_season.description} "
+        time_to_end = bot_client.cog.current_season.time_to_end(now)
 
         if time_to_end.days > 0:
             season_ch_name += f"({time_to_end.days}D left)"
@@ -166,7 +165,7 @@ class aGuildClocks():
 
         if self.season_channel.name != season_ch_name:
             await self.season_channel.edit(name=season_ch_name)
-            self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Season Channel updated to {season_ch_name}.")
+            bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Season Channel updated to {season_ch_name}.")
 
     ##################################################
     ### RAID CLOCKS
@@ -223,7 +222,7 @@ class aGuildClocks():
         
         if raid_ch_name and self.raids_channel.name != raid_ch_name:
             await self.raids_channel.edit(name=raid_ch_name)
-            self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Raids Channel updated to {raid_ch_name}.")
+            bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Raids Channel updated to {raid_ch_name}.")
     
     @property
     def raids_event(self) -> Optional[discord.ScheduledEvent]:
@@ -308,7 +307,7 @@ class aGuildClocks():
         
         if cg_ch_name and self.clangames_channel.name != cg_ch_name:
             await self.clangames_channel.edit(name=cg_ch_name)
-            self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Clan Games Channel updated to {cg_ch_name}.")
+            bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Clan Games Channel updated to {cg_ch_name}.")
     
     @property
     def clangames_event(self) -> Optional[discord.ScheduledEvent]:
@@ -396,7 +395,7 @@ class aGuildClocks():
         
         if cwl_ch_name and self.warleague_channel.name != cwl_ch_name:
             await self.warleague_channel.edit(name=cwl_ch_name)
-            self.client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: CWL Channel updated to {cwl_ch_name}.")
+            bot_client.cog.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: CWL Channel updated to {cwl_ch_name}.")
     
     @property
     def warleague_event(self) -> Optional[discord.ScheduledEvent]:
@@ -407,10 +406,6 @@ class aGuildClocks():
         if isinstance(event,discord.ScheduledEvent):
             self.guild_db.warleague_event = event_id
             self.guild_db.save()
-            self.client.cog.coc_main_log.warning(f"nopoop {event.id}")
-            self.client.cog.coc_main_log.warning(f"{self.guild_db.warleague_event}")
-        else:
-            self.client.cog.coc_main_log.warning(f"poop")
     
     async def update_warleagues_event(self):
         now = pendulum.now('UTC')
