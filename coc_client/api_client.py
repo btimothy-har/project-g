@@ -42,7 +42,8 @@ class DataCache():
             del self.cache[key]
     def add_to_queue(self,key):
         if key not in self.queue:
-            self.queue.append(key)
+            if key not in self.cache:
+                self.queue.append(key)
     def remove_from_queue(self,key):
         if key in self.queue:
             self.queue.remove(key)
