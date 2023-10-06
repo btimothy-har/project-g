@@ -205,7 +205,7 @@ class StoreManager(DefaultView):
         self.new_item.price = int(modal.children[1].value)
         self.new_item.stock = int(modal.children[2].value)
         self.new_item.category = modal.children[3].value
-        self.new_item.description = modal.children[3].value
+        self.new_item.description = modal.children[4].value
 
         await self._add_item_main(interaction,modal)
     
