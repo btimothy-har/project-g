@@ -126,7 +126,7 @@ class aGuild():
                         '#2YL99GC9L':3,
                         '#92G9J8CG':4
                         }
-                    clans = sorted(clans,key=lambda c:(arix_rank.get(c.tag,999),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+                    clans = sorted(clans,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
                 else:
                     clans = sorted(clans,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
                 
@@ -217,7 +217,7 @@ class aGuild():
                         '#2YL99GC9L':3,
                         '#92G9J8CG':4
                         }
-                    clans = sorted(cc,key=lambda c:(arix_rank.get(c.tag,999),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+                    clans = sorted(cc,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
                 else:
                     clans = sorted(cc,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
 

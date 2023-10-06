@@ -447,7 +447,7 @@ class Bank(commands.Cog):
         clan = None
         if clan_abbreviation:
             try:
-                clan = await aClan.from_abbreviation(clan_abbreviation)
+                clan = await bot_client.cog.from_clan_abbreviation(clan_abbreviation)
             except InvalidAbbreviation as exc:
                 clan = None
             
@@ -487,7 +487,7 @@ class Bank(commands.Cog):
         clan = None
         if select_clan:
             try:
-                clan = await aClan.create(select_clan)
+                clan = await bot_client.cog.fetch_clan(select_clan)
             except:
                 clan = None
             
@@ -791,7 +791,7 @@ class Bank(commands.Cog):
         
         else:
             try:
-                clan = await aClan.from_abbreviation(account_type_or_clan_abbreviation)
+                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
@@ -835,7 +835,7 @@ class Bank(commands.Cog):
         
         else:
             try:
-                clan = await aClan.create(select_account)
+                clan = await bot_client.cog.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
@@ -896,7 +896,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await aClan.from_abbreviation(account_type_or_clan_abbreviation)
+                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             else:
@@ -944,7 +944,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await aClan.create(select_account)
+                clan = await bot_client.cog.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message,ephemeral=True)
             else:
@@ -989,7 +989,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await aClan.from_abbreviation(account_type_or_clan_abbreviation)
+                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             else:
@@ -1037,7 +1037,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await aClan.create(select_account)
+                clan = await bot_client.cog.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message,ephemeral=True)
             else:
@@ -1071,7 +1071,7 @@ class Bank(commands.Cog):
                 )                 
         else:
             try:
-                clan = await aClan.from_abbreviation(account_type_or_clan_abbreviation)
+                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             
@@ -1105,7 +1105,7 @@ class Bank(commands.Cog):
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
             account = MasterAccount(select_account)        
         else:
-            clan = await aClan.create(select_account)
+            clan = await bot_client.cog.fetch_clan(select_account)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)            
