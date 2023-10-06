@@ -20,11 +20,9 @@ class ClanSettingsMenu(DefaultView):
         clan:aClan):
         
         self.clan = clan
+        self.main_menu_options = ['Discord Feed','War Reminders','Raid Reminders']
         if self.clan.is_alliance_clan:
-            self.main_menu_options = ['Recruiting']
-        else:
-            self.main_menu_options = []
-        self.main_menu_options.extend(['Discord Feed','War Reminders','Raid Reminders'])
+            self.main_menu_options.append('Recruiting')
             
         super().__init__(context)
     
@@ -108,16 +106,16 @@ class ClanSettingsMenu(DefaultView):
 
         select_menu = self.main_menu_options[int(menu.values[0])]
 
-        if select_menu == self.main_menu_options[0]:
+        if select_menu == 'Recruiting':
             await self._recruiting_menu(interaction)
 
-        elif select_menu == self.main_menu_options[1]:
+        elif select_menu == 'Discord Feed':
             await self._discord_feed_menu(interaction)
             
-        elif select_menu == self.main_menu_options[2]:
+        elif select_menu == 'War Reminders':
             await self._war_reminder_menu(interaction)
 
-        elif select_menu == self.main_menu_options[3]:
+        elif select_menu == 'Raid Reminders':
             await self._raid_reminder_menu(interaction)
         else:
             await self._main_menu(interaction)
