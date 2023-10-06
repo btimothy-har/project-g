@@ -242,7 +242,7 @@ class RecruitingReminder():
     
     @property
     def remind_user(self) -> Optional[discord.User]:
-        return self.bot.get_user(self._remind_user)
+        return bot_client.bot.get_user(self._remind_user)
     @remind_user.setter
     def remind_user(self,value:int):
         self._remind_user = value
