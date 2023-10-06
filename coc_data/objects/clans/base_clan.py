@@ -357,7 +357,7 @@ class BasicClan():
     ##################################################     
     @property
     def bank_account(self):
-        bank_cog = self.client.bot.get_cog("Bank")
+        bank_cog = bot_client.bot.get_cog("Bank")
         if not bank_cog or not self.is_alliance_clan:
             return None
         return bank_cog.get_clan_account(self)
