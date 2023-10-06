@@ -14,7 +14,7 @@ from .spell import aSpell
 from .pet import aPet
 
 from .base_player import *
-from .player_season import aPlayerSeason
+from .player_season import *
 
 from ..season.season import aClashSeason
 from ..clans.clan import aClan

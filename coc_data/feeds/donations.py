@@ -43,11 +43,11 @@ class ClanDonationFeed():
             url=self.clan.share_link,
             timestamp=pendulum.now()
             )
-        if len(m for m in self.raw_data if m.donated_chg > 0):
+        if len([m for m in self.raw_data if m.donated_chg]) > 0:
             embed.description += "\n**Donated**"
             embed.description += "\n".join([f"{EmojisClash.DONATIONSOUT} `{m.donated_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.donated_chg > 0])
 
-        if len(m for m in self.raw_data if m.received_chg > 0):
+        if len([m for m in self.raw_data if m.received_chg]) > 0:
             embed.description += "\n**Received**"
             embed.description += "\n".join([f"{EmojisClash.DONATIONSRCVD} `{m.received_chg:<3}` | **[{m.member.name}]({m.member.share_link})**" for m in self.raw_data if m.received_chg > 0])
         return embed

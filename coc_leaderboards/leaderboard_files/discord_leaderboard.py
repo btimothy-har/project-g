@@ -359,7 +359,8 @@ class ClanWarLeaderboard():
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
         leaderboard = cls(parent,season)
-        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
+        
+        all_players = await asyncio.gather(*(bot_client.cog.fetch_player(tag=p.tag) for p in db_PlayerStats.objects(is_member=True,season=season.id).only('tag')))
 
         async for p in AsyncIter(all_players):
             stats = p.get_season_stats(season)
@@ -433,7 +434,7 @@ class ResourceLootLeaderboard():
                 return stats.attacks.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
-        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
+        all_players = await asyncio.gather(*(bot_client.cog.fetch_player(tag=p.tag) for p in db_PlayerStats.objects(is_member=True,season=season.id).only('tag')))
         
         iter_players = AsyncIter(all_players)
 
@@ -510,7 +511,7 @@ class DonationsLeaderboard():
                 return stats.donations_sent.season_total > 0 and stats.home_clan.tag in [c.tag for c in parent.lb_clans]
 
         leaderboard = cls(parent,season)
-        all_players = await asyncio.gather(*(p.get_full_player() for p in bot_client.cog.get_members_by_season(season=season)))
+        all_players = await asyncio.gather(*(bot_client.cog.fetch_player(tag=p.tag) for p in db_PlayerStats.objects(is_member=True,season=season.id).only('tag')))
         iter_players = AsyncIter(all_players)
 
         async for p in iter_players.filter(predicate_leaderboard):
@@ -581,7 +582,7 @@ class ClanGamesLeaderboard():
             return stats.clangames.score > 0 and stats.clangames.clan_tag in [c.tag for c in parent.lb_clans] and stats.home_clan.tag == stats.clangames.clan_tag
 
         leaderboard = cls(parent,season)
-        all_players = AsyncIter(bot_client.cog.get_members_by_season(season=season))
+        all_players = await asyncio.gather(*(bot_client.cog.fetch_player(tag=p.tag) for p in db_PlayerStats.objects(is_member=True,season=season.id).only('tag')))
         iter_players = AsyncIter(all_players)
 
         leaderboard.leaderboard_players['global'] = []
