@@ -3,8 +3,9 @@ import discord
 from mongoengine import *
 
 from coc_client.api_client import BotClashClient
-
 from redbot.core.utils import AsyncIter
+
+bot_client = BotClashClient()
 
 class db_ClanGuildLink(Document):
     #ID using format {'guild':int,'tag':#123}
@@ -17,9 +18,6 @@ class db_ClanGuildLink(Document):
 
 class ClanGuildLink():
     def __init__(self,database_entry:db_ClanGuildLink):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-
         self.id = database_entry.link_id
         self.tag = database_entry.tag
         self.guild_id = database_entry.guild_id
@@ -72,27 +70,23 @@ class ClanGuildLink():
             link.delete()
     
     @property
-    def clan(self):
-        return self.client.cog.get_clan(self.tag)
+    def guild(self) -> discord.Guild:
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
-    def guild(self):
-        return self.bot.get_guild(self.guild_id)
-    
-    @property
-    def member_role(self):
+    def member_role(self) -> discord.Role:
         if self.guild: 
             return self.guild.get_role(self._member_role)
         return None
 
     @property
-    def elder_role(self):
+    def elder_role(self) -> discord.Role:
         if self.guild: 
             return self.guild.get_role(self._elder_role)
         return None
     
     @property
-    def coleader_role(self):
+    def coleader_role(self) -> discord.Role:
         if self.guild: 
             return self.guild.get_role(self._coleader_role)
         return None

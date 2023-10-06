@@ -19,6 +19,8 @@ from coc_data.utilities.utils import *
 from coc_data.constants.coc_emojis import *
 from coc_data.constants.ui_emojis import *
 
+bot_client = BotClashClient()
+
 async def clan_composition_embed(context:Union[commands.Context,discord.Interaction],clan:aClan):
     embed = await clash_embed(
         context=context,
@@ -26,10 +28,10 @@ async def clan_composition_embed(context:Union[commands.Context,discord.Interact
         message=f"**Clan Member Composition**",
         thumbnail=clan.badge,
         )            
-    fetch_member_tasks = [asyncio.create_task(aPlayer.create(member.tag)) for member in clan.members]
+    ingame_members = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in clan.members))
 
     if clan.is_alliance_clan and clan.alliance_member_count > 0:
-        clan_members = clan.alliance_members
+        clan_members = await asyncio.gather(*(m.get_full_player() for m in clan.alliance_members))
         townhall_levels = [member.town_hall.level for member in clan_members]
         townhall_levels.sort(reverse=True)
         average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
@@ -46,8 +48,6 @@ async def clan_composition_embed(context:Union[commands.Context,discord.Interact
                 + "\n\u200b",
             inline=False,
             )
-    
-    ingame_members = await asyncio.gather(*fetch_member_tasks)
     townhall_levels = [member.town_hall.level for member in ingame_members]
     townhall_levels.sort(reverse=True)
     average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
@@ -69,10 +69,10 @@ async def clan_composition_embed(context:Union[commands.Context,discord.Interact
 async def clan_strength_embed(context:Union[commands.Context,discord.Interaction],clan:aClan):
     if clan.is_alliance_clan and clan.alliance_member_count > 0:
         showing_registered = True
-        clan_members = clan.alliance_members
+        clan_members = await asyncio.gather(*(m.get_full_player() for m in clan.alliance_members))
     else:
         showing_registered = False
-        clan_members = await asyncio.gather(*[aPlayer.create(member.tag) for member in clan.members])
+        clan_members = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in clan.members))
     
     townhall_levels = list(set([member.town_hall.level for member in clan_members]))
     townhall_levels.sort(reverse=True)
@@ -99,13 +99,14 @@ async def clan_strength_embed(context:Union[commands.Context,discord.Interaction
                 name=f"{EmojisTownHall.get(th)} **TH{th}**"
                     + (f" - ({i+1}/{len(chunked_members)})" if len(chunked_members) > 1 else ""),
                 value="\n".join([
-                    f"`{getattr(member.get_hero('Barbarian King'),'level',''):^2}{'':^2}"
-                    + f"{getattr(member.get_hero('Archer Queen'),'level',''):^2}{'':^2}"
-                    + f"{getattr(member.get_hero('Grand Warden'),'level',''):^2}{'':^2}"
-                    + f"{getattr(member.get_hero('Royal Champion'),'level',''):^2}{'':^2}"
+                    f"`"
+                    + (f"{getattr(member.get_hero('Barbarian King'),'level',''):^2}{'':^2}" if member.town_hall.level >= 7 else f"{'':^4}")
+                    + (f"{getattr(member.get_hero('Archer Queen'),'level',''):^2}{'':^2}" if member.town_hall.level >= 9 else f"{'':^4}")
+                    + (f"{getattr(member.get_hero('Grand Warden'),'level',''):^2}{'':^2}" if member.town_hall.level >= 11 else f"{'':^4}")
+                    + (f"{getattr(member.get_hero('Royal Champion'),'level',''):^2}{'':^2}" if member.town_hall.level >= 13 else f"{'':^4}")
                     + f"{str(round((member.troop_strength / member.max_troop_strength)*100))+'%':>7}{'':^2}"
                     + (f"{str(round((member.spell_strength / member.max_spell_strength)*100))+'%':>7}" if member.max_spell_strength > 0 else f"{'':>7}")
-                    + f"{'':^2}`\u3000{re.sub('[_*/]','',member.name)}"
+                    + f"{'':^2}`\u3000{re.sub('[_*/]','',member.clean_name)}"
                     + (f" {EmojisUI.LOGOUT}" if clan.is_alliance_clan and member.tag not in clan.members_dict else "")
                     for member in members_chunk
                     ]),
@@ -115,7 +116,7 @@ async def clan_strength_embed(context:Union[commands.Context,discord.Interaction
 
 async def clan_donations_embed(context:Union[commands.Context,discord.Interaction],clan:aClan):
     if clan.is_alliance_clan and clan.alliance_member_count > 0:
-        clan_members = clan.alliance_members
+        clan_members = await asyncio.gather(*(m.get_full_player() for m in clan.alliance_members))
         clan_members.sort(key=lambda member: member.current_season.donations_sent.alliance_only,reverse=True)
 
         stats_text = "\n".join([
@@ -127,7 +128,7 @@ async def clan_donations_embed(context:Union[commands.Context,discord.Interactio
         embed = await clash_embed(
             context=context,
             title=f"{clan.title}: Donations",
-            message=f"**Showing stats for: {clan.client.cog.current_season.description}**\n\n"
+            message=f"**Showing stats for: {bot_client.cog.current_season.description}**\n\n"
                 + f"{EmojisClash.DONATIONSOUT} Total Sent: {sum(member.current_season.donations_sent.season_only_clan for member in clan_members):,}\u3000|\u3000"
                 + f"{EmojisClash.DONATIONSRCVD} Total Received: {sum(member.current_season.donations_rcvd.season_only_clan for member in clan_members):,}\n\n"
                 + f"`{'SENT':>6}{'':^2}{'RCVD':>6}{'':^2}`\n"
@@ -135,7 +136,7 @@ async def clan_donations_embed(context:Union[commands.Context,discord.Interactio
             thumbnail=clan.badge,
             )    
     else:
-        clan_members = await asyncio.gather(*[aPlayer.create(member.tag) for member in clan.members])
+        clan_members = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in clan.members))
         clan_members.sort(key=lambda member: member.donations,reverse=True)
 
         stats_text = "\n".join([
@@ -157,7 +158,7 @@ async def clan_donations_embed(context:Union[commands.Context,discord.Interactio
 
 async def clan_games_data(context:Union[commands.Context,discord.Interaction],clan:aClan,season:aClashSeason):
 
-    participants = await aPlayerSeason.clan_games_participants(season,clan)
+    participants = await bot_client.cog.get_clan_games_participants(season=season,clan=clan)
 
     embed = await clash_embed(
         context=context,

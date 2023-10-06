@@ -3,6 +3,8 @@ import discord
 from redbot.core import commands, app_commands
 from redbot.core.utils import AsyncIter
 
+from coc_client.api_client import BotClashClient
+
 from coc_client.exceptions import ClashOfClansError
 
 from coc_data.objects.players.player import aPlayer
@@ -26,6 +28,8 @@ from .helpers.checks import *
 from .helpers.autocomplete import *
 from .helpers.components import *
 
+bot_client = BotClashClient()
+
 ############################################################
 ############################################################
 #####
@@ -39,7 +43,7 @@ class ClanWarLeagues(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.0"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):        
         self.bot = bot
@@ -47,10 +51,6 @@ class ClanWarLeagues(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
-
-    @property
-    def client(self):
-        return self.bot.get_cog("ClashOfClansClient").client
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -85,9 +85,9 @@ class ClanWarLeagues(commands.Cog):
     ##### - mycwl
     ##### - cwl
     #####   - info
-    #####   - clans
     #####   - setup
     #####   - clan
+    #####     - list
     #####     - add
     #####     - remove
     #####     - roster
@@ -135,10 +135,10 @@ class ClanWarLeagues(commands.Cog):
         Defaults to the currently running CWL Season.
         """
         
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=7):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=7):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
         cwlmenu = CWLPlayerMenu(ctx,season,aMember(ctx.author.id,ctx.guild.id))
 
@@ -155,10 +155,10 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=7):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=7):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
         cwlmenu = CWLPlayerMenu(interaction,season,aMember(interaction.user.id,interaction.guild.id))
 
@@ -251,10 +251,10 @@ class ClanWarLeagues(commands.Cog):
         Provides an overview to Admins of the current CWL Season, and provides toggles to control various options.
         """
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=5):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=5):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
 
         menu = CWLSeasonSetup(ctx,season)
         await menu.start()
@@ -267,10 +267,10 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=5):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=5):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
         menu = CWLSeasonSetup(interaction,season)
         await menu.start()
@@ -315,12 +315,12 @@ class ClanWarLeagues(commands.Cog):
             message=f"Roles will not appear if they are from a different Server."
                 + f"\nIf using Thread Channels, archived threads will not be visible."
             )
-        for clan in self.client.cog.get_cwl_clans():
+        for clan in bot_client.cog.get_cwl_clans():
             embed.add_field(
                 name=f"{clan.title}",
-                value=f"**League:** {EmojisLeagues.get(clan.war_league.name)} {clan.war_league.name}"
-                    + f"\n**Channel:** {getattr(clan.cwl_config.channel,'mention','Unknown Channel')}"
-                    + f"\n**Role:** {getattr(clan.cwl_config.role,'mention','Unknown Role')}"
+                value=f"**League:** {EmojisLeagues.get(clan.war_league_name)} {clan.war_league_name}"
+                    + f"\n**Channel:** {getattr(clan.league_clan_channel,'mention','Unknown Channel')}"
+                    + f"\n**Role:** {getattr(clan.league_clan_role,'mention','Unknown Role')}"
                     + f"\n\u200b",
                 inline=False
                 )            
@@ -339,12 +339,12 @@ class ClanWarLeagues(commands.Cog):
             message=f"Roles will not appear if they are from a different Server."
                 + f"\nIf using Thread Channels, archived threads will not be visible."
             )
-        for clan in self.client.cog.get_cwl_clans():
+        for clan in bot_client.cog.get_cwl_clans():
             embed.add_field(
                 name=f"{clan.title}",
-                value=f"**League:** {EmojisLeagues.get(clan.war_league.name)} {clan.war_league.name}"
-                    + f"\n**Channel:** {getattr(clan.cwl_config.channel,'mention','Unknown Channel')}"
-                    + f"\n**Role:** {getattr(clan.cwl_config.role,'mention','Unknown Role')}"
+                value=f"**League:** {EmojisLeagues.get(clan.war_league_name)} {clan.war_league_name}"
+                    + f"\n**Channel:** {getattr(clan.league_clan_channel,'mention','Unknown Channel')}"
+                    + f"\n**Role:** {getattr(clan.league_clan_role,'mention','Unknown Role')}"
                     + f"\n\u200b",
                 inline=False
                 )            
@@ -366,16 +366,16 @@ class ClanWarLeagues(commands.Cog):
         This adds the Clan to the master list. It does not add the Clan to the current CWL Season. To enable a Clan for a specific season, use `/cwl setup`.
         """
         
-        clan = await aClan.create(clan_tag)
-        clan.cwl_config.channel = cwl_channel.id
-        clan.cwl_config.role = cwl_role.id
-        clan.cwl_config.is_cwl_clan = True
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        clan.league_clan_channel = cwl_channel.id
+        clan.league_clan_role = cwl_role.id
+        clan.is_active_league_clan = True
 
         embed = await clash_embed(
             context=ctx,
             message=f"**{clan.title}** is now added as a CWL Clan."
-                + f"\n\n**Channel:** {clan.cwl_config.channel.mention}"
-                + f"\n**Role:** {clan.cwl_config.role.mention}",
+                + f"\n\n**Channel:** {clan.league_clan_channel.mention}"
+                + f"\n**Role:** {clan.league_clan_role.mention}",
             success=True
             )
         await ctx.reply(embed=embed)
@@ -393,16 +393,16 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        get_clan = await aClan.create(clan)
-        get_clan.cwl_config.channel = channel.id
-        get_clan.cwl_config.role = role.id
-        get_clan.cwl_config.is_cwl_clan = True
+        clan = await bot_client.cog.fetch_clan(clan)
+        clan.league_clan_channel = channel
+        clan.league_clan_role = role
+        clan.is_active_league_clan = True
 
         embed = await clash_embed(
             context=interaction,
-            message=f"**{get_clan.title}** is now added as a CWL Clan."
-                + f"\n\n**Channel:** {get_clan.cwl_config.channel.mention}"
-                + f"\n**Role:** {get_clan.cwl_config.role.mention}",
+            message=f"**{clan.title}** is now added as a CWL Clan."
+                + f"\n\n**Channel:** {clan.league_clan_channel.mention}"
+                + f"\n**Role:** {clan.league_clan_role.mention}",
             success=True
             )
         await interaction.edit_original_response(embed=embed,view=None)
@@ -420,8 +420,8 @@ class ClanWarLeagues(commands.Cog):
         Owner-only to prevent strange things from happening.
         """
         
-        clan = await aClan.create(clan_tag)
-        clan.cwl_config.is_cwl_clan = False
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        clan.is_active_league_clan = False
 
         embed = await clash_embed(
             context=ctx,
@@ -441,13 +441,13 @@ class ClanWarLeagues(commands.Cog):
         View the Roster for a CWL Clan.
         """
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=5):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=5):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        clan = await aClan.create(clan_tag)
-        cwl_clan = clan.cwl_season(season)
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        cwl_clan = clan.war_league_season(season)
 
         if not cwl_clan.is_participating:
             embed = await clash_embed(
@@ -470,13 +470,13 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=5):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=5):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
 
-        get_clan = await aClan.create(clan)
-        cwl_clan = get_clan.cwl_season(season)
+        clan = await bot_client.cog.fetch_clan(clan)
+        cwl_clan = clan.war_league_season(season)
 
         if not cwl_clan.is_participating:
             embed = await clash_embed(
@@ -500,13 +500,13 @@ class ClanWarLeagues(commands.Cog):
         View the League Group for a CWL Clan.
         """
         
-        clan = await aClan.create(clan_tag)
-        cwl_clan = clan.cwl_season(self.client.cog.current_season)
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        cwl_clan = clan.war_league_season(bot_client.cog.current_season)
 
         if not cwl_clan.league_group:
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{clan.title}** has not started CWL for {self.client.cog.current_season.description}."
+                message=f"**{clan.title}** has not started CWL for {bot_client.cog.current_season.description}."
                     + "\n\nIf you're looking for the Clan Roster, use [p]`cwl clan roster` instead.",
                 success=False
                 )
@@ -525,13 +525,13 @@ class ClanWarLeagues(commands.Cog):
 
         await interaction.response.defer()
         
-        get_clan = await aClan.create(clan)
-        cwl_clan = get_clan.cwl_season(self.client.cog.current_season)
+        clan = await bot_client.cog.fetch_clan(clan)
+        cwl_clan = clan.war_league_season(bot_client.cog.current_season)
 
         if not cwl_clan.league_group:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{clan.title}** has not started CWL for {self.client.cog.current_season.description}."
+                message=f"**{clan.title}** has not started CWL for {bot_client.cog.current_season.description}."
                     + "\n\nIf you're looking for the Clan Roster, use [p]`cwl clan roster` instead.",
                 success=False
                 )
@@ -582,13 +582,13 @@ class ClanWarLeagues(commands.Cog):
         Always defaults to the next open CWL Season.
         """
             
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        clan = await aClan.create(clan_tag)
-        cwl_clan = clan.cwl_season(season)
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        cwl_clan = clan.war_league_season(season)
 
         if not cwl_clan.is_participating:
             embed = await clash_embed(
@@ -611,18 +611,18 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
 
-        get_clan = await aClan.create(clan)
-        cwl_clan = get_clan.cwl_season(season)
+        clan = await bot_client.cog.fetch_clan(clan)
+        cwl_clan = clan.cwl_season(season)
 
         if not cwl_clan.is_participating:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{get_clan.title}** is not participating in CWL for {season.description}.",
+                message=f"**{clan.title}** is not participating in CWL for {season.description}.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -648,13 +648,13 @@ class ClanWarLeagues(commands.Cog):
         """
         
         reopen = False
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        clan = await aClan.create(clan_tag)
-        cwl_clan = clan.cwl_season(season)
+        clan = await bot_client.cog.fetch_clan(clan_tag)
+        cwl_clan = clan.war_league_season(season)
 
         if not cwl_clan.is_participating:
             embed = await clash_embed(
@@ -672,8 +672,8 @@ class ClanWarLeagues(commands.Cog):
                 )
             return await ctx.reply(embed=embed,view=None)
 
-        player = await aPlayer.create(player_tag)        
-        cwl_player = player.cwl_player(season)
+        player = await bot_client.cog.fetch_player(player_tag)
+        cwl_player = player.war_league_season(season)
         original_roster = cwl_player.roster_clan
 
         cwl_player.admin_add(cwl_clan.tag)
@@ -687,7 +687,7 @@ class ClanWarLeagues(commands.Cog):
         embed = await clash_embed(
             context=ctx,
             message=f"**{player.title}** has been added to CWL."
-                + f"\n\n> Clan: {cwl_player.roster_clan.clan.title}"
+                + f"\n\n> Clan: {cwl_player.roster_clan.title}"
                 + f"\n> Discord: <@{cwl_player.discord_user}>"
                 + (f"\n\n{original_roster.name}'s Roster has been re-opened. ({original_roster_length} players remain)" if reopen else ""),
             success=True
@@ -708,18 +708,18 @@ class ClanWarLeagues(commands.Cog):
         await interaction.response.defer()
 
         reopen = False
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        clan = await aClan.create(clan)
-        cwl_clan = clan.cwl_season(season)
+        get_clan = await bot_client.cog.fetch_clan(clan)
+        cwl_clan = get_clan.war_league_season(season)
         
         if not cwl_clan.is_participating:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{clan.title}** is not participating in CWL for {season.description}.",
+                message=f"**{get_clan.title}** is not participating in CWL for {season.description}.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -732,8 +732,8 @@ class ClanWarLeagues(commands.Cog):
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
 
-        player = await aPlayer.create(player)        
-        cwl_player = player.cwl_player(season)
+        get_player = await bot_client.cog.fetch_player(player)
+        cwl_player = get_player.war_league_season(season)
         original_roster = cwl_player.roster_clan
 
         cwl_player.admin_add(cwl_clan.tag)
@@ -746,8 +746,8 @@ class ClanWarLeagues(commands.Cog):
 
         embed = await clash_embed(
             context=interaction,
-            message=f"**{player.title}** has been added to {season.description} CWL."
-                + f"\n\n> Clan: {cwl_player.roster_clan.clan.title}"
+            message=f"**{get_player.title}** has been added to {season.description} CWL."
+                + f"\n\n> Clan: {cwl_player.roster_clan.title}"
                 + f"\n> Discord: <@{cwl_player.discord_user}>"
                 + (f"\n\n{original_roster.name}'s Roster has been re-opened. ({original_roster_length} players remain)" if reopen else ""),
             success=True
@@ -771,18 +771,18 @@ class ClanWarLeagues(commands.Cog):
         """
             
         reopen = False
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        player = await aPlayer.create(player_tag)
-        cwl_player = player.cwl_player(season)
+        player = await bot_client.cog.fetch_player(player_tag)
+        cwl_player = player.war_league_season(season)
         
         if getattr(cwl_player,'league_clan',None):
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{player}** is already in CWL with **{cwl_player.league_clan.clan.title}**.",
+                message=f"**{player}** is already in CWL with **{cwl_player.league_clan.title}**.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
@@ -815,18 +815,18 @@ class ClanWarLeagues(commands.Cog):
         await interaction.response.defer()
 
         reopen = False
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
-        player = await aPlayer.create(player)
-        cwl_player = player.cwl_player(season)
+        get_player = await bot_client.cog.fetch_player(player)
+        cwl_player = get_player.war_league_season(season)
 
         if getattr(cwl_player,'league_clan',None):
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{player}** is already in CWL with **{cwl_player.league_clan.clan.title}**.",
+                message=f"**{get_player}** is already in CWL with **{cwl_player.league_clan.title}**.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)       
@@ -842,7 +842,7 @@ class ClanWarLeagues(commands.Cog):
 
         embed = await clash_embed(
             context=interaction,
-            message=f"**{player.title}** has been removed from {season.description} CWL."
+            message=f"**{get_player.title}** has been removed from {season.description} CWL."
                 + (f"\n\n{original_roster.name}'s Roster has been re-opened. ({original_roster_length} players remain)" if reopen else ""),
             success=True
             )
@@ -861,10 +861,10 @@ class ClanWarLeagues(commands.Cog):
         Defaults to the currently open CWL Season.
         """
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
 
         wait_msg = await ctx.reply("Exporting Data... please wait.")
 
@@ -886,10 +886,10 @@ class ClanWarLeagues(commands.Cog):
         
         await interaction.response.defer()
 
-        if pendulum.now() > self.client.cog.current_season.cwl_end.add(days=1):
-            season = self.client.cog.current_season.next_season()
+        if pendulum.now() > bot_client.cog.current_season.cwl_end.add(days=1):
+            season = bot_client.cog.current_season.next_season()
         else:
-            season = self.client.cog.current_season
+            season = bot_client.cog.current_season
         
         rp_file = await generate_cwl_roster_export(season)
         

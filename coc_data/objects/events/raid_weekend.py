@@ -17,6 +17,8 @@ from PIL import Image, ImageDraw, ImageFont
 from coc_client.api_client import BotClashClient
 
 from ..season.season import aClashSeason
+from ..clans.base_clan import BasicClan
+from ..players.base_player import BasicPlayer
 
 from ...constants.coc_constants import *
 from ...constants.coc_emojis import *
@@ -172,12 +174,11 @@ class aRaidWeekend():
                 self._last_save = pendulum.from_timestamp(raid_data.get('last_save',0)) if raid_data.get('last_save',0) > 0 else None
     
     @classmethod
-    async def create_from_api(cls,clan,data:coc.RaidLogEntry):
+    async def create_from_api(cls,clan:BasicClan,data:coc.RaidLogEntry):
         base_raid_id = clan.tag + str(pendulum.instance(data.start_time.time).int_timestamp)
         raid_id = hashlib.sha256(base_raid_id.encode()).hexdigest()
 
         raid_weekend = cls(raid_id=raid_id)
-
             
         raid_weekend.clan_tag = clan.tag
         raid_weekend.clan_name = clan.name
@@ -201,25 +202,11 @@ class aRaidWeekend():
         raid_weekend.members = [aRaidMember(raid_weekend,data=member) for member in data.members]
 
         if raid_weekend.do_i_save:
-            raid_weekend.save_raid_to_db()
+            raid_weekend.save_to_database()
         
         return raid_weekend
-
-    @property
-    def do_i_save(self):
-        if not self._found_in_db:
-            return True
-        if self.state == 'ongoing':
-            if self._last_save is None:
-                return True
-            if self._last_save.diff().in_minutes() > 60:
-                return True
-        if self.end_time <= pendulum.now() <= self.end_time.add(hours=2):
-            return True
-        return False
     
-    def save_raid_to_db(self):
-        #self.bot.clash_state.data.add_to_cache(self)
+    def save_to_database(self):
         self._last_save = pendulum.now()
         db_raid = db_RaidWeekend(
             raid_id = self.raid_id,
@@ -243,7 +230,21 @@ class aRaidWeekend():
             members = [m.to_json() for m in self.members],
             last_save = self._last_save.int_timestamp
             )
-        db_raid.save()
+        db_raid.save()    
+
+    @property
+    def do_i_save(self):
+        now = pendulum.now()
+        if not self._found_in_db:
+            return True
+        if self.state == 'ongoing':
+            if self._last_save is None:
+                return True
+            if now.int_timestamp - getattr(self._last_save,'int_timestamp',0) > 60:
+                return True
+        if self.end_time <= pendulum.now() <= self.end_time.add(hours=2):
+            return True
+        return False
 
     ##################################################
     ### DATA FORMATTERS
@@ -360,60 +361,15 @@ class aRaidWeekend():
         file = await asyncio.to_thread(save_im,background)
         return file
 
-    # @classmethod
-    # async def get(cls,**kwargs):
-    #     clan = kwargs.get('clan',None)
-    #     raid_id = kwargs.get('raid_id',None)
-
-    #     bot = BotClashState().bot
-
-    #     raid_cache = None
-    #     raid_weekend = None
-    #     api_raid = None
-
-    #     if raid_id:
-    #         raid_cache = bot.clash_state.data.raids.get(raid_id)
-    #         if raid_cache:
-    #             return raid_cache
-            
-    #         raid_weekend = aRaidWeekend(raid_id=raid_id)
-    #         if not raid_weekend._found_in_db:
-    #             raise NoRaidFoundError(raid_id)
-            
-    #         bot.clash_state.data.add_to_cache(raid_weekend)
-    #         return raid_weekend
-        
-    #     if clan:
-    #         try:
-    #             raidloggen = await bot.coc_client.get_raidlog(clan_tag=clan.tag,page=False,limit=1)
-    #         except coc.PrivateWarLog:
-    #             raidloggen = []
-    #         except coc.NotFound as exc:
-    #             raise InvalidTag(clan.tag) from exc
-    #         except (coc.Maintenance,coc.GatewayError) as exc:
-    #             raise ClashAPIError(exc) from exc
-
-    #         if len(raidloggen) == 0:
-    #             return None
-    #         api_raid = raidloggen[0]
-
-    #         if not api_raid:
-    #             return None
-            
-    #         base_raid_id = clan.tag + str(pendulum.instance(api_raid.start_time.time).int_timestamp)
-    #         raid_id = hashlib.sha256(base_raid_id.encode()).hexdigest()
-    #         raid_weekend = aRaidWeekend(raid_id=raid_id)
-    #         raid_weekend.update_from_api(api_raid,clan)
-        
-    #         bot.clash_state.data.add_to_cache(raid_weekend)
-    #         return raid_weekend
-
-class aRaidClan():
+class aRaidClan(BasicClan):
     def __init__(self,raid_entry,**kwargs):
         self.raid = raid_entry
 
         json = kwargs.get('json',None)
         game = kwargs.get('data',None)
+
+        super().__init__()
+
         if json:
             self.tag = json['tag']
             self.name = json['name']
@@ -436,15 +392,8 @@ class aRaidClan():
             self.districts = [aRaidDistrict(self.raid,self,data=district) for district in game.districts]
             self.attacks = [aRaidAttack(self.raid, self, data=attack) for district in game.districts for attack in district.attacks]
     
-    def get_district(self,district_id):
-        find_district = [rd for rd in self.districts if rd.id == district_id]
-        if len(find_district) == 0:
-            return None
-        else:
-            return find_district[0]
-
     def to_json(self):
-        rcJson = {
+        return {
             'tag': self.tag,
             'name': self.name,
             'badge': self.badge,
@@ -455,7 +404,13 @@ class aRaidClan():
             'districts': [d.to_json() for d in self.districts],
             'attacks': [a.to_json() for a in self.attacks]
             }
-        return rcJson
+    
+    def get_district(self,district_id):
+        find_district = [rd for rd in self.districts if rd.id == district_id]
+        if len(find_district) == 0:
+            return None
+        else:
+            return find_district[0]
 
 class aRaidDistrict():
     def __init__(self,raid_entry,raid_clan,**kwargs):
@@ -481,13 +436,9 @@ class aRaidDistrict():
             self.destruction = data.destruction
             self.attack_count = data.attack_count
             self.looted = data.looted
-        
-    @property
-    def attacks(self):
-        return [attack for attack in self.clan.attacks if self.id == attack.district_id]
 
     def to_json(self):
-        districtJson = {
+        return {
             'id': self.id,
             'name': self.name,
             'hall_level': self.hall_level,
@@ -495,7 +446,10 @@ class aRaidDistrict():
             'attack_count': self.attack_count,
             'resources_looted': self.looted
             }
-        return districtJson
+        
+    @property
+    def attacks(self):
+        return [attack for attack in self.clan.attacks if self.id == attack.district_id]    
 
 class aRaidAttack():
     def __init__(self,raid_entry,raid_clan,**kwargs):
@@ -524,17 +478,30 @@ class aRaidAttack():
         self._new_stars = None
         self._new_destruction = None
     
+    def to_json(self):
+        return {
+            'raid_clan': self.clan_tag,
+            'district': self.district_id,
+            'attacker_tag': self.attacker_tag,
+            'attacker_name': self.attacker_name,
+            'stars': self.stars,
+            'destruction': self.destruction
+            }
+    
     @property
     def district(self):
         return self.clan.get_district(self.district_id)
+    
     @property
     def attacker(self):
         return self.raid.get_member(self.attacker_tag)
+    
     @property
     def new_stars(self):
         if self._new_stars is None or pendulum.now() < self.raid.end_time:
             self.compute_stats()
         return self._new_stars
+    
     @property
     def new_destruction(self):
         if self._new_destruction is None or pendulum.now() < self.raid.end_time:
@@ -558,23 +525,14 @@ class aRaidAttack():
         self._new_stars = max(0,self.stars - base_stars)
         self._new_destruction = max(0,self.destruction - base_destruction)
 
-    def to_json(self):
-        attackJson = {
-            'raid_clan': self.clan_tag,
-            'district': self.district_id,
-            'attacker_tag': self.attacker_tag,
-            'attacker_name': self.attacker_name,
-            'stars': self.stars,
-            'destruction': self.destruction
-            }
-        return attackJson
-
-class aRaidMember():
+class aRaidMember(BasicPlayer):
     def __init__(self,raid_entry,**kwargs):
         self.raid = raid_entry
 
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
+
+        super().__init__()
 
         if json_data:
             self.tag = json_data['tag']
@@ -591,58 +549,18 @@ class aRaidMember():
         self.medals_earned = (self.raid.offensive_reward * self.attack_count) + self.raid.defensive_reward
         self._attacks = None
     
-    @property
-    def attacks(self):
-        if self._attacks is None or pendulum.now() < self.raid.end_time:
-            self._attacks = []
-            for offense_clan in self.raid.attack_log:
-                self._attacks.extend([a for a in offense_clan.attacks if a.attacker_tag == self.tag])        
-        return sorted(self._attacks, key=lambda x:(x.clan.tag,x.district_id,x.stars,x.destruction),reverse=True)
-
-    def to_json(self):
-        memberJson = {
+    def to_json(self) -> dict:
+        return {
             'tag': self.tag,
             'name': self.name,
             'attack_count': self.attack_count,
             'resources_looted': self.capital_resources_looted,
             }
-        return memberJson
-
-class aSummaryRaidStats():
-    def __init__(self,player_tag:str,raid_log:list[aRaidWeekend]):
         
-        
-        self.timestamp = pendulum.now()
-        self.raid_log = raid_log
-        self.tag = player_tag
-        self.raids_participated = 0
-        self.raid_attacks = 0
-        self.resources_looted = 0
-        self.medals_earned = 0
-        self.unused_attacks = 0
-    
-    @classmethod
-    async def for_player(cls,player_tag:str,raid_log:list[aRaidWeekend]):
-        def predicate_raid(raid):
-            return raid.is_alliance_raid and raid.get_member(player_tag)
-
-        stats = cls(player_tag,raid_log)
-
-        stats.raids_participated = len(
-            [raid for raid in raid_log if predicate_raid(raid)]
-            )
-        stats.raid_attacks = sum(
-            [raid.get_member(player_tag).attack_count
-            for raid in raid_log if predicate_raid(raid)]
-            )
-        stats.resources_looted = sum(
-            [raid.get_member(player_tag).capital_resources_looted
-            for raid in raid_log if predicate_raid(raid)]
-            )
-        stats.medals_earned = sum(
-            [raid.get_member(player_tag).medals_earned
-            for raid in raid_log if predicate_raid(raid)]
-            )
-        stats.unused_attacks = (stats.raids_participated * 6) - stats.raid_attacks
-        
-        return stats
+    @property
+    def attacks(self) -> list[aRaidAttack]:
+        if self._attacks is None or pendulum.now() < self.raid.end_time:
+            self._attacks = []
+            for offense_clan in self.raid.attack_log:
+                self._attacks.extend([a for a in offense_clan.attacks if a.attacker_tag == self.tag])        
+        return sorted(self._attacks, key=lambda x:(x.clan.tag,x.district_id,x.stars,x.destruction),reverse=True)

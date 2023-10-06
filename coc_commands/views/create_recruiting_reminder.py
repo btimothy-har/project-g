@@ -1,9 +1,7 @@
 import discord
-import asyncio
 
 from typing import *
 
-from coc_data.objects.discord.guild import aGuild
 from coc_data.objects.discord.recruiting_reminder import RecruitingReminder
 
 from coc_data.utilities.components import *

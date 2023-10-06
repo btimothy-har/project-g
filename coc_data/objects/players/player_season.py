@@ -9,17 +9,18 @@ from redbot.core.utils import AsyncIter, deduplicate_iterables
 from coc_client.api_client import BotClashClient
 
 from ..season.season import aClashSeason
-from ..clans.clan import aClan
-from ..events.clan_war import aClanWar
-from ..events.clan_war_summary import aSummaryWarStats
+from ..clans.player_clan import aPlayerClan
+from ..events.clan_war import aClanWar, aSummaryWarStats
 from ..events.raid_weekend import aRaidWeekend
-from ..events.raid_weekend import aSummaryRaidStats
+from ..events.raid_summary import aSummaryRaidStats
 
 from .value_playerstats import aPlayerStat
 from .value_clangames import aPlayerClanGames
 
 from ...constants.coc_constants import *
 from ...exceptions import *
+
+client = BotClashClient()
 
 ##################################################
 #####
@@ -59,7 +60,6 @@ class aPlayerSeason():
 
     @classmethod
     async def fetch_all_for_player(cls,player_tag:str):
-        client = BotClashClient()
         stats = db_PlayerStats.objects(tag=player_tag)
         ret = []
         async for p_season in AsyncIter(stats):
@@ -70,16 +70,6 @@ class aPlayerSeason():
                 continue            
             ret.append(aPlayerSeason(player,season))
         return ret
-
-    @classmethod
-    async def clan_games_participants(cls,season:aClashSeason,clan:aClan) -> List['aPlayerSeason']:
-        query = db_PlayerStats.objects(
-            season=season.id,
-            clangames__clan=clan.tag,
-            clangames__score__gt=0
-            )
-        p = [cls.from_database(db_player.tag,season) for db_player in query]
-        return sorted([player for player in p if isinstance(player,aPlayerSeason)],key=lambda p: (p.clangames.score,(p.clangames.completion_seconds*-1)),reverse=True)
     
     @classmethod
     def from_database(cls,player_tag:str,season:aClashSeason):
@@ -97,16 +87,13 @@ class aPlayerSeason():
             cls._cache[(player.tag,season.id)] = instance
         return cls._cache[(player.tag,season.id)]
     
-    def __init__(self,player,season):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-        
+    def __init__(self,player,season):        
         self.tag = player.tag
         self.season = season
 
         if self.is_current_season:
             self.name = player.name
-            self.home_clan_tag = player._attributes._home_clan_tag
+            self.home_clan_tag = getattr(player.home_clan,'tag',None)
             self.is_member = player.is_member
                
         if self._is_new:
@@ -195,10 +182,8 @@ class aPlayerSeason():
                 api_value=getattr(player.get_achievement('Games Champion'),'value',0),
                 dict_value=stats.get('clangames',{})
                 )
-            self._war_stats = aSummaryWarStats(war_log=[])
-            asyncio.create_task(self.compute_war_stats())
-            self._raid_stats = aSummaryRaidStats(player_tag=self.tag,raid_log=[])
-            asyncio.create_task(self.compute_raid_stats())
+            self._war_stats = None
+            self._raid_stats = None
             self.player = player
             
         self._is_new = False
@@ -216,29 +201,34 @@ class aPlayerSeason():
     @property
     def home_clan(self):
         if self.home_clan_tag:
-            return aClan.from_cache(self.home_clan_tag)
-        else:
-            return aClan()
+            return aPlayerClan(tag=self.home_clan_tag)
+        return None
     
     @property
-    def war_stats(self):            
+    def war_stats(self):
+        if not self._war_stats or (self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600):
+            self.compute_war_stats()
         return self._war_stats
         
-    async def compute_war_stats(self):
-        self._war_stats = await aSummaryWarStats.for_player(
+    def compute_war_stats(self):
+        self._war_stats = aSummaryWarStats.for_player(
             player_tag=self.tag,
             war_log=aClanWar.for_player(self.tag,self.season)
             )
+        return self._war_stats
     
     @property
     def raid_stats(self):
+        if not self._raid_stats or self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
+            self.compute_raid_stats()
         return self._raid_stats
         
-    async def compute_raid_stats(self):
-        self._raid_stats = await aSummaryRaidStats.for_player(
+    def compute_raid_stats(self):
+        self._raid_stats = aSummaryRaidStats.for_player(
             player_tag=self.tag,
             raid_log=aRaidWeekend.for_player(self.tag,self.season)
             )
+        return self._raid_stats
 
     def save(self):
         if not self.is_current_season:
@@ -275,14 +265,14 @@ class aPlayerSeason():
             if player.is_member and player.clan.tag == self.home_clan_tag:
                 if max((player.timestamp.int_timestamp - self.update_time.int_timestamp),0) > 0:
                     self.time_in_home_clan += max((player.timestamp.int_timestamp - self.update_time.int_timestamp),0)
-                    self.client.cog.coc_data_log.debug(
+                    client.cog.coc_data_log.debug(
                         f'{self}: time in home clan updated to {self.time_in_home_clan}.'
                         )
                     updated += 1                    
 
         if player.clan.tag not in self.other_clan_tags and player.clan.tag != None:
             self.other_clan_tags.append(player.clan.tag)            
-            self.client.cog.coc_data_log.debug(
+            client.cog.coc_data_log.debug(
                 f'{self}: other clan {player.clan.tag} {player.clan.name} added.'
                 )
             updated += 1
@@ -342,14 +332,7 @@ class aPlayerSeason():
         if cap_contri > 0:
             if bank_cog and getattr(player.clan,'is_alliance_clan',False):
                 asyncio.create_task(bank_cog.capital_contribution_rewards(player,cap_contri))            
-            await self.client.cog.capital_contribution_feed(player,cap_contri)
-        
-        if self.war_stats.wars_participated == 0 or (self.is_current_season and (pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp) >= 3600):
-            await self.compute_war_stats()
-        
-        if self.raid_stats.raids_participated == 0 or self.is_current_season and (pendulum.now().int_timestamp - self._raid_stats.timestamp.int_timestamp) >= 3600:
-            await self.compute_raid_stats()        
-
+            await client.cog.capital_contribution_feed(player,cap_contri)        
         return updated
     
     async def compute_last_seen(self,new_player):
@@ -357,7 +340,7 @@ class aPlayerSeason():
         if new_player.name != self.player.name or new_player.war_opted_in != self.player.war_opted_in or len([l.id for l in new_player.labels if l.id not in [l.id for l in self.player.labels]]) > 0:
             self.last_seen.append(new_player.timestamp)
             updated += 1
-            self.client.cog.coc_data_log.debug(
+            client.cog.coc_data_log.debug(
                 f'{self}: added {new_player.timestamp} to last_seen.'
                 )
         else:
@@ -366,7 +349,7 @@ class aPlayerSeason():
                     if achievement.value != self.player.get_achievement(achievement.name).value:
                         self.last_seen.append(new_player.timestamp)
                         updated += 1
-                        self.client.cog.coc_data_log.debug(
+                        client.cog.coc_data_log.debug(
                             f'{self}: added {new_player.timestamp} to last_seen.'
                             )
                         break

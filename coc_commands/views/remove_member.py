@@ -1,6 +1,8 @@
 import discord
 import asyncio
 
+from coc_client.api_client import BotClashClient
+
 from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
@@ -19,6 +21,8 @@ from coc_data.exceptions import *
 
 from ..helpers.components import *
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 class RemoveMemberMenu(DefaultView):
     def __init__(self,
@@ -94,7 +98,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = [a for a in self.member.accounts if a.is_member]
+        member_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.member_accounts))
         
         if len(member_accounts) == 0:
             embed = await clash_embed(
@@ -106,7 +110,7 @@ class RemoveMemberMenu(DefaultView):
             return await self.message.edit(embed=embed,view=None)
         
         dropdown_options = [discord.SelectOption(
-            label=f"{account.name}" + " | " + f"{account.tag}",
+            label=f"{account.clean_name}" + " | " + f"{account.tag}",
             value=account.tag,
             description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
             emoji=account.town_hall.emoji)
@@ -150,7 +154,7 @@ class RemoveMemberMenu(DefaultView):
 
         async for tag in AsyncIter(menu.values):
             try:
-                player = await aPlayer.create(tag)
+                player = await bot_client.cog.fetch_player(tag)
             except InvalidTag:
                 continue
             else:
@@ -233,7 +237,7 @@ class RemoveMemberMenu(DefaultView):
                 report_output += f"\nRoles Added for {member.mention}: {roles_added_output}"
                 report_output += f"\nRoles Removed for {member.mention}: {roles_removed_output}"
 
-                new_nickname = await self.member.get_nickname()
+                new_nickname = await member.get_nickname()
 
                 try:
                     await member.discord_member.edit(nick=new_nickname)

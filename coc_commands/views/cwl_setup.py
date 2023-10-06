@@ -2,6 +2,7 @@ import discord
 
 from typing import *
 from redbot.core import commands
+from redbot.core.utils import AsyncIter
 
 from coc_client.api_client import BotClashClient
 
@@ -17,12 +18,13 @@ from coc_data.constants.coc_constants import *
 
 from coc_data.exceptions import *
 
+bot_client = BotClashClient()
+
 class CWLSeasonSetup(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
         season:aClashSeason):
 
-        self.client = BotClashClient()
         self.season = season
         
         self._open_signups_button = DiscordButton(
@@ -59,7 +61,7 @@ class CWLSeasonSetup(DefaultView):
     ##################################################
     async def start(self):
 
-        cwl_clans = self.client.cog.get_cwl_clans()
+        cwl_clans = bot_client.cog.get_cwl_clans()
         if len(cwl_clans) == 0:
             embed = await clash_embed(
                 context=self.ctx,
@@ -72,7 +74,7 @@ class CWLSeasonSetup(DefaultView):
         
         embed = await self.get_embed()
 
-        self.build_clan_selector()
+        await self.build_clan_selector()
         self.is_active = True
 
         if isinstance(self.ctx,discord.Interaction):
@@ -112,11 +114,11 @@ class CWLSeasonSetup(DefaultView):
                 clan.is_participating = False
         
         for clan_tag in select.values:
-            clan = await aClan.create(clan_tag)
-            clan.cwl_season(self.season).is_participating = True
+            clan = await bot_client.cog.fetch_clan(clan_tag)
+            clan.war_league_season(self.season).is_participating = True
             
         embed = await self.get_embed()
-        self.build_clan_selector()
+        await self.build_clan_selector()
         await interaction.edit_original_response(embed=embed,view=self)
     
     async def get_embed(self):
@@ -152,9 +154,9 @@ class CWLSeasonSetup(DefaultView):
             inline=False
             )
         participating_clans = WarLeagueClan.participating_by_season(self.season)
-        for cwl_clan in participating_clans:
+        async for cwl_clan in AsyncIter(participating_clans):
             embed.add_field(
-                name=f"{EmojisLeagues.get(cwl_clan.clan.war_league.name)} {cwl_clan.clan}",
+                name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.clan_str}",
                 value=f"# in Roster: {len(cwl_clan.participants)} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
                     + (f"\nIn War: Round {len(cwl_clan.league_group.rounds)-1} / {cwl_clan.league_group.number_of_rounds}\nPreparation: Round {len(cwl_clan.league_group.rounds)} / {cwl_clan.league_group.number_of_rounds}" if cwl_clan.league_group else "\nCWL Not Started" if self.season.cwl_signup_lock else "")
                     + (f"\nMaster Roster: {len(cwl_clan.master_roster)}" if cwl_clan.league_group else "")
@@ -163,26 +165,31 @@ class CWLSeasonSetup(DefaultView):
                 )
         return embed
 
-    def build_clan_selector(self):
+    async def build_clan_selector(self):
         if self.clan_selector:
             self.remove_item(self.clan_selector)
             self.clan_selector = None
 
         if not self.season.cwl_signup_lock:
-            clan_options = [discord.SelectOption(
-                label=str(clan),
-                value=clan.tag,
-                emoji=EmojisLeagues.get(clan.war_league.name),
-                description=f"Level {clan.level} | {clan.war_league.name}",
-                default=clan.cwl_season(self.season).is_participating)
-                for clan in self.client.cog.get_cwl_clans()]
+            clans = bot_client.cog.get_cwl_clans()
+
+            options = []
+            async for c in AsyncIter(clans):
+                clan = await c.get_full_clan()
+                options.append(discord.SelectOption(
+                    label=str(clan),
+                    value=clan.tag,
+                    emoji=EmojisLeagues.get(clan.war_league_name),
+                    description=f"Level {clan.level} | {clan.war_league_name}",
+                    default=clan.war_league_season(self.season).is_participating)
+                    )
             
             self.clan_selector = DiscordSelectMenu(
                 function=self._callback_clan_select,
-                options=clan_options,
+                options=options,
                 placeholder="Select one or more clan(s) for CWL...",
                 min_values=1,
-                max_values=len(clan_options)
+                max_values=len(options)
                 )        
             self.clan_selector.disabled = self.season.cwl_signup_lock
             self.add_item(self.clan_selector)

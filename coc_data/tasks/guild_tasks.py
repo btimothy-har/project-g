@@ -5,25 +5,29 @@ from .default import TaskLoop
 from ..objects.discord.member import aMember
 from ..objects.discord.guild import aGuild
 
+from coc_client.api_client import BotClashClient
+
 from ..utilities.utils import *
 from ..utilities.components import *
 from ..constants.coc_emojis import *
 
+bot_client = BotClashClient()
+
 class DiscordGuildLoop(TaskLoop):
     _loops = {}
 
-    def __new__(cls,bot,guild_id:int):
+    def __new__(cls,guild_id:int):
         if guild_id not in cls._loops:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._loops[guild_id] = instance
         return cls._loops[guild_id]
 
-    def __init__(self,bot,guild_id:int):
+    def __init__(self,guild_id:int):
         self.guild_id = guild_id
         
         if self._is_new:
-            super().__init__(bot=bot)
+            super().__init__()
             self._is_new = False
     
     async def start(self):
@@ -42,7 +46,7 @@ class DiscordGuildLoop(TaskLoop):
     ##################################################
     @property
     def guild(self):
-        return self.bot.get_guild(self.guild_id)
+        return bot_client.bot.get_guild(self.guild_id)
 
     async def _loop_task(self):
         try:
@@ -78,11 +82,9 @@ class DiscordGuildLoop(TaskLoop):
                 if not self.guild:
                     raise asyncio.CancelledError
                 
-                member_tasks = [asyncio.create_task(
-                    aMember.save_user_roles(member.id,self.guild_id))
+                await asyncio.gather(*(aMember.save_user_roles(member.id,self.guild_id)
                     for member in self.guild.members if not member.bot
-                    ]
-                await asyncio.gather(*member_tasks)
+                    ))
             
             except asyncio.CancelledError:
                 await self.stop()

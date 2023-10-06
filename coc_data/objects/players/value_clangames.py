@@ -7,14 +7,14 @@ from coc_client.api_client import BotClashClient
 
 from ..season.season import aClashSeason
 
+bot_client = BotClashClient()
+
 class aPlayerClanGames():
     def __init__(self,
         tag:str,
         season:aClashSeason,
         api_value:int,
         dict_value:dict):
-
-        self.client = BotClashClient()
         
         self.tag = tag
         self.season = season    
@@ -102,20 +102,20 @@ class aPlayerClanGames():
                 if self.score == 0:
                     self.clan_tag = player.clan.tag
                     self.starting_time = player.timestamp                    
-                    self.client.cog.coc_data_log.debug(
+                    bot_client.cog.coc_data_log.debug(
                         f"Player {self.tag} {self.season.id}: Started Clan Games at {player.timestamp}."
                         )
 
                 self.score += increment
                 self.last_updated = new_score
-                self.client.cog.coc_data_log.debug(
+                bot_client.cog.coc_data_log.debug(
                     f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
                     )
 
                 if self.score >= self.season.clangames_max:
                     self.ending_time = player.timestamp
                     self.score = self.season.clangames_max
-                    self.client.cog.coc_data_log.debug(
+                    bot_client.cog.coc_data_log.debug(
                         f"Player {self.tag} {self.season.id}: Finished Clan Games at {player.timestamp}."
                         )
         else:

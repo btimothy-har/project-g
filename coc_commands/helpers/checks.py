@@ -34,7 +34,7 @@ def is_bot_owner_or_guild_owner(interaction:discord.Interaction):
     if interaction.guild:
         member = interaction.guild.get_member(interaction.user.id)
         if member.guild_permissions.administrator:
-            return True    
+            return True
     return False
 
 ##################################################
@@ -67,6 +67,54 @@ def is_coleader(ctx:Union[discord.Interaction,commands.Context]):
         user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
 
     if user.id in bot.owner_ids:
+        return True
+    
+    if guild.id == 1132581106571550831:
+        member = aMember(user.id)
+    else:
+        member = aMember(user.id,guild.id)
+    if member.is_coleader:
+        return True
+    return False
+
+def is_admin_or_leader(ctx:Union[discord.Interaction,commands.Context]):
+    if isinstance(ctx,commands.Context):
+        bot = ctx.bot
+        guild = ctx.guild
+        user = guild.get_member(ctx.author.id) if guild else bot.get_user(ctx.author.id)
+    elif isinstance(ctx,discord.Interaction):
+        bot = ctx.client
+        guild = ctx.guild
+        user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
+
+    if user.id in bot.owner_ids:
+        return True
+    member = guild.get_member(user.id)
+    if member.guild_permissions.administrator:
+        return True
+    
+    if guild.id == 1132581106571550831:
+        member = aMember(user.id)
+    else:
+        member = aMember(user.id,guild.id)
+    if member.is_leader:
+        return True
+    return False
+
+def is_admin_or_coleader(ctx:Union[discord.Interaction,commands.Context]):
+    if isinstance(ctx,commands.Context):
+        bot = ctx.bot
+        guild = ctx.guild
+        user = guild.get_member(ctx.author.id) if guild else bot.get_user(ctx.author.id)
+    elif isinstance(ctx,discord.Interaction):
+        bot = ctx.client
+        guild = ctx.guild
+        user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
+
+    if user.id in bot.owner_ids:
+        return True
+    member = guild.get_member(user.id)
+    if member.guild_permissions.administrator:
         return True
     
     if guild.id == 1132581106571550831:

@@ -12,6 +12,8 @@ from mongoengine import *
 
 from ..components import *
 
+bot_client = BotClashClient()
+
 class dbWarBase(Document):
     base_id = StringField(primary_key=True,required=True)
     townhall = IntField(default=0)
@@ -31,8 +33,7 @@ class eWarBase():
     async def by_user_claim(cls,user_id:int):
         bases = []
         async for base in AsyncIter(dbWarBase.objects(claims__in=[user_id])):
-            bases.append(await cls.from_base_id(base.base_id))
-        
+            bases.append(await cls.from_base_id(base.base_id))        
         return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
 
     @classmethod
@@ -56,8 +57,6 @@ class eWarBase():
         if self._is_new:
             link_parse = urllib.parse.urlparse(base_link)
             cc_parse = urllib.parse.urlparse(defensive_cc_link)
-
-            self.bot = BotClashClient().bot
             self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
 
             try:
@@ -70,7 +69,7 @@ class eWarBase():
             self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
             self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
 
-            parsed_cc = self.bot.coc_client.parse_army_link(self.defensive_cc_link)
+            parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
             self.defensive_cc_str = ""
             for troop in parsed_cc[0]:
                 if self.defensive_cc_str != "":
@@ -115,7 +114,6 @@ class eWarBase():
     @classmethod
     async def new_base(cls,base_link,source,base_builder,base_type,defensive_cc,notes,image_attachment):
         
-        client = BotClashClient()
         base = eWarBase(base_link,defensive_cc)
         base.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={base.id}"
 
@@ -134,7 +132,7 @@ class eWarBase():
         base.base_type = base_type
 
         image_filename = base.id + '.' + image_attachment.filename.split('.')[-1]
-        image_filepath = client.bot.get_cog("ECLIPSE").base_image_path + "/" + image_filename
+        image_filepath = bot_client.bot.get_cog("ECLIPSE").base_image_path + "/" + image_filename
 
         await image_attachment.save(image_filepath)
         base.base_image = image_filename
@@ -171,7 +169,7 @@ class eWarBase():
             self.save_base()
 
     async def base_embed(self):
-        image_file_path = self.bot.get_cog('ECLIPSE').base_image_path + '/' + self.base_image
+        image_file_path = bot_client.get_cog('ECLIPSE').base_image_path + '/' + self.base_image
         image_file = discord.File(image_file_path,'image.png')
 
         base_text = (f"Date Added: {pendulum.from_timestamp(self.added_on).format('DD MMM YYYY')}"

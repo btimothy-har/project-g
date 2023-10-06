@@ -8,6 +8,8 @@ from coc_client.api_client import BotClashClient
 from .transaction import db_BankTransaction
 from mongoengine import *
 
+bot_client = BotClashClient()
+
 class BankAccount():
     def __init__(self,account_id):
         self.id = account_id
@@ -62,8 +64,7 @@ class BankAccount():
         if len(transactions) == 0:
             return None
         
-        client = BotClashClient()
-        report_file = client.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
+        report_file = bot_client.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
 
         workbook = xlsxwriter.Workbook(report_file)
         worksheet = workbook.add_worksheet('Bank Transactions')
@@ -81,11 +82,11 @@ class BankAccount():
             col = 0
             row += 1
 
-            transaction_user = client.bot.get_user(t.user)
+            transaction_user = bot_client.bot.get_user(t.user)
 
             m_data = []
             m_data.append(pendulum.from_timestamp(t.timestamp).to_iso8601_string())
-            if t.user == client.bot.user.id:
+            if t.user == bot_client.bot.user.id:
                 m_data.append('System')
             else:
                 m_data.append(transaction_user.name if transaction_user else t.user)

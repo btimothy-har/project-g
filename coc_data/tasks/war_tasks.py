@@ -5,6 +5,8 @@ from redbot.core.utils import AsyncIter
 
 from .default import TaskLoop
 
+from coc_client.api_client import BotClashClient
+
 from ..feeds.reminders import EventReminders
 from ..objects.clans.clan import aClan, db_ClanEventReminder
 from ..objects.events.clan_war import aClanWar
@@ -12,21 +14,23 @@ from ..objects.events.clan_war import aClanWar
 from ..constants.coc_constants import *
 from ..exceptions import *
 
+bot_client = BotClashClient()
+
 class ClanWarLoop(TaskLoop):
     _loops = {}
 
-    def __new__(cls,bot,clan_tag:str):
+    def __new__(cls,clan_tag:str):
         if clan_tag not in cls._loops:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._loops[clan_tag] = instance
         return cls._loops[clan_tag]
 
-    def __init__(self,bot,clan_tag:str):
+    def __init__(self,clan_tag:str):
         self.tag = clan_tag
         
         if self._is_new:
-            super().__init__(bot=bot)
+            super().__init__()
             self.clan = None
             self.cached_war = None
             self._is_new = False
@@ -59,9 +63,6 @@ class ClanWarLoop(TaskLoop):
         try:
             while self.loop_active:
                 try:
-                    reminder_tasks = None
-                    reward_tasks = None
-
                     st = pendulum.now()
                     if not self.loop_active:
                         raise asyncio.CancelledError
@@ -71,58 +72,94 @@ class ClanWarLoop(TaskLoop):
                             await asyncio.sleep(0)
                     
                     if not self.loop_active:
-                        return
+                        raise asyncio.CancelledError
                     
                     work_start = pendulum.now()
                     try:
-                        self.clan = await aClan.create(self.tag,no_cache=False,bot=self.bot)
-                    except CacheNotReady:
-                        return
+                        self.clan = await bot_client.cog.fetch_clan(tag=self.tag)
+                    except InvalidTag:
+                        raise asyncio.CancelledError
                     
                     if not self.clan.public_war_log:
-                        return
+                        continue
+
+                    if self.clan.is_active_league_clan:
+                        if self.clan.league_clan_channel:
+                            war_league_reminder = [r for r in self.clan.clan_war_reminders if r.channel_id == self.clan.league_clan_channel.id]
+                            if len(war_league_reminder) == 0:
+                                await self.clan.create_clan_war_reminder(
+                                    channel=self.clan.league_clan_channel,
+                                    war_types=['cwl'],
+                                    interval=[12,8,6,4,3,2,1],
+                                    )
                         
                     current_war = await self.clan.get_current_war()
                     if not current_war:
-                        return            
+                        continue            
                     if current_war.do_i_save:
-                        current_war.save_war_to_db()
+                        current_war.save_to_database()
 
                     #Current War Management
-                    if current_war.state in ['inWar','warEnded'] and pendulum.now() < current_war.end_time.add(hours=2):
+                    if current_war.state in ['inWar','warEnded']:
                         #new attacks
                         if self.cached_war:
                             new_attacks = [a for a in current_war.attacks if a.order not in [ca.order for ca in self.cached_war.attacks]]
+                        
+                        await asyncio.gather(*(self._setup_war_reminder(current_war,r) for r in self.clan.clan_war_reminders))
+                    
+                    if current_war.state in ['inWar']:
+                        time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
 
-                        #reminders
-                        if current_war.state in ['inWar']:
-                            reminder_tasks = [asyncio.create_task(self._setup_war_reminder(current_war,r)) for r in self.clan.war_reminders]
+                        if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0 and time_remaining > 3600:
+                            await bot_client.cog.update_bot_status(
+                                cooldown=360,
+                                text=f"{self.clan.abbreviation} {WarResult.ongoing(current_war.get_clan(self.clan.tag).result)} in war!"
+                                )
                         
                     #War State Changes
                     if self.cached_war and current_war.state != self.cached_war.state:
+
                         #War State Changes - new war spin
                         if current_war.state in ['preparation'] and current_war.preparation_start_time != self.cached_war.preparation_start_time:
                             async for m in AsyncIter(current_war.members):
-                                self.client.cog.player_cache.add_to_queue(m.tag)
+                                bot_client.player_cache.add_to_queue(m.tag)
                     
                         #War State Changes - war started
                         if current_war.state in ['inWar']:
-                            pass
+                            if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0:
+                                await bot_client.cog.update_bot_status(
+                                    cooldown=60,
+                                    text=f"{self.clan.abbreviation} declare war!"
+                                    )
                         
                         #War Ended
-                        if current_war.state in ['warEnded']:
-                            reward_task = None
+                        if current_war.state in ['warEnded']:                            
+                            if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0:
+                                if current_war.get_clan(self.clan.tag).result in ['winning','won']:
+                                    if current_war.type == ClanWarType.RANDOM:
+                                        if self.clan.war_win_streak >= 3:
+                                            await bot_client.cog.update_bot_status(
+                                                cooldown=60,
+                                                text=f"{self.clan.abbreviation} on a {self.clan.war_win_streak} streak!"
+                                                )
+                                        else:
+                                            await bot_client.cog.update_bot_status(
+                                                cooldown=60,
+                                                text=f"{self.clan.abbreviation} with {self.clan.war_wins} War Wins."
+                                                )
+                                    elif current_war.type == ClanWarType.CWL:
+                                        await bot_client.cog.update_bot_status(
+                                            cooldown=60,
+                                            text=f"{self.clan.abbreviation} with the CWL Win!"
+                                            )
+                                            
                             if self.clan.is_alliance_clan and current_war.type == ClanWarType.RANDOM:
                                 war_clan = current_war.get_clan(self.tag)
-                                bank_cog = self.bot.get_cog("Bank")
-                                reward_tasks = [asyncio.create_task(bank_cog.war_bank_rewards(m)) for m in war_clan.members]
+                                bank_cog = bot_client.bot.get_cog("Bank")
+                                if bank_cog:
+                                    await asyncio.gather(*(bank_cog.war_bank_rewards(m) for m in war_clan.members))
 
                     self.cached_war = current_war
-
-                    if reminder_tasks:
-                        await asyncio.gather(*reminder_tasks)            
-                    if reward_tasks:
-                        await asyncio.gather(*reward_task)
                 
                 except ClashAPIError as exc:
                     self.api_error = True
@@ -177,7 +214,7 @@ class ClanWarLoop(TaskLoop):
                 next_reminder = max(reminder.interval_tracker)
 
                 if time_remaining < (next_reminder * 3600):
-                    channel = self.bot.get_channel(reminder.channel_id)
+                    channel = bot_client.bot.get_channel(reminder.channel_id)
                     reminder_clan = current_war.get_clan(self.clan.tag)
                     
                     if channel and reminder_clan:        
@@ -185,9 +222,7 @@ class ClanWarLoop(TaskLoop):
 
                         remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
                         
-                        create_reminder_task = [asyncio.create_task(event_reminder.add_account(m.tag)) for m in remind_members]
-                        await asyncio.gather(*create_reminder_task,return_exceptions=True)
-                        
+                        await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))                        
                         await event_reminder.send_war_reminders(self.clan,current_war)
 
                         war_reminder_tracking = reminder.interval_tracker.copy()
@@ -195,7 +230,8 @@ class ClanWarLoop(TaskLoop):
                         reminder.interval_tracker = war_reminder_tracking
                         reminder.save()
                 
-            if len(reminder.interval_tracker) != len(reminder.reminder_interval) and len(reminder.reminder_interval) > 0:
+            if len(reminder.reminder_interval) > 0:
+                if len(reminder.interval_tracker) != len(reminder.reminder_interval):
                     track = []
                     for i in reminder.reminder_interval:
                         if i < (time_remaining / 3600):

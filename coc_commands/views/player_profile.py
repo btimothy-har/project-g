@@ -20,12 +20,12 @@ from coc_data.exceptions import *
 from ..helpers.components import *
 from ..exceptions import *
 
+bot_client = BotClashClient()
+
 class PlayerProfileMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
         accounts:List[aPlayer]):
-
-        self.client = BotClashClient()
         
         self.accounts = accounts
         self.current_page = "summary"
@@ -213,6 +213,7 @@ class PlayerProfileMenu(DefaultView):
                 + (f"{EmojisClash.BOOKSPELLS} {player.spell_strength} / {player.max_spell_strength} *(rushed: {player.spell_rushed_pct}%)*\n" if player.town_hall.level >= 5 else "")
                 + (f"{EmojisClash.BOOKHEROES} {player.hero_strength} / {player.max_hero_strength} *(rushed: {player.hero_rushed_pct}%)*\n" if player.town_hall.level >= 7 else "")
                 + (f"**Currently Boosting**\n" + " ".join([troop.emoji for troop in player.super_troops]) + "\n" if len(player.super_troops) > 0 else "")
+                #+ f"**Currently Boosting**\n {len(player.boosting_troops)}"
                 + f"\u200b",
             inline=False
             )
@@ -267,7 +268,7 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**War Log: {player}**",
-            message=f"**Stats for: {self.client.cog.current_season.description} Season**\n"
+            message=f"**Stats for: {bot_client.cog.current_season.description} Season**\n"
                 + f"{EmojisClash.CLANWAR} `{player.current_season.war_stats.wars_participated:^3}`\u3000"
                 + f"{EmojisClash.THREESTARS} `{player.current_season.war_stats.triples:^3}`\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} `{player.current_season.war_stats.unused_attacks:^3}`\n"
@@ -292,7 +293,7 @@ class PlayerProfileMenu(DefaultView):
                 for defe in war_defenses]
                 )
             embed.add_field(
-                name=f"{war_member.clan.emoji} {war_member.clan.name} vs {war_member.opponent.name}",
+                name=f"{war_member.clan.emoji} {war_member.clan.clean_name} vs {war_member.opponent.clean_name}",
                 value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
                     + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
                     + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
@@ -309,7 +310,7 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**Raid Log: {player}**",
-            message=f"**Stats for: {self.client.cog.current_season.description} Season**\n"
+            message=f"**Stats for: {bot_client.cog.current_season.description} Season**\n"
                 + f"{EmojisClash.CAPITALRAID} `{player.current_season.raid_stats.raids_participated:^3}`\u3000"
                 + f"{EmojisClash.ATTACK} {player.current_season.raid_stats.raid_attacks:^3}\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} {player.current_season.raid_stats.unused_attacks:^3}\n"
@@ -353,7 +354,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.heroes) > 0:
             hero_list = []
             for i, hero in enumerate(player.heroes):
-                hero_t = f"{hero.emoji}{'*' if hero.is_rushed else ''}`{str(hero.level) + ' / ' + str(hero.maxlevel_for_townhall):^7}`{'*' if hero.is_rushed else ''}"
+                hero_t = f"{hero.emoji}{'*' if hero.is_rushed else ''}`{str(hero.level) + ' / ' + str(hero.max_level):^7}`{'*' if hero.is_rushed else ''}"
                 if i % 2 == 0:
                     hero_list.append(hero_t)
                 else:
@@ -363,7 +364,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.pets) > 0:
             pet_list = []
             for i, pet in enumerate(player.pets):
-                pet_t = f"{pet.emoji}{'*' if pet.is_rushed else ''}`{str(pet.level) + ' / ' + str(pet.maxlevel_for_townhall):^7}`{'*' if pet.is_rushed else ''}"
+                pet_t = f"{pet.emoji}{'*' if pet.is_rushed else ''}`{str(pet.level) + ' / ' + str(pet.max_level):^7}`{'*' if pet.is_rushed else ''}"
                 if i % 2 == 0:
                     pet_list.append(pet_t)
                 else:
@@ -373,7 +374,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.elixir_troops) > 0:
             elixir_troop_list = []
             for i, troop in enumerate(player.elixir_troops,start=1):
-                troop_t = f"{troop.emoji}{'*' if troop.is_rushed else ''}`{str(troop.level) + ' / ' + str(troop.maxlevel_for_townhall):^7}`{'*' if troop.is_rushed else ''}"
+                troop_t = f"{troop.emoji}{'*' if troop.is_rushed else ''}`{str(troop.level) + ' / ' + str(troop.max_level):^7}`{'*' if troop.is_rushed else ''}"
                 if i % 3 == 1:
                     elixir_troop_list.append(troop_t)
                 else:
@@ -383,7 +384,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.darkelixir_troops) > 0:
             darkelixir_troop_list = []
             for i, troop in enumerate(player.darkelixir_troops,start=1):
-                troop_t = f"{troop.emoji}{'*' if troop.is_rushed else ''}`{str(troop.level) + ' / ' + str(troop.maxlevel_for_townhall):^7}`{'*' if troop.is_rushed else ''}"
+                troop_t = f"{troop.emoji}{'*' if troop.is_rushed else ''}`{str(troop.level) + ' / ' + str(troop.max_level):^7}`{'*' if troop.is_rushed else ''}"
                 if i % 3 == 1:
                     darkelixir_troop_list.append(troop_t)
                 else:
@@ -393,7 +394,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.siege_machines) > 0:
             siege_machine_list = []
             for i, siege_machine in enumerate(player.siege_machines,start=1):
-                siege_machine_t = f"{siege_machine.emoji}{'*' if siege_machine.is_rushed else ''}`{str(siege_machine.level) + ' / ' + str(siege_machine.maxlevel_for_townhall):^7}`{'*' if siege_machine.is_rushed else ''}"
+                siege_machine_t = f"{siege_machine.emoji}{'*' if siege_machine.is_rushed else ''}`{str(siege_machine.level) + ' / ' + str(siege_machine.max_level):^7}`{'*' if siege_machine.is_rushed else ''}"
                 if i % 3 == 1:
                     siege_machine_list.append(siege_machine_t)
                 else:
@@ -403,7 +404,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.elixir_spells) > 0:
             elixir_spell_list = []
             for i, spell in enumerate(player.elixir_spells,start=1):
-                spell_t = f"{spell.emoji}{'*' if spell.is_rushed else ''}`{str(spell.level) + ' / ' + str(spell.maxlevel_for_townhall):^7}`{'*' if spell.is_rushed else ''}"
+                spell_t = f"{spell.emoji}{'*' if spell.is_rushed else ''}`{str(spell.level) + ' / ' + str(spell.max_level):^7}`{'*' if spell.is_rushed else ''}"
                 if i % 3 == 1:
                     elixir_spell_list.append(spell_t)
                 else:
@@ -413,7 +414,7 @@ class PlayerProfileMenu(DefaultView):
         if len(player.darkelixir_spells) > 0:
             darkelixir_spell_list = []
             for i, spell in enumerate(player.darkelixir_spells,start=1):
-                spell_t = f"{spell.emoji}{'*' if spell.is_rushed else ''}`{str(spell.level) + ' / ' + str(spell.maxlevel_for_townhall):^7}`{'*' if spell.is_rushed else ''}"
+                spell_t = f"{spell.emoji}{'*' if spell.is_rushed else ''}`{str(spell.level) + ' / ' + str(spell.max_level):^7}`{'*' if spell.is_rushed else ''}"
                 if i % 3 == 1:
                     darkelixir_spell_list.append(spell_t)
                 else:
@@ -439,7 +440,7 @@ class PlayerProfileMenu(DefaultView):
         if len([hero for hero in player.heroes if hero.is_rushed]) > 0:
             hero_list = []
             for i, hero in enumerate([hero for hero in player.heroes if hero.is_rushed]):
-                hero_t = f"{hero.emoji}`{str(hero.level) + ' / ' + str(hero.maxlevel_for_townhall): ^7}`"
+                hero_t = f"{hero.emoji}`{str(hero.level) + ' / ' + str(hero.max_level): ^7}`"
                 if i % 2 == 0:
                     hero_list.append(hero_t)
                 else:
@@ -453,7 +454,7 @@ class PlayerProfileMenu(DefaultView):
         if len([pet for pet in player.pets if pet.is_rushed]) > 0:
             pet_list = []
             for i, pet in enumerate([pet for pet in player.pets if pet.is_rushed]):
-                pet_t = f"{pet.emoji}`{str(pet.level) + ' / ' + str(pet.maxlevel_for_townhall): ^7}`"
+                pet_t = f"{pet.emoji}`{str(pet.level) + ' / ' + str(pet.max_level): ^7}`"
                 if i % 2 == 0:
                     pet_list.append(pet_t)
                 else:
@@ -467,7 +468,7 @@ class PlayerProfileMenu(DefaultView):
         if len([troop for troop in player.elixir_troops if troop.is_rushed]) > 0:
             troop_list = []
             for i, troop in enumerate([troop for troop in player.elixir_troops if troop.is_rushed],start=1):
-                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.maxlevel_for_townhall): ^7}`"
+                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.max_level): ^7}`"
                 if i % 3 == 1:
                     troop_list.append(troop_t)
                 else:
@@ -481,7 +482,7 @@ class PlayerProfileMenu(DefaultView):
         if len([troop for troop in player.darkelixir_troops if troop.is_rushed]) > 0:
             troop_list = []
             for i, troop in enumerate([troop for troop in player.darkelixir_troops if troop.is_rushed],start=1):
-                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.maxlevel_for_townhall): ^7}`"
+                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.max_level): ^7}`"
                 if i % 3 == 1:
                     troop_list.append(troop_t)
                 else:
@@ -495,7 +496,7 @@ class PlayerProfileMenu(DefaultView):
         if len([siege_machine for siege_machine in player.siege_machines if siege_machine.is_rushed]) > 0:
             siege_machine_list = []
             for i, siege_machine in enumerate([siege_machine for siege_machine in player.siege_machines if siege_machine.is_rushed],start=1):
-                siege_machine_t = f"{siege_machine.emoji}`{str(siege_machine.level) + ' / ' + str(siege_machine.maxlevel_for_townhall): ^7}`"
+                siege_machine_t = f"{siege_machine.emoji}`{str(siege_machine.level) + ' / ' + str(siege_machine.max_level): ^7}`"
                 if i % 3 == 1:
                     siege_machine_list.append(siege_machine_t)
                 else:
@@ -509,7 +510,7 @@ class PlayerProfileMenu(DefaultView):
         if len([spell for spell in player.elixir_spells if spell.is_rushed]) > 0:
             spell_list = []
             for i, spell in enumerate([spell for spell in player.elixir_spells if spell.is_rushed],start=1):
-                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.maxlevel_for_townhall): ^7}`"
+                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.max_level): ^7}`"
                 if i % 3 == 1:
                     spell_list.append(spell_t)
                 else:
@@ -523,7 +524,7 @@ class PlayerProfileMenu(DefaultView):
         if len([spell for spell in player.darkelixir_spells if spell.is_rushed]) > 0:
             spell_list = []
             for i, spell in enumerate([spell for spell in player.darkelixir_spells if spell.is_rushed],start=1):
-                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.maxlevel_for_townhall): ^7}`"
+                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.max_level): ^7}`"
                 if i % 3 == 1:
                     spell_list.append(spell_t)
                 else:

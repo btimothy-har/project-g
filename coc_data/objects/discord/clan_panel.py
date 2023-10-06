@@ -12,6 +12,8 @@ from ...constants.coc_emojis import *
 from ...constants.ui_emojis import *
 from ...exceptions import *
 
+bot_client = BotClashClient()
+
 ##################################################
 #####
 ##### ATTRIBUTES
@@ -31,10 +33,7 @@ class db_GuildClanPanel(Document):
 #####
 ##################################################
 class GuildClanPanel():   
-    def __init__(self,database_entry:db_GuildClanPanel):
-        self.client = BotClashClient()
-        self.bot = self.client.bot
-        
+    def __init__(self,database_entry:db_GuildClanPanel):        
         self.id = database_entry.panel_id
         
         self.guild_id = database_entry.server_id
@@ -69,7 +68,7 @@ class GuildClanPanel():
         return cls(panel)
 
     @classmethod
-    def get_guild_panels(cls,guild_id:int):
+    async def get_guild_panels(cls,guild_id:int):
         return [cls(link) for link in db_GuildClanPanel.objects(server_id=guild_id)]
     
     @classmethod
@@ -107,7 +106,7 @@ class GuildClanPanel():
 
     @property
     def guild(self):
-        return self.bot.get_guild(self.guild_id)
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
     def channel(self):
@@ -129,7 +128,7 @@ class GuildClanPanel():
 
             message_ids_master = []
             existing_messages = len(self.long_message_ids)
-            
+
             #iterate through embeds up to len existing messages
             for i,send_message in enumerate(embeds[:existing_messages]):
                 link_button = ClanLinkMenu([send_message['clan']])
@@ -170,6 +169,6 @@ class GuildClanPanel():
             self.long_message_ids = message_ids_master
             self.save()
         except Exception as exc:
-            self.client.cog.coc_main_log.exception(
+            bot_client.cog.coc_main_log.exception(
                 f"Error sending Clan Panel to Discord: {self.guild.name} {getattr(self.channel,'name','Unknown Channel')}. {exc}"
                 )

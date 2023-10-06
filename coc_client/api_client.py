@@ -3,10 +3,14 @@ import logging
 import coc
 import asyncio
 
-from coc.ext import discordlinks
-from redbot.core.utils import AsyncIter
+from typing import *
 
+from coc.ext import discordlinks
+from redbot.core.bot import Red
+from redbot.core.utils import AsyncIter
 from .exceptions import *
+
+#from coc_data.cog_coc_data import ClashOfClansData
 
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
@@ -53,26 +57,27 @@ class DataCache():
 class BotClashClient():
     _instance = None
 
-    def __new__(cls,bot=None):
+    def __new__(cls,bot:Optional[Red]=None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._is_initialized = False
             cls._instance._api_logged_in = False
         return cls._instance
     
-    def __init__(self,bot=None):
+    def __init__(self,bot:Optional[Red]=None):
         if not bot and not self._is_initialized:
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
             self.bot = bot
+            self.last_status_update = None
             self.discordlinks_sandbox = False
             self.discordlinks_client = None
 
             self.discordlinks_log = clashlinks_log
 
-            self.player_cache = DataCache(self.bot,"players")
-            self.clan_cache = DataCache(self.bot,"clans")
+            self._player_cache = DataCache(self.bot,"players")
+            self._clan_cache = DataCache(self.bot,"clans")
 
             clashlinks_logpath = f"{self.bot.coc_log_path}/discordlinks"
             if not os.path.exists(clashlinks_logpath):
@@ -88,8 +93,20 @@ class BotClashClient():
             self.discordlinks_log.addHandler(clashlinks_log_handler)
 
     @property
-    def cog(self):
+    def cog(self) -> 'ClashOfClansData':
         return self.bot.get_cog("ClashOfClansData")
+
+    @property
+    def coc(self) -> coc.EventsClient:
+        return self.bot.coc_client
+
+    @property
+    def player_cache(self) -> DataCache:
+        return self._player_cache
+
+    @property
+    def clan_cache(self) -> DataCache:
+        return self._clan_cache
     
     @classmethod
     async def initialize(cls,bot):
@@ -97,7 +114,7 @@ class BotClashClient():
         if instance._is_initialized:
             return instance
         
-        asyncio.create_task(instance.api_login())
+        await instance.api_login()
         asyncio.create_task(instance.discordlinks_login())
 
         instance._is_initialized = True
@@ -133,6 +150,40 @@ class BotClashClient():
             )
         await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))        
         self._api_logged_in = True
+
+        # available_clients = ['clashapi']
+        # for i in range(1,10):
+        #     available_clients.append(f'clashapi{str(i)}')
+
+        # keys = []
+
+        # async for client in AsyncIter(available_clients):
+        #     try:
+        #         clashapi_login = await self.bot.get_shared_api_tokens(client)
+        #     except:
+        #         continue
+
+        #     if clashapi_login.get("username") is None:
+        #         continue
+        #     if clashapi_login.get("password") is None:
+        #         continue
+
+        #     client = coc.Client(
+        #         key_count=int(clashapi_login.get("keys",1)),
+        #         key_names='Created for Project G, from coc.py',
+        #         )
+        #     await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
+        #     keys.extend(client.http._keys)
+        #     await client.close()
+
+        # if len(keys) == 0:
+        #     raise LoginNotSet(f"No Clash API keys were found.")
+
+        # self.bot.coc_client = coc.EventsClient(
+        #     load_game_data=coc.LoadGameData(always=True)
+        #     )
+        # await self.bot.coc_client.login_with_tokens(*keys)
+        # self._api_logged_in = True
     
     async def api_logout(self):
         await self.bot.coc_client.close()

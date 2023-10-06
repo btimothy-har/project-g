@@ -16,20 +16,20 @@ from art import text2art
 
 from coc_client.api_client import BotClashClient
 
-from mongoengine import DoesNotExist
+from mongoengine import *
 
 from .objects.season.season import dSeason, aClashSeason
-from .objects.players.player import aPlayer, db_Player, _PlayerAttributes
+from .objects.players.player import *
 from .objects.players.player_season import db_PlayerStats
-from .objects.clans.clan import aClan, db_Clan, db_AllianceClan
-from .objects.clans.clan_cwl_attributes import db_WarLeagueClanSetup
+
+from .objects.clans.clan import *
 from .objects.events.clan_war_leagues import WarLeagueGroup
 from .objects.events.clan_war import db_ClanWar, aClanWar
 from .objects.events.raid_weekend import db_RaidWeekend, aRaidWeekend
 
 from .objects.discord.member import aMember
 from .objects.discord.guild import aGuild
-from .objects.discord.apply_panel import db_ClanApplication, account_recruiting_summary, account_recruiting_embed
+from .objects.discord.apply_panel import db_ClanApplication, account_recruiting_summary
 from .objects.discord.recruiting_reminder import RecruitingReminder
 from .objects.discord.clan_link import ClanGuildLink
 
@@ -54,6 +54,8 @@ coc_main_logger.setLevel(logging.INFO)
 
 coc_data_logger = logging.getLogger("coc.data")
 coc_data_logger.setLevel(logging.INFO)
+
+bot_client = BotClashClient()
 
 ############################################################
 ############################################################
@@ -91,13 +93,15 @@ class ClashOfClansData(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.4.3"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):
         self.bot = bot
         self.ready = False
         self.coc_main_log = coc_main_logger
         self.coc_data_log = coc_data_logger
+
+        self.lock_seq = 0
 
         log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 
@@ -128,10 +132,7 @@ class ClashOfClansData(commands.Cog):
         self.last_refresh_loop = None
         self.last_error_report = None
 
-        #self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*10))
-        self.clash_semaphore_limit = 1000000
-        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
-
+        self.clash_data_loop_lock = asyncio.Lock()
         self.clash_task_lock = asyncio.Lock()
         self.recruiting_task_lock = asyncio.Lock()
 
@@ -141,24 +142,11 @@ class ClashOfClansData(commands.Cog):
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
 
-    @property
-    def client(self):
-        return BotClashClient()
-    
-    @property
-    def player_cache(self):
-        return self.client.player_cache
-
-    @property
-    def clan_cache(self):
-        return self.client.clan_cache
-
     async def cog_load(self):
         self.coc_main_log.info(
             "##################################################\n"
             + text2art("Loading Clash of Clans",font="big")
-            )
-        
+            )        
         asyncio.create_task(self.cog_start_up())
     
     async def cog_start_up(self):            
@@ -189,36 +177,29 @@ class ClashOfClansData(commands.Cog):
         raids = await raid_tasks
         self.coc_main_log.info(
             f"Loaded {len(raids):,} Capital Raids from database."
-            )
-        players = [p.tag for p in db_Player.objects().only('tag')]
-        clans_in_database = [c.tag for c in db_Clan.objects().only('tag')]
+            )        
 
         while True:
-            if isinstance(getattr(self.bot,'coc_client',None),coc.EventsClient):
-                if self.bot.coc_state._api_logged_in:
-                    break
+            if bot_client._api_logged_in:
+                break
             await asyncio.sleep(1)
-
-        self.coc_main_log.info(f"Found {len(self.bot.coc_client.http._keys):,} API Keys, setting semaphore limit at {self.clash_semaphore_limit:,}.")
         
-        self.clan_cache.queue.extend(clans_in_database)
-        self.coc_main_log.info(
-            f"Found {len(clans_in_database):,} clans in database."
-            )
-        self.player_cache.queue.extend(players)
-        self.coc_main_log.info(
-            f"Found {len(players):,} players in database."
-            )        
+        self.clash_semaphore_limit = int((len(self.bot.coc_client.http._keys)*20))
+        #self.clash_semaphore_limit = 10000
+        self.clash_semaphore = asyncio.Semaphore(self.clash_semaphore_limit)
+
+        self.coc_main_log.info(f"Found {len(bot_client.coc.http._keys):,} API Keys, setting semaphore limit at {self.clash_semaphore_limit:,}.")
+        
+        self.global_task_controller.start()
+        
         async with self.clash_task_lock:
             self.clash_data_loop.start()
         self.bot_status_update_loop.start()
-        self.clash_data_loop_reset.start()
         
-        self.bot.coc_client.add_events(
+        bot_client.coc.add_events(
             self.clash_maintenance_start,
             self.clash_maintenance_complete
-            )
-        
+            )        
         self.coc_main_log.info(f"Completed initialization of Clash Data Client.\n"
             + text2art("Clash On!",font="banner")
             )
@@ -239,15 +220,14 @@ class ClashOfClansData(commands.Cog):
                         if count > 30:
                             self.coc_main_log.exception(f"Could not refresh reminder for {post.id} - {post}")
                             break
-                        await asyncio.sleep(1)
-        
+                        await asyncio.sleep(1)        
             self.refresh_recruiting_reminders.start()        
     
     async def cog_unload(self):
         self.clash_data_loop.cancel()
         self.refresh_recruiting_reminders.cancel()
         self.bot_status_update_loop.cancel()
-        self.clash_data_loop_reset.cancel()
+        self.global_task_controller.cancel()
 
         self.coc_main_log.info(f"Stopped Clash Data Loop.")
 
@@ -268,18 +248,68 @@ class ClashOfClansData(commands.Cog):
         #disconnect from MongoEngine
         #disconnect()
 
-    ##################################################
-    ### TASK REFRESH LOOP
-    ##################################################
+    ############################################################
+    #####
+    ##### CLASH OF CLANS BACKGROUND DATA TASKS
+    #####
+    ############################################################
+    @coc.ClientEvents.maintenance_start()
+    async def clash_maintenance_start(self):
+        self.api_maintenance = True
+        await self.clash_task_lock.acquire()
+
+        self.coc_main_log.warning(f"Clash Maintenance Started. Sync loops locked.\n"
+            + text2art("Clash Maintenance Started",font="small")
+            )
+        await self.update_bot_status(
+            cooldown=0,
+            text="Clash Maintenance!"
+            )
+    
+    @coc.ClientEvents.maintenance_completion()
+    async def clash_maintenance_complete(self,time_started):
+        self.api_maintenance = False
+        if self.clash_task_lock.locked():
+            self.clash_task_lock.release()
+
+        maint_start = pendulum.instance(time_started)
+        maint_end = pendulum.now()
+
+        self.coc_main_log.warning(f"Clash Maintenance Completed. Maintenance took: {maint_end.diff(maint_start).in_minutes()} minutes. Sync loops unlocked.\n"
+            + text2art("Clash Maintenance Completed",font="small")
+            )
+        await self.update_bot_status(
+            cooldown=0,
+            text="Clash of Clans!"
+            )
+        
+    @tasks.loop(seconds=0.5)
+    async def global_task_controller(self):
+        if self.clash_task_lock.locked():
+            return        
+        if self.clash_semaphore._value == 0:                
+            async with self.clash_task_lock:
+                self.lock_seq += 1
+                if self.lock_seq > 100:
+                    self.lock_seq = 0
+                while self.clash_semaphore._value < self.clash_semaphore_limit:
+                    await asyncio.sleep(0)
+
     @tasks.loop(seconds=60)
     async def clash_data_loop(self):
         def predicate_clan_not_in_loop(clan):
             if clan.tag not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
                 return True
-            if clan.tag not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
-                return True
-            if clan.tag not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
-                return True
+            return False
+        def predicate_clan_not_in_war_loop(clan):
+            if clan.is_alliance_clan or clan.is_registered_clan or clan.is_active_league_clan:
+                if clan.tag not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
+                    return True
+            return False
+        def predicate_clan_not_in_raid_loop(clan):
+            if clan.is_alliance_clan or clan.is_registered_clan:
+                if clan.tag not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
+                    return True
             return False
         
         def predicate_player_not_in_loop(player):
@@ -288,39 +318,50 @@ class ClashOfClansData(commands.Cog):
         if not hasattr(self,'clash_semaphore'):
             return
         
-        try:            
-            clans = AsyncIter(self.clan_cache.values)
-            async for clan in clans.filter(predicate_clan_not_in_loop):
-                await self.create_clan_task(clan.tag)
-                if clan.is_alliance_clan or clan.is_registered_clan or clan.cwl_config.is_cwl_clan:
+        if self.clash_data_loop_lock.locked():
+            return
+        
+        try:
+            async with self.clash_data_loop_lock:
+                clans = AsyncIter(bot_client.clan_cache.values)
+                async for clan in clans.filter(predicate_clan_not_in_loop):
+                    await self.create_clan_task(clan.tag)
+                
+                clans = AsyncIter(bot_client.clan_cache.values)
+                async for clan in clans.filter(predicate_clan_not_in_war_loop):
                     await self.create_war_task(clan.tag)
-                if clan.is_alliance_clan or clan.is_registered_clan:
+                
+                clans = AsyncIter(bot_client.clan_cache.values)
+                async for clan in clans.filter(predicate_clan_not_in_raid_loop):
                     await self.create_raid_task(clan.tag)
+                
+                clans_db = AsyncIter(db_Clan.objects().only('tag'))
+                async for clan in clans_db.filter(predicate_clan_not_in_loop):
+                    await self.create_clan_task(clan.tag)
 
-            players = AsyncIter(self.player_cache.values)
-            async for player in players.filter(predicate_player_not_in_loop):
-                await self.create_player_task(player.tag)
-            
-            for guild in self.bot.guilds:
-                if guild.id not in [i.guild_id for i in DiscordGuildLoop.loops() if i.loop_active]:
-                    await self.create_guild_task(guild.id)
+                players = AsyncIter(bot_client.player_cache.values)
+                async for player in players.filter(predicate_player_not_in_loop):
+                    await self.create_player_task(player.tag)
 
-            player_queue = self.player_cache.queue.copy()
-            clan_queue = self.clan_cache.queue.copy()
+                player_db = AsyncIter(db_Player.objects().only('tag'))
+                async for player in player_db.filter(predicate_player_not_in_loop):
+                    await self.create_player_task(player.tag)
+                
+                for guild in self.bot.guilds:
+                    if guild.id not in [i.guild_id for i in DiscordGuildLoop.loops() if i.loop_active]:
+                        await self.create_guild_task(guild.id)
 
-            batch_limit = 1000
-            c_count = 0
-            async for c in AsyncIter(clan_queue[:batch_limit]):
-                c_count += 1
-                await self.create_clan_task(c)
-                self.clan_cache.remove_from_queue(c)
+                player_queue = bot_client.player_cache.queue.copy()
+                clan_queue = bot_client.clan_cache.queue.copy()
 
-            p_limit = batch_limit - c_count
-            async for p in AsyncIter(player_queue[:p_limit]):
-                await self.create_player_task(p)
-                self.player_cache.remove_from_queue(p)
-            
-            await self._season_check()                
+                async for c in AsyncIter(clan_queue):
+                    await self.create_clan_task(c)
+                    bot_client.clan_cache.remove_from_queue(c)
+
+                async for p in AsyncIter(player_queue):
+                    await self.create_player_task(p)
+                    bot_client.player_cache.remove_from_queue(p)            
+                await self._season_check()
 
         except Exception as exc:
             await self.bot.send_to_owners(f"An error occured during Clash Data loop. Check logs for details."
@@ -330,15 +371,7 @@ class ClashOfClansData(commands.Cog):
                 )        
         finally:
             self.last_refresh_loop = pendulum.now()
-        
-    @tasks.loop(seconds=2.0)
-    async def clash_data_loop_reset(self):
-        if self.clash_task_lock.locked():
-            return
-        async with self.clash_task_lock:
-            while self.clash_semaphore._value < self.clash_semaphore_limit:
-                await asyncio.sleep(0)
-    
+
     @tasks.loop(minutes=5.0)
     async def refresh_recruiting_reminders(self):
         if self.recruiting_task_lock.locked():
@@ -354,15 +387,24 @@ class ClashOfClansData(commands.Cog):
             await self.bot.send_to_owners(f"An error occured during Recruiting Loop. Check logs for details.")
             self.coc_main_log.exception(f"Error in Recruiting Loop")
     
-    @tasks.loop(minutes=30.0)
+    ############################################################
+    #####
+    ##### BOT STATUS
+    #####
+    ############################################################    
+    @tasks.loop(minutes=10.0)
     async def bot_status_update_loop(self):
         try:
+            if bot_client.last_status_update != None and (pendulum.now().int_timestamp - bot_client.last_status_update.int_timestamp) < 14400:
+                return
+            
             event_options = [
                 'default',
                 'player_count',
-                'member_count'
+                'clan_count'
                 ]
-            select_event = random.choice(event_options)        
+            select_event = random.choice(event_options)
+
             while True:
                 if select_event in ['default']:
                     await self.bot.change_presence(
@@ -370,6 +412,7 @@ class ClashOfClansData(commands.Cog):
                             type=discord.ActivityType.listening,
                             name=f"$help!")
                             )
+                    bot_client.last_status_update = pendulum.now()
                     break
 
                 try:
@@ -377,24 +420,21 @@ class ClashOfClansData(commands.Cog):
                         if len(PlayerLoop.keys()) == 0:
                             select_event = 'default'
                         else:
-                            await self.bot.change_presence(
-                                activity=discord.Activity(
-                                    type=discord.ActivityType.watching,
-                                    name=f"{len(PlayerLoop.keys()):,} Clashers")
-                                    )
+                            await self.update_bot_status(
+                                cooldown=240,
+                                text=f"{len(db_Player.objects().only('tag')):,} Clashers!"
+                                )
                             break
                 except:
                     select_event = 'default'
 
                 try:
-                    if select_event in ['member_count']:
-                        await self.bot.change_presence(
-                            activity=discord.Activity(
-                                type=discord.ActivityType.playing,
-                                name=f"with {len(self.bot.users):,} Hoomans")
-                                )
-                        break
-                    
+                    if select_event in ['clan_count']:
+                        await self.update_bot_status(
+                            cooldown=240,
+                            text=f"{len(db_Clan.objects().only('tag')):,} Clans!"
+                            )
+                        break                    
                 except:
                     select_event = 'default'                    
         
@@ -404,37 +444,29 @@ class ClashOfClansData(commands.Cog):
                 f"Error in Bot Status Loop"
                 )
     
-    @coc.ClientEvents.maintenance_start()
-    async def clash_maintenance_start(self):
-        self.api_maintenance = True
-        await self.clash_task_lock.acquire()
-
-        self.coc_main_log.warning(f"Clash Maintenance Started. Sync loops locked.\n"
-            + text2art("Clash Maintenance Started",font="small")
-            )
-        await self.bot.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.playing,
-                name=f"Clash Maintenance!")
-            )
-    
-    @coc.ClientEvents.maintenance_completion()
-    async def clash_maintenance_complete(self,time_started):
-        self.api_maintenance = False
-        if self.clash_task_lock.locked():
-            self.clash_task_lock.release()
-
-        maint_start = pendulum.instance(time_started)
-        maint_end = pendulum.now()
-
-        self.coc_main_log.warning(f"Clash Maintenance Completed. Maintenance took: {maint_end.diff(maint_start).in_minutes()} minutes. Sync loops unlocked.\n"
-            + text2art("Clash Maintenance Completed",font="small")
-            )
-        await self.bot.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.playing,
-                name=f"Clash of Clans!")
-            )
+    async def update_bot_status(self,cooldown:int,text:str):
+        #cooldown in minutes
+        diff = pendulum.now().int_timestamp - getattr(bot_client.last_status_update,'int_timestamp',0)
+        if bot_client.last_status_update and diff < (cooldown*60):
+            return
+        
+        activity_types = [
+            discord.ActivityType.playing,
+            discord.ActivityType.listening,
+            discord.ActivityType.watching
+            ]
+        activity_select = random.choice(activity_types)
+        try:
+            await self.bot.wait_until_ready()
+            await self.bot.change_presence(
+                activity=discord.Activity(
+                    type=activity_select,
+                    name=text))
+        except Exception as exc:
+            self.coc_main_log.exception(f"Bot Status Update Error: {text}")
+        else:
+            bot_client.last_status_update = pendulum.now()
+            self.coc_main_log.info(f"Bot Status Updated: {text}.")
     
     ############################################################
     ############################################################
@@ -505,8 +537,8 @@ class ClashOfClansData(commands.Cog):
                 )
             return await channel.send(embed=embed)
         
-        account_tasks = [asyncio.create_task(aPlayer.create(i)) for i in application.tags]
-        clan_tasks = [asyncio.create_task(aClan.create(i)) for i in application.clans]
+        account_tasks = [asyncio.create_task(self.fetch_player(tag=i)) for i in application.tags]
+        clan_tasks = [asyncio.create_task(self.fetch_clan(tag=i)) for i in application.clans]
         
         member = aMember(user_id=application.applicant_id,guild_id=application.guild_id)
         
@@ -549,20 +581,21 @@ class ClashOfClansData(commands.Cog):
                 inline=False
                 )
         
-        accounts = [a for a in await asyncio.gather(*account_tasks,return_exceptions=True) if isinstance(a,aPlayer)]        
-        accounts.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
-        accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
+        ret_accounts = await asyncio.gather(*account_tasks,return_exceptions=True)        
+        accounts = sorted([a for a in ret_accounts if isinstance(a,aPlayer)],key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
 
+        accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
         other_accounts = [tag for tag in member.account_tags if tag not in application.tags]
+
         if len(accounts) == 0:
-            accounts_embed_text = "Did not find any valid accounts."
+            accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.tags)
         else:
             accounts_embed_text = ""
             async for a in AsyncIter(accounts):
                 accounts_embed_text += account_recruiting_summary(a)
         
         accounts_embed = await clash_embed(
-            context=self.bot,
+            context=bot_client.bot,
             title=f"{member.name}",
             message=accounts_embed_text + "\u200b",
             thumbnail=member.display_avatar
@@ -572,7 +605,7 @@ class ClashOfClansData(commands.Cog):
             other_accounts_embed_text = ""
             async for a in AsyncIter(other_accounts[:5]):
                 try:
-                    account = await aPlayer.create(a)
+                    account = await self.fetch_player(tag=a)
                 except Exception:
                     continue
                 else:
@@ -626,7 +659,7 @@ class ClashOfClansData(commands.Cog):
     ### SEASON HELPERS
     ##################################################
     @property    
-    def current_season(self):
+    def current_season(self) -> aClashSeason:
         try:
             current_season = aClashSeason(dSeason.objects.get(s_is_current=True).only('s_id').s_id)
         except:
@@ -649,35 +682,37 @@ class ClashOfClansData(commands.Cog):
         tracked.sort(key=lambda x:x.season_start,reverse=True)
         return tracked
 
-    ##################################################
-    ### TASK HELPERS
-    ##################################################   
+    ############################################################
+    #####
+    ##### TASKS HELPERS
+    #####
+    ############################################################
     async def create_player_task(self,player_tag):
-        loop = PlayerLoop(self.bot,player_tag)
+        loop = PlayerLoop(player_tag)
         if not loop.loop_active:
             await loop.start()
             return player_tag
     
     async def create_clan_task(self,clan_tag):
-        loop = ClanLoop(self.bot,clan_tag)
+        loop = ClanLoop(clan_tag)
         if not loop.loop_active:
             await loop.start()
             return clan_tag
     
     async def create_war_task(self,clan_tag):
-        loop = ClanWarLoop(self.bot,clan_tag)
+        loop = ClanWarLoop(clan_tag)
         if not loop.loop_active:
             await loop.start()
             return clan_tag
     
     async def create_raid_task(self,clan_tag):
-        loop = ClanRaidLoop(self.bot,clan_tag)
+        loop = ClanRaidLoop(clan_tag)
         if not loop.loop_active:
             await loop.start()
             return clan_tag
     
     async def create_guild_task(self,guild_id):
-        loop = DiscordGuildLoop(self.bot,guild_id)
+        loop = DiscordGuildLoop(guild_id)
         if not loop.loop_active:
             await loop.start()
             return guild_id
@@ -685,7 +720,7 @@ class ClashOfClansData(commands.Cog):
     async def _season_check(self):
         season = aClashSeason.get_current_season()
         if season.id == self.current_season.id:
-            return None        
+            return None
         async with self.clash_task_lock:
             while self.clash_semaphore._value < self.clash_semaphore_limit:
                 await asyncio.sleep(0)
@@ -713,25 +748,52 @@ class ClashOfClansData(commands.Cog):
     ##################################################
     ### PLAYER HELPERS
     ##################################################
-    def get_player(self,tag:str) -> aPlayer:
-        return aPlayer.from_cache(tag)
-    
-    def count_members_by_season(self,clan:Optional[aClan]=None, season:Optional[aClashSeason]=None):
-        if not season or season.id not in [s.id for s in self.tracked_seasons]:
-            season = self.current_season
+    async def fetch_player(self,tag:str,no_cache=False) -> aPlayer:
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(tag):
+            raise InvalidTag(tag)        
         
-        if season.is_current and clan:
-            return len(db_Player.objects(home_clan=clan.tag,is_member=True).only('tag'))
-        elif season.is_current and not clan:
-            return len(db_Player.objects(is_member=True).only('tag'))
-        elif not season.is_current and clan:
-            return len(db_PlayerStats.objects(home_clan=clan.tag,is_member=True,season=season.id).only('tag'))
-        elif not season.is_current and not clan:
-            return len(db_PlayerStats.objects(is_member=True,season=season.id).only('tag'))
-        else:
-            return 0 
+        try:
+            cached = bot_client.player_cache.get(n_tag)
+        except:
+            cached = None
+
+        if not no_cache and isinstance(cached,aPlayer):
+            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
+                return cached
+
+        try:
+            player = await bot_client.coc.get_player(n_tag,cls=aPlayer)
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
+            if cached:
+                return cached
+            else:
+                raise ClashAPIError(exc) from exc
+        
+        await bot_client.player_cache.set(player.tag,player)        
+        return player
     
-    def get_members_by_season(self,clan:Optional[aClan]=None, season:Optional[aClashSeason]=None):
+    def get_all_players(self):
+        ret_clans = [BasicPlayer(tag=p.tag) for p in db_Player.objects().only('tag')]
+        return sorted(ret_clans, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
+    
+    def get_player(self,tag:str) -> aPlayer:      
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
+        
+        player = bot_client.player_cache.get(n_tag)
+        if player:
+            return player
+        if tag in [c.tag for c in db_Player.objects().only('tag')]:
+            raise CacheNotReady
+        bot_client.player_cache.add_to_queue(tag)
+        #client.cog.coc_data_log.warning(f"Player {tag} not found in cache."
+        #    + (f" Already in queue." if tag in client.player_cache.queue else " Added to queue."))     
+
+    def get_members_by_season(self,clan:Optional[aClan]=None, season:Optional[aClashSeason]=None) -> List[BasicPlayer]:
         if not season or season.id not in [s.id for s in self.tracked_seasons]:
             season = self.current_season
         
@@ -742,30 +804,86 @@ class ClashOfClansData(commands.Cog):
         elif not season.is_current and clan:
             query = db_PlayerStats.objects(home_clan=clan.tag,is_member=True,season=season.id).only('tag')
         elif not season.is_current and not clan:
-            query = db_PlayerStats.objects(is_member=True,season=season.id).only('tag')
+            query = db_PlayerStats.objects(is_member=True,season=season.id).only('tag')        
         
-        ret_players = [aPlayer.from_cache(p.tag) for p in query]
-        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),reverse=True)     
-
-    async def fetch_player(self,tag:str) -> aPlayer:
-        return await aPlayer.create(tag=tag)
+        ret_players = [BasicPlayer(tag=p.tag) for p in query]
+        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)     
+    
+    async def get_clan_games_participants(self,season:aClashSeason,clan:aClan) -> List[aPlayerSeason]:
+        query = db_PlayerStats.objects(
+            season=season.id,
+            clangames__clan=clan.tag,
+            clangames__score__gt=0
+            ).only('tag')
+        players = await asyncio.gather(*(self.fetch_player(p.tag) for p in query))
+        return sorted([p.get_season_stats(season) for p in players if isinstance(p,BasicPlayer)],key=lambda p: (p.clangames.score,(p.clangames.completion_seconds*-1)),reverse=True)
 
     ##################################################
     ### CLAN HELPERS
     ##################################################
+    async def fetch_clan(self,tag:str,no_cache:bool=False) -> aClan:
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(tag):
+            raise InvalidTag(tag)
+
+        try:
+            cached = bot_client.clan_cache.get(n_tag)
+        except:
+            cached = None
+        if no_cache:
+            pass        
+        elif isinstance(cached,aClan):
+            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
+                return cached
+
+        try:
+            clan = await bot_client.coc.get_clan(n_tag,cls=aClan)
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        except (coc.Maintenance,coc.GatewayError) as exc:
+            if cached:
+                return cached
+            else:
+                raise ClashAPIError(exc) from exc
+            
+        await bot_client.clan_cache.set(clan.tag,clan)
+        return clan
+
+    async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
+        try:
+            get_clan = db_Clan.objects.get(abbreviation=abbreviation.upper())
+        except (DoesNotExist,MultipleObjectsReturned):
+            raise InvalidAbbreviation(abbreviation.upper())        
+        clan = await self.fetch_clan(get_clan.tag)
+        return clan
+    
     def get_clan(self,tag:str) -> aClan:
-        return aClan.from_cache(tag)
+        n_tag = coc.utils.correct_tag(tag)        
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
+        
+        clan = bot_client.clan_cache.get(n_tag)
+        if clan:
+            return clan
+        if tag in [c.tag for c in db_Clan.objects().only('tag')]:
+            raise CacheNotReady
+        bot_client.clan_cache.add_to_queue(tag)
     
-    async def fetch_clan(self,tag:str) -> aClan:
-        return await aClan.create(tag)
+    def get_all_clans(self):
+        ret_clans = [BasicClan(tag=c.tag) for c in db_Clan.objects()]
+        return sorted(ret_clans, key=lambda x:(x.level,x.capital_hall),reverse=True)
     
+    def get_registered_clans(self):
+        ret_clans = [BasicClan(tag=c.tag) for c in db_Clan.objects(emoji__ne="").only('tag')]
+        return sorted([c for c in ret_clans if c.is_registered_clan], key=lambda x:(x.level,x.capital_hall),reverse=True)
+
     def get_alliance_clans(self):
-        ret_clans = [self.get_clan(c.tag) for c in db_AllianceClan.objects().only('tag')]
+        ret_clans = [BasicClan(tag=c.tag) for c in db_AllianceClan.objects().only('tag')]
         return sorted(ret_clans, key=lambda x:(x.level,x.capital_hall),reverse=True)
     
     def get_cwl_clans(self):
-        ret_clans = [aClan.from_cache(c.tag) for c in db_WarLeagueClanSetup.objects(is_active=True).only('tag')]
-        return sorted(ret_clans, key=lambda x:(x.level,multiplayer_leagues.index(x.war_league.name)),reverse=True)
+        ret_clans = [BasicClan(tag=c.tag) for c in db_WarLeagueClanSetup.objects(is_active=True).only('tag')]
+        return sorted(ret_clans, key=lambda x:(x.level,multiplayer_leagues.index(x.war_league_name)),reverse=True)
 
     ##################################################
     ### CLAN WAR HELPERS
@@ -782,7 +900,7 @@ class ClashOfClansData(commands.Cog):
     async def get_clan_war(self,tag:str) -> aClanWar:
         api_war = None
         try:
-            api_war = await self.bot.coc_client.get_clan_war(tag)
+            api_war = await bot_client.coc.get_clan_war(tag)
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
@@ -799,7 +917,7 @@ class ClashOfClansData(commands.Cog):
     async def get_league_war(self,league_group_id:str,war_tag:str):
         api_war = None
         try:
-            api_war = await self.bot.coc_client.get_league_war(war_tag)
+            api_war = await bot_client.coc.get_league_war(war_tag)
         except coc.NotFound as exc:
             raise InvalidTag(war_tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -813,7 +931,7 @@ class ClashOfClansData(commands.Cog):
 
     async def get_league_group(self,tag:str) -> WarLeagueGroup:
         try:
-            api_group = await self.bot.coc_client.get_league_group(tag)
+            api_group = await bot_client.coc.get_league_group(tag)
         except coc.NotFound:
             pass
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -828,6 +946,26 @@ class ClashOfClansData(commands.Cog):
     ##################################################
     ### RAID WEEKEND HELPERS
     ##################################################
+    async def get_raid_weekend(self,tag:str) -> aRaidWeekend:
+        clan = await self.fetch_clan(tag)
+        api_raid = None
+        try:
+            raidloggen = await bot_client.coc.get_raid_log(clan_tag=tag,page=False,limit=1)
+        except coc.PrivateWarLog:
+            return None
+        except coc.NotFound as exc:
+            raise InvalidTag(self.tag) from exc
+        except (coc.Maintenance,coc.GatewayError) as exc:
+            raise ClashAPIError(exc) from exc
+        
+        if len(raidloggen) == 0:
+            return None
+        api_raid = raidloggen[0]
+        if not api_raid:
+            return None        
+        raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
+        return raid_weekend
+    
     def get_raid_weekend_from_id(self,raid_id:str) -> aRaidWeekend:
         raid_weekend = aRaidWeekend(raid_id=raid_id)
         if not raid_weekend._found_in_db:
@@ -835,12 +973,7 @@ class ClashOfClansData(commands.Cog):
         return raid_weekend
     
     def get_raids_by_player(self,player_tag:str,season:Optional[aClashSeason] = None):
-        return aRaidWeekend.for_player(player_tag,season=season)
-    
-    async def get_raid_weekend(self,tag:str) -> aRaidWeekend:
-        clan = await aClan.create(tag)
-        return clan.get_raid_weekend()        
-        
+        return aRaidWeekend.for_player(player_tag,season=season)    
     
     ##################################################
     ### DISCORD HELPERS
@@ -878,21 +1011,22 @@ class ClashOfClansData(commands.Cog):
         embed = await clash_embed(ctx,
             title="**Clash of Clans Data Report**",
             message=f"**T**: Total | **A**: Active | **R**: Running | **W**: Waiting\n"
+                + (f"Master Refresh Loop: <t:{self.last_refresh_loop.int_timestamp}:R>\n" if self.last_refresh_loop else "")
                 )
         embed.add_field(
             name="**Events Client**",
             value="```ini"
-                + f"\n{'[Master]':<15} {'Locked' if self.clash_task_lock.locked() else 'Unlocked'}"
+                + f"\n{'[Master]':<15} {'Locked' if self.clash_task_lock.locked() else 'Unlocked'} (Seq: {self.lock_seq})"
                 + (f" (API Maintenance)" if self.api_maintenance else "")
-                + f"\n{'[Running]':<15} {self.clash_semaphore_limit - self.clash_semaphore._value:,}"
-                + f"\n{'[Keys]':<15} {len(self.bot.coc_client.http._keys)}"
+                + f"\n{'[Running]':<15} {self.clash_semaphore_limit - self.clash_semaphore._value:,} / {self.clash_semaphore_limit:,}"
+                + f"\n{'[Keys]':<15} {len(bot_client.coc.http._keys)}"
                 + "```",
             inline=False
             )        
         embed.add_field(
             name="**Players**",
             value="```ini"
-                + f"\n{'[Mem/DB/Queue]':<15} {len(self.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(self.player_cache.queue):,})"
+                + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(bot_client.player_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Work Time]':<15} {round(PlayerLoop.api_avg())}s (min: {round(PlayerLoop.api_min())}s, max: {round(PlayerLoop.api_max())}s)"
                 + f"\n{'[Run Time]':<15} {round(PlayerLoop.runtime_avg())}s (min: {round(PlayerLoop.runtime_min())}s, max: {round(PlayerLoop.runtime_max())}s)"
@@ -902,7 +1036,7 @@ class ClashOfClansData(commands.Cog):
         embed.add_field(
             name="**Clans**",
             value="```ini"
-                + f"\n{'[Mem/DB/Queue]':<15} {len(self.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(self.clan_cache.queue):,})"
+                + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(bot_client.clan_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Work Time]':<15} {round(ClanLoop.api_avg())}s (min: {round(ClanLoop.api_min())}s, max: {round(ClanLoop.api_max())}s)"
                 + f"\n{'[Run Time]':<15} {round(ClanLoop.runtime_avg())}s (min: {round(ClanLoop.runtime_min())}s, max: {round(ClanLoop.runtime_max())}s)"

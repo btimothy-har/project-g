@@ -6,6 +6,8 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
+from coc_client.api_client import BotClashClient
+
 from coc_data.objects.players.player import aPlayer
 from coc_data.objects.clans.clan import aClan
 from coc_data.objects.discord.member import aMember
@@ -19,6 +21,8 @@ from coc_data.exceptions import *
 
 from ..helpers.components import *
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 class NewMember():
     def __init__(self,account:aPlayer,home_clan:Optional[aClan]=None):
@@ -79,7 +83,7 @@ class NewMemberMenu(DefaultView):
             if len(self.member.accounts) == 0:
                 await self._manual_tag_entry()
             else:
-                await self._get_accounts_select(self.member.accounts)
+                await self._get_accounts_select()
         except CacheNotReady:
             await self._manual_tag_entry()
     
@@ -98,15 +102,18 @@ class NewMemberMenu(DefaultView):
     ##### STEP 1: GET USER ACCOUNTS
     #####
     ####################################################################################################
-    async def _get_accounts_select(self,linked_accounts):
+    async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
+
+        player_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.accounts))
+        player_accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         
         dropdown_list = [discord.SelectOption(
             label=f"{account.name} | {account.tag}",
             value=f"{account.tag}",
             description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
             emoji=f"{account.town_hall.emoji}")
-            for account in linked_accounts
+            for account in player_accounts
             ]
         account_select_menu = DiscordSelectMenu(
             function=self._callback_menu_tags,
@@ -209,14 +216,11 @@ class NewMemberMenu(DefaultView):
     ### COLLATE ACCOUNTS
     ##################################################    
     async def _collate_player_accounts(self,tags:List[str]):
-        async for tag in AsyncIter(tags):
-            try:
-                player = await aPlayer.create(tag)
-            except InvalidTag:
-                continue
-            else:
-                if isinstance(player,aPlayer):
-                    self.accounts.append(player)
+        accounts = await asyncio.gather(*(bot_client.cog.fetch_player(tag) for tag in tags),return_exceptions=True)
+        for account in accounts:
+            if isinstance(account,aPlayer):
+                self.accounts.append(account)        
+        self.accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         await self._get_home_clans()
     
     ####################################################################################################
@@ -237,8 +241,7 @@ class NewMemberMenu(DefaultView):
             return self.stop_menu()
     
         async for account in AsyncIter(self.accounts):
-            await self._select_home_clan(account)
-    
+            await self._select_home_clan(account)    
         await self._finish_add()
 
     async def _select_home_clan(self,account:aPlayer):        
@@ -262,7 +265,7 @@ class NewMemberMenu(DefaultView):
             )
         home_clan_select_view = MultipleChoiceSelectionMenu(context=self.ctx,timeout=120,timeout_function=self.on_timeout)
         for clan in alliance_clans:
-            home_clan_select_view.add_list_item(reference=clan.tag,label=clan.name,emoji=clan.emoji)            
+            home_clan_select_view.add_list_item(reference=clan.tag,label=clan.name[:80],emoji=clan.emoji)            
             homeclan_embed.add_field(
                 name=f"{clan.title}",
                 value=f"Members: {clan.alliance_member_count}\u3000Recruiting: {clan.recruitment_level_emojis}",
@@ -373,7 +376,7 @@ class NewMemberMenu(DefaultView):
                 return action
         return None
 
-    async def send_welcome_dm(self): #member accepts aMember class
+    async def send_welcome_dm(self): 
         intro_embed = await clash_embed(
             context=self.ctx,
             title="Congratulations! You're an AriX Member!",

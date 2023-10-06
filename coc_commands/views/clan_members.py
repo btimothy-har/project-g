@@ -3,11 +3,18 @@ import discord
 import re
 
 from typing import *
+
+from coc_client.api_client import BotClashClient
+
+from redbot.core.utils import AsyncIter
+
 from coc_data.objects.players.player import aPlayer
 from coc_data.objects.clans.clan import aClan
 from coc_data.utilities.components import *
 
 from ..helpers.components import *
+
+bot_client = BotClashClient()
 
 class ClanMembersMenu(MenuPaginator):
     def __init__(self,
@@ -66,9 +73,10 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            registered_members = self.clan.alliance_members
+            registered_members = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in self.clan.alliance_members))
 
-        self.members_in_clan = await asyncio.gather(*[aPlayer.create(tag) for tag in list(self.clan.members_dict.keys())])
+        self.members_in_clan = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in self.clan.members))
+                                                            
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan
         self.is_active = True
@@ -218,11 +226,18 @@ class ClanMembersMenu(MenuPaginator):
                 + f"{'':^1}`"
                 for member in lst])
             return text
+        
+        war_status_num = {
+            'IN': 1,
+            'OUT': 0,
+            }
 
         embeds = []
-        chunked_members = list(chunks(self.all_clan_members,25))
+        #sort self.all_clan_members by war opt status and town hall level and hero levels        
+        chunked_members = list(chunks(sorted(self.all_clan_members,key=lambda x: (war_status_num[x.war_opt_status],x.town_hall.level,x.hero_strength),reverse=True),25))
+        iter_chunks = AsyncIter(chunked_members)
 
-        for i, members_chunk in enumerate(chunked_members):
+        async for i, members_chunk in iter_chunks.enumerate():
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member War Status**\nIn Clan: {self.clan.member_count}\u3000"

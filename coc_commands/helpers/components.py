@@ -43,7 +43,7 @@ class MenuConfirmation(discord.ui.View):
             function=self.no_callback,
             label="",
             emoji=EmojisUI.NO,
-            style=discord.ButtonStyle.red,
+            style=discord.ButtonStyle.grey,
             )
 
         super().__init__(timeout=60)

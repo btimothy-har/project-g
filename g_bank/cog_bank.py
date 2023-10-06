@@ -24,6 +24,11 @@ from coc_commands.helpers.autocomplete import *
 from coc_commands.helpers.components import *
 
 from .objects.accounts import MasterAccount, ClanAccount
+from .objects.inventory import UserInventory
+from .objects.item import ShopItem
+from .views.user_store import UserStore
+from .views.store_manager import StoreManager
+
 from .components import *
 from .checks import *
 from .autocomplete import *
@@ -43,7 +48,7 @@ class Bank(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "1.0.1"
+    __version__ = "2023.10.1"
 
     def __init__(self,bot):
         self.bot = bot
@@ -393,8 +398,16 @@ class Bank(commands.Cog):
     ##### - bank / transactions
     ##### - bank / deposit
     ##### - bank / withdraw
-    ##### - bank / reward    
-    #####
+    ##### - bank / reward
+    ##### - inventory
+    ##### - store
+    ##### - gift
+    ##### - manage-store
+    ##### - shop-items / distribute
+    ##### - shop-items / redeem
+    ##### - shop-items / delete
+    ##### - shop-items / restock
+    #####    
     ############################################################
     ############################################################
     
@@ -1038,12 +1051,12 @@ class Bank(commands.Cog):
     ##################################################
     ### REWARD
     ##################################################    
-    @command_group_bank.command(name="reward")
+    @command_group_bank.command(name="distribute")
     @commands.guild_only()
     @commands.check(is_coleader_or_bank_admin)
     async def subcommand_bank_reward(self,ctx:commands.Context,account_type_or_clan_abbreviation:str,user:discord.Member,amount:int):
         """
-        Rewards Discord Users with a set amount of money.
+        Distribute a set amount of money to a Discord User.
 
         Funds are withdrawn from Global or Clan Accounts.
         """
@@ -1075,14 +1088,14 @@ class Bank(commands.Cog):
         await bank.deposit_credits(user,amount)
         await ctx.tick()
     
-    @app_command_group_bank.command(name="reward",
-        description="Rewards Discord Users with a set amount of money.")
+    @app_command_group_bank.command(name="distribute",
+        description="Distribute a set amount of money to a Discord User.")
     @app_commands.check(is_coleader_or_bank_admin)
     @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
     @app_commands.describe(
         select_account="Select an Account to withdraw the reward from.",
-        user="Select a User to reward.",
-        amount="The amount to reward.")
+        user="Select a User to distribute to.",
+        amount="The amount to distribute.")
     async def app_command_bank_reward(self,interaction:discord.Interaction,select_account:str,user:discord.Member,amount:int):
         
         await interaction.response.defer(ephemeral=True)
@@ -1105,3 +1118,307 @@ class Bank(commands.Cog):
             )
         await bank.deposit_credits(user,amount)
         return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,}.",ephemeral=True)
+
+    ##################################################
+    ### USER INVENTORY
+    ##################################################
+    @commands.command(name="inventory")
+    @commands.guild_only()
+    async def command_user_inventory(self,ctx:commands.Context):
+        """
+        Display your inventory.
+
+        Your inventory, like your Bank Balances, are considered global and will contain items from different server stores.
+        """
+
+        inventory = UserInventory(ctx.author)
+        embed = await inventory.get_embed(ctx)
+        await ctx.reply(embed=embed)
+    
+    @app_commands.command(
+        name="inventory",
+        description="Display your inventory."
+        )
+    @app_commands.guild_only()
+    async def app_command_user_inventory(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+
+        inventory = UserInventory(interaction.user)
+        embed = await inventory.get_embed(interaction)
+        await interaction.followup.send(embed=embed)
+    
+    ##################################################
+    ### USER STORE
+    ##################################################
+    @commands.command(name="shop",aliases=['store'])
+    @commands.guild_only()
+    async def command_user_store(self,ctx:commands.Context):
+        """
+        Open the Guild Shop.
+        """
+
+        store = UserStore(ctx)
+        await store.start()
+    
+    @app_commands.command(
+        name="shop",
+        description="Open the Guild Shop."
+        )
+    @app_commands.guild_only()
+    async def app_command_user_store(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+
+        store = UserStore(interaction)
+        await store.start()
+    
+    ##################################################
+    ### USER GIFT
+    ##################################################
+    @commands.command(name="gift",aliases=['give'])
+    @commands.guild_only()
+    async def command_user_gift(self,ctx:commands.Context):
+        """
+        Gift a friend an item from your Inventory!
+
+        You can only gift items from the current server.
+        """
+
+        await ctx.reply(f"For a better experience, use the Slash Command `/gift` to do this action.")
+    
+    @app_commands.command(
+        name="gift",
+        description="Gift a friend an item from your Inventory!"
+        )
+    @app_commands.guild_only()
+    @app_commands.autocomplete(item=autocomplete_gift_items)
+    @app_commands.describe(
+        item="Select an item to gift.",
+        user="Select a user to gift to."
+        )
+    async def app_command_user_gift(self,interaction:discord.Interaction,item:str,user:discord.Member):        
+        await interaction.response.defer(ephemeral=True)
+
+        if user.id == interaction.user.id:
+            return await interaction.followup.send("You can't gift yourself!",ephemeral=True)
+
+        if user.bot:
+            return await interaction.followup.send("You can't gift bots!",ephemeral=True)
+        
+        item = ShopItem.get_by_id(item)
+
+        inventory = UserInventory(interaction.user)
+        gift = await inventory.gift_item(item,user)
+        if not gift:
+            return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
+
+        return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
+    
+    ##################################################
+    ### STORE MANAGER
+    ##################################################    
+    @commands.command(name="shopmanager")
+    @commands.admin()
+    @commands.guild_only()
+    async def command_user_store_manager(self,ctx:commands.Context):
+        """
+        Manage the Store for this Guild.
+        """
+
+        store = StoreManager(ctx)
+        await store.start()
+    
+    @app_commands.command(
+        name="shop-manager",
+        description="Open the Shop Manager. Equivalent to [p]`shopmanager`."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    async def app_command_store_manager(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+
+        store = StoreManager(interaction)
+        await store.start()
+    
+    ##################################################
+    ### SHOP ITEM GROUP
+    ##################################################    
+    @commands.group(name="shopitem")
+    @commands.admin()
+    @commands.guild_only()
+    async def command_group_shop_item(self,ctx:commands.Context):
+        """
+        Group Command to help manage Shop Items.
+        """
+        if not ctx.invoked_subcommand:
+            pass
+    
+    app_command_group_shopitem = app_commands.Group(
+        name="shop-item",
+        description="Group for Shop Item commands. Equivalent to [p]shopitem.",
+        guild_only=True
+        )
+    
+    ##################################################
+    ### SHOP ITEM / DISTRIBUTE
+    ##################################################
+    @command_group_shop_item.command(name="distribute")
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_item_distribute(self,ctx:commands.Context):
+        """
+        Administratively distribute an item to a specified user.
+
+        This bypasses all checks and will distribute the item directly to the user's inventory.
+        """
+
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-item distribute` to do this action.")
+    
+    @app_command_group_shopitem.command(
+        name="distribute",
+        description="Administratively distribute an item to a specified user."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_distribute_items)
+    @app_commands.describe(
+        item="Select an item to distribute. Only Basic items can be distributed.",
+        user="Select a user to distribute to."
+        )
+    async def app_command_distribute_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
+        await interaction.response.defer(ephemeral=True)
+
+        if user.id == interaction.user.id:
+            return await interaction.followup.send("You can't give items to yourself!",ephemeral=True)
+        if user.bot:
+            return await interaction.followup.send("You can't give items to bots!",ephemeral=True)
+        
+        item = ShopItem.get_by_id(item)
+
+        inventory = UserInventory(user)
+        await inventory.add_item_to_inventory(item)
+
+        return await interaction.followup.send(f"1x **{item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)
+
+    ##################################################
+    ### SHOP ITEM / REDEEM
+    ##################################################
+    @command_group_shop_item.command(name="redeem")
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_item_redeem(self,ctx:commands.Context):
+        """
+        Redeems an item from a user's inventory.
+
+        Only usable if item exists in the user's inventory.
+        """
+
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-item redeem` to do this action.")
+    
+    @app_command_group_shopitem.command(
+        name="redeem",
+        description="Redeems an item from a user's inventory."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_distribute_items)
+    @app_commands.describe(
+        item="Select an item to redeem. Only Basic items can be distributed.",
+        user="Select a user to redeem from."
+        )
+    async def app_command_redeem_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
+        await interaction.response.defer()
+
+        if user.id == interaction.user.id:
+            return await interaction.followup.send("You can't redeem items for yourself!")
+        if user.bot:
+            return await interaction.followup.send("You can't redeem items for bots!")
+        
+        item = ShopItem.get_by_id(item)
+        inventory = UserInventory(user)
+
+        if not inventory.has_item(item):
+            return await interaction.followup.send(f"{user.mention} doesn't have that item.")
+
+        await inventory.remove_item_from_inventory(item)
+        await interaction.followup.send(f"1x **{item.name}** has been redeemed from {user.mention}'s inventory.")
+    
+    ##################################################
+    ### SHOP ITEM / DELETE
+    ################################################## 
+    @command_group_shop_item.command(name="delete")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_delete(self,ctx:commands.Context,item_id:str):
+        """
+        Delete a Shop Item.
+
+        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        """
+        item = ShopItem.get_by_id(item_id)
+        if not item:
+            return await ctx.reply("I couldn't find that item.")
+        await item.delete()
+        await ctx.tick()
+    
+    @app_command_group_shopitem.command(
+        name="delete",
+        description="Delete a Shop Item."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_store_items)
+    @app_commands.describe(
+        item="Select a Shop Item to delete."
+        )        
+    async def app_command_delete_item(self,interaction:discord.Interaction,item:str):
+        
+        await interaction.response.defer(ephemeral=True)
+        item = ShopItem.get_by_id(item)
+        if not item:
+            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
+        await item.delete()
+        await interaction.followup.send("Item deleted.",ephemeral=True)
+    
+    ##################################################
+    ### SHOP ITEM / RESTOCK
+    ################################################## 
+    @command_group_shop_item.command(name="restock")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_restock(self,ctx:commands.Context,item_id:str,amount:int):
+        """
+        Restocks a Shop Item.
+
+        Adds the specified amount to the current stock. Only usable if item is not unlimited.
+
+        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        """
+        item = ShopItem.get_by_id(item_id)
+        if not item:
+            return await ctx.reply("I couldn't find that item.")
+        
+        item.stock += amount
+        await ctx.reply(f"Restocked {item} by {amount}. New stock: {item.stock}.")
+    
+    @app_command_group_shopitem.command(
+        name="restock",
+        description="Restocks a Shop Item."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_store_items_restock)
+    @app_commands.describe(
+        item="Select a Shop Item to restock.",
+        amount="The amount to restock."
+        )        
+    async def app_command_restock_item(self,interaction:discord.Interaction,item:str,amount:int):
+        
+        await interaction.response.defer(ephemeral=True)
+        item = ShopItem.get_by_id(item)
+        if not item:
+            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
+        item.stock += amount
+        await interaction.followup.send(f"Restocked {item} by {amount}. New stock: {item.stock}.",ephemeral=True)

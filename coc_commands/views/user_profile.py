@@ -1,9 +1,13 @@
 import discord
+import asyncio
 
 from typing import *
 from redbot.core import commands
+from redbot.core.utils import AsyncIter
 
-from coc_data.objects.players.player import aPlayer
+from coc_client.api_client import BotClashClient
+
+from coc_data.objects.players.player import *
 from coc_data.objects.discord.member import aMember
 
 from coc_data.utilities.components import *
@@ -15,6 +19,8 @@ from coc_data.exceptions import *
 
 from ..helpers.components import *
 from ..exceptions import *
+
+bot_client = BotClashClient()
 
 ####################################################################################################
 #####
@@ -93,6 +99,7 @@ class UserProfileMenu(DefaultView):
     @staticmethod
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
 
+        m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
 
         embed = await clash_embed(
             context=ctx,
@@ -103,7 +110,7 @@ class UserProfileMenu(DefaultView):
             thumbnail=member.display_avatar
             )
 
-        for account in member.accounts[:10]:
+        async for account in AsyncIter(m_accounts[:10]):
             embed.add_field(
                 name=(f"{account.home_clan.emoji} " if account.is_member else "") + f"{account.town_hall.emote} **{account.name}**",
                 value=f"{account.hero_description}\n[Player Link: {account.tag}]({account.share_link})\n\u200b",
@@ -116,7 +123,7 @@ class UserProfileMenu(DefaultView):
                 thumbnail=member.display_avatar,
                 show_author=False,
                 )
-            for account in member.accounts[10:20]:
+            async for account in AsyncIter(m_accounts[10:20]):
                 embed_2.add_field(
                     name=(f"{account.home_clan.emoji} " if account.is_member else "") + f"{account.town_hall.emote} **{account.name}**",
                     value=f"{account.hero_description}\n[Player Link: {account.tag}]({account.share_link})\n\u200b",
@@ -201,7 +208,7 @@ class AddLinkMenu(DefaultView):
             verify = True
         else:
             try:
-                verify = await self.bot.coc_client.verify_player_token(player_tag=tag,token=api_token)
+                verify = await bot_client.coc.verify_player_token(player_tag=tag,token=api_token)
             except (coc.NotFound) as exc:
                 embed = await clash_embed(
                     context=self.ctx,
@@ -215,7 +222,7 @@ class AddLinkMenu(DefaultView):
                 raise ClashAPIError(exc) from exc
 
         try:
-            self.add_link_account = aPlayer.from_cache(tag)
+            self.add_link_account = await bot_client.cog.fetch_player(tag)
         except CacheNotReady as exc:
             embed = await clash_embed(
                 context=self.ctx,
@@ -239,14 +246,13 @@ class AddLinkMenu(DefaultView):
             return self.stop_menu()
 
         if verify:
-            aPlayer.add_link(tag,interaction.user.id)
+            BasicPlayer.add_link(tag,interaction.user.id)
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account **{tag}** is now linked to your Discord account!",
+                message=f"The account **{coc.utils.correct_tag(tag)}** is now linked to your Discord account!",
                 success=True
                 )
             await interaction.edit_original_response(embed=embed,view=None)
-            self.client.coc_state.player_cache.add_to_queue(tag)
         else:
             embed = await clash_embed(
                 context=self.ctx,
@@ -267,23 +273,8 @@ class DeleteLinkMenu(DefaultView):
 
         self.member = member
 
-        select_options = [discord.SelectOption(
-            label=f"{account}",
-            value=account.tag,
-            description=account.member_description_no_emoji,
-            emoji=account.town_hall.emoji)
-            for account in self.member.accounts if not account.is_member
-            ]
-        self.remove_link_dropdown = DiscordSelectMenu(
-            function=self._callback_remove_account,
-            options=select_options,
-            placeholder="Select an account to remove.",
-            min_values=1,
-            max_values=len(select_options)
-            )
-        
         super().__init__(context,timeout=120)
-        self.add_item(self.remove_link_dropdown)
+        
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -299,6 +290,24 @@ class DeleteLinkMenu(DefaultView):
     ### CALLBACK METHODS
     ################################################## 
     async def _start_delete_link(self):
+
+        m_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.accounts))
+        select_options = [discord.SelectOption(
+            label=f"{account}",
+            value=account.tag,
+            description=account.member_description_no_emoji,
+            emoji=EmojisTownHall.get(account.town_hall_level))
+            for account in m_accounts if not account.is_member
+            ]        
+        remove_link_dropdown = DiscordSelectMenu(
+            function=self._callback_remove_account,
+            options=select_options,
+            placeholder="Select an account to remove.",
+            min_values=1,
+            max_values=len(select_options)
+            )        
+        self.add_item(remove_link_dropdown)
+
         self.is_active = True
         embed = await clash_embed(
             context=self.ctx,
@@ -316,7 +325,7 @@ class DeleteLinkMenu(DefaultView):
         
     async def _callback_remove_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
-        remove_accounts = [account for account in self.member.accounts if account.tag in menu.values]
+        remove_accounts = await asyncio.gather(*(bot_client.cog.fetch_player(tag) for tag in menu.values))
 
         for account in remove_accounts:
             account.discord_user = 0
