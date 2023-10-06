@@ -135,55 +135,55 @@ class BotClashClient():
     ##################################################
     async def api_login(self):
         
-        # clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
+        clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
 
-        # if clashapi_login.get("username") is None:
-        #     raise LoginNotSet(f"Clash API Username is not set.")
+        if clashapi_login.get("username") is None:
+            raise LoginNotSet(f"Clash API Username is not set.")
         
-        # if clashapi_login.get("password") is None:
-        #     raise LoginNotSet(f"Clash API Password is not set.")
-
-        # self.bot.coc_client = coc.EventsClient(
-        #     key_count=int(clashapi_login.get("keys",1)),
-        #     key_names='Created for Project G, from coc.py',
-        #     load_game_data=coc.LoadGameData(always=True)
-        #     )
-        # await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))        
-        # self._api_logged_in = True
-
-        available_clients = ['clashapi']
-        for i in range(1,10):
-            available_clients.append(f'clashapi{str(i)}')
-
-        keys = []
-
-        async for client in AsyncIter(available_clients):
-            try:
-                clashapi_login = await self.bot.get_shared_api_tokens(client)
-            except:
-                continue
-
-            if clashapi_login.get("username") is None:
-                continue
-            if clashapi_login.get("password") is None:
-                continue
-
-            client = coc.Client(
-                key_count=int(clashapi_login.get("keys",1)),
-                key_names='Created for Project G, from coc.py',
-                )
-            await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
-            keys.extend(client.http._keys)
-            await client.close()
-
-        if len(keys) == 0:
-            raise LoginNotSet(f"No Clash API keys were found.")
+        if clashapi_login.get("password") is None:
+            raise LoginNotSet(f"Clash API Password is not set.")
 
         self.bot.coc_client = coc.EventsClient(
+            key_count=int(clashapi_login.get("keys",1)),
+            key_names='Created for Project G, from coc.py',
             load_game_data=coc.LoadGameData(always=True)
             )
-        await self.bot.coc_client.login_with_tokens(*keys)
+        await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))        
         self._api_logged_in = True
+
+        # available_clients = ['clashapi']
+        # for i in range(1,10):
+        #     available_clients.append(f'clashapi{str(i)}')
+
+        # keys = []
+
+        # async for client in AsyncIter(available_clients):
+        #     try:
+        #         clashapi_login = await self.bot.get_shared_api_tokens(client)
+        #     except:
+        #         continue
+
+        #     if clashapi_login.get("username") is None:
+        #         continue
+        #     if clashapi_login.get("password") is None:
+        #         continue
+
+        #     client = coc.Client(
+        #         key_count=int(clashapi_login.get("keys",1)),
+        #         key_names='Created for Project G, from coc.py',
+        #         )
+        #     await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
+        #     keys.extend(client.http._keys)
+        #     await client.close()
+
+        # if len(keys) == 0:
+        #     raise LoginNotSet(f"No Clash API keys were found.")
+
+        # self.bot.coc_client = coc.EventsClient(
+        #     load_game_data=coc.LoadGameData(always=True)
+        #     )
+        # await self.bot.coc_client.login_with_tokens(*keys)
+        # self._api_logged_in = True
     
     async def api_logout(self):
         await self.bot.coc_client.close()

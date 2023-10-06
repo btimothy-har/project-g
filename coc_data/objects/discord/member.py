@@ -64,21 +64,11 @@ class aMember():
         if not user.discord_member:
             raise InvalidUser(user.user_id)
         if not user.guild:
-            raise InvalidGuild(user.guild_id)        
-        try:
-            db_member = db_DiscordMember.objects.get(
-                user_id=user.user_id,
-                guild_id=user.guild_id
-                )
-        except DoesNotExist:            
-            db_member = db_DiscordMember(
-                member_id=user.db_id,
-                user_id=user.user_id,
-                guild_id=user.guild_id
-                )
-        db_member.roles = [str(r.id) for r in user.discord_member.roles if r.is_assignable()]
-        db_member.last_role_save = pendulum.now().int_timestamp
-        db_member.save()
+            raise InvalidGuild(user.guild_id)    
+        db_DiscordMember.objects(member_id=user.db_id,user_id=user.user_id,guild_id=user.guild_id).update_one(
+            set__roles=[str(r.id) for r in user.discord_member.roles if r.is_assignable()],
+            set__last_role_save=pendulum.now().int_timestamp,
+            upsert=True)
     
     ##################################################
     ### DISCORD MEMBER ATTRIBUTES
@@ -352,17 +342,10 @@ class aMember():
     def last_payday(self,timestamp:int):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
-        try:
-            db_member = db_DiscordMember.objects.get(user_id=self.user_id,guild_id=self.guild_id)
-        except DoesNotExist:
-            member_id = {'guild':self.guild_id,'user':self.user_id}
-            db_member = db_DiscordMember(
-                member_id=member_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id
-                )
-        db_member.last_payday = timestamp
-        db_member.save()
+        db_DiscordMember.objects(member_id=self.db_id,user_id=self.user_id,guild_id=self.guild_id).update_one(
+            set__last_payday=timestamp,
+            upsert=True
+            )
 
     ##################################################
     ### ROLE ATTRIBUTES & METHODS
@@ -424,16 +407,10 @@ class aMember():
         
         guild = aGuild(self.guild_id)
 
-        try:
-            db_member = db_DiscordMember.objects.get(user_id=self.user_id,guild_id=self.guild_id)
-        except DoesNotExist:
-            db_member = db_DiscordMember(
-                member_id=self.db_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id
-                )        
-        db_member.last_role_sync = pendulum.now().int_timestamp
-        db_member.save()
+        db_DiscordMember.objects(member_id=self.db_id,user_id=self.user_id,guild_id=self.guild_id).update_one(
+            set__last_role_sync=pendulum.now().int_timestamp,
+            upsert=True
+            )
 
         if self.guild_id == 1132581106571550831:
             global_member = aMember(self.user_id)
@@ -545,17 +522,10 @@ class aMember():
             raise InvalidUser(self.user_id)
         if account_tag not in self.account_tags:
             raise InvalidTag(account_tag)
-        try:
-            db_member = db_DiscordMember.objects.get(user_id=self.user_id,guild_id=self.guild_id)
-        except DoesNotExist:
-            member_id = {'guild':self.guild_id,'user':self.user_id}
-            db_member = db_DiscordMember(
-                member_id=member_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id
-                )
-        db_member.default_account = account_tag
-        db_member.save()
+        db_DiscordMember.objects(member_id=self.db_id,user_id=self.user_id,guild_id=self.guild_id).update_one(
+            set__default_account=account_tag,
+            upsert=True
+            )
 
     async def get_nickname(self):
         if not self.discord_member:

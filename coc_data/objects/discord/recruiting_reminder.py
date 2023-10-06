@@ -230,9 +230,7 @@ class RecruitingReminder():
     @ad_link.setter
     def ad_link(self,value:str):
         self._ad_link = value
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.ad_link = value
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__ad_link=value)
 
     @property
     def interval(self) -> int:
@@ -240,9 +238,7 @@ class RecruitingReminder():
     @interval.setter
     def interval(self,value:int):
         self._interval = value
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.interval = value
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__interval=value)
     
     @property
     def remind_user(self) -> Optional[discord.User]:
@@ -250,9 +246,7 @@ class RecruitingReminder():
     @remind_user.setter
     def remind_user(self,value:int):
         self._remind_user = value
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.remind_user = value
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__remind_user=value)
     
     @property
     def last_posted(self) -> Optional[pendulum.DateTime]:
@@ -262,9 +256,7 @@ class RecruitingReminder():
     @last_posted.setter
     def last_posted(self,timestamp:pendulum.DateTime):
         self._last_posted = timestamp.int_timestamp
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.last_posted = timestamp.int_timestamp
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__last_posted=timestamp.int_timestamp)
     
     @property
     def next_reminder(self) -> Optional[pendulum.DateTime]:
@@ -284,9 +276,7 @@ class RecruitingReminder():
     @last_user.setter
     def last_user(self,user_id:int):
         self._last_user = user_id
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.last_user = user_id
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__last_user=user_id)
 
     @property
     def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
@@ -298,9 +288,7 @@ class RecruitingReminder():
             self._channel = channel.id
         else:
             self._channel = 0
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.channel = self._channel
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__channel=self._channel)
     
     @property
     def active_reminder(self) -> int:
@@ -313,9 +301,7 @@ class RecruitingReminder():
             self._active_reminder = 0
         else:
             self._active_reminder = message.id
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.active_reminder = self._active_reminder
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(set__active_reminder=self._active_reminder)
 
     @property
     def logs(self) -> list:
@@ -327,9 +313,7 @@ class RecruitingReminder():
             "timestamp":new_log.created_at.timestamp(),
             }
         self._logs.append(new_log)
-        db = db_RecruitingPost.objects.get(id=self.id)
-        db.logs = self._logs
-        db.save()
+        db_RecruitingPost.objects(id=self.id).update_one(push__logs=new_log)
 
 class RecruitingPostPrompt(discord.ui.View):
     def __init__(self,post:RecruitingReminder):
