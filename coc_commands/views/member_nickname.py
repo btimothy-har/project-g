@@ -70,7 +70,7 @@ class MemberNicknameMenu(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=embed,view=self)
 
-        if len(self.member.member_accountsaccounts) > 1:
+        if len(self.member.member_accounts) > 1:
             await self._select_accounts()
         else:
             await self._change_nickname()

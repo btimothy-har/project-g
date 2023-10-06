@@ -74,8 +74,10 @@ class StoreManager(DefaultView):
             restock_five.disabled = True
         self.add_item(restock_five)
         
-        self.add_item(self.show_item_select)
-        self.add_item(self.hide_item_select)
+        if self.show_item_select:
+            self.add_item(self.show_item_select)
+        if self.hide_item_select:
+            self.add_item(self.hide_item_select)
         self.add_item(self.close_button)
 
         embed = await self.main_menu_embed()
@@ -152,6 +154,8 @@ class StoreManager(DefaultView):
             )
     @property
     def show_item_select(self):
+        if len([i for i in self.guild_items if not i.show_in_store]) == 0:
+            return None
         select_options = [discord.SelectOption(
             label=f"{str(item)}",
             value=item.id,
@@ -169,6 +173,8 @@ class StoreManager(DefaultView):
         return item_select
     @property
     def hide_item_select(self):
+        if len([i for i in self.guild_items if i.show_in_store]) == 0:
+            return None
         select_options = [discord.SelectOption(
             label=f"{item}",
             value=item.id,
