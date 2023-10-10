@@ -123,7 +123,7 @@ class ClanApplyMenuUser(DefaultView):
     ##################################################
     async def start(self):
         if self.clan_tags:
-            self.clans = await asyncio.gather(*(await self.coc_client.fetch_clan(tag=tag) for tag in self.clan_tags))
+            self.clans = await asyncio.gather(*(self.coc_client.fetch_clan(tag=tag) for tag in self.clan_tags))
 
         self.is_active = True
         available_accounts = []

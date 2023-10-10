@@ -17,7 +17,7 @@ from redbot.core.utils import AsyncIter, bounded_gather
 from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
 
-from .coc_objects.clans.mongo_clan import db_Clan
+from .coc_objects.clans.mongo_clan import db_Clan, db_WarLeagueClanSetup
 from .coc_objects.players.mongo_player import db_Player
 from .coc_objects.events.mongo_events import db_ClanWar, db_RaidWeekend
 
@@ -296,12 +296,19 @@ class ClashOfClansTasks(commands.Cog):
                 async for player in players.filter(predicate_player_not_in_loop):
                     await self.create_player_task(player.tag)
                 
-                alliance_clans = AsyncIter(db_AllianceClan.objects().only('tag'))
+                alliance_tags = [db.tag for db in db_AllianceClan.objects().only('tag')]
+                alliance_clans = AsyncIter(alliance_tags)
                 async for clan in alliance_clans:
-                    if clan.tag not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
-                        await self.create_war_task(clan.tag)
-                    if clan.tag not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
-                        await self.create_raid_task(clan.tag)
+                    if clan not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
+                        await self.create_war_task(clan)
+                    if clan not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
+                        await self.create_raid_task(clan)
+                
+                cwl_tags = [db.tag for db in db_WarLeagueClanSetup.objects().only('tag')]
+                cwl_clans = AsyncIter(cwl_tags)
+                async for clan in cwl_clans:
+                    if clan not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
+                        await self.create_war_task(clan)
 
                 await self._season_check()
 
