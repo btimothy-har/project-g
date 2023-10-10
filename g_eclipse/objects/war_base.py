@@ -44,35 +44,34 @@ class eWarBase():
         return sorted(bases,key=lambda x: x.added_on,reverse=True)
     
     def __init__(self,base_link,defensive_cc_link):
-        if self._is_new:
-            link_parse = urllib.parse.urlparse(base_link)
-            cc_parse = urllib.parse.urlparse(defensive_cc_link)
-            self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
+        link_parse = urllib.parse.urlparse(base_link)
+        cc_parse = urllib.parse.urlparse(defensive_cc_link)
+        self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
 
-            try:
-                self.town_hall = int(self.id.split('TH',1)[1][:2])
-            except:
-                self.town_hall = int(self.id.split('TH',1)[1][:1])
+        try:
+            self.town_hall = int(self.id.split('TH',1)[1][:2])
+        except:
+            self.town_hall = int(self.id.split('TH',1)[1][:1])
 
-            self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={urllib.parse.quote_plus(self.id)}"
+        self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={urllib.parse.quote_plus(self.id)}"
 
-            self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
-            self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
+        self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
+        self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
 
-            parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
-            self.defensive_cc_str = ""
-            for troop in parsed_cc[0]:
-                if self.defensive_cc_str != "":
-                    self.defensive_cc_str += "\u3000"
-                self.defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
+        parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
+        self.defensive_cc_str = ""
+        for troop in parsed_cc[0]:
+            if self.defensive_cc_str != "":
+                self.defensive_cc_str += "\u3000"
+            self.defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
 
-            self.source = ""
-            self.builder = None
-            self.added_on = 0
-            self.base_type = ""
-            self.base_image = ""
-            self.notes = ""
-            self.claims = []
+        self.source = ""
+        self.builder = None
+        self.added_on = 0
+        self.base_type = ""
+        self.base_image = ""
+        self.notes = ""
+        self.claims = []
 
     @classmethod
     async def from_base_id(cls,b_id):
