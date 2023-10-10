@@ -28,7 +28,7 @@ class dbWarBase(Document):
 
 class eWarBase():
     _cache = {}
-    
+
     @classmethod
     async def load_all(cls):
         bases = []
@@ -39,19 +39,11 @@ class eWarBase():
 
     @classmethod
     async def by_user_claim(cls,user_id:int):
-        bases = []
-        query = dbWarBase.objects(claims__in=[user_id])
-        async for base in AsyncIter(query):
-            bases.append(await cls.from_base_id(base.base_id))        
-        return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
+        return sorted([b for b in eWarBase._cache.values() if user_id in b.claims],key=lambda x:(x.town_hall,x.added_on),reverse=True)
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
-        bases = []
-        query = dbWarBase.objects(townhall=townhall)
-        async for base in AsyncIter(query):
-            bases.append(await cls.from_base_id(base.base_id))
-        return sorted(bases,key=lambda x: x.added_on,reverse=True)
+        return sorted([b for b in eWarBase._cache.values() if townhall == b.town_hall],key=lambda x:(x.added_on),reverse=True)
     
     def __new__(cls,base_link,defensive_cc_link):
         link_parse = urllib.parse.urlparse(base_link)

@@ -39,7 +39,7 @@ class ECLIPSE(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 2
+    __release__ = 3
 
     def __init__(self,bot):        
         self.bot = bot
