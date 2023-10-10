@@ -170,7 +170,7 @@ class Players(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __version__ = "2023.10.3"
 
     def __init__(self,bot:Red):
         self.bot = bot

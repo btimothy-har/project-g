@@ -28,6 +28,13 @@ class aGuildClocks():
     def guild(self):
         return bot_client.bot.get_guild(self.id)
     
+    @property
+    def config(self) -> Optional[db_ClockConfig]:
+        try:
+            return db_ClockConfig.objects.get(s_id=self.id)
+        except DoesNotExist:
+            return None
+    
     async def create_clock_channel(self):
         default_permissions = {
             self.guild.default_role: discord.PermissionOverwrite(
@@ -84,15 +91,15 @@ class aGuildClocks():
     ### CONFIGURATION
     ##################################################    
     @property
-    def use_channels(self) -> bool:   
-        return getattr(db_ClockConfig.objects(s_id=self.id),'use_channels',False)
+    def use_channels(self) -> bool:
+        return getattr(self.config,'use_channels',False)
     @use_channels.setter
     def use_channels(self,use_channels:bool):
         db_ClockConfig.objects(s_id=self.id).update_one(use_channels=use_channels,upsert=True)
     
     @property
     def use_events(self) -> bool:
-        return getattr(db_ClockConfig.objects(s_id=self.id),'use_events',False)
+        return getattr(self.config,'use_events',False)
     @use_events.setter
     def use_events(self,use_events:bool):
         db_ClockConfig.objects(s_id=self.id).update_one(use_events=use_events,upsert=True)
@@ -101,10 +108,8 @@ class aGuildClocks():
     ### SEASON CLOCKS
     ##################################################
     @property
-    def season_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(
-            getattr(db_ClockConfig.objects(s_id=self.id),'season_channel',0)
-            )
+    def season_channel(self) -> Optional[discord.VoiceChannel]:    
+        channel = self.guild.get_channel(getattr(self.config,'season_channel',0))
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
@@ -141,9 +146,7 @@ class aGuildClocks():
     ##################################################
     @property
     def raids_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(
-            getattr(db_ClockConfig.objects(s_id=self.id),'raids_channel',0)
-            )
+        channel = self.guild.get_channel(getattr(self.config,'raids_channel',0))
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
@@ -212,9 +215,7 @@ class aGuildClocks():
     ##################################################
     @property
     def clangames_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(
-            getattr(db_ClockConfig.objects(s_id=self.id),'clangames_channel',0)
-            )
+        channel = self.guild.get_channel(getattr(self.config,'clangames_channel',0))
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
@@ -292,9 +293,7 @@ class aGuildClocks():
     ##################################################    
     @property
     def warleague_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(
-            getattr(db_ClockConfig.objects(s_id=self.id),'warleague_channel',0)
-            )
+        channel = self.guild.get_channel(getattr(self.config,'warleague_channel',0))
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None    

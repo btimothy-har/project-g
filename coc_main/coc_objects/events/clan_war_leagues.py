@@ -149,7 +149,14 @@ class WarLeagueGroup():
     
     @property
     def state(self) -> str:
-        return self.current_round.state if self.current_round else self._state
+        if len(self.rounds) == self.number_of_rounds:
+            ref_states = [WarState.PREPARATION,WarState.INWAR,WarState.WAR_ENDED]
+        else:
+            ref_states = [WarState.PREPARATION,WarState.INWAR]
+
+        for i, round in enumerate(reversed(self.rounds)):
+            if any([aClanWar(war_id).state in ref_states for war_id in round]):
+                return [aClanWar(war_id).state in ref_states for war_id in round][0].state
     
     @property
     def current_round(self) -> int:

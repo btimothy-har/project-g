@@ -244,7 +244,7 @@ class NewMemberMenu(DefaultView):
     async def _select_home_clan(self,account:aPlayer):        
         guild = aGuild(self.guild.id)
         guild_clans = await asyncio.gather(*(self.client.fetch_clan(c.tag) for c in guild.clan_links))
-        alliance_clans = [c for c in guild_clans if c.is_alliance_clan].sort(key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
+        alliance_clans = sorted([c for c in guild_clans if c.is_alliance_clan],key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
             raise NoClansRegistered()
 
