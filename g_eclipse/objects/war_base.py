@@ -27,6 +27,8 @@ class dbWarBase(Document):
     claims = ListField(IntField(),default=[])
 
 class eWarBase():
+    _cache = {}
+    
     @classmethod
     async def load_all(cls):
         bases = []
