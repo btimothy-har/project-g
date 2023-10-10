@@ -49,8 +49,8 @@ class ClashOfClansTasks(commands.Cog):
     Background task handler for Clash of Clans.
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot:Red):
         self.bot = bot

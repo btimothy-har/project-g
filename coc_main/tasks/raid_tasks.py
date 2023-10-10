@@ -57,8 +57,8 @@ class ClanRaidLoop(TaskLoop):
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
-                    if self.task_lock.locked():
-                        async with self.task_lock:
+                    if self.master_lock.locked():
+                        async with self.master_lock:
                             await asyncio.sleep(0)
                     
                     if not self.loop_active:
@@ -191,6 +191,8 @@ class ClanRaidLoop(TaskLoop):
 
     @property
     def sleep_time(self):
+        if not self.clan:
+            return 30
         if pendulum.now().day_of_week not in [5,6,7,1]:
             return 3600
         elif self.api_error:

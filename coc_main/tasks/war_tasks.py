@@ -57,8 +57,8 @@ class ClanWarLoop(TaskLoop):
                     if not self.loop_active:
                         raise asyncio.CancelledError
 
-                    if self.task_lock.locked():
-                        async with self.task_lock:
+                    if self.master_lock.locked():
+                        async with self.master_lock:
                             await asyncio.sleep(0)
                     
                     if not self.loop_active:
@@ -68,7 +68,7 @@ class ClanWarLoop(TaskLoop):
                     try:
                         self.clan = await self.coc_client.fetch_clan(tag=self.tag)
                     except InvalidTag:
-                        raise asyncio.CancelledError
+                        raise asyncio.CancelledError                    
                     
                     if not self.clan.public_war_log:
                         continue
@@ -82,15 +82,14 @@ class ClanWarLoop(TaskLoop):
                                     war_types=['cwl'],
                                     interval=[12,8,6,4,3,2,1],
                                     )
-                        
+                    
                     current_war = await self.coc_client.get_clan_war(clan=self.clan)
                     if not current_war or current_war.state == 'notInWar':
-                        if bot_client.current_season.cwl_start <= pendulum.now() <= bot_client.current_season.cwl_end.add(days=1):
-                            league_group = await self.coc_client.get_league_group(clan=self.clan)
+                        league_group = await self.coc_client.get_league_group(self.clan)
 
-                            if league_group:
-                                league_clan = league_group.get_clan(self.tag)
-                                current_war = league_clan.current_war
+                        if league_group:
+                            league_clan = league_group.get_clan(self.tag)
+                            current_war = league_clan.current_war
                     
                     if not current_war:
                         continue
@@ -247,6 +246,8 @@ class ClanWarLoop(TaskLoop):
     
     @property
     def sleep_time(self):
+        if not self.clan:
+            return 30
         if not self.clan.public_war_log:
             return 1800 #30mins
         if self.api_error:

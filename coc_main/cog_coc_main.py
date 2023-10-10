@@ -38,7 +38,7 @@ class ClashOfClansMain(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __version__ = "2023.10.3"
 
     def __init__(self,bot):
         self.bot = bot
@@ -64,7 +64,7 @@ class ClashOfClansMain(commands.Cog):
         if not os.path.exists(self.bot.coc_imggen_path):
             os.makedirs(self.bot.coc_imggen_path)
             
-        self.client = await BotClashClient.initialize(self.bot)
+        self.client = await BotClashClient.initialize(self.bot,self.__author__,self.__version__)
     
     ##################################################
     ### COG LOAD

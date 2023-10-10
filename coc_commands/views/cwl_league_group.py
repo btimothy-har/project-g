@@ -285,7 +285,8 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_roster(self):
-        roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.master_roster))
+        get_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.master_roster),return_exceptions=True)
+        roster_players = [p for p in get_players if not isinstance(p,Exception)]
         roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(

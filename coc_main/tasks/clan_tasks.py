@@ -133,7 +133,7 @@ class ClanLoop(TaskLoop):
     @property
     def sleep_time(self):
         if not self.cached_clan:
-            sleep = 300
+            sleep = 30
         elif self.api_error:
             sleep = 600
             self.api_error = False

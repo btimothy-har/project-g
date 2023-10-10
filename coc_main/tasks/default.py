@@ -71,6 +71,11 @@ class TaskLoop():
         return cog.task_lock
     
     @property
+    def master_lock(self) -> asyncio.Lock:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog._master_task_lock
+    
+    @property
     def api_semaphore(self) -> asyncio.Semaphore:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.api_semaphore

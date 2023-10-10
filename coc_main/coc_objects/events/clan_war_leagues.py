@@ -74,46 +74,34 @@ class WarLeagueGroup():
     async def from_api(cls,clan:BasicClan,api_data:coc.ClanWarLeagueGroup):
         combined = f"{pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY')}-{''.join(sorted([clan.tag for clan in api_data.clans]))}"
         group_id = hashlib.sha256(combined.encode()).hexdigest()
+        
+        db_WarLeagueGroup.objects(group_id=group_id).update(
+            set__season=pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY'),
+            set__state=api_data.state,
+            set__league=clan.war_league.name,
+            set__number_of_rounds=api_data.number_of_rounds,
+            set__clans=[clan.tag for clan in api_data.clans],
+            upsert=True)
 
-        _new_group = False
-
-        try:
-            wl_group = db_WarLeagueGroup.objects.get(group_id=group_id)
-        except DoesNotExist:
-            _new_group = True
-            wl_group = db_WarLeagueGroup(group_id=group_id)
-        finally:
-            if _new_group:
-                wl_group.league = clan.war_league.name
-                wl_group.season = pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY')
-                wl_group.number_of_rounds = api_data.number_of_rounds
-                wl_group.clans = [clan.tag for clan in api_data.clans]
-            
-            wl_group._state = api_data.state
-
-            league_rounds = [await asyncio.gather(*(cls.fetch_wars_in_round(group_id,round) for round in api_data.rounds))]
-            league_round_ids = []
-            for round in league_rounds:
-                league_round_ids.append([getattr(war,'war_id','') for war in round if war is not None])                
-            wl_group.rounds = league_round_ids            
-            wl_group.save()
+        war_ids_by_rounds = []
+        async for round in AsyncIter(api_data.rounds):
+            wars_in_round = await asyncio.gather(*(cls.get_league_war(group_id,tag) for tag in round))
+            war_ids_by_rounds.append([war.war_id for war in wars_in_round if war is not None])
+        
+        db_WarLeagueGroup.objects(group_id=group_id).update(
+            set__rounds=war_ids_by_rounds,
+            upsert=True)
         
         group = cls(group_id)
         group.load()
 
-        clan_tasks = [WarLeagueClan.from_api(group,league_clan) for league_clan in api_data.clans]
-        await asyncio.gather(*clan_tasks)
+        await asyncio.gather(*(WarLeagueClan.from_api(group,league_clan) for league_clan in api_data.clans))
 
-        if _new_group:
-            bot_client.coc_data_log.debug(f"New CWL Group found: {group_id}"
-                + f"\nLeague: {group.league}"
-                + f"\nClans: {'; '.join([f'{clan.name} {clan.tag}' for clan in group.clans])}"
-                )    
+        bot_client.coc_data_log.debug(f"CWL Group: {group_id}"
+            + f"\nLeague: {group.league}"
+            + f"\nClans: {'; '.join([f'{clan.name} {clan.tag}' for clan in group.clans])}"
+            )
         return group
-
-    @staticmethod
-    async def fetch_wars_in_round(group_id:str,war_tags:List[str]) -> List[aClanWar]:
-        return await asyncio.gather(*(WarLeagueGroup.get_league_war(group_id,tag) for tag in war_tags))
     
     @staticmethod
     async def get_league_war(group_id:str,war_tag:str) -> Optional[aClanWar]:

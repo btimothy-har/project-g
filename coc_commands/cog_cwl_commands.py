@@ -38,8 +38,8 @@ class ClanWarLeagues(commands.Cog):
     Commands for Clan War Leagues.
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot):        
         self.bot = bot

@@ -47,8 +47,8 @@ class ClashOfClansClient(commands.Cog):
     The use of Clash DiscordLinks is optional.
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot):
         self.bot = bot
@@ -258,7 +258,7 @@ class ClashOfClansClient(commands.Cog):
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc)
         else:
-            if api_group and api_group.state in ['preparation','inWar','warEnded'] and pendulum.from_format(api_group.season, 'YYYY-MM').format('M-YYYY') == self.client.current_season.id:
+            if api_group and api_group.state in ['preparation','inWar','ended','warEnded']:
                 league_group = await WarLeagueGroup.from_api(clan,api_group)
                 return league_group
         return None

@@ -182,6 +182,7 @@ class aClanWar():
             last_save=self._last_save.int_timestamp
             )
         db_war.save()
+        return db_war
     
     @property
     def do_i_save(self) -> bool:
@@ -199,12 +200,15 @@ class aClanWar():
     
     @property
     def state(self) -> WarState:
-        if self.preparation_start_time <= pendulum.now() < self.start_time:
-            return WarState.PREPARATION
-        elif self.start_time <= pendulum.now() < self.end_time:
-            return WarState.INWAR
-        elif self.end_time <= pendulum.now():
-            return WarState.WAR_ENDED
+        try:
+            if self.preparation_start_time <= pendulum.now() < self.start_time:
+                return WarState.PREPARATION
+            elif self.start_time <= pendulum.now() < self.end_time:
+                return WarState.INWAR
+            elif self.end_time <= pendulum.now():
+                return WarState.WAR_ENDED
+        except:
+            return self._state
 
     ##################################################
     ##### DATA FORMATTERS

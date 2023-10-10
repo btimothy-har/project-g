@@ -141,10 +141,12 @@ class BotClashClient():
             self.discordlinks_client = None
     
     @classmethod
-    async def initialize(cls,bot):
+    async def initialize(cls,bot,author,version):
         instance = cls(bot)
         if instance._is_initialized:
             return instance
+        instance.author = author
+        instance.version = version
         
         await instance.api_login()
         await instance.database_login()

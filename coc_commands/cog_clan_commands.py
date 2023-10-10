@@ -14,7 +14,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, db_Clan, db_AllianceClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, db_Clan, db_AllianceClan, aClanWar
 
 from coc_main.utils.components import clash_embed, MenuConfirmation, ClanLinkMenu
 from coc_main.utils.utils import chunks
@@ -74,8 +74,8 @@ class Clans(commands.Cog):
     Clan Commands
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot:Red):
         self.bot = bot    

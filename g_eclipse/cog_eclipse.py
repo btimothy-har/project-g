@@ -37,8 +37,8 @@ class ECLIPSE(commands.Cog):
     Your Clash of Clans database of attack strategies, guides and war bases.a
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.1"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot):        
         self.bot = bot

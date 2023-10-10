@@ -77,8 +77,8 @@ class ClashServerConfig(commands.Cog):
     Clash of Clans Server Config.
     """
 
-    __author__ = "bakkutteh"
-    __version__ = "2023.10.2"
+    __author__ = bot_client.author
+    __version__ = bot_client.version
 
     def __init__(self,bot:Red):
         self.bot = bot

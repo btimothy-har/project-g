@@ -354,9 +354,9 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         title=f"{member.display_name}",
         message=f"`{member.id}`"
             + f"\n**Joined Discord**"
-            + f"\n<t:{member.created_at.int_timestamp}:f>"
+            + f"\n<t:{int(member.created_at.timestamp())}:f>"
             + f"\n\n**Joined {member.guild.name}**"
-            + f"\n<t:{member.joined_at.int_timestamp}:f>"
+            + f"\n<t:{int(member.joined_at.timestamp())}:f>"
             + (f"\n\n**Applied to Clans**" if len(clans) > 0 else "")
             + (f"\n{newline.join([c.title for c in clans])}" if len(clans) > 0 else "")
             + f"\n\u200b",
