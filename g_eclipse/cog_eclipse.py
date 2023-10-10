@@ -39,7 +39,7 @@ class ECLIPSE(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 1
+    __release__ = 2
 
     def __init__(self,bot):        
         self.bot = bot
@@ -56,6 +56,9 @@ class ECLIPSE(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return self.bot.get_cog("ClashOfClansClient")
+
+    async def cog_load(self):
+        await eWarBase.load_all()
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):

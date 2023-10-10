@@ -28,6 +28,14 @@ class dbWarBase(Document):
 
 class eWarBase():
     @classmethod
+    async def load_all(cls):
+        bases = []
+        query = dbWarBase.objects()
+        async for base in AsyncIter(query):
+            bases.append(await cls.from_base_id(base.base_id))
+        return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
+
+    @classmethod
     async def by_user_claim(cls,user_id:int):
         bases = []
         query = dbWarBase.objects(claims__in=[user_id])
@@ -43,39 +51,49 @@ class eWarBase():
             bases.append(await cls.from_base_id(base.base_id))
         return sorted(bases,key=lambda x: x.added_on,reverse=True)
     
-    def __init__(self,base_link,defensive_cc_link):
+    def __new__(cls,base_link,defensive_cc_link):
         link_parse = urllib.parse.urlparse(base_link)
-        cc_parse = urllib.parse.urlparse(defensive_cc_link)
-        self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
+        base_id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
 
-        try:
-            self.town_hall = int(self.id.split('TH',1)[1][:2])
-        except:
-            self.town_hall = int(self.id.split('TH',1)[1][:1])
+        if base_id not in cls._cache:
+            instance = super().__new__(cls)
+            cls._cache[base_id] = instance
+            instance._is_new = True
+        return cls._cache[base_id]
+    
+    def __init__(self,base_link,defensive_cc_link):
+        if self._is_new:
+            link_parse = urllib.parse.urlparse(base_link)
+            cc_parse = urllib.parse.urlparse(defensive_cc_link)
+            self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
 
-        self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={urllib.parse.quote_plus(self.id)}"
+            try:
+                self.town_hall = int(self.id.split('TH',1)[1][:2])
+            except:
+                self.town_hall = int(self.id.split('TH',1)[1][:1])
 
-        self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
-        self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
+            self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={urllib.parse.quote_plus(self.id)}"
 
-        parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
-        self.defensive_cc_str = ""
-        for troop in parsed_cc[0]:
-            if self.defensive_cc_str != "":
-                self.defensive_cc_str += "\u3000"
-            self.defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
+            self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
+            self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
 
-        self.source = ""
-        self.builder = None
-        self.added_on = 0
-        self.base_type = ""
-        self.base_image = ""
-        self.notes = ""
-        self.claims = []
+            parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
+            self.defensive_cc_str = ""
+            for troop in parsed_cc[0]:
+                if self.defensive_cc_str != "":
+                    self.defensive_cc_str += "\u3000"
+                self.defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
+
+            self.source = ""
+            self.builder = None
+            self.added_on = 0
+            self.base_type = ""
+            self.base_image = ""
+            self.notes = ""
+            self.claims = []
 
     @classmethod
     async def from_base_id(cls,b_id):
-
         try:
             base_data = dbWarBase.objects.get(base_id=b_id).to_mongo().to_dict()
         except DoesNotExist:
