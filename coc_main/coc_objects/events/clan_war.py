@@ -134,7 +134,7 @@ class aClanWar():
         else:
             clan_war.type = data.type
 
-        if data.state != clan_war.state:
+        if data.state != clan_war._state:
             clan_war._found_in_db = False
 
         clan_war._state = data.state
@@ -188,7 +188,7 @@ class aClanWar():
         now = pendulum.now()
         if not self._found_in_db:
             return True
-        if self.state == 'inWar':
+        if self._state == 'inWar':
             if not self._last_save:
                 return True
             if now.int_timestamp - getattr(self._last_save,'int_timestamp',0) > 60:

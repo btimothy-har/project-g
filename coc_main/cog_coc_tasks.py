@@ -165,7 +165,7 @@ class ClashOfClansTasks(commands.Cog):
     
     @commands.Cog.listener("on_member_join")
     async def new_discord_member(self,member:discord.Member):        
-        linked_accounts = await bot_client.get_linked_players(self.user_id)
+        linked_accounts = await bot_client.get_linked_players(member.id)
         async for tag in AsyncIter(linked_accounts):
             player = await self.client.fetch_player(tag)
             if player.discord_user == 0:                    

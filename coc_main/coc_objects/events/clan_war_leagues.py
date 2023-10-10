@@ -156,7 +156,9 @@ class WarLeagueGroup():
 
         for i, round in enumerate(reversed(self.rounds)):
             if any([aClanWar(war_id).state in ref_states for war_id in round]):
-                return [aClanWar(war_id).state in ref_states for war_id in round][0].state
+                last_round = self.rounds[-1]
+                war = aClanWar(last_round[0])
+                return war.state
     
     @property
     def current_round(self) -> int:

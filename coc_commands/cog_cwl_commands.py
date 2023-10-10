@@ -345,8 +345,8 @@ class ClanWarLeagues(commands.Cog):
         channel:discord.TextChannel,
         role:discord.Role):
 
-        clan.league_clan_channel = channel.id
-        clan.league_clan_role = role.id
+        clan.league_clan_channel = channel
+        clan.league_clan_role = role
         clan.is_active_league_clan = True
 
         embed = await clash_embed(
