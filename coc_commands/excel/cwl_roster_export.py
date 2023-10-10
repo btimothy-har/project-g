@@ -2,17 +2,14 @@ import os
 import pendulum
 import xlsxwriter
 
+from typing import *
+
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient, aClashSeason
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.season.season import aClashSeason
-from coc_data.objects.discord.member import aMember
-from coc_data.objects.events.clan_war import aClanWar
-from coc_data.objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
-
-from coc_data.constants.coc_constants import *
+from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 
 cwl_roster_headers = [
     'Tag',
@@ -32,10 +29,12 @@ cwl_roster_headers = [
     'Roster Finalized?'
     ]
 
+bot_client = BotClashClient()
+coc_client = bot_client.bot.get_cog('ClashOfClansClient')
+
 async def generate_cwl_roster_export(season:aClashSeason):
-    client = BotClashClient()
     
-    report_file = client.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
+    report_file = bot_client.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
 
     if pendulum.now() > season.cwl_end:
         if os.path.exists(report_file):
@@ -57,30 +56,32 @@ async def generate_cwl_roster_export(season:aClashSeason):
         master.write(row,col,header,bold)
         col += 1
     
-    all_signups = WarLeaguePlayer.signups_by_season(season=season)
+    all_signups = await WarLeaguePlayer.signups_by_season(season=season)
     async for m in AsyncIter(all_signups):
+        player = await coc_client.fetch_player(m.tag)
+
         col = 0
         row += 1
         m_data = []
         m_data.append(m.tag)
         m_data.append(m.name)
-        m_data.append(f"{m.player.home_clan.name} ({m.player.home_clan.tag})" if m.player.home_clan else "")
-        m_data.append(getattr(client.bot.get_user(m.discord_user),'display_name',' ') if m.discord_user else " ")
+        m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
+        m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'display_name',' ') if m.discord_user else " ")
         m_data.append(str(m.discord_user) if m.discord_user else " ")
-        m_data.append(m.town_hall)
-        m_data.append(m.player.hero_strength)
+        m_data.append(player.town_hall.level)
+        m_data.append(player.hero_strength)
         try:
-            m_data.append(f"{round((m.player.hero_strength/m.player.max_hero_strength)*100,0)}%")
+            m_data.append(f"{round((player.hero_strength/player.max_hero_strength)*100,0)}%")
         except ZeroDivisionError:
             m_data.append("0%")
-        m_data.append(m.player.troop_strength)
+        m_data.append(player.troop_strength)
         try:
-            m_data.append(f"{round((m.player.troop_strength/m.player.max_troop_strength)*100,0)}%")
+            m_data.append(f"{round((player.troop_strength/player.max_troop_strength)*100,0)}%")
         except ZeroDivisionError:
             m_data.append("0%")
-        m_data.append(m.player.spell_strength)
+        m_data.append(player.spell_strength)
         try:
-            m_data.append(f"{round((m.player.spell_strength/m.player.max_spell_strength)*100,0)}%")
+            m_data.append(f"{round((player.spell_strength/player.max_spell_strength)*100,0)}%")
         except ZeroDivisionError:
             m_data.append("0%")
         m_data.append(CWLLeagueGroups.get_description_no_emoji(m.league_group))
@@ -91,7 +92,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
             master.write(row,col,d)
             col += 1
     
-    participating_clans = WarLeagueClan.participating_by_season(season=season)    
+    participating_clans = await WarLeagueClan.participating_by_season(season=season)    
     async for cwl_clan in AsyncIter(participating_clans):
         clan_ws = workbook.add_worksheet(cwl_clan.name)
 
@@ -103,28 +104,29 @@ async def generate_cwl_roster_export(season:aClashSeason):
 
         clan_roster = [s for s in all_signups if s.is_registered and s.roster_clan and s.roster_clan.tag == cwl_clan.tag]
         async for m in AsyncIter(clan_roster):
+            player = await coc_client.fetch_player(m.tag)
             col = 0
             row += 1
             m_data = []
             m_data.append(m.tag)
             m_data.append(m.name)
-            m_data.append(f"{m.player.home_clan.name} ({m.player.home_clan.tag})" if m.player.home_clan else "")
-            m_data.append(getattr(client.bot.get_user(m.discord_user),'display_name',' ') if m.discord_user else " ")
+            m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
+            m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'display_name',' ') if m.discord_user else " ")
             m_data.append(str(m.discord_user) if m.discord_user else " ")
-            m_data.append(m.town_hall)
-            m_data.append(m.player.hero_strength)
+            m_data.append(player.town_hall.level)
+            m_data.append(player.hero_strength)
             try:
-                m_data.append(f"{round((m.player.hero_strength/m.player.max_hero_strength)*100,0)}%")
+                m_data.append(f"{round((player.hero_strength/player.max_hero_strength)*100,0)}%")
             except ZeroDivisionError:
                 m_data.append("0%")
-            m_data.append(m.player.troop_strength)
+            m_data.append(player.troop_strength)
             try:
-                m_data.append(f"{round((m.player.troop_strength/m.player.max_troop_strength)*100,0)}%")
+                m_data.append(f"{round((player.troop_strength/player.max_troop_strength)*100,0)}%")
             except ZeroDivisionError:
                 m_data.append("0%")
-            m_data.append(m.player.spell_strength)
+            m_data.append(player.spell_strength)
             try:
-                m_data.append(f"{round((m.player.spell_strength/m.player.max_spell_strength)*100,0)}%")
+                m_data.append(f"{round((player.spell_strength/player.max_spell_strength)*100,0)}%")
             except ZeroDivisionError:
                 m_data.append("0%")
             m_data.append(CWLLeagueGroups.get_description_no_emoji(m.league_group))

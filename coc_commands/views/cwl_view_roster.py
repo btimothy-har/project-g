@@ -1,25 +1,20 @@
 import discord
 import asyncio
+import re
 
 from typing import *
 
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
-
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-
-from coc_data.exceptions import *
-
-from ..helpers.components import *
+from coc_main.utils.components import DiscordButton, MenuPaginator, handle_command_error, clash_embed
+from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisHeroes, EmojisLeagues, EmojisTownHall
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.utils import chunks
 
 bot_client = BotClashClient()
 
@@ -32,14 +27,18 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.waiting_for = False
 
         self.league_clan = clan
+        self.clan = None
         self.reference_list = []
 
         super().__init__(context,[])
     
-    # this exists because we are lazy
     @property
-    def clan(self):
-        return self.league_clan
+    def bot_client(self) -> BotClashClient:
+        return bot_client
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -81,16 +80,19 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.stop()
 
     async def start(self):
+        self.clan = await self.client.fetch_clan(self.league_clan.tag)
+
         if self.league_clan.status in ['CWL Started']:
-            roster_players = await asyncio.gather(*(p.get_full_player() for p in self.league_clan.master_roster))
+            roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
             self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+
         else:
-            if self.clan.roster_open:
+            if self.league_clan.roster_open:
                 embed = await clash_embed(
                     context=self.ctx,
-                    title=f"CWL Roster: {self.league_clan.name} ({self.league_clan.tag})",
+                    title=f"CWL Roster: {self.league_clan.clean_name} ({self.league_clan.tag})",
                     message="This Clan's roster isn't available yet.",
-                    thumbnail=self.league_clan.clan.badge,
+                    thumbnail=self.clan.badge,
                     success=False,
                     )
                 if isinstance(self.ctx,discord.Interaction):
@@ -99,11 +101,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
                     await self.ctx.reply(embed=embed,view=None)
                 return
 
-            roster_players = await asyncio.gather(*(p.get_full_player() for p in self.league_clan.participants))
+            roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
             self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
-
-            game_clan = await self.league_clan.get_full_clan()
-            mem_in_clan = await asyncio.gather(*(bot_client.cog.fetch_player(p.tag) for p in game_clan.members))
+            
+            mem_in_clan = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.members))
             async for mem in AsyncIter(mem_in_clan):
                 if mem.tag not in [p.tag for p in self.reference_list]:
                     self.reference_list.append(mem)
@@ -136,10 +137,29 @@ class CWLRosterDisplayMenu(MenuPaginator):
     ### CONTENT HELPERS
     ##################################################
     def _build_menu_items(self):
-        self.previous_page_button = DiscordButton(function=self.to_previous_page,style=discord.ButtonStyle.gray,emoji=EmojisUI.GREEN_PREVIOUS)
-        self.next_page_button = DiscordButton(function=self.to_next_page,style=discord.ButtonStyle.gray,emoji=EmojisUI.GREEN_NEXT)
-        self.roster_status_button = DiscordButton(function=self._callback_roster_status,label="Roster Status",emoji=EmojisClash.WARLEAGUES)
-        self.roster_strength_button = DiscordButton(function=self._callback_roster_strength,label="Roster Strength",emoji=EmojisHeroes.BARBARIAN_KING)
+        self.previous_page_button = DiscordButton(
+            function=self.to_previous_page,
+            style=discord.ButtonStyle.gray,
+            emoji=EmojisUI.GREEN_PREVIOUS
+            )
+        
+        self.next_page_button = DiscordButton(
+            function=self.to_next_page,
+            style=discord.ButtonStyle.gray,
+            emoji=EmojisUI.GREEN_NEXT
+            )
+        
+        self.roster_status_button = DiscordButton(
+            function=self._callback_roster_status,
+            label="Roster Status",
+            emoji=EmojisClash.WARLEAGUES
+            )
+        
+        self.roster_strength_button = DiscordButton(
+            function=self._callback_roster_strength,
+            label="Roster Strength",
+            emoji=EmojisHeroes.BARBARIAN_KING
+            )
 
     async def _set_roster_status_content(self):
         def evaluate_player_status(player):
@@ -164,11 +184,12 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await asyncio.gather(*(p.get_full_player() for p in self.league_clan.master_roster))
-                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len([p for p in self.league_clan.master_roster])} in CWL"
+                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
+                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
+                header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await asyncio.gather(*(p.get_full_player() for p in self.league_clan.participants))
-                header_text += f"\n**Rostered:** {len([p for p in self.league_clan.participants if p.clan.tag == self.league_clan.tag])} In Clan / {len([p for p in self.league_clan.participants])} Rostered"
+                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
+                header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += (f"{EmojisUI.YES}: a Rostered CWL Player\n" if self.league_clan.status in ["Roster Finalized","Roster Pending"] else "")
@@ -178,8 +199,8 @@ class CWLRosterDisplayMenu(MenuPaginator):
             
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
-                + (f"{EmojisUI.LOGOUT}" if player.clan.tag != self.clan.tag else f"{EmojisUI.SPACER}")
-                + f"{EmojisTownHall.get(player.town_hall)}"
+                + (f"{EmojisUI.LOGOUT}" if player.clan.tag != self.league_clan.tag else f"{EmojisUI.SPACER}")
+                + f"{EmojisTownHall.get(player.town_hall.level)}"
                 + f"`{re.sub('[_*/]','',player.clean_name)[:13]:<13}`\u3000" + f"`{'':^1}{player.tag:<11}`\u3000"
                 + (f"`{'':^1}{getattr(self.ctx.guild.get_member(player.discord_user),'display_name','Not Found')[:12]:<12}`" if player.discord_user else f"`{'':<13}`")
                 for player in members_chunk]
@@ -219,12 +240,12 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await asyncio.gather(*(p.get_full_player() for p in self.league_clan.master_roster))
-                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.clan.tag])} In Clan / {len([p for p in self.clan.master_roster])} in CWL"
+                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
+                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await asyncio.gather(*(p.get_full_player() for p in self.clan.participants))
-                header_text += f"\n**Rostered:** {len([p for p in self.clan.participants if p.clan.tag == self.clan.tag])} In Clan / {len([p for p in self.clan.participants])} Rostered"
+                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
+                header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += f"{EmojisUI.YES}: This player is rostered to play in CWL."
@@ -233,7 +254,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"{EmojisUI.SPACER}{EmojisUI.SPACER}`{'':<1}{'BK':>2}{'':<2}{'AQ':>2}{'':<2}{'GW':>2}{'':<2}{'RC':>2}{'':<2}{'':<15}`\n"
             member_text = "\n".join([
                 f"{EmojisTownHall.get(player.town_hall)}"
-                + (f"{EmojisUI.YES}" if player in self.clan.participants else f"{EmojisUI.SPACER}")
+                + (f"{EmojisUI.YES}" if player in self.league_clan.participants else f"{EmojisUI.SPACER}")
                 + f"`{'':<1}{getattr(player.get_hero('Barbarian King'),'level',''):>2}"
                 + f"{'':<2}{getattr(player.get_hero('Archer Queen'),'level',''):>2}"
                 + f"{'':<2}{getattr(player.get_hero('Grand Warden'),'level',''):>2}"

@@ -1,16 +1,14 @@
 import os
-import pendulum
 import xlsxwriter
 
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient, aClashSeason
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWeekend
+from coc_main.coc_objects.events.war_summary import aClanWarSummary
+from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.season.season import aClashSeason
-from coc_data.objects.discord.member import aMember
-from coc_data.objects.events.clan_war import aClanWar
-from coc_data.objects.events.raid_weekend import aRaidWeekend
+from coc_main.discord.member import aMember
 
 members_headers = [
     'Tag',
@@ -71,14 +69,18 @@ raid_headers = [
     'Destruction',
     ]
 
+bot_client = BotClashClient()
+
 class ClanExcelExport():
     def __init__(self,clan:aClan,season:aClashSeason):
-        self.client = BotClashClient()
-
         self.clan = clan
         self.season = season
-        self.file_path = self.client.bot.coc_report_path + '/' + f"{clan.name} {season.description}.xlsx"
+        self.file_path = bot_client.bot.coc_report_path + '/' + f"{clan.name} {season.description}.xlsx"
         self.workbook = None
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     @classmethod
     async def generate_report(cls,clan:aClan,season:aClashSeason):
@@ -106,7 +108,7 @@ class ClanExcelExport():
             members_worksheet.write(row,col,header,bold)
             col += 1
         
-        members = self.client.cog.get_members_by_season(clan=self.clan,season=self.season)
+        members = await self.client.fetch_members_by_season(self.clan,self.season)
         async for m in AsyncIter(members):
             col = 0
             row += 1
@@ -115,6 +117,12 @@ class ClanExcelExport():
                 stats = m.current_season
             else:
                 stats = m.get_season_stats(self.season)
+
+            war_log = aClanWar.for_player(m.tag,season=self.season)
+            war_stats = aClanWarSummary.for_player(m.tag,war_log)
+
+            raid_log = aRaidWeekend.for_player(m.tag,season=self.season)
+            raid_stats = aSummaryRaidStats.for_player(m.tag,raid_log)
 
             m_data = []
             m_data.append(stats.tag)
@@ -140,22 +148,22 @@ class ClanExcelExport():
             m_data.append(stats.clangames.score)
             m_data.append(stats.clangames.completion.in_minutes() if stats.clangames.completion else '')
 
-            m_data.append(stats.war_stats.wars_participated)
-            m_data.append(stats.war_stats.attack_count)
-            m_data.append(stats.war_stats.unused_attacks)
+            m_data.append(war_stats.wars_participated)
+            m_data.append(war_stats.attack_count)
+            m_data.append(war_stats.unused_attacks)
 
-            m_data.append(stats.war_stats.triples)
-            m_data.append(stats.war_stats.offense_stars)
-            m_data.append(stats.war_stats.offense_destruction)
+            m_data.append(war_stats.triples)
+            m_data.append(war_stats.offense_stars)
+            m_data.append(war_stats.offense_destruction)
 
-            m_data.append(stats.war_stats.defense_stars)
-            m_data.append(stats.war_stats.defense_destruction)
+            m_data.append(war_stats.defense_stars)
+            m_data.append(war_stats.defense_destruction)
 
-            m_data.append(stats.raid_stats.raids_participated)
+            m_data.append(raid_stats.raids_participated)
 
-            m_data.append(stats.raid_stats.raid_attacks)
-            m_data.append(stats.raid_stats.resources_looted)
-            m_data.append(stats.raid_stats.medals_earned)
+            m_data.append(raid_stats.raid_attacks)
+            m_data.append(raid_stats.resources_looted)
+            m_data.append(raid_stats.medals_earned)
 
             async for d in AsyncIter(m_data):
                 members_worksheet.write(row,col,d)

@@ -2,15 +2,10 @@ import discord
 
 from typing import *
 
-from coc_data.objects.discord.recruiting_reminder import RecruitingReminder
+from redbot.core import commands
 
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-
-from coc_data.exceptions import *
+from coc_main.discord.recruiting_reminder import RecruitingReminder
+from coc_main.utils.components import DiscordButton, DiscordModal, DefaultView
 
 class CreateRecruitingReminder(DefaultView):
     def __init__(self,

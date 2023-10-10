@@ -1,13 +1,20 @@
+import asyncio
 import discord
+import pendulum
+
+from typing import *
 
 from redbot.core import commands, app_commands
+from redbot.core.bot import Red
 
-from coc_client.api_client import BotClashClient
-from coc_client.exceptions import ClashOfClansError
+from coc_main.api_client import BotClashClient, ClashOfClansError
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 
-from coc_data.utilities.utils import *
-from coc_data.utilities.components import *
-from coc_data.exceptions import *
+from coc_main.discord.member import aMember
+
+from coc_main.utils.components import handle_command_error, clash_embed
+from coc_main.utils.checks import is_coleader, has_manage_roles
+from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -15,12 +22,6 @@ from .views.promote_demote import MemberRankMenu
 from .views.member_nickname import MemberNicknameMenu
 from .views.user_profile import UserProfileMenu
 from .views.player_profile import PlayerProfileMenu
-
-from .data_embeds import *
-
-from .helpers.checks import *
-from .helpers.autocomplete import *
-from .helpers.components import *
 
 bot_client = BotClashClient()
 
@@ -48,8 +49,11 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
     menu = None
     try:
         await interaction.response.defer()
+        coc = bot_client.bot.get_cog("ClashOfClansClient")
+
         member = aMember(member.id,member.guild.id)
-        view_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+        view_accounts = await asyncio.gather(*(coc.fetch_player(p) for p in member.accounts_tags))
+
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()
     except Exception as exc:
@@ -166,14 +170,22 @@ class Players(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.1"
+    __version__ = "2023.10.2"
 
-    def __init__(self,bot):        
+    def __init__(self,bot:Red):
         self.bot = bot
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+
+    @property
+    def bot_client(self) -> BotClashClient:
+        return BotClashClient()
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -304,7 +316,7 @@ class Players(commands.Cog):
         discord_id = int(discord_id) if discord_id else None
 
         if player:
-            selected_account = await bot_client.cog.fetch_player(player)
+            selected_account = await self.client.fetch_player(player)
         selected_member = member if member else discord_id if discord_id else None
 
         menu = RemoveMemberMenu(interaction,member=selected_member,account=selected_account)
@@ -400,7 +412,8 @@ class Players(commands.Cog):
     @app_commands.command(name="nickname",
         description="Select a Clash account to be displayed as your nickname.")
     @app_commands.guild_only()
-    async def app_command_change_nickname(self,interaction:discord.Interaction):     
+    async def app_command_change_nickname(self,interaction:discord.Interaction):
+
         await interaction.response.defer()
         menu = MemberNicknameMenu(interaction,interaction.user)
         await menu.start()
@@ -435,6 +448,7 @@ class Players(commands.Cog):
         await interaction.response.defer()
         if member is None:
             member = interaction.user
+
         menu = UserProfileMenu(interaction,member)
         await menu.start()
     
@@ -452,12 +466,13 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player_tag:
-            player = await bot_client.cog.fetch_player(player_tag)
+            player = await self.client.fetch_player(player_tag)
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         else:
             member = aMember(ctx.author.id,ctx.guild.id)
-            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+
+            m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in member.account_tags))
             view_accounts.extend(m_accounts)
         
         menu = PlayerProfileMenu(ctx,view_accounts)
@@ -481,20 +496,23 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player:
-            player = await bot_client.cog.fetch_player(player)
-            if isinstance(player,aPlayer):
-                view_accounts.append(player)
+            get_player = await self.client.fetch_player(player)
+            if isinstance(get_player,aPlayer):
+                view_accounts.append(get_player)
+
         if member:
-            member = aMember(member.id,interaction.guild.id)
-            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            get_member = aMember(member.id,interaction.guild.id)
+            m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in get_member.account_tags))
             view_accounts.extend(m_accounts)
+
         if user_id:
-            member = aMember(user_id,interaction.guild.id)
-            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            get_member = aMember(user_id,interaction.guild.id)
+            m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in get_member.account_tags))
             view_accounts.extend(m_accounts)
+
         if not (player or member or user_id):
-            member = aMember(interaction.user.id,interaction.guild.id)
-            m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+            get_member = aMember(interaction.user.id,interaction.guild.id)
+            m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in get_member.account_tags))
             view_accounts.extend(m_accounts)
         
         menu = PlayerProfileMenu(interaction,view_accounts)

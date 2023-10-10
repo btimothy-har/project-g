@@ -2,15 +2,15 @@ import discord
 import pendulum
 import urllib
 
-from redbot.core.utils import AsyncIter
-
-from coc_client.api_client import BotClashClient
-from coc_data.constants.coc_emojis import *
-
 from typing import *
 from mongoengine import *
 
-from ..components import *
+from redbot.core.utils import AsyncIter
+
+from coc_main.api_client import BotClashClient
+from coc_main.utils.constants.coc_emojis import EmojisTroops, EmojisTownHall
+
+from ..components import eclipse_embed
 
 bot_client = BotClashClient()
 
@@ -27,32 +27,22 @@ class dbWarBase(Document):
     claims = ListField(IntField(),default=[])
 
 class eWarBase():
-    _cache = {}
-
     @classmethod
     async def by_user_claim(cls,user_id:int):
         bases = []
-        async for base in AsyncIter(dbWarBase.objects(claims__in=[user_id])):
+        query = dbWarBase.objects(claims__in=[user_id])
+        async for base in AsyncIter(query):
             bases.append(await cls.from_base_id(base.base_id))        
         return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
         bases = []
-        async for base in AsyncIter(dbWarBase.objects(townhall=townhall)):
+        query = dbWarBase.objects(townhall=townhall)
+        async for base in AsyncIter(query):
             bases.append(await cls.from_base_id(base.base_id))
         return sorted(bases,key=lambda x: x.added_on,reverse=True)
-
-    def __new__(cls,base_link,defensive_cc_link):
-        link_parse = urllib.parse.urlparse(base_link)
-        base_id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
-
-        if base_id not in cls._cache:
-            instance = super().__new__(cls)
-            cls._cache[base_id] = instance
-            instance._is_new = True
-        return cls._cache[base_id]
-
+    
     def __init__(self,base_link,defensive_cc_link):
         if self._is_new:
             link_parse = urllib.parse.urlparse(base_link)
@@ -132,7 +122,7 @@ class eWarBase():
         base.base_type = base_type
 
         image_filename = base.id + '.' + image_attachment.filename.split('.')[-1]
-        image_filepath = bot_client.bot.get_cog("ECLIPSE").base_image_path + "/" + image_filename
+        image_filepath = bot_client.bot.base_image_path + "/" + image_filename
 
         await image_attachment.save(image_filepath)
         base.base_image = image_filename
@@ -156,20 +146,19 @@ class eWarBase():
         db_base.save()
 
     def add_claim(self,user_id:int):
+        dbWarBase.objects(base_id=self.id).update_one(push__claims=user_id)
         if user_id not in self.claims:
             self.claims.append(user_id)
-            self.save_base()
 
     def remove_claim(self,user_id:int):
+        dbWarBase.objects(base_id=self.id).update_one(pull__claims=user_id)
         try:
             self.claims.remove(user_id)
         except ValueError:
             pass
-        else:
-            self.save_base()
 
     async def base_embed(self):
-        image_file_path = bot_client.get_cog('ECLIPSE').base_image_path + '/' + self.base_image
+        image_file_path = bot_client.bot.base_image_path + '/' + self.base_image
         image_file = discord.File(image_file_path,'image.png')
 
         base_text = (f"Date Added: {pendulum.from_timestamp(self.added_on).format('DD MMM YYYY')}"
@@ -180,7 +169,7 @@ class eWarBase():
             base_text += f"\n\n**Builder Notes**:\n{self.notes}"
         base_text += "\n\u200b"
         embed = await eclipse_embed(
-            context=self.bot,
+            context=bot_client.bot,
             title=f"**TH{self.town_hall} {EmojisTownHall.get(int(self.town_hall))} {self.base_type}**",
             message=base_text)
         embed.set_image(url="attachment://image.png")

@@ -2,25 +2,18 @@ import discord
 import asyncio
 
 from typing import *
+
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
-from redbot.core.utils import chat_formatting as chat
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient, CacheNotReady, NoClansRegistered
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.discord.member import aMember
-from coc_data.objects.discord.guild import aGuild
+from coc_main.discord.member import aMember
+from coc_main.discord.guild import aGuild
 
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.exceptions import *
-
-from ..helpers.components import *
-from ..exceptions import *
+from coc_main.utils.components import DiscordButton, DefaultView, MultipleChoiceSelectionMenu, DiscordSelectMenu, clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 bot_client = BotClashClient()
 
@@ -49,6 +42,10 @@ class NewMemberMenu(DefaultView):
             style=discord.ButtonStyle.danger)
  
         super().__init__(context)
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -80,7 +77,7 @@ class NewMemberMenu(DefaultView):
             self.message = await self.ctx.reply(embed=main_embed,view=self)
         
         try:
-            if len(self.member.accounts) == 0:
+            if len(self.member.account_tags) == 0:
                 await self._manual_tag_entry()
             else:
                 await self._get_accounts_select()
@@ -105,7 +102,7 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.accounts))
+        player_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.account_tags))
         player_accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         
         dropdown_list = [discord.SelectOption(
@@ -216,7 +213,7 @@ class NewMemberMenu(DefaultView):
     ### COLLATE ACCOUNTS
     ##################################################    
     async def _collate_player_accounts(self,tags:List[str]):
-        accounts = await asyncio.gather(*(bot_client.cog.fetch_player(tag) for tag in tags),return_exceptions=True)
+        accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in tags),return_exceptions=True)
         for account in accounts:
             if isinstance(account,aPlayer):
                 self.accounts.append(account)        
@@ -246,7 +243,8 @@ class NewMemberMenu(DefaultView):
 
     async def _select_home_clan(self,account:aPlayer):        
         guild = aGuild(self.guild.id)
-        alliance_clans = [c for c in guild.clans if c.is_alliance_clan]
+        guild_clans = await asyncio.gather(*(self.client.fetch_clan(c.tag) for c in guild.clan_links))
+        alliance_clans = [c for c in guild_clans if c.is_alliance_clan].sort(key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
             raise NoClansRegistered()
 

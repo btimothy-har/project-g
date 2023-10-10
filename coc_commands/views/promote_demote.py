@@ -1,22 +1,18 @@
 import discord
 
 from typing import *
+
 from redbot.core import commands
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.coc_objects.clans.player_clan import aPlayerClan
 
-from coc_data.objects.clans.clan import *
-from coc_data.objects.discord.member import aMember
+from coc_main.discord.member import aMember
 
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-from coc_data.exceptions import *
-
-from ..helpers.components import *
-from ..exceptions import *
+from coc_main.utils.components import MultipleChoiceSelectionMenu, MenuConfirmation, clash_embed
+from coc_main.utils.constants.coc_constants import ClanRanks
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 bot_client = BotClashClient()
 
@@ -49,6 +45,10 @@ class MemberRankMenu():
         
         self.executor = aMember(self.user.id,self.guild.id)
         self.member = aMember(member.id,self.guild.id)
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -226,7 +226,7 @@ class MemberRankMenu():
     async def _apply_rank_changes(self,target_clan:str):
         report_output = ""
 
-        clan = await bot_client.cog.fetch_clan(target_clan)
+        clan = await self.client.fetch_clan(target_clan)
         current_rank_int = ClanRanks.get_number(self.get_current_rank(clan))
         new_rank = ClanRanks.get_rank(current_rank_int + self.rank_action)
 
@@ -268,7 +268,7 @@ class MemberRankMenu():
     ##################################################
     ### HELPERS
     ##################################################
-    def _predicate_is_eligible_clan(self,clan:BasicClan):
+    def _predicate_is_eligible_clan(self,clan:aPlayerClan):
         if self.member.user_id == clan.leader:
             return False
         elif self.member.user_id in clan.coleaders:
@@ -301,7 +301,7 @@ class MemberRankMenu():
             else:
                 return False
     
-    def get_current_rank(self,clan:BasicClan):
+    def get_current_rank(self,clan:aPlayerClan):
         if self.member.user_id in clan.coleaders:
             current_rank = "Co-Leader"
         elif self.member.user_id in clan.elders:

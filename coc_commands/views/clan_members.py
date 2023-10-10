@@ -4,15 +4,17 @@ import re
 
 from typing import *
 
-from coc_client.api_client import BotClashClient
-
+from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
-from coc_data.utilities.components import *
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient, aClan
 
-from ..helpers.components import *
+from coc_main.utils.components import clash_embed, handle_command_error, MenuPaginator, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView
+
+from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisClash
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.utils import chunks
 
 bot_client = BotClashClient()
 
@@ -30,6 +32,10 @@ class ClanMembersMenu(MenuPaginator):
         self.all_clan_members = []
 
         super().__init__(context,[])
+    
+    @property
+    def coc_client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -73,9 +79,9 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            registered_members = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in self.clan.alliance_members))
+            registered_members = await asyncio.gather(*(self.coc_client.fetch_player(member) for member in self.clan.alliance_members))
 
-        self.members_in_clan = await asyncio.gather(*(bot_client.cog.fetch_player(member.tag) for member in self.clan.members))
+        self.members_in_clan = await asyncio.gather(*(self.coc_client.fetch_player(member.tag) for member in self.clan.members))
                                                             
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan

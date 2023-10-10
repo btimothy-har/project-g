@@ -1,25 +1,24 @@
 import discord
 import asyncio
+import re
 
 from typing import *
-from collections import defaultdict
 
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.events.clan_war import aClanWar
-from coc_data.objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient, aClanWar
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
+from coc_main.coc_objects.events.war_summary import aClanWarSummary
+from coc_main.coc_objects.events.helpers import clan_war_embed
 
-from coc_data.utilities.components import *
+from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu
+from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
+from coc_main.utils.constants.coc_constants import WarState, WarResult
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-
-from coc_data.exceptions import *
-
-from ..helpers.components import *
+bot_client = BotClashClient()
 
 class CWLClanGroupMenu(DefaultView):
     def __init__(self,
@@ -31,6 +30,14 @@ class CWLClanGroupMenu(DefaultView):
         self.war = None
         self.clan_nav = None
         super().__init__(context,timeout=300)
+    
+    @property
+    def bot_client(self) -> BotClashClient:
+        return bot_client
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### START / STOP
@@ -104,7 +111,7 @@ class CWLClanGroupMenu(DefaultView):
         stats_button = self._button_clan_stats()
         self.add_item(stats_button)
         self.add_item(self._dropdown_clan_select())
-        self.add_item(self._dropdown_war_select(self.clan.all_wars))
+        self.add_item(self._dropdown_war_select(self.clan.league_wars))
 
         if not self.clan_nav:
             embed = await self._content_clan_roster()
@@ -145,9 +152,10 @@ class CWLClanGroupMenu(DefaultView):
         self.add_item(self._button_clan_roster())
         self.add_item(self._button_clan_stats())
         self.add_item(self._dropdown_clan_select())
-        self.add_item(self._dropdown_war_select(self.clan.all_wars))
+        self.add_item(self._dropdown_war_select(self.clan.league_wars))
 
-        embed = await self.war.war_embed_overview(ctx=self.ctx)
+        #embed = await self.war.war_embed_overview(ctx=self.ctx)
+        embed = await clan_war_embed(self.ctx,self.war)
         await interaction.edit_original_response(embed=embed,view=self)
 
     ##################################################
@@ -213,7 +221,7 @@ class CWLClanGroupMenu(DefaultView):
     ##################################################    
     async def _content_embed_league_group(self):
         emoji_id = re.search(r'\d+',EmojisLeagues.get(self.league_group.league)).group()
-        league_emoji = self.bot.get_emoji(int(emoji_id))
+        league_emoji = self.bot_client.bot.get_emoji(int(emoji_id))
 
         content_body = (f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
             + f"\n**Rounds:** {self.league_group.number_of_rounds}"
@@ -227,21 +235,13 @@ class CWLClanGroupMenu(DefaultView):
             thumbnail=league_emoji.url
             )
         
-        for lc in self.league_group.clans:
-            #count the number of players in master_roster for each TH level for the clan
-            th_levels = defaultdict(int)
-            sum_th_levels = 0
-            for player in lc.master_roster:
-                th_levels[player.town_hall] += 1
-                sum_th_levels += player.town_hall
-            average_th_level = round(sum_th_levels/len(lc.master_roster),1)
-
+        for lc in self.league_group.clans:            
             embed.add_field(
                 name=f"\u200E__**{lc.clean_name} ({lc.tag})**__",
                 value=f"**Level**: {lc.level}"
-                    + f"\n**Players In CWL:** {len(lc.master_roster)}\u3000**Average TH:** {average_th_level}"
+                    + f"\n**Players In CWL:** {len(lc.master_roster)}\u3000**Average TH:** {lc.master_average_th}"
                     + "\n"
-                    + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in th_levels.items())
+                    + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in lc.master_lineup.items())
                     + "\n\u200b",
                 inline=False
                 )               
@@ -249,7 +249,7 @@ class CWLClanGroupMenu(DefaultView):
     
     async def _content_embed_league_table(self):
         emoji_id = re.search(r'\d+',EmojisLeagues.get(self.league_group.league)).group()
-        league_emoji = self.bot.get_emoji(int(emoji_id))
+        league_emoji = self.bot_client.bot.get_emoji(int(emoji_id))
         league_clans = sorted(self.league_group.clans,key=lambda x: (x.total_score,x.total_destruction),reverse=True)
 
         league_table = f"```{'':^3}{'STARS':>5}{'':^2}{'DESTR %':>7}{'':^20}\n"        
@@ -285,64 +285,65 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_roster(self):
-        th_levels = defaultdict(int)
-        sum_th_levels = 0
-        for player in self.clan.master_roster:
-            th_levels[player.town_hall] += 1
-            sum_th_levels += player.town_hall            
-        average_th_level = round(sum_th_levels/len(self.clan.master_roster),1)
-
-        roster_players = await asyncio.gather(*(player.get_full_player() for player in self.clan.master_roster))
+        roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.master_roster))
+        roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(
             context=self.ctx,
             title=f"CWL Roster: {self.clan.clean_name} ({self.clan.tag})",
             message=f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
                 + f"\n**Players in CWL:** {len(self.clan.master_roster)}"
-                + f"\n**Average TH:** {average_th_level}"
+                + f"\n**Average TH:** {self.clan.master_average_th}"
                 + "\n"
-                + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in th_levels.items())
+                + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in self.clan.master_lineup.items())
                 + "\n\n"
                 + f"{EmojisUI.SPACER}`{'':^2}{'BK':>3}{'':^2}{'AQ':>3}{'':^2}{'GW':>3}{'':^2}{'RC':>3}{'':^2}{'':^15}`\n"
                 + '\n'.join([
                     f"{EmojisTownHall.get(player.town_hall.level)}"
                     + f"`"
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Barbarian King'),'level','')):>3}" if player.get_hero('Barbarian King') else f"{'':<3}") if player.town_hall.level >= 7 else f"{'':<3}")
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Archer Queen'),'level','')):>3}" if player.get_hero('Archer Queen') else f"{'':<3}") if player.town_hall.level >= 9 else f"{'':<3}")
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Grand Warden'),'level','')):>3}" if player.get_hero('Grand Warden') else f"{'':<3}") if player.town_hall.level >= 11 else f"{'':<3}")
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Royal Champion'),'level','')):>3}" if player.get_hero('Royal Champion') else f"{'':<3}") if player.town_hall.level >= 13 else f"{'':<3}")
+                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Barbarian King'),'level','')):>3}" if player.get_hero('Barbarian King') else f"{'':<3}"))
+                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Archer Queen'),'level','')):>3}" if player.get_hero('Archer Queen') else f"{'':<3}"))
+                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Grand Warden'),'level','')):>3}" if player.get_hero('Grand Warden') else f"{'':<3}"))
+                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Royal Champion'),'level','')):>3}" if player.get_hero('Royal Champion') else f"{'':<3}"))
                     + f"\u200E{'':<2}{re.sub('[_*/]','',player.clean_name)[:15]:<15}`"
                     for player in roster_players
                     ]),
             thumbnail=self.clan.badge)
         return embed
     
-    async def _content_clan_stats(self): 
+    async def _content_clan_stats(self):
+        war_stats = aClanWarSummary.for_clan(self.clan.tag,self.clan.league_wars)
+
         embed = await clash_embed(
             context=self.ctx,
             title=f"CWL Stats: {self.clan.clean_name} ({self.clan.tag})",
             message=f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
                 + f"\n**Players in CWL:** {len(self.clan.master_roster)}"
                 + "\n\n"
-                + f"{EmojisClash.ATTACK} `{self.clan.war_stats.attack_count:>3}`\u3000"
-                + f"{EmojisClash.UNUSEDATTACK} `{self.clan.war_stats.unused_attacks:>3}`\u3000"
-                + f"{EmojisClash.THREESTARS} `{self.clan.war_stats.triples:>3} ({str(round((self.clan.war_stats.triples/self.clan.war_stats.attack_count)*100))+'%'})`\n"
+                + f"{EmojisClash.ATTACK} `{war_stats.attack_count:>3}`\u3000"
+                + f"{EmojisClash.UNUSEDATTACK} `{war_stats.unused_attacks:>3}`\u3000"
+                + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} ({str(round((war_stats.triples/war_stats.attack_count)*100))+'%'})`\n"
                 + f"{EmojisClash.STAR} `{self.clan.total_score:>4}`\u3000"
                 + f"{EmojisClash.DESTRUCTION} `{str(self.clan.total_destruction)+'%':>7}`"
-                + f"\n\n*Last Refreshed: <t:{self.clan.war_stats.timestamp.int_timestamp}:R>*"
                 + f"\n*Only hit rates with 4 or more attacks are shown below.*\u200b",
             thumbnail=self.clan.badge)
         
-        hitrates = [hr for hr in list(self.clan.war_stats.hit_rate.values()) if hr['total'] >= 4]
-        for hr in sorted(hitrates, key=lambda x:(x['attacker'],x['defender']), reverse=True):
-            embed.add_field(
-                name=f"TH{hr['attacker']} vs TH{hr['defender']}",
-                value=f"{EmojisClash.ATTACK} `{hr['total']:^3}`\u3000"
-                    + f"{EmojisClash.STAR} `{hr['stars']:^3}`\u3000"
-                    + f"{EmojisClash.DESTRUCTION} `{hr['destruction']:^5}%`"
-                    + f"\nHit Rate: {hr['triples']/hr['total']*100:.0f}% ({hr['triples']} {EmojisClash.THREESTARS} / {hr['total']} {EmojisClash.ATTACK})"
-                    + f"\nAverage: {EmojisClash.STAR} {hr['stars']/hr['total']:.2f}\u3000{EmojisClash.DESTRUCTION} {hr['destruction']/hr['total']:.2f}%"
-                    + "\n\u200b",
-                inline=False
-                )
+        roster_townhalls = sorted(list(self.clan.master_lineup.keys()),reverse=True)
+        
+        async for th_level in AsyncIter(roster_townhalls):
+            hitrates = await war_stats.hit_rate_for_th(int(th_level))
+
+            async for hr in AsyncIter(sorted(list(hitrates.keys()),reverse=True)):
+                if hitrates[hr]['total'] >= 4:
+                    h = hitrates[hr]
+                    embed.add_field(
+                        name=f"TH{h['attacker']} vs TH{h['defender']}",
+                        value=f"{EmojisClash.ATTACK} `{h['total']:^3}`\u3000"
+                            + f"{EmojisClash.STAR} `{h['stars']:^3}`\u3000"
+                            + f"{EmojisClash.DESTRUCTION} `{h['destruction']:^5}%`"
+                            + f"\nHit Rate: {h['triples']/h['total']*100:.0f}% ({h['triples']} {EmojisClash.THREESTARS} / {h['total']} {EmojisClash.ATTACK})"
+                            + f"\nAverage: {EmojisClash.STAR} {h['stars']/h['total']:.2f}\u3000{EmojisClash.DESTRUCTION} {h['destruction']/h['total']:.2f}%"
+                            + "\n\u200b",
+                        inline=False
+                        )
         return embed

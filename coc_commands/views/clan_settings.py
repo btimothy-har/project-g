@@ -2,17 +2,19 @@ import discord
 import asyncio
 
 from typing import *
+
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
-from coc_data.objects.clans.clan import aClan, feed_description
-from coc_data.utilities.components import *
+from coc_main.api_client import CommandUnauthorized
 
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
+from coc_main.coc_objects.clans.clan import aClan, feed_description
 
-from ..exceptions import *
+from coc_main.utils.components import clash_embed, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView
+
+from coc_main.utils.constants.coc_emojis import EmojisTownHall
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 class ClanSettingsMenu(DefaultView):
     def __init__(self,
@@ -65,7 +67,7 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             message=f"**Menu closed**")
         await interaction.response.edit_message(embed=embed,view=None,delete_after=60)
-    
+
     def home_button(self):
         return DiscordButton(
             function=self._main_menu,

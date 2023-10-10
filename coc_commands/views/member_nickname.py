@@ -2,21 +2,17 @@ import discord
 import asyncio
 
 from typing import *
+
 from redbot.core import commands
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_data.objects.discord.member import aMember
+from coc_main.discord.member import aMember
 
-from coc_data.utilities.components import *
+from coc_main.utils.components import DefaultView, DiscordSelectMenu, clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-from coc_data.exceptions import *
-
-from ..helpers.components import *
-from ..exceptions import *
 
 bot_client = BotClashClient()
 
@@ -32,6 +28,10 @@ class MemberNicknameMenu(DefaultView):
 
         self.member = aMember(member.id,self.guild.id)
         self.for_self = self.user.id == self.member.user_id
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -79,7 +79,7 @@ class MemberNicknameMenu(DefaultView):
     ### STEP 1: SELECT ACCOUNT (IF MEMBER ACCOUNTS > 1)
     ##################################################
     async def _select_accounts(self):
-        player_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.member_accounts))
+        player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.member.member_accounts))
 
         dropdown_options = [discord.SelectOption(
             label=f"{account.name} | {account.tag}",

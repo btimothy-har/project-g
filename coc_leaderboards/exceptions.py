@@ -1,17 +1,6 @@
-import coc
-import discord
+from coc_main.exceptions import ClashOfClansError
 
-from coc_client.exceptions import *
-
-class ClashLeaderboardError(ClashOfClansError):
-    """
-    Base Class for Clash of Clans Data Errors.
-    
-    This inherits from the ClashOfClansError class.
-    """
-    pass
-
-class LeaderboardExists(ClashLeaderboardError):
+class LeaderboardExists(ClashOfClansError):
     def __init__(self, exc):
         self.message = exc
         super().__init__(self.message)

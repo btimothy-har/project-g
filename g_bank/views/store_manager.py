@@ -1,11 +1,14 @@
 import discord
+
 from typing import *
+
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
+
 from ..objects.item import ShopItem, NewShopItem
 
-from coc_data.utilities.components import *
-from coc_data.constants.ui_emojis import *
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, DiscordRoleSelect, clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 class StoreManager(DefaultView):
     def __init__(self,

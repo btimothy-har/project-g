@@ -1,9 +1,9 @@
 import discord
 
 from typing import *
-from redbot.core import Config, commands, app_commands, bank
+from redbot.core import commands
 
-from coc_commands.helpers.checks import *
+from coc_main.utils.checks import is_coleader
 
 def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
     if isinstance(ctx,commands.Context):

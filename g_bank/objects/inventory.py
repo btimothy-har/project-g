@@ -1,14 +1,15 @@
 import discord
 import copy
-
 import pendulum
-from redbot.core import bank
-from mongoengine import *
 
 from typing import *
+from mongoengine import *
+
+from redbot.core import bank
+
 from .item import ShopItem
 
-from coc_data.utilities.components import *
+from coc_main.utils.components import clash_embed
 
 class db_UserInventory(Document):
     user_id = IntField(required=True,primary_key=True)

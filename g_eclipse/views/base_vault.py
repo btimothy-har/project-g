@@ -1,10 +1,15 @@
+import discord
+import pendulum
+
 from typing import *
+from ..components import eclipse_embed
 
-from coc_data.utilities.components import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.ui_emojis import *
+from redbot.core import commands
 
-from ..components import *
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu
+from coc_main.utils.constants.coc_emojis import EmojisTownHall
+from coc_main.utils.constants.ui_emojis import EmojisUI
+
 from ..objects.war_base import eWarBase
 
 class BaseVaultMenu(DefaultView):

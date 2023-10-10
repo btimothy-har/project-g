@@ -3,15 +3,11 @@ import asyncio
 
 from typing import *
 
-from coc_data.objects.discord.guild import aGuild
+from redbot.core import commands
 
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-
-from coc_data.exceptions import *
+from coc_main.api_client import CacheNotReady
+from coc_main.discord.guild import aGuild
+from coc_main.utils.components import DiscordButton, DiscordModal, DefaultView
 
 class CreateApplicationMenu(DefaultView):
     def __init__(self,
@@ -131,7 +127,7 @@ class CreateApplicationMenu(DefaultView):
         new_panel.save()
         while True:
             try:
-                await aGuild.update_apply_panels(interaction.guild.id)
+                await guild.update_apply_panels()
             except CacheNotReady:
                 await asyncio.sleep(10)
             else:

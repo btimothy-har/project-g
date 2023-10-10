@@ -4,19 +4,14 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient, aClashSeason
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
+from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.season.season import aClashSeason
-from coc_data.objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
-
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-
-from coc_data.exceptions import *
+from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisLeagues
+from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 
 bot_client = BotClashClient()
 
@@ -56,12 +51,20 @@ class CWLSeasonSetup(DefaultView):
         self.add_item(self._close_signups_button)
         self.add_item(self.close_button)
     
+    @property
+    def bot_client(self) -> BotClashClient:
+        return bot_client
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
+    
     ##################################################
     ### START / STOP CALL
     ##################################################
     async def start(self):
 
-        cwl_clans = bot_client.cog.get_cwl_clans()
+        cwl_clans = await self.client.get_war_league_clans()
         if len(cwl_clans) == 0:
             embed = await clash_embed(
                 context=self.ctx,
@@ -109,12 +112,14 @@ class CWLSeasonSetup(DefaultView):
     async def _callback_clan_select(self,interaction:discord.Interaction,select:DiscordSelectMenu):
         await interaction.response.defer()
 
-        for clan in WarLeagueClan.participating_by_season(self.season):
+        currently_participating = await WarLeagueClan.participating_by_season(self.season)
+
+        for clan in currently_participating:
             if clan.tag not in select.values:
                 clan.is_participating = False
         
         for clan_tag in select.values:
-            clan = await bot_client.cog.fetch_clan(clan_tag)
+            clan = await self.client.fetch_clan(clan_tag)
             clan.war_league_season(self.season).is_participating = True
             
         embed = await self.get_embed()
@@ -122,7 +127,7 @@ class CWLSeasonSetup(DefaultView):
         await interaction.edit_original_response(embed=embed,view=self)
     
     async def get_embed(self):
-        current_signups = WarLeaguePlayer.signups_by_season(self.season)
+        current_signups = await WarLeaguePlayer.signups_by_season(self.season)
 
         all_th = sorted(list(set([p.town_hall for p in current_signups])),reverse=True)
 
@@ -153,7 +158,7 @@ class CWLSeasonSetup(DefaultView):
                 + "\n\u200b",
             inline=False
             )
-        participating_clans = WarLeagueClan.participating_by_season(self.season)
+        participating_clans = await WarLeagueClan.participating_by_season(self.season)
         async for cwl_clan in AsyncIter(participating_clans):
             embed.add_field(
                 name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.clan_str}",
@@ -171,17 +176,16 @@ class CWLSeasonSetup(DefaultView):
             self.clan_selector = None
 
         if not self.season.cwl_signup_lock:
-            clans = bot_client.cog.get_cwl_clans()
+            clans = await self.client.get_war_league_clans()
 
             options = []
             async for c in AsyncIter(clans):
-                clan = await c.get_full_clan()
                 options.append(discord.SelectOption(
-                    label=str(clan),
-                    value=clan.tag,
-                    emoji=EmojisLeagues.get(clan.war_league_name),
-                    description=f"Level {clan.level} | {clan.war_league_name}",
-                    default=clan.war_league_season(self.season).is_participating)
+                    label=str(c),
+                    value=c.tag,
+                    emoji=EmojisLeagues.get(c.war_league_name),
+                    description=f"Level {c.level} | {c.war_league_name}",
+                    default=c.war_league_season(self.season).is_participating)
                     )
             
             self.clan_selector = DiscordSelectMenu(

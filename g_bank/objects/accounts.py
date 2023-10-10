@@ -3,7 +3,8 @@ import pendulum
 import xlsxwriter
 
 from redbot.core.utils import AsyncIter
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient
 
 from .transaction import db_BankTransaction
 from mongoengine import *
@@ -13,6 +14,14 @@ bot_client = BotClashClient()
 class BankAccount():
     def __init__(self,account_id):
         self.id = account_id
+    
+    @property
+    def bot_client(self) -> BotClashClient:
+        return bot_client
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     @property
     def balance(self):

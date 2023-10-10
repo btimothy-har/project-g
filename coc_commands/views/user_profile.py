@@ -1,24 +1,21 @@
+import coc
 import discord
 import asyncio
 
 from typing import *
+
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient, ClashAPIError, InvalidTag
+from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_data.objects.players.player import *
-from coc_data.objects.discord.member import aMember
+from coc_main.discord.member import aMember
 
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-from coc_data.exceptions import *
-
-from ..helpers.components import *
-from ..exceptions import *
+from coc_main.utils.components import DefaultView, DiscordSelectMenu, DiscordButton, DiscordModal, clash_embed
+from coc_main.utils.constants.coc_constants import ClanRanks
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.constants.coc_emojis import EmojisTownHall
 
 bot_client = BotClashClient()
 
@@ -50,7 +47,11 @@ class UserProfileMenu(DefaultView):
 
         if self.user.id == self.member.user_id:
             self.add_item(self.add_link_button)
-            self.add_item(self.delete_link_button)        
+            self.add_item(self.delete_link_button)
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -99,7 +100,10 @@ class UserProfileMenu(DefaultView):
     @staticmethod
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
 
-        m_accounts = await asyncio.gather(*(p.get_full_player() for p in member.accounts))
+        cog = bot_client.bot.get_cog("ClashOfClansClient")
+        m_accounts = await asyncio.gather(*(cog.fetch_player(p) for p in member.account_tags))
+
+        m_accounts.sort(key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
 
         embed = await clash_embed(
             context=ctx,
@@ -116,20 +120,20 @@ class UserProfileMenu(DefaultView):
                 value=f"{account.hero_description}\n[Player Link: {account.tag}]({account.share_link})\n\u200b",
                 inline=False
                 )
-        if len(member.accounts) > 10:
-            embed_2 = await clash_embed(
-                context=ctx,
-                embed_color=next((r.color for r in sorted(member.discord_member.roles,key=lambda x:(x.position),reverse=True) if r.color.value), None),
-                thumbnail=member.display_avatar,
-                show_author=False,
-                )
-            async for account in AsyncIter(m_accounts[10:20]):
-                embed_2.add_field(
-                    name=(f"{account.home_clan.emoji} " if account.is_member else "") + f"{account.town_hall.emote} **{account.name}**",
-                    value=f"{account.hero_description}\n[Player Link: {account.tag}]({account.share_link})\n\u200b",
-                    inline=False
-                    )
-            return [embed,embed_2]
+        # if len(member.accounts) > 10:
+        #     embed_2 = await clash_embed(
+        #         context=ctx,
+        #         embed_color=next((r.color for r in sorted(member.discord_member.roles,key=lambda x:(x.position),reverse=True) if r.color.value), None),
+        #         thumbnail=member.display_avatar,
+        #         show_author=False,
+        #         )
+        #     async for account in AsyncIter(m_accounts[10:20]):
+        #         embed_2.add_field(
+        #             name=(f"{account.home_clan.emoji} " if account.is_member else "") + f"{account.town_hall.emote} **{account.name}**",
+        #             value=f"{account.hero_description}\n[Player Link: {account.tag}]({account.share_link})\n\u200b",
+        #             inline=False
+        #             )
+        #     return [embed,embed_2]
         return [embed]
 
 class AddLinkMenu(DefaultView):
@@ -161,6 +165,11 @@ class AddLinkMenu(DefaultView):
             placeholder="API Tokens are not case sensitive.",
             required=True
             )
+        
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
+    
     ##################################################
     ### OVERRIDE BUILT IN METHODS
     ##################################################
@@ -201,8 +210,13 @@ class AddLinkMenu(DefaultView):
         await interaction.response.defer(ephemeral=True)
         await self.ctx.edit_original_response(view=None)
 
-        tag = modal.children[0].value
+        o_tag = modal.children[0].value
         api_token = modal.children[1].value
+
+        if not coc.utils.is_valid_tag(o_tag):
+            raise InvalidTag(o_tag)
+        
+        tag = coc.utils.correct_tag(o_tag)
         
         if self.bot.user.id == 828838353977868368:
             verify = True
@@ -210,28 +224,13 @@ class AddLinkMenu(DefaultView):
             try:
                 verify = await bot_client.coc.verify_player_token(player_tag=tag,token=api_token)
             except (coc.NotFound) as exc:
-                embed = await clash_embed(
-                    context=self.ctx,
-                    message=f"The tag {tag.upper()} doesn't seem to be valid.",
-                    success=False,
-                    view=None
-                    )
-                await interaction.edit_original_response(embed=embed,view=None)
-                return
+                raise InvalidTag(tag) from exc
             except (coc.Maintenance,coc.GatewayError) as exc:
                 raise ClashAPIError(exc) from exc
 
-        try:
-            self.add_link_account = await bot_client.cog.fetch_player(tag)
-        except CacheNotReady as exc:
-            embed = await clash_embed(
-                context=self.ctx,
-                message=f"{exc.message}",
-                success=False
-                )
-            return await interaction.edit_original_response(embed=embed,view=None)
+        self.add_link_account = await self.client.fetch_player(tag)
 
-        if self.add_link_account and self.add_link_account.is_member:
+        if self.add_link_account.is_member:
             verify = False
             embed = await clash_embed(
                 context=self.ctx,
@@ -246,7 +245,7 @@ class AddLinkMenu(DefaultView):
             return self.stop_menu()
 
         if verify:
-            BasicPlayer.add_link(tag,interaction.user.id)
+            self.add_link_account.discord_user = interaction.user.id
             embed = await clash_embed(
                 context=self.ctx,
                 message=f"The account **{coc.utils.correct_tag(tag)}** is now linked to your Discord account!",
@@ -274,7 +273,10 @@ class DeleteLinkMenu(DefaultView):
         self.member = member
 
         super().__init__(context,timeout=120)
-        
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -291,7 +293,9 @@ class DeleteLinkMenu(DefaultView):
     ################################################## 
     async def _start_delete_link(self):
 
-        m_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.accounts))
+        m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.account_tags))
+        m_accounts.sort(key=lambda x:(x.town_hall_level,x.exp_level,x.clean_name),reverse=True)
+
         select_options = [discord.SelectOption(
             label=f"{account}",
             value=account.tag,
@@ -325,7 +329,7 @@ class DeleteLinkMenu(DefaultView):
         
     async def _callback_remove_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
-        remove_accounts = await asyncio.gather(*(bot_client.cog.fetch_player(tag) for tag in menu.values))
+        remove_accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in menu.values))
 
         for account in remove_accounts:
             account.discord_user = 0

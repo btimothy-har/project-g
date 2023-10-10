@@ -1,27 +1,25 @@
 import os
+import coc
 import discord
 import pendulum
 import urllib
 import asyncio
 
-
 from redbot.core import commands, app_commands
 from redbot.core.data_manager import cog_data_path
 
-from coc_data.objects.discord.member import aMember
-from coc_data.constants.coc_constants import *
+from coc_main.api_client import BotClashClient, ClashOfClansError
+from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_data.utilities.utils import *
-from coc_data.utilities.components import *
-from coc_data.exceptions import *
+from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu
+from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_size
+from coc_main.utils.checks import is_member
 
-from coc_commands.helpers.components import *
-from coc_commands.helpers.checks import *
-
-from .components import *
 from .views.base_vault import BaseVaultMenu
 from .objects.war_base import eWarBase
+from .components import eclipse_embed
 
+bot_client = BotClashClient()
 
 ############################################################
 ############################################################
@@ -45,18 +43,18 @@ class ECLIPSE(commands.Cog):
     def __init__(self,bot):        
         self.bot = bot
 
-        self.resource_path = f"{cog_data_path(self)}"
-        self.base_image_path = f"{self.resource_path}/base_images"
-        if not os.path.exists(self.base_image_path):
-            os.makedirs(self.base_image_path)
+        resource_path = f"{cog_data_path(self)}"
+        self.bot.base_image_path = f"{resource_path}/base_images"
+        if not os.path.exists(self.bot.base_image_path):
+            os.makedirs(self.bot.base_image_path)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
-
+    
     @property
-    def client(self):
-        return self.bot.get_cog("ClashOfClansClient").client
+    def client(self) -> ClashOfClansClient:
+        return self.bot.get_cog("ClashOfClansClient")
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):

@@ -1,24 +1,20 @@
 import discord
+import pendulum
 
 from typing import *
+
 from numerize import numerize
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClanWar, aRaidWeekend
+from coc_main.coc_objects.events.war_summary import aClanWarSummary
+from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.discord.member import aMember
-
-from coc_data.utilities.components import *
-
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.coc_constants import *
-from coc_data.exceptions import *
-
-from ..helpers.components import *
-from ..exceptions import *
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed, s_convert_seconds_to_str
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.constants.coc_constants import EmojisClash, EmojisLeagues, EmojisTownHall, WarResult
 
 bot_client = BotClashClient()
 
@@ -31,6 +27,20 @@ class PlayerProfileMenu(DefaultView):
         self.current_page = "summary"
         self.current_account = self.accounts[0]
 
+        self.current_warstats = aClanWarSummary.for_player(
+            player_tag=self.current_account.tag,
+            war_log=aClanWar.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
+        
+        self.current_raidstats = aSummaryRaidStats.for_player(
+            player_tag=self.current_account.tag,
+            raid_log=aRaidWeekend.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
+        
         self.summary_button = DiscordButton(
             function=self._callback_summary,
             emoji=EmojisUI.HOME,
@@ -68,6 +78,10 @@ class PlayerProfileMenu(DefaultView):
         self.add_item(self.trooplevels_button)
         self.add_item(self.rushed_button)
         self._build_dynamic_menu()
+    
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -173,6 +187,21 @@ class PlayerProfileMenu(DefaultView):
     async def _callback_select_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
         self.current_account = [account for account in self.accounts if account.tag == menu.values[0]][0]
+
+        self.current_warstats = aClanWarSummary.for_player(
+            player_tag=self.current_account.tag,
+            war_log=aClanWar.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
+        
+        self.current_raidstats = aSummaryRaidStats.for_player(
+            player_tag=self.current_account.tag,
+            raid_log=aRaidWeekend.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
+
         self._build_dynamic_menu()
             
         if self.current_page == "warlog":
@@ -213,7 +242,6 @@ class PlayerProfileMenu(DefaultView):
                 + (f"{EmojisClash.BOOKSPELLS} {player.spell_strength} / {player.max_spell_strength} *(rushed: {player.spell_rushed_pct}%)*\n" if player.town_hall.level >= 5 else "")
                 + (f"{EmojisClash.BOOKHEROES} {player.hero_strength} / {player.max_hero_strength} *(rushed: {player.hero_rushed_pct}%)*\n" if player.town_hall.level >= 7 else "")
                 + (f"**Currently Boosting**\n" + " ".join([troop.emoji for troop in player.super_troops]) + "\n" if len(player.super_troops) > 0 else "")
-                #+ f"**Currently Boosting**\n {len(player.boosting_troops)}"
                 + f"\u200b",
             inline=False
             )
@@ -230,9 +258,9 @@ class PlayerProfileMenu(DefaultView):
                     + f"**Loot**\n"
                     + f"{EmojisClash.GOLD} {player.current_season.loot_gold}\u3000{EmojisClash.ELIXIR} {player.current_season.loot_elixir}\u3000{EmojisClash.DARKELIXIR} {player.current_season.loot_darkelixir}\n"
                     + f"**Clan Capital**\n"
-                    + f"{EmojisClash.CAPITALGOLD} {player.current_season.capitalcontribution}\u3000{EmojisClash.CAPITALRAID} {player.current_season.raid_stats.raids_participated}\u3000{EmojisClash.RAIDMEDALS} {player.current_season.raid_stats.medals_earned:,}\n"
+                    + f"{EmojisClash.CAPITALGOLD} {player.current_season.capitalcontribution}\u3000{EmojisClash.CAPITALRAID} {self.current_raidstats.raids_participated}\u3000{EmojisClash.RAIDMEDALS} {self.current_raidstats.medals_earned:,}\n"
                     + f"**Clan War Performance**\n"
-                    + f"{EmojisClash.CLANWAR} {player.current_season.war_stats.wars_participated}\u3000{EmojisClash.STAR} {player.current_season.war_stats.offense_stars}\u3000{EmojisClash.THREESTARS} {player.current_season.war_stats.triples}\u3000{EmojisClash.UNUSEDATTACK} {player.current_season.war_stats.unused_attacks}\n"
+                    + f"{EmojisClash.CLANWAR} {self.current_warstats.wars_participated}\u3000{EmojisClash.STAR} {self.current_warstats.offense_stars}\u3000{EmojisClash.THREESTARS} {self.current_warstats.triples}\u3000{EmojisClash.UNUSEDATTACK} {self.current_warstats.unused_attacks}\n"
                     + f"**Clan Games**\n"
                     + f"{EmojisClash.CLANGAMES} {player.current_season.clangames.score:,} "
                     + (f"{EmojisUI.TIMER} {player.current_season.clangames.time_to_completion}\n" if player.current_season.clangames.ending_time else "\n")
@@ -268,16 +296,16 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**War Log: {player}**",
-            message=f"**Stats for: {bot_client.cog.current_season.description} Season**\n"
-                + f"{EmojisClash.CLANWAR} `{player.current_season.war_stats.wars_participated:^3}`\u3000"
-                + f"{EmojisClash.THREESTARS} `{player.current_season.war_stats.triples:^3}`\u3000"
-                + f"{EmojisClash.UNUSEDATTACK} `{player.current_season.war_stats.unused_attacks:^3}`\n"
-                + f"{EmojisClash.ATTACK}\u3000{EmojisClash.STAR} `{player.current_season.war_stats.offense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{player.current_season.war_stats.offense_destruction:>3}%`\n"
-                + f"{EmojisClash.DEFENSE}\u3000{EmojisClash.STAR} `{player.current_season.war_stats.defense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{player.current_season.war_stats.defense_destruction:>3}%`\n"
+            message=f"**Stats for: {bot_client.current_season.description} Season**\n"
+                + f"{EmojisClash.CLANWAR} `{self.current_warstats.wars_participated:^3}`\u3000"
+                + f"{EmojisClash.THREESTARS} `{self.current_warstats.triples:^3}`\u3000"
+                + f"{EmojisClash.UNUSEDATTACK} `{self.current_warstats.unused_attacks:^3}`\n"
+                + f"{EmojisClash.ATTACK}\u3000{EmojisClash.STAR} `{self.current_warstats.offense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{self.current_warstats.offense_destruction:>3}%`\n"
+                + f"{EmojisClash.DEFENSE}\u3000{EmojisClash.STAR} `{self.current_warstats.defense_stars:<3}`\u3000{EmojisClash.DESTRUCTION} `{self.current_warstats.defense_destruction:>3}%`\n"
                 + f"\u200b"
             )
         war_count = 0
-        async for war in AsyncIter(player.current_season.war_stats.war_log):
+        async for war in AsyncIter(self.current_warstats.war_log):
             if war_count >= 5:
                 break
 
@@ -310,16 +338,17 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**Raid Log: {player}**",
-            message=f"**Stats for: {bot_client.cog.current_season.description} Season**\n"
-                + f"{EmojisClash.CAPITALRAID} `{player.current_season.raid_stats.raids_participated:^3}`\u3000"
-                + f"{EmojisClash.ATTACK} {player.current_season.raid_stats.raid_attacks:^3}\u3000"
-                + f"{EmojisClash.UNUSEDATTACK} {player.current_season.raid_stats.unused_attacks:^3}\n"
-                + f"{EmojisClash.CAPITALGOLD} {player.current_season.raid_stats.resources_looted:>6,}\u3000"
-                + f"{EmojisClash.RAIDMEDALS} {player.current_season.raid_stats.medals_earned:>5,}\n"
+            message=f"**Stats for: {bot_client.current_season.description} Season**\n"
+                + f"{EmojisClash.CAPITALRAID} `{self.current_raidstats.raids_participated:^3}`\u3000"
+                + f"{EmojisClash.ATTACK} {self.current_raidstats.raid_attacks:^3}\u3000"
+                + f"{EmojisClash.UNUSEDATTACK} {self.current_raidstats.unused_attacks:^3}\n"
+                + f"{EmojisClash.CAPITALGOLD} {self.current_raidstats.resources_looted:>6,}\u3000"
+                + f"{EmojisClash.RAIDMEDALS} {self.current_raidstats.medals_earned:>5,}\n"
                 + f"\u200b"
             )
         raid_count = 0
-        async for raid in AsyncIter(player.current_season.raid_stats.raid_log):
+        async for raid in AsyncIter(self.current_raidstats.raid_log):
+            r_clan = await self.client.fetch_clan(raid.clan_tag)
             if raid_count >= 5:
                 break
 
@@ -329,8 +358,8 @@ class PlayerProfileMenu(DefaultView):
                  for att in raid_member.attacks]
                  )            
             embed.add_field(
-                name=(f"{raid.clan.emoji}" if raid.is_alliance_raid else "")
-                    + f"**{raid.clan_name} {raid.start_time.format('DD MMM YYYY')}**",
+                name=(f"{r_clan.emoji}" if raid.is_alliance_raid else "")
+                    + f"**{r_clan.clean_name} {raid.start_time.format('DD MMM YYYY')}**",
                 value=f"{EmojisClash.ATTACK} {raid_member.attack_count} / 6\u3000"
                     + f"{EmojisClash.CAPITALGOLD} {raid_member.capital_resources_looted:,}\u3000"
                     + f"{EmojisClash.RAIDMEDALS} {raid_member.medals_earned:,}\n"

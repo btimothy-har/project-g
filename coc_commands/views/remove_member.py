@@ -1,26 +1,19 @@
 import discord
 import asyncio
 
-from coc_client.api_client import BotClashClient
-
 from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.discord.member import aMember
-from coc_data.objects.discord.guild import aGuild
+from coc_main.api_client import BotClashClient, InvalidTag, InvalidUser
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 
-from coc_data.utilities.components import *
+from coc_main.discord.member import aMember
 
-from coc_data.constants.ui_emojis import *
-from coc_data.constants.coc_emojis import *
-from coc_data.exceptions import *
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, MenuConfirmation, clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from ..helpers.components import *
-from ..exceptions import *
 
 bot_client = BotClashClient()
 
@@ -47,6 +40,10 @@ class RemoveMemberMenu(DefaultView):
             self.member = aMember(member,self.guild.id)
         if account:
             self.remove_accounts.append(account)
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -98,7 +95,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = await asyncio.gather(*(p.get_full_player() for p in self.member.member_accounts))
+        member_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.member_accounts))
         
         if len(member_accounts) == 0:
             embed = await clash_embed(
@@ -154,7 +151,7 @@ class RemoveMemberMenu(DefaultView):
 
         async for tag in AsyncIter(menu.values):
             try:
-                player = await bot_client.cog.fetch_player(tag)
+                player = await self.client.fetch_player(tag)
             except InvalidTag:
                 continue
             else:

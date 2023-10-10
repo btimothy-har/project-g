@@ -1,37 +1,40 @@
 import os
 import discord
 import pendulum
-import asyncio
+
+from typing import *
 
 from redbot.core import Config, commands, app_commands, bank
+from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
-
-from mee6rank.mee6rank import Mee6Rank
-
-from coc_data.objects.players.player import aPlayer
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.events.clan_war import aWarPlayer
-from coc_data.objects.events.raid_weekend import aRaidMember
-from coc_data.constants.coc_constants import *
-
-from coc_data.utilities.utils import *
-from coc_data.utilities.components import *
-from coc_data.exceptions import *
-
-from coc_commands.helpers.autocomplete import *
-
-from coc_commands.helpers.components import *
 
 from .objects.accounts import MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
 from .objects.item import ShopItem
-from .views.user_store import UserStore
 from .views.store_manager import StoreManager
+from .views.user_store import UserStore
 
-from .components import *
-from .checks import *
-from .autocomplete import *
+from .checks import is_bank_admin, is_bank_server, is_coleader_or_bank_admin
+from .autocomplete import autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items
+
+from mee6rank.mee6rank import Mee6Rank
+
+from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbreviation
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
+
+from coc_main.coc_objects.events.clan_war import aWarPlayer
+from coc_main.coc_objects.events.raid_weekend import aRaidMember
+
+from coc_main.discord.member import aMember
+
+from coc_main.utils.components import clash_embed, MenuPaginator
+from coc_main.utils.constants.coc_constants import WarResult
+from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.checks import is_admin
+from coc_main.utils.autocomplete import autocomplete_clans_coleader
+
+bot_client = BotClashClient()
 
 non_member_multiplier = 0.2
 
@@ -50,7 +53,7 @@ class Bank(commands.Cog):
     __author__ = "bakkutteh"
     __version__ = "2023.10.1"
 
-    def __init__(self,bot):
+    def __init__(self,bot:Red):
         self.bot = bot
 
         self.bot.coc_bank_path = f"{cog_data_path(self)}/reports"
@@ -73,8 +76,8 @@ class Bank(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
 
     @property
-    def client(self):
-        return self.bot.get_cog("ClashOfClansClient").client
+    def client(self) -> ClashOfClansClient:
+        return self.bot.get_cog("ClashOfClansClient")
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -143,14 +146,8 @@ class Bank(commands.Cog):
                     comment="EOS to Sweep & Reserve Accounts."
                     )
         
-        while True:
-            try:
-                alliance_clans = self.client.cog.get_alliance_clans()
-            except CacheNotReady:
-                await asyncio.sleep(5)
-                continue
-            else:
-                break
+        alliance_clans = await self.client.get_alliance_clans()
+            
         sweep_balance = self.sweep_account.balance
         available_for_distribution = sweep_balance * 0.7
         async for clan in AsyncIter(alliance_clans):
@@ -181,14 +178,8 @@ class Bank(commands.Cog):
                     comment=f"EOS to {clan.tag} {clan.name}."
                     )      
                                   
-        while True:
-            try:
-                alliance_members = self.client.cog.get_members_by_season()
-            except CacheNotReady:
-                await asyncio.sleep(5)
-                continue
-            else:
-                break
+        alliance_members = await self.client.fetch_members_by_season()
+           
         await self.current_account.deposit(
             amount=round(len(alliance_members) * 25000),
             user_id=self.bot.user.id,
@@ -252,7 +243,7 @@ class Bank(commands.Cog):
         await self.current_account.withdraw(
             amount = reward,
             user_id = self.bot.user.id,
-            comment = f"Townhall Bonus for {player.name} ({player.tag}): TH{cached_value} to TH{player.town_hall}."
+            comment = f"Townhall Bonus for {player.name} ({player.tag}): TH{cached_value} to TH{player.town_hall.level}."
             )
     
     async def member_hero_upgrade_reward(self,player:aPlayer,cached_value:int):
@@ -278,14 +269,7 @@ class Bank(commands.Cog):
         
         reward_per_trophy = 20
 
-        while True:
-            try:
-                alliance_members = self.client.cog.get_members_by_season()
-            except CacheNotReady:
-                await asyncio.sleep(5)
-                continue
-            else:
-                break
+        alliance_members = await self.client.fetch_members_by_season()
         
         async for player in AsyncIter(alliance_members):
             if not player.is_member:
@@ -311,8 +295,7 @@ class Bank(commands.Cog):
         if not self.use_rewards:
             return
         
-        p = await aPlayer.create(player.tag)
-        member = self.bot.get_user(p.discord_user)
+        member = self.bot.get_user(player.discord_user)
         if not member:
             return
         
@@ -323,10 +306,10 @@ class Bank(commands.Cog):
             await self.current_account.deposit(
                 amount = penalty,
                 user_id = self.bot.user.id,
-                comment = f"Clan War Penalty for {p.name} ({p.tag})."
+                comment = f"Clan War Penalty for {player.name} ({player.tag})."
                 )
 
-        membership_multiplier = 1 if p.is_member else non_member_multiplier
+        membership_multiplier = 1 if player.is_member else non_member_multiplier
         participation = 50
         performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
         result = 100 if player.clan.result == WarResult.WON else 0
@@ -336,15 +319,14 @@ class Bank(commands.Cog):
         await self.current_account.withdraw(
             amount = total_reward,
             user_id = self.bot.user.id,
-            comment = f"Clan War Reward for {p.name} ({p.tag})."
+            comment = f"Clan War Reward for {player.name} ({player.tag})."
             )
     
     async def raid_bank_rewards(self,player:aRaidMember):
         if not self.use_rewards:
             return
         
-        p = await aPlayer.create(player.tag)
-        member = self.bot.get_user(p.discord_user)
+        member = self.bot.get_user(player.discord_user)
         if not member:
             return
         
@@ -356,17 +338,17 @@ class Bank(commands.Cog):
             await self.current_account.deposit(
                 amount = penalty,
                 user_id = self.bot.user.id,
-                comment = f"Raid Weekend Penalty for {p.name} ({p.tag})."
+                comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
                 )
         
-        membership_multiplier = 1 if p.is_member else non_member_multiplier
+        membership_multiplier = 1 if player.is_member else non_member_multiplier
 
         total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * membership_multiplier)
         await bank.deposit_credits(member,total_reward)
         await self.current_account.withdraw(
             amount = total_reward,
             user_id = self.bot.user.id,
-            comment = f"Raid Weekend Reward for {p.name} ({p.tag})."
+            comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
             )
     
     async def capital_contribution_rewards(self,player:aPlayer,value_increment:int):
@@ -434,43 +416,51 @@ class Bank(commands.Cog):
     ##################################################
     ### BALANCE
     ##################################################
-    @commands.command(name="balance",aliases=['bal'])
-    @commands.guild_only()
-    async def command_bank_balance(self,ctx:commands.Context,clan_abbreviation:str=None):
-        """
-        Display your current Bank Balance (or Clan's balance).
+    async def helper_show_balance(self,
+        context:Union[discord.Interaction,commands.Context],
+        clan:Optional[aClan]=None):
 
-        Clan balances are only usable by Clan Leaders and Co-Leaders.
-        """
         currency = await bank.get_currency_name()
+        user = context.user if isinstance(context,discord.Interaction) else context.author
 
-        clan = None
-        if clan_abbreviation:
-            try:
-                clan = await bot_client.cog.from_clan_abbreviation(clan_abbreviation)
-            except InvalidAbbreviation as exc:
-                clan = None
-            
-            check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
+        if clan:
+            check_permissions = True if (is_bank_admin(context) or user.id == clan.leader or user.id in clan.coleaders) else False
             if not check_permissions:
                 clan = None
         
         if clan:
             embed = await clash_embed(
-                context=ctx,
+                context=context,
                 message=f"**{clan.title}** has **{clan.balance:,} {currency}**.",
                 timestamp=pendulum.now()
                 )
-            return await ctx.reply(embed=embed)
+            return embed       
 
-        member = aMember(ctx.author.id,ctx.guild.id)
+        member = aMember(user.id,context.guild.id)
 
         embed = await clash_embed(
-            context=ctx,
-            message=f"You have **{await bank.get_balance(ctx.author):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).\nNext payday: "
+            context=context,
+            message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).\nNext payday: "
                 + (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!"),
             timestamp=pendulum.now()
             )
+        return embed
+    
+    @commands.command(name="balance",aliases=['bal'])
+    @commands.guild_only()
+    async def command_bank_balance(self,ctx:commands.Context,clan_abbreviation:Optional[str]=None):
+        """
+        Display your current Bank Balance (or Clan's balance).
+
+        Clan balances are only usable by Clan Leaders and Co-Leaders.
+        """
+        
+        if clan_abbreviation:
+            clan = await self.client.from_clan_abbreviation(clan_abbreviation)
+            embed = await self.helper_show_balance(ctx,clan)
+        else:
+            embed = await self.helper_show_balance(ctx)
+
         await ctx.reply(embed=embed)
     
     @app_commands.command(name="balance",
@@ -479,71 +469,42 @@ class Bank(commands.Cog):
     @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
     @app_commands.describe(
         select_clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
-    async def app_command_bank_balance(self,interaction:discord.Interaction,select_clan:str=None):
+    async def app_command_bank_balance(self,interaction:discord.Interaction,select_clan:Optional[str]=None):
         
         await interaction.response.defer()
-        currency = await bank.get_currency_name()
 
-        clan = None
         if select_clan:
-            try:
-                clan = await bot_client.cog.fetch_clan(select_clan)
-            except:
-                clan = None
-            
-            check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
-            if not check_permissions:
-                clan = None
-        
-        if clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"**{clan.title}** has **{clan.balance:,} {currency}**.",
-                timestamp=pendulum.now()
-                )
-            return await interaction.followup.send(embed=embed)        
+            clan = await self.client.fetch_clan(select_clan)
+            embed = await self.helper_show_balance(interaction,clan)
+        else:
+            embed = await self.helper_show_balance(interaction)
 
-        member = aMember(interaction.user.id,interaction.guild.id)
-
-        embed = await clash_embed(
-            context=interaction,
-            message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).\nNext payday: "
-                + (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!"),
-            timestamp=pendulum.now()
-            )
-        await interaction.followup.send(embed=embed)
+        await interaction.edit_original_response(embed=embed)        
     
     ##################################################
     ### PAYDAY
-    ##################################################    
-    @commands.command(name="payday")
-    @commands.guild_only()
-    @commands.check(is_bank_server)
-    async def command_payday(self,ctx:commands.Context):
-        """
-        Payday!
-
-        Receive a set amount of money every 24 hours.
-        """
-        member = aMember(ctx.author.id,ctx.guild.id)
+    ##################################################
+    async def helper_payday(self,context:Union[discord.Interaction,commands.Context]):
+        currency = await bank.get_currency_name()
+        user = context.guild.get_member(context.user.id) if isinstance(context,discord.Interaction) else context.author
+        member = aMember(user.id,context.guild.id)
 
         is_booster = True if member.discord_member.premium_since else False
-        # for g in self.eligible_boost_servers:
-        #     m = aMember(ctx.author.id,g)
-        #     if m.discord_member.premium_since:
-        #         is_booster = True
-        #         break
 
         last_payday = member.last_payday
         if last_payday:
             if last_payday.add(days=1) > pendulum.now():
-                return await ctx.reply(f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.")
-
-        currency = await bank.get_currency_name()
+                embed = await clash_embed(
+                    context=context,
+                    message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
+                    success=False,
+                    timestamp=pendulum.now()
+                    )        
+                return embed        
         try:
             mee6user = await Mee6Rank._get_player(
-                ctx.bot.get_cog("Mee6Rank"),
-                ctx.author,
+                bot_client.bot.get_cog("Mee6Rank"),
+                user,
                 get_avatar=False
                 )
         except:
@@ -554,21 +515,33 @@ class Bank(commands.Cog):
         boost_bonus = 1000 if is_booster else 0
 
         total_payout = basic_payout + xp_bonus + boost_bonus
-        await bank.deposit_credits(ctx.author,total_payout)
+        await bank.deposit_credits(user,total_payout)
 
         member.last_payday = pendulum.now().int_timestamp
 
         embed = await clash_embed(
-            context=ctx,
-            message=f"Here's some money, {ctx.author.mention}! You received:"
+            context=context,
+            message=f"Here's some money, {user.mention}! You received:"
                 + f"\n\nBase Payout: {basic_payout} {currency}"
                 + f"\nXP Bonus: {xp_bonus:,} {currency}"
                 + f"\nNitro Bonus: {boost_bonus:,} {currency}"
-                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(ctx.author):,} {currency}.",
+                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(user):,} {currency}.",
             success=True,
             timestamp=pendulum.now()
             )        
-        return await ctx.send(embed=embed)
+        return embed
+    
+    @commands.command(name="payday")
+    @commands.guild_only()
+    @commands.check(is_bank_server)
+    async def command_payday(self,ctx:commands.Context):
+        """
+        Payday!
+
+        Receive a set amount of money every 24 hours.
+        """
+        embed = await self.helper_payday(ctx)
+        await ctx.reply(embed=embed)
 
     @app_commands.command(name="payday",
         description="Receive a set amount of money every 24 hours.")
@@ -577,43 +550,8 @@ class Bank(commands.Cog):
     async def app_command_payday(self,interaction:discord.Interaction):
 
         await interaction.response.defer()        
-        member = aMember(interaction.user.id,interaction.guild.id)
-
-        last_payday = member.last_payday
-        if last_payday:
-            if last_payday.add(days=1) > pendulum.now():
-                return await interaction.followup.send(f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.")
-
-        currency = await bank.get_currency_name()
-        try:
-            mee6user = await Mee6Rank._get_player(
-                self.bot.get_cog("Mee6Rank"),
-                member.discord_member,
-                get_avatar=False
-                )
-        except:
-            mee6user = None
-
-        basic_payout = 50
-        xp_bonus = 10 * (mee6user.level // 10 if mee6user else 0)
-        boost_bonus = 1000 if member.discord_member.premium_since else 0
-
-        total_payout = basic_payout + xp_bonus + boost_bonus
-        await bank.deposit_credits(member.discord_member,total_payout)
-
-        member.last_payday = pendulum.now().int_timestamp
-
-        embed = await clash_embed(
-            context=interaction,
-            message=f"Here's some money, {member.mention}! You received:"
-                + f"\n\nBase Payout: {basic_payout} {currency}"
-                + f"\nXP Bonus: {xp_bonus:,} {currency}"
-                + f"\nNitro Bonus: {boost_bonus:,} {currency}"
-                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
-            success=True,
-            timestamp=pendulum.now()
-            )        
-        return await interaction.followup.send(embed=embed)         
+        embed = await self.helper_payday(interaction)
+        await interaction.followup.send(embed=embed)         
     
     ##################################################
     ### BANK / TOGGLEREWARDS
@@ -631,15 +569,8 @@ class Bank(commands.Cog):
 
     ##################################################
     ### BANK / GLOBALBAL
-    ##################################################    
-    @command_group_bank.command(name="globalbal",aliases=['gbal'])
-    @commands.guild_only()
-    @commands.check(is_bank_admin)
-    async def subcommand_bank_global_balances(self,ctx:commands.Context):
-        """
-        [Bank Admin only] Display Global Account Balances.
-        """
-        
+    ##################################################
+    async def helper_global_account_balances(self,context:Union[discord.Interaction,commands.Context]):
         currency = await bank.get_currency_name()
         leaderboard = await bank.get_leaderboard()
         if len(leaderboard) == 0:
@@ -647,13 +578,10 @@ class Bank(commands.Cog):
         else:
             total_balance = sum([account['balance'] for id,account in leaderboard])
 
-        try:
-            alliance_members = self.client.cog.get_members_by_season()
-        except CacheNotReady:
-            alliance_members = []            
+        alliance_members = await self.client.fetch_members_by_season()        
 
         embed = await clash_embed(
-            context=ctx,
+            context=context,
             title=f"**Guild Bank Accounts**",
             message=f"`{'Current':<10}` {self.current_account.balance:,} {currency}"
                 + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
@@ -662,7 +590,17 @@ class Bank(commands.Cog):
                 + f"\n\nNew Monthly Balance (est.): {len(alliance_members) * 25000:,}",
             timestamp=pendulum.now()
             )
-        return await ctx.send(embed=embed)
+        return embed
+
+    @command_group_bank.command(name="globalbal",aliases=['gbal'])
+    @commands.guild_only()
+    @commands.check(is_bank_admin)
+    async def subcommand_bank_global_balances(self,ctx:commands.Context):
+        """
+        [Bank Admin only] Display Global Account Balances.
+        """
+        embed = await self.helper_global_account_balances(ctx)
+        await ctx.send(embed=embed)
 
     @app_command_group_bank.command(name="global-balances",
         description="[Bank Admin only] Display Global Account Balances.")
@@ -671,30 +609,8 @@ class Bank(commands.Cog):
     async def app_command_global_balances(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
-
-        currency = await bank.get_currency_name()
-        leaderboard = await bank.get_leaderboard()
-        if len(leaderboard) == 0:
-            total_balance = 0
-        else:
-            total_balance = sum([account['balance'] for id,account in leaderboard])
-
-        try:
-            alliance_members = self.client.cog.get_members_by_season()
-        except CacheNotReady:
-            alliance_members = []            
-
-        embed = await clash_embed(
-            context=interaction,
-            title=f"**Guild Bank Accounts**",
-            message=f"`{'Current':<10}` {self.current_account.balance:,} {currency}"
-                + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
-                + f"\n`{'Reserve':<10}` {self.reserve_account.balance:,} {currency}"
-                + f"\n`{'Total':<10}` {total_balance:,} {currency}"
-                + f"\n\nNew Monthly Balance (est.): {len(alliance_members) * 25000:,}",
-            timestamp=pendulum.now()
-            )
-        return await interaction.followup.send(embed=embed)
+        embed = await self.helper_global_account_balances(interaction)        
+        await interaction.followup.send(embed=embed)
 
     ##################################################
     ### BANK / LEADERBOARD
@@ -790,10 +706,7 @@ class Bank(commands.Cog):
             account = MasterAccount(account_type_or_clan_abbreviation)
         
         else:
-            try:
-                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
-            except InvalidAbbreviation as exc:
-                return await ctx.reply(exc.message)
+            clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
             check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
 
             if not check_permissions:
@@ -835,7 +748,7 @@ class Bank(commands.Cog):
         
         else:
             try:
-                clan = await bot_client.cog.fetch_clan(select_account)
+                clan = await self.client.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
@@ -896,7 +809,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
+                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             else:
@@ -944,7 +857,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await bot_client.cog.fetch_clan(select_account)
+                clan = await self.client.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message,ephemeral=True)
             else:
@@ -989,7 +902,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
+                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             else:
@@ -1037,7 +950,7 @@ class Bank(commands.Cog):
             
         else:
             try:
-                clan = await bot_client.cog.fetch_clan(select_account)
+                clan = await self.client.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message,ephemeral=True)
             else:
@@ -1054,7 +967,7 @@ class Bank(commands.Cog):
     @command_group_bank.command(name="distribute")
     @commands.guild_only()
     @commands.check(is_coleader_or_bank_admin)
-    async def subcommand_bank_reward(self,ctx:commands.Context,account_type_or_clan_abbreviation:str,user:discord.Member,amount:int):
+    async def subcommand_bank_reward(self,ctx:commands.Context,account_type_or_clan_abbreviation:str,amount:int,user:discord.Member):
         """
         Distribute a set amount of money to a Discord User.
 
@@ -1063,6 +976,7 @@ class Bank(commands.Cog):
         if account_type_or_clan_abbreviation in ['current','sweep','reserve']:
             if not is_bank_admin(ctx):
                 return await ctx.reply("You don't have permission to do this.")
+            
             account = MasterAccount(account_type_or_clan_abbreviation)
             await account.withdraw(
                 amount=amount,
@@ -1071,7 +985,7 @@ class Bank(commands.Cog):
                 )                 
         else:
             try:
-                clan = await bot_client.cog.from_clan_abbreviation(account_type_or_clan_abbreviation)
+                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             
@@ -1094,31 +1008,60 @@ class Bank(commands.Cog):
     @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
     @app_commands.describe(
         select_account="Select an Account to withdraw the reward from.",
+        amount="The amount to distribute.",
         user="Select a User to distribute to.",
-        amount="The amount to distribute.")
-    async def app_command_bank_reward(self,interaction:discord.Interaction,select_account:str,user:discord.Member,amount:int):
+        role="Select a Role to distribute to."
+        )
+    async def app_command_bank_reward(self,
+        interaction:discord.Interaction,
+        select_account:str,
+        amount:int,
+        user:Optional[discord.Member]=None,
+        role:Optional[discord.Role]=None):
         
         await interaction.response.defer(ephemeral=True)
+
+        if not user and not role:
+            return await interaction.followup.send(f"You need to provide at least a User or a Role.",ephemeral=True)
 
         if select_account in ['current','sweep','reserve']:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
-            account = MasterAccount(select_account)        
+            account = MasterAccount(select_account)
+            
         else:
-            clan = await bot_client.cog.fetch_clan(select_account)
+            clan = await self.client.fetch_clan(select_account)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
             if not check_permissions:
-                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)            
-            account = ClanAccount(clan.tag)     
+                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
+            account = ClanAccount(clan.tag)
         
-        await account.withdraw(
-            amount=amount,
-            user_id=interaction.user.id,
-            comment=f"Reward transfer to {user.name} {user.id}."
-            )
-        await bank.deposit_credits(user,amount)
-        return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,}.",ephemeral=True)
-
+        if role:
+            count = 0
+            iter_members = AsyncIter(role.members)
+            async for member in iter_members:
+                await account.withdraw(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Reward transfer to {member.name} {member.id}."
+                    )
+                await bank.deposit_credits(member,amount)
+                count += 1
+        
+        if user:
+            await account.withdraw(
+                amount=amount,
+                user_id=interaction.user.id,
+                comment=f"Reward transfer to {user.name} {user.id}."
+                )
+            await bank.deposit_credits(user,amount)
+            count += 1
+        
+        if count == 1 and user:
+            return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,}.",ephemeral=True)
+        else:
+            return await interaction.followup.send(f"Distributed {amount:,} to {count} members.",ephemeral=True)
+        
     ##################################################
     ### USER INVENTORY
     ##################################################
@@ -1212,7 +1155,6 @@ class Bank(commands.Cog):
         gift = await inventory.gift_item(item,user)
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
-
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
     
     ##################################################

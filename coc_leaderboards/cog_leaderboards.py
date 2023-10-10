@@ -1,21 +1,23 @@
 import asyncio
 import discord
 import pendulum
+import random
 
 from discord.ext import tasks
 
+from typing import *
+from mongoengine import *
+
 from redbot.core import commands, app_commands
-from redbot.core.data_manager import cog_data_path
-from coc_client.api_client import BotClashClient
-from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive
+from redbot.core.bot import Red
+from redbot.core.utils import AsyncIter
 
-from coc_data.utilities.utils import *
-from coc_data.utilities.components import *
-from coc_data.exceptions import *
+from coc_main.api_client import BotClashClient, ClashOfClansError
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.utils.checks import is_admin
+from coc_main.utils.components import clash_embed
 
-from coc_commands.helpers.checks import *
-
-from .leaderboard_files.discord_leaderboard import *
+from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive, DiscordLeaderboard
 
 lb_type_selector = [
     app_commands.Choice(name="Clan War Triples", value=1),
@@ -25,14 +27,22 @@ lb_type_selector = [
     ]
 
 async def autocomplete_leaderboard_selector(interaction:discord.Interaction,current:str):
-    guild_leaderboards = DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id)
-    return [
-        app_commands.Choice(
-            name=str(lb),
-            value=lb.id
-            )
-        for lb in guild_leaderboards
-        ]
+    try:
+        guild_leaderboards = list(DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id))
+        if current:
+            sel_lb = [p for p in guild_leaderboards if current.lower() in str(p).lower()]
+        else:
+            sel_lb = guild_leaderboards
+
+        return [
+            app_commands.Choice(
+                name=str(lb),
+                value=lb.id
+                )
+            for lb in random.sample(sel_lb,min(5,len(sel_lb)))
+            ]
+    except Exception:
+        bot_client.coc_main_log.exception("Error in autocomplete_leaderboard_selector")
 
 bot_client = BotClashClient()
 
@@ -49,9 +59,9 @@ class Leaderboards(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.1"
+    __version__ = "2023.10.3"
 
-    def __init__(self,bot):        
+    def __init__(self,bot:Red):
         self.bot = bot 
         self.leaderboard_lock = asyncio.Lock()
 
@@ -60,8 +70,12 @@ class Leaderboards(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
 
     @property
-    def client(self):
-        return self.bot.get_cog("ClashOfClansClient").client
+    def bot_client(self) -> BotClashClient:
+        return bot_client
+
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
     
     async def cog_load(self):
         self.update_leaderboards.start()
@@ -140,19 +154,15 @@ class Leaderboards(commands.Cog):
     ##################################################
     ### LEADERBOARD / LIST
     ##################################################
-    @command_group_clash_leaderboards.command(name="list")
-    @commands.guild_only()
-    @commands.admin()
-    async def command_list_leaderboard(self,ctx):
-        """
-        List all Leaderboards setup in this server.
-        """
-        
+    async def helper_list_guild_leaderboards(self,
+        context:Union[discord.Interaction,commands.Context],
+        guild:discord.Guild) -> discord.Embed:
+
         embed = await clash_embed(
-            context=ctx,
+            context=context,
             title="**Server Leaderboards**"
             )
-        async for lb in AsyncIter(DiscordLeaderboard.get_guild_leaderboards(ctx.guild.id)):
+        async for lb in AsyncIter(DiscordLeaderboard.get_guild_leaderboards(guild.id)):
             embed.add_field(
                 name=f"**{getattr(lb.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await lb.fetch_message(),'jump_url','')}"
@@ -162,7 +172,17 @@ class Leaderboards(commands.Cog):
                     + f"\n\u200b",
                 inline=True
                 )            
-        await ctx.reply(embed=embed)
+        return embed
+
+    @command_group_clash_leaderboards.command(name="list")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_list_leaderboard(self,ctx):
+        """
+        List all Leaderboards setup in this server.
+        """
+        embed = await self.helper_list_guild_leaderboards(ctx,ctx.guild)
+        await ctx.reply(embed=embed)        
     
     @app_command_group_leaderboards.command(name="list",
         description="List all Leaderboards setup in this server.")
@@ -172,25 +192,54 @@ class Leaderboards(commands.Cog):
         
         await interaction.response.defer()
 
-        embed = await clash_embed(
-            context=interaction,
-            title="**Server Leaderboards**"
-            )
-        async for lb in AsyncIter(DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id)):
-            embed.add_field(
-                name=f"**{getattr(lb.channel,'name','Unknown Channel')}**",
-                value=f"\nMessage: {getattr(await lb.fetch_message(),'jump_url','')}"
-                    + f"\nID: `{lb.id}`"
-                    + f"\nType: {lb.lb_type}"
-                    + f"\nIs Global? `{lb.is_global}`"
-                    + f"\n\u200b",
-                inline=True
-                )            
+        embed = await self.helper_list_guild_leaderboards(interaction,interaction.guild)
         await interaction.edit_original_response(embed=embed,view=None)
     
     ##################################################
     ### LEADERBOARD / CREATE
     ##################################################
+    async def helper_create_guild_leaderboard(self,
+        context:Union[discord.Interaction,commands.Context],
+        type:int,
+        is_global:int,
+        channel:discord.TextChannel) -> discord.Embed:  
+
+        if type not in [1,3,4,5]:
+            embed = await clash_embed(
+                context=context,
+                message=f"Type `{type}` is not a valid type.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            return embed
+        
+        if is_global not in [0,1]:
+            embed = await clash_embed(
+                context=context,
+                message=f"Is_Global argument should be `0` or `1`.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            return embed
+        
+        lb = await DiscordLeaderboard.create(
+            leaderboard_type=type,
+            is_global=True if is_global == 1 else False,
+            guild=context.guild,
+            channel=channel
+            )        
+        embed = await clash_embed(
+            context=context,
+            title="**Leaderboard Created**",
+            message=f"Channel: {getattr(lb.channel,'name','Unknown Channel')}"
+                + f"\nID: `{lb.id}`"
+                + f"\nType: {lb.lb_type}"
+                + f"\nIs Global? `{lb.is_global}`",
+            success=True,
+            timestamp=pendulum.now()
+            )
+        return embed
+                                              
     @command_group_clash_leaderboards.command(name="create")
     @commands.guild_only()
     @commands.admin()
@@ -215,41 +264,7 @@ class Leaderboards(commands.Cog):
         3) `channel` - The channel to post the leaderboard in.
         """
 
-        if type not in [1,3,4,5]:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Type `{type}` is not a valid type.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await ctx.reply(embed=embed)
-        
-        if is_global not in [0,1]:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Is_Global argument should be `0` or `1`.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await ctx.reply(embed=embed)
-        
-        lb = await DiscordLeaderboard.create(
-            leaderboard_type=type,
-            is_global=True if is_global == 1 else False,
-            guild=ctx.guild,
-            channel=channel
-            )
-        
-        embed = await clash_embed(
-            context=ctx,
-            title="**Leaderboard Created**",
-            message=f"Channel: {getattr(lb.channel,'name','Unknown Channel')}"
-                + f"\nID: `{lb.id}`"
-                + f"\nType: {lb.lb_type}"
-                + f"\nIs Global? `{lb.is_global}`",
-            success=True,
-            timestamp=pendulum.now()
-            )
+        embed = await self.helper_create_guild_leaderboard(ctx,type,is_global,channel)
         await ctx.reply(embed=embed)
     
     @app_command_group_leaderboards.command(name="create",
@@ -266,29 +281,49 @@ class Leaderboards(commands.Cog):
     async def app_command_create_leaderboard(self,interaction:discord.Interaction,type:int,is_global:int,channel:discord.TextChannel):
         
         await interaction.response.defer()
-
-        lb = await DiscordLeaderboard.create(
-            leaderboard_type=type,
-            is_global=True if is_global == 1 else False,
-            guild=interaction.guild,
-            channel=channel
-            )
-        
-        embed = await clash_embed(
-            context=interaction,
-            title="**Leaderboard Created**",
-            message=f"Channel: {getattr(lb.channel,'name','Unknown Channel')}"
-                + f"\nID: `{lb.id}`"
-                + f"\nType: {lb.lb_type}"
-                + f"\nIs Global? `{lb.is_global}`",
-            success=True,
-            timestamp=pendulum.now()
-            )
-        await interaction.edit_original_response(embed=embed,view=None)
+        embed = await self.helper_create_guild_leaderboard(interaction,type,is_global,channel)
+        await interaction.edit_original_response(embed=embed)
     
     ##################################################
     ### LEADERBOARD / DELETE
-    ##################################################    
+    ##################################################
+    async def helper_delete_guild_leaderboard(self,
+        context:Union[discord.Interaction,commands.Context],
+        leaderboard_id:str) -> discord.Embed:  
+
+        try:
+            lb = DiscordLeaderboard.get_by_id(leaderboard_id)
+        except DoesNotExist:
+            embed = await clash_embed(
+                context=context,
+                message=f"Leaderboard with ID `{leaderboard_id}` does not exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            return embed
+        
+        if lb.guild_id != context.guild.id:
+            embed = await clash_embed(
+                context=context,
+                message=f"Leaderboard with ID `{leaderboard_id}` was not found in this server.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            return embed
+
+        message = await lb.fetch_message()
+        if message:
+            await message.delete()        
+        lb.delete()
+
+        embed = await clash_embed(
+            context=context,
+            message=f"Leaderboard with ID `{leaderboard_id}` was successfully deleted.",
+            success=True,
+            timestamp=pendulum.now()
+            )
+        return embed
+    
     @command_group_clash_leaderboards.command(name="delete")
     @commands.guild_only()
     @commands.admin()
@@ -298,38 +333,7 @@ class Leaderboards(commands.Cog):
 
         To get the ID of a Leaderboard, use the command [p]`coclb list`.
         """
-
-        try:
-            lb = DiscordLeaderboard.get_by_id(leaderboard_id)
-        except DoesNotExist:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Leaderboard with ID `{leaderboard_id}` does not exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await ctx.reply(embed=embed)
-        
-        if lb.guild_id != ctx.guild.id:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Leaderboard with ID `{leaderboard_id}` was not found in this server.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await ctx.reply(embed=embed)
-
-        message = await lb.fetch_message()
-        if message:
-            await message.delete()        
-        lb.delete()
-
-        embed = await clash_embed(
-            context=ctx,
-            message=f"Leaderboard with ID `{leaderboard_id}` was successfully deleted.",
-            success=True,
-            timestamp=pendulum.now()
-            )
+        embed = await self.helper_delete_guild_leaderboard(ctx,leaderboard_id)
         await ctx.reply(embed=embed)
     
     @app_command_group_leaderboards.command(name="delete",
@@ -342,38 +346,7 @@ class Leaderboards(commands.Cog):
     async def appcommand_delete_leaderboard(self,interaction:discord.Interaction,leaderboard:str):
         
         await interaction.response.defer()
-
-        try:
-            lb = DiscordLeaderboard.get_by_id(leaderboard)
-        except DoesNotExist:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Leaderboard with ID `{leaderboard}` does not exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await interaction.edit_original_response(embed=embed,view=None)
-        
-        if lb.guild_id != interaction.guild.id:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Leaderboard with ID `{leaderboard}` was not found in this server.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            return await interaction.edit_original_response(embed=embed,view=None)
-
-        message = await lb.fetch_message()
-        if message:
-            await message.delete()        
-        lb.delete()
-
-        embed = await clash_embed(
-            context=interaction,
-            message=f"Leaderboard with ID `{leaderboard}` was successfully deleted.",
-            success=True,
-            timestamp=pendulum.now()
-            )
+        embed = await self.helper_delete_guild_leaderboard(interaction,leaderboard)
         await interaction.edit_original_response(embed=embed,view=None)
     
     @tasks.loop(minutes=20.0)
@@ -383,12 +356,9 @@ class Leaderboards(commands.Cog):
 
         async with self.leaderboard_lock:
             st = pendulum.now()
-            bot_client.cog.coc_main_log.info("Updating Leaderboards...")
-            tasks = []
-            for guild in bot_client.bot.guilds:
-                guild_leaderboards = DiscordLeaderboard.get_guild_leaderboards(guild.id)
-                tasks.extend([asyncio.create_task(lb.update_leaderboard()) for lb in guild_leaderboards])
+            bot_client.coc_main_log.info("Updating Leaderboards...")
+            all_leaderboards = DiscordLeaderboard.get_all_leaderboards()
+            await asyncio.gather(*(lb.update_leaderboard() for lb in all_leaderboards))
             
-            await asyncio.gather(*tasks)
             et = pendulum.now()
-            bot_client.cog.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")
+            bot_client.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")

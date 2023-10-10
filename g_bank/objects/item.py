@@ -6,7 +6,8 @@ from redbot.core import bank
 from mongoengine import *
 from typing import *
 
-from coc_client.api_client import BotClashClient
+from coc_main.api_client import BotClashClient
+
 #Available Item Types
 #1 Basic
 #2 Role

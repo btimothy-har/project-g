@@ -1,19 +1,13 @@
-import copy
-import asyncio
-
 from typing import *
-from numerize import numerize
 
 from redbot.core.utils import AsyncIter
 
-from coc_data.objects.players.player import *
-from coc_data.objects.clans.clan import aClan
-from coc_data.objects.events.clan_war import aClanWar, aWarAttack
-from coc_data.objects.events.war_summary import aSummaryWarStats
+from coc_main.coc_objects.players.player import aPlayerSeason
+from coc_main.coc_objects.events.clan_war import aClanWar, aWarAttack
+from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
-from coc_data.constants.coc_constants import *
-from coc_data.constants.coc_emojis import *
-from coc_data.constants.ui_emojis import *
+from coc_main.utils.constants.coc_constants import ClanWarType
+from coc_main.utils.utils import check_rtl
 
 class ClanWarLeaderboardPlayer():
     def __init__(self,player_season:aPlayerSeason,leaderboard_th:int):
@@ -31,8 +25,18 @@ class ClanWarLeaderboardPlayer():
         self.hit_rate = 0
         self.avg_stars = 0.0
     
+    @property
+    def clean_name(self) -> str:
+        if check_rtl(self.name):
+            return '\u200F' + self.name + '\u200E'
+        return self.name
+    
     @classmethod
-    async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int,eligible_clans:Optional[List[str]]=None):
+    async def calculate(cls,
+        player_season:aPlayerSeason,
+        leaderboard_th:int,
+        eligible_clans:Optional[List[str]]=None):
+
         def predicate_war(clan_war:aClanWar):
             if eligible_clans:
                 return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan_1.tag in eligible_clans or clan_war.clan_2.tag in eligible_clans)
@@ -44,8 +48,9 @@ class ClanWarLeaderboardPlayer():
             
         lb_player = cls(player_season,leaderboard_th)
 
-        loop = asyncio.get_running_loop()
-        war_stats = await loop.run_in_executor(None,aSummaryWarStats.for_player,player_season.tag,aClanWar.for_player(player_season.tag,player_season.season))
+        war_stats = aClanWarSummary.for_player(
+            player_tag=player_season.tag,
+            war_log=aClanWar.for_player(player_season.tag,player_season.season))
 
         participated_wars = AsyncIter(war_stats.war_log)
         async for war in participated_wars.filter(predicate_war):
@@ -64,8 +69,7 @@ class ClanWarLeaderboardPlayer():
         
         if lb_player.total_attacks > 0:
             lb_player.hit_rate = int(round((lb_player.total_triples / lb_player.total_attacks) * 100,0))
-            lb_player.avg_stars = round(lb_player.total_stars / lb_player.total_attacks,1)
-        
+            lb_player.avg_stars = round(lb_player.total_stars / lb_player.total_attacks,1)        
         return lb_player
 
 class ResourceLootLeaderboardPlayer():
@@ -78,6 +82,12 @@ class ResourceLootLeaderboardPlayer():
         self.loot_darkelixir = self.stats.loot_darkelixir.season_total
         self._loot_elixir = self.stats.loot_elixir
         self._loot_gold = self.stats.loot_gold
+    
+    @property
+    def clean_name(self) -> str:
+        if check_rtl(self.name):
+            return '\u200F' + self.name + '\u200E'
+        return self.name
     
     @classmethod
     async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int):        
@@ -102,6 +112,12 @@ class DonationsLeaderboardPlayer():
         self.donations_sent = self.stats.donations_sent.season_total
         self.donations_rcvd = self.stats.donations_rcvd.season_total
     
+    @property
+    def clean_name(self) -> str:
+        if check_rtl(self.name):
+            return '\u200F' + self.name + '\u200E'
+        return self.name
+    
     @classmethod
     async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int):        
         lb_player = cls(player_season,leaderboard_th)
@@ -117,6 +133,12 @@ class ClanGamesLeaderboardPlayer():
         self.clangames_clan_tag = self.stats.clangames.clan_tag
         self.time_to_completion = self.stats.clangames.time_to_completion
         self.completion_seconds = self.stats.clangames.completion_seconds
+    
+    @property
+    def clean_name(self) -> str:
+        if check_rtl(self.name):
+            return '\u200F' + self.name + '\u200E'
+        return self.name
     
     @classmethod
     async def calculate(cls,player_season:aPlayerSeason):

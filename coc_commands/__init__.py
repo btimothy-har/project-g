@@ -24,16 +24,7 @@ async def setup(bot:Red):
         if count > try_limit:
             raise RuntimeError("ClashOfClansClient is not installed.")
         await asyncio.sleep(sleep_time)
-    
-    count = 0
-    while True:
-        count += 1
-        data_client = bot.get_cog("ClashOfClansData")
-        if getattr(data_client,'ready',False):
-            break
-        if count > try_limit:
-            raise RuntimeError("ClashOfClansData is not installed.")
-        await asyncio.sleep(sleep_time)
+
     
     commands_clan = clan_commands(bot)
     await bot.add_cog(commands_clan)
