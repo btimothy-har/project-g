@@ -39,6 +39,7 @@ class ECLIPSE(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
+    __release__ = 1
 
     def __init__(self,bot):        
         self.bot = bot
@@ -50,7 +51,7 @@ class ECLIPSE(commands.Cog):
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
     
     @property
     def client(self) -> ClashOfClansClient:

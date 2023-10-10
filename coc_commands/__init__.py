@@ -10,6 +10,7 @@ from .cog_config_commands import ClashServerConfig as config_commands
 
 try_limit = 60
 sleep_time = 1
+version = 1
 
 async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1031240380487831664]:
@@ -26,16 +27,16 @@ async def setup(bot:Red):
         await asyncio.sleep(sleep_time)
 
     
-    commands_clan = clan_commands(bot)
+    commands_clan = clan_commands(bot,version)
     await bot.add_cog(commands_clan)
 
-    commands_player = player_commands(bot)    
+    commands_player = player_commands(bot,version)    
     await bot.add_cog(commands_player)
   
-    commands_cwl = cwl_commands(bot)
+    commands_cwl = cwl_commands(bot,version)
     await bot.add_cog(commands_cwl)
      
-    commands_config = config_commands(bot)
+    commands_config = config_commands(bot,version)
     await bot.add_cog(commands_config)
  
     bot.tree.add_command(context_menu_user_profile)

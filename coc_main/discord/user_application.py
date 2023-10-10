@@ -429,12 +429,18 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
                     
     application.ticket_channel = channel.id
     application.save()
+    
+    await channel.send(embed=application_embed)
+    await channel.send(embed=accounts_embed)
 
     channel_name = ""
     if channel.name.startswith('ticket-'):
         channel_name += f"{re.split('-', channel.name)[1]}-"
     else:
-        channel_name += f"{re.split('📝', channel.name)[0]}"
+        if channel.guild.id == 1132581106571550831: #guild
+            channel_name += f"{re.split('-', channel.name)[0]}-"
+        elif channel.guild.id == 688449973553201335: #arix
+            channel_name += f"{re.split('📝', channel.name)[0]}-"
     
     for c in clans:
         if c.unicode_emoji:
@@ -445,20 +451,20 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
     for th in accounts_townhalls:
         channel_name += f"-th{th}"
     
-    await channel.edit(name=channel_name.lower())                    
-    await channel.send(embed=application_embed)
-    await channel.send(embed=accounts_embed)        
-    await channel.set_permissions(member,read_messages=True)
-    
+    await channel.edit(name=channel_name.lower())    
+    await channel.set_permissions(member,read_messages=True)    
     async for c in AsyncIter(clans):
-        link = db_ClanGuildLink(tag=c.tag,guild_id=channel.guild.id)
-
-        coleader_role = channel.guild.get_role(link.coleader_role)        
-        if coleader_role:
-            await channel.set_permissions(coleader_role,read_messages=True)
-            if len(channel.threads) > 0:
-                thread = channel.threads[0]
-                await thread.send(
-                    f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
-                    allowed_mentions=discord.AllowedMentions(roles=True)
-                    )
+        try:
+            link = db_ClanGuildLink.objects.get(tag=c.tag,guild_id=channel.guild.id)
+        except DoesNotExist:
+            continue
+        else:
+            coleader_role = channel.guild.get_role(link.coleader_role)        
+            if coleader_role:
+                await channel.set_permissions(coleader_role,read_messages=True)
+                if len(channel.threads) > 0:
+                    thread = channel.threads[0]
+                    await thread.send(
+                        f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
+                        allowed_mentions=discord.AllowedMentions(roles=True)
+                        )

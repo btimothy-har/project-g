@@ -38,7 +38,7 @@ class ClashOfClansMain(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.3"
+    __version__ = "2023.10.4"
 
     def __init__(self,bot):
         self.bot = bot

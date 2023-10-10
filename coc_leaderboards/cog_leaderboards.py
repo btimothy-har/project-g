@@ -60,14 +60,15 @@ class Leaderboards(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
+    __release__ = 1
 
     def __init__(self,bot:Red):
-        self.bot = bot 
+        self.bot = bot
         self.leaderboard_lock = asyncio.Lock()
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
 
     @property
     def bot_client(self) -> BotClashClient:

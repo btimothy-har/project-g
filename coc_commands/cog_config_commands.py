@@ -80,12 +80,12 @@ class ClashServerConfig(commands.Cog):
     __author__ = bot_client.author
     __version__ = bot_client.version
 
-    def __init__(self,bot:Red):
+    def __init__(self,bot:Red,version:int):
         self.bot = bot
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
 
     @property
     def bot_client(self) -> BotClashClient:
