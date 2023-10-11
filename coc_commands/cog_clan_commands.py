@@ -1186,7 +1186,7 @@ class Clans(commands.Cog):
         ingame_members = [member for member in get_members if isinstance(member,aPlayer)]
 
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            get_members = await asyncio.gather(*(self.client.fetch_clan(m) for m in clan.alliance_members),return_exceptions=True)
+            get_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members),return_exceptions=True)
             clan_members = [member for member in get_members if isinstance(member,aPlayer)]
             townhall_levels = [member.town_hall.level for member in clan_members]
             townhall_levels.sort(reverse=True)
