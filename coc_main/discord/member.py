@@ -259,11 +259,7 @@ class aMember():
 
     @property
     def home_clans(self) -> List[aPlayerClan]:
-        accounts = db_Player.objects(
-            discord_user=self.user_id,
-            is_member=True
-            )
-        clan_tags = list(set([a.home_clan for a in accounts]))
+        clan_tags = list(set([a.home_clan.tag for a in self.member_accounts]))
         return [aPlayerClan(tag=tag) for tag in clan_tags]
     
     @property
