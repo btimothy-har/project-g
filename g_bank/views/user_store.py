@@ -141,7 +141,7 @@ class UserStore(DefaultView):
     async def main_menu_embed(self):
         bal = await bank.get_balance(self.user)
 
-        if len(self.store_items) <= 1:
+        if len(self.store_items) < 1:
             embed = await clash_embed(
                 context=self.ctx,
                 title=f"**The Guild Store: {self.guild.name}**",
@@ -150,7 +150,7 @@ class UserStore(DefaultView):
                     + "\n\nThere are no items available in the Store at this time.",
                 thumbnail=self.guild.icon.url
                 )        
-        elif len(self.store_categories) > 1:
+        elif len(self.store_categories) > 2:
             embed = await clash_embed(
                 context=self.ctx,
                 title=f"**The Guild Store: {self.guild.name}**",
@@ -307,7 +307,7 @@ class UserStore(DefaultView):
         
         item_embed.add_field(
             name="Price",
-            value=f"{self.current_item.price} {currency}",
+            value=f"{self.current_item.price:,} {currency}",
             inline=True
             )
         item_embed.add_field(
