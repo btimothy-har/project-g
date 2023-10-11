@@ -465,6 +465,6 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
                 if len(channel.threads) > 0:
                     thread = channel.threads[0]
                     await thread.send(
-                        f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
+                        f"{coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
                         allowed_mentions=discord.AllowedMentions(roles=True)
                         )
