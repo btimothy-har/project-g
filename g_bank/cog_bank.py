@@ -52,7 +52,7 @@ class Bank(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 1
+    __release__ = 2
 
     def __init__(self,bot:Red):
         self.bot = bot
@@ -441,10 +441,12 @@ class Bank(commands.Cog):
 
         embed = await clash_embed(
             context=context,
-            message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).\nNext payday: "
-                + (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!"),
+            message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
             timestamp=pendulum.now()
             )
+        if context.guild.id == 1132581106571550831:
+            embed.description += "\nNext payday: "
+            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
         return embed
     
     @commands.command(name="balance",aliases=['bal'])
