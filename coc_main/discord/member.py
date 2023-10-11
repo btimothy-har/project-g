@@ -400,7 +400,7 @@ class aMember():
         #Assassins guild Member Role
         if self.guild.id == 1132581106571550831:
             global_member = aMember(self.user_id)
-            clan_member_role = self.guild.get_role(1139855695068540979)
+            clan_member_role = self.guild.guild.get_role(1139855695068540979)
             
             if global_member.is_member:                
                 if clan_member_role not in self.discord_member.roles:
