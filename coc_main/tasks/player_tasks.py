@@ -1,5 +1,6 @@
 import asyncio
 import pendulum
+import random
 
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
@@ -55,10 +56,7 @@ class PlayerLoop(TaskLoop):
                         async with self.task_lock:
                             await asyncio.sleep(0)
                     
-                    async with self.task_semaphore:
-                        if not self.loop_active:
-                            raise asyncio.CancelledError
-                        
+                    async with self.task_semaphore:                        
                         work_start = pendulum.now()
 
                         try:
@@ -127,11 +125,11 @@ class PlayerLoop(TaskLoop):
             sleep = 600
             self.api_error = False
         elif self.cached_player.is_member:
-            sleep = 60 #1min
+            sleep = random.randint(60,120) #1-2min
         elif self.cached_player.clan.is_alliance_clan or self.cached_player.clan.is_registered_clan or self.cached_player.clan.is_active_league_clan:
-            sleep = 60 #1min
+            sleep = random.randint(60,180) #1-3min
         elif self.cached_player.discord_user in [u.id for u in bot_client.bot.users]:
-            sleep = 300 #3min
+            sleep = random.randint(180,300) #3-5min
         else:
-            sleep = 600 #10min
+            sleep = random.randint(300,600) #5-10min
         return sleep

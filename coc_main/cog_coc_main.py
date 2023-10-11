@@ -38,7 +38,7 @@ class ClashOfClansMain(commands.Cog):
     """
 
     __author__ = "bakkutteh"
-    __version__ = "2023.10.4"
+    __version__ = "2023.10.5"
 
     def __init__(self,bot):
         self.bot = bot
@@ -72,6 +72,15 @@ class ClashOfClansMain(commands.Cog):
     async def cog_unload(self):
         await self.client.shutdown()
         del self.client
+
+    @commands.command(name="reloadg")
+    @commands.is_owner()
+    async def command_reload_clash(self,ctx:commands.Context):
+        """
+        Reload the Clash of Clans API Client.
+        """
+        await ctx.invoke(self.bot.get_command("reload"),'coc_commands', 'coc_leaderboards', 'g_eclipse', 'g_bank')
+        await ctx.message.delete()
     
     ##################################################
     ### REPORT BUTTON
@@ -94,9 +103,8 @@ class ClashOfClansMain(commands.Cog):
     @app_commands.checks.cooldown(rate=1,per=60)
     async def app_command_report(self,interaction:discord.Interaction):
 
-        await interaction.response.defer()
         report_view = ReportButton(interaction)
-        await interaction.followup.send(f"Click the button to send a report.",view=report_view)
+        await interaction.response.send_modal(report_view.report_modal)
 
 class ReportButton(DefaultView):
     def __init__(self,context:Union[discord.Interaction,commands.Context]):
@@ -117,10 +125,14 @@ class ReportButton(DefaultView):
         await interaction.followup.edit_message(interaction.message.id,view=self)
     
     async def _callback_send_report(self,interaction:discord.Interaction,modal:DiscordModal):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
+
+        mesge = await interaction.followup.send(
+            content=f"Thanks for the report! I've sent it to the bot owner.",
+            wait=True
+            )
 
         channel = interaction.client.get_channel(1161269740594020403)
-
         summary = modal.children[0].value
         describe = modal.children[1].value
 
@@ -148,14 +160,10 @@ class ReportButton(DefaultView):
             )
         embed.add_field(
             name="Message",
-            value=f"{self.message.jump_url}",
+            value=f"{mesge.jump_url}",
             inline=True
             )        
         await channel.send(embed=embed)
-        await interaction.followup.edit_message(
-            message_id=interaction.message.id,
-            content=f"Thanks for your message! I've sent it to the bot owner."
-            )
 
     @property
     def report_modal(self):

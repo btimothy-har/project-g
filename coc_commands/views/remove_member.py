@@ -95,7 +95,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.member_accounts))
+        member_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.member.member_accounts))
         
         if len(member_accounts) == 0:
             embed = await clash_embed(

@@ -33,7 +33,8 @@ from .discord.guild import aGuild
 from .discord.user_application import listener_user_application
 from .discord.recruiting_reminder import RecruitingReminder
 
-from .utils.components import clash_embed
+from .utils.components import DefaultView, DiscordButton, clash_embed
+from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
 
@@ -56,9 +57,11 @@ class ClashOfClansTasks(commands.Cog):
         self.bot = bot
         self.last_coc_task_error = None
 
+        self.controller_task = None
+        self.task_lock_timestamp = None
+
         self._master_task_lock = asyncio.Lock()
         self._task_lock = asyncio.Lock()
-        self.task_lock_timestamp = None
         self.task_semaphore_limit = 10000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
@@ -93,6 +96,10 @@ class ClashOfClansTasks(commands.Cog):
     def coc_data_log(self) -> logging.Logger:
         return bot_client.coc_data_log
 
+    @property
+    def api_semaphore_waiters(self) -> int:
+        return len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0
+
     ##################################################
     ### COG LOAD
     ##################################################
@@ -117,8 +124,8 @@ class ClashOfClansTasks(commands.Cog):
         
         self.coc_main_log.info(f"Found {len(bot_client.coc.http._keys):,} API Keys, setting semaphore limit at {self.api_semaphore_limit:,}.")
 
+        self.controller_task = asyncio.create_task(self.coc_task_controller())
         self.refresh_discord_tasks.start()
-        self.coc_task_controller.start()
         self.coc_data_queue.start()
         self.refresh_coc_tasks.start()
     
@@ -147,7 +154,7 @@ class ClashOfClansTasks(commands.Cog):
         self.refresh_discord_tasks.cancel()
         self.refresh_coc_tasks.cancel()
         self.coc_data_queue.cancel()
-        self.coc_task_controller.cancel()
+        self.controller_task.cancel()
 
         self.coc_main_log.info(f"Stopped Clash Data Loop.")
 
@@ -224,15 +231,32 @@ class ClashOfClansTasks(commands.Cog):
     #####
     ##### CLASH OF CLANS CORE DATA LOOPS
     #####
-    ############################################################
-    @tasks.loop(seconds=1)
+    ############################################################    
     async def coc_task_controller(self):
-        if self.task_lock.locked():
-            return
-        async with self._task_lock:
-            self.task_lock_timestamp = pendulum.now()
-            while self.api_semaphore._value < self.api_semaphore_limit:
-                await asyncio.sleep(0)
+        def maintain_lock():
+            if self.api_semaphore._value < self.api_semaphore_limit:
+                return True
+            if self.api_semaphore_waiters > 0:
+                return True
+            return False
+
+        while True:
+            try:
+                async with self._task_lock:
+                    self.task_lock_timestamp = pendulum.now()
+                    while maintain_lock():
+                        await asyncio.sleep(0)
+
+                    self.task_lock_timestamp = None
+            
+            except asyncio.CancelledError:
+                return
+
+            except Exception:
+                bot_client.coc_main_log.exception(f"Error in Clash Task Controller")
+
+            finally:
+                await asyncio.sleep(0.5)
 
     @tasks.loop(seconds=60)
     async def coc_data_queue(self):
@@ -409,31 +433,20 @@ class ClashOfClansTasks(commands.Cog):
             cooldown=0,
             text="Clash of Clans!"
             )
-    
-    @commands.group(name="cocdata")
-    @commands.is_owner()
-    async def command_group_clash_data(self,ctx):
-        """Manage the Clash of Clans Data Client."""
-        if not ctx.invoked_subcommand:
-            pass
 
-    @command_group_clash_data.command(name="status")
-    @commands.is_owner()
-    async def subcommand_clash_data_status(self,ctx):
-        """Clash of Clans Data Status."""
-
-        if not getattr(bot_client,'_is_initialized',False):
-            return await ctx.reply("Clash of Clans API Client not yet initialized.")
-        
-        embed = await clash_embed(ctx,
+    async def status_embed(self):
+        embed = await clash_embed(self.bot,
             title="**Clash of Clans Data Report**",
-            message="Last Refresh: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
+            message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
+                + f"\n\nRefresh Task: " + ("Running" if self.refresh_lock.locked() else "Not Running")
+                + f"\nLast Refresh: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
             )
         embed.add_field(
             name="**Tasks Client**",
             value="```ini"
+                + f"\n{'[Overall]':<15} " + ('Locked' if self.task_lock.locked() else 'Unlocked')
                 + f"\n{'[Master Lock]':<15} " + ('Locked' if self._master_task_lock.locked() else 'Unlocked')
-                + f"\n{'[Control Lock]':<15} " + (f"Locked ({self.task_lock_timestamp.format('HH:mm:ss')})" if self._task_lock.locked() and self.task_lock_timestamp else 'Unlocked')
+                + f"\n{'[Control Lock]':<15} " + (f"Locked" if self._task_lock.locked() else 'Unlocked') + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
                 + f"\n{'[Running]':<15} " + f"{self.task_semaphore_limit - self.task_semaphore._value:,}"
                 + "```",
             inline=False
@@ -443,7 +456,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} {len(bot_client.coc.http._keys)}"
-                + f"\n{'[API Requests]':<15} {self.api_semaphore._value:,} / {self.api_semaphore_limit} (Waiting: {len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0:,})"
+                + f"\n{'[API Requests]':<15} {self.api_semaphore._value:,} / {self.api_semaphore_limit} (Waiting: {self.api_semaphore_waiters:,})"
                 + "```",
             inline=False
             )
@@ -495,7 +508,26 @@ class ClashOfClansTasks(commands.Cog):
                 + "```",
             inline=False
             )
-        await ctx.reply(embed=embed)
+        return embed
+    
+    @commands.group(name="cocdata")
+    @commands.is_owner()
+    async def command_group_clash_data(self,ctx):
+        """Manage the Clash of Clans Data Client."""
+        if not ctx.invoked_subcommand:
+            pass
+
+    @command_group_clash_data.command(name="status")
+    @commands.is_owner()
+    async def subcommand_clash_data_status(self,ctx):
+        """Clash of Clans Data Status."""
+
+        if not getattr(bot_client,'_is_initialized',False):
+            return await ctx.reply("Clash of Clans API Client not yet initialized.")
+
+        embed = await self.status_embed()
+        view = RefreshStatus(ctx)
+        await ctx.reply(embed=embed,view=view)
     
     @command_group_clash_data.command(name="lock")
     @commands.is_owner()
@@ -549,3 +581,25 @@ class ClashOfClansTasks(commands.Cog):
         else:
             logging.getLogger("coc.http").setLevel(logging.DEBUG)
             await ctx.tick()
+
+class RefreshStatus(DefaultView):
+    def __init__(self,context:Union[discord.Interaction,commands.Context]):
+
+        button = DiscordButton(
+            function=self._refresh_embed,
+            emoji=EmojisUI.REFRESH,
+            )
+
+        super().__init__(context,timeout=9999999)
+        self.is_active = True
+
+        self.add_item(button)
+    
+    @property
+    def task_cog(self) -> ClashOfClansTasks:
+        return bot_client.bot.get_cog("ClashOfClansTasks")
+    
+    async def _refresh_embed(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        embed = await self.task_cog.status_embed()
+        await interaction.followup.edit_message(interaction.message.id,embed=embed)

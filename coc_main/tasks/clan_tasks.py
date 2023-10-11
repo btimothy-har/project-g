@@ -1,5 +1,6 @@
 import asyncio
 import pendulum
+import random
 
 from redbot.core.utils import AsyncIter
 
@@ -57,10 +58,7 @@ class ClanLoop(TaskLoop):
                         async with self.task_lock:
                             await asyncio.sleep(0)
                     
-                    async with self.task_semaphore:
-                        if not self.loop_active:
-                            raise asyncio.CancelledError
-                        
+                    async with self.task_semaphore:                        
                         work_start = pendulum.now()
 
                         try:
@@ -138,9 +136,9 @@ class ClanLoop(TaskLoop):
             sleep = 600
             self.api_error = False
         elif self.cached_clan.is_alliance_clan or len(self.cached_clan.discord_feeds) > 0:
-            sleep = 120 # 2 minute
+            sleep = random.randint(60,180) #1-3min
         elif self.cached_clan.is_registered_clan or self.cached_clan.is_active_league_clan:
-            sleep = 300 # 5 minutes
+            sleep = random.randint(180,300) #3-5min
         else:
-            sleep = 600 # 10 minutes
+            sleep = random.randint(300,600) #5-10min
         return sleep

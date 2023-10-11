@@ -4,6 +4,8 @@ import pendulum
 from typing import *
 from redbot.core import commands
 
+from ..api_client import BotClashClient as client
+
 from .constants.coc_constants import *
 from .constants.coc_emojis import *
 from .constants.ui_emojis import *
@@ -17,17 +19,19 @@ async def handle_command_error(
     exception:Exception,
     context:Union[discord.Interaction,commands.Context]=None,
     message:Optional[discord.Message]=None):
+
+    bot_client = client()
     
     if isinstance(exception,ClashOfClansError):
         error_embed = await clash_embed(
-            context=context,
+            context=bot_client.bot,
             message=f"**Error**: {exception.message}",
             success=False,
             timestamp=pendulum.now())
     else:
         error_embed = await clash_embed(
-            context=context,
-            message=f"An unexpected error occurred. I've forwarded this error to my owners."
+            context=bot_client.bot,
+            message=f"An unexpected error occurred. I've forwarded this error to my owners. You may also report this error with `/report`."
                 + f"\n\nI apologise for the inconvenience.",
             success=False,
             timestamp=pendulum.now())
