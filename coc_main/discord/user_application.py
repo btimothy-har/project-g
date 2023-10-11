@@ -126,18 +126,12 @@ class ClanApplyMenuUser(DefaultView):
             self.clans = await asyncio.gather(*(self.coc_client.fetch_clan(tag=tag) for tag in self.clan_tags))
 
         self.is_active = True
-        available_accounts = []
         dropdown_options = []
 
         account_tags = [db.tag for db in db_Player.objects(discord_user=self.member.id).only('tag')]
 
-        async for a in AsyncIter(account_tags[:20]):
-            try:
-                player = await self.coc_client.fetch_player(tag=a)
-            except Exception:
-                continue
-            else:
-                available_accounts.append(player)
+        get_accounts = await asyncio.gather(*(self.coc_client.fetch_player(tag=a) for a in account_tags[:10]),return_exceptions=True)
+        accounts = [a for a in get_accounts if isinstance(a,aPlayer)]
         
         dropdown_options.extend([
             discord.SelectOption(
@@ -145,7 +139,7 @@ class ClanApplyMenuUser(DefaultView):
                 value=player.tag,
                 emoji=player.town_hall.emoji
                 )
-            for player in sorted(available_accounts,key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+            for player in sorted(accounts,key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
             ])
         dropdown_options.append(
             discord.SelectOption(
