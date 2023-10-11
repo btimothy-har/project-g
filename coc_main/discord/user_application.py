@@ -196,7 +196,7 @@ class ClanApplyMenuUser(DefaultView):
             else:
                 tags_chk.append(player.tag)
                 if player.discord_user == 0:
-                    player.discord_user = self.member.user_id
+                    player.discord_user = self.member.id
         
         if len(self.clans) == 0:
             eligible_townhalls = set([a.town_hall.level for a in accounts])
