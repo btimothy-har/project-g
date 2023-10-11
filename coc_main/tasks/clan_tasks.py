@@ -78,7 +78,7 @@ class ClanLoop(TaskLoop):
 
                                 await asyncio.gather(
                                     *(ClanMemberFeed.member_join(clan,m.tag) for m in members_joined),
-                                    *(ClanMemberFeed.member_join(clan,m.tag) for m in members_left),
+                                    *(ClanMemberFeed.member_leave(clan,m.tag) for m in members_left),
                                     ClanDonationFeed.start_feed(clan,self.cached_clan)
                                     )
                         self.cached_clan = clan
