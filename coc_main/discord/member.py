@@ -523,7 +523,7 @@ class aMember():
         if len(self.leader_clans) > 0:
             [abb_clans.append(c.abbreviation) for c in self.leader_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in guild.clan_links]]
         elif len(self.home_clans) > 0:
-            if self.default_account.home_clan.tag:
+            if self.default_account.home_clan.tag and self.default_account.home_clan.tag in [gc.tag for gc in guild.clan_links]:
                 abb_clans.append(self.default_account.home_clan.abbreviation)
             [abb_clans.append(c.abbreviation) for c in self.home_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in guild.clan_links]]
 

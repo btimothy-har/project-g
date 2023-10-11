@@ -1022,10 +1022,10 @@ class Bank(commands.Cog):
         user:Optional[discord.Member]=None,
         role:Optional[discord.Role]=None):
         
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         if not user and not role:
-            return await interaction.followup.send(f"You need to provide at least a User or a Role.",ephemeral=True)
+            return await interaction.followup.send(f"You need to provide at least a User or a Role.")
 
         if select_account in ['current','sweep','reserve']:
             if not is_bank_admin(interaction):
@@ -1039,8 +1039,8 @@ class Bank(commands.Cog):
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
             account = ClanAccount(clan.tag)
         
-        if role:
-            count = 0
+        count = 0
+        if role:            
             iter_members = AsyncIter(role.members)
             async for member in iter_members:
                 await account.withdraw(
