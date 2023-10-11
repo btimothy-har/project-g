@@ -32,7 +32,7 @@ class UserStore(DefaultView):
     ##################################################
     @property
     def category_select(self):
-        if len(self.store_categories) == 0:
+        if len(self.store_categories) <= 2:
             return None
         
         select_options = [discord.SelectOption(
@@ -126,10 +126,10 @@ class UserStore(DefaultView):
         self.add_item(self.home_button)
         self.add_item(self.close_button)
 
-        if len(self.store_categories) > 1:
+        if len(self.store_categories) > 2:
             self.add_item(self.category_select)
         
-        elif len(self.store_items) > 1:
+        elif len(self.store_items) >= 1:
             self.add_item(self.item_select)
 
         embed = await self.main_menu_embed()

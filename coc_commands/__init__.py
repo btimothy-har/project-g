@@ -10,7 +10,7 @@ from .cog_config_commands import ClashServerConfig as config_commands
 
 try_limit = 60
 sleep_time = 1
-version = 3
+version = 4
 
 async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1031240380487831664]:
