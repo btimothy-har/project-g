@@ -62,7 +62,7 @@ class ClashOfClansTasks(commands.Cog):
 
         self._master_task_lock = asyncio.Lock()
         self._task_lock = asyncio.Lock()
-        self.task_semaphore_limit = 10000
+        self.task_semaphore_limit = 1000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
         self.queue_lock = asyncio.Lock()
@@ -97,6 +97,10 @@ class ClashOfClansTasks(commands.Cog):
         return bot_client.coc_data_log
 
     @property
+    def task_semaphore_waiters(self) -> int:
+        return len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0
+
+    @property
     def api_semaphore_waiters(self) -> int:
         return len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0
 
@@ -116,11 +120,11 @@ class ClashOfClansTasks(commands.Cog):
             self.clash_maintenance_complete
             )
 
-        self.api_semaphore_limit = int((len(bot_client.coc.http._keys)*20))
+        self.api_semaphore_limit = int((len(bot_client.coc.http._keys)*25))
         self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
-        self.clan_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 10))
-        self.player_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 10))
+        self.clan_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 20))
+        self.player_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 20))
         
         self.coc_main_log.info(f"Found {len(bot_client.coc.http._keys):,} API Keys, setting semaphore limit at {self.api_semaphore_limit:,}.")
 
@@ -234,9 +238,9 @@ class ClashOfClansTasks(commands.Cog):
     ############################################################    
     async def coc_task_controller(self):
         def maintain_lock():
-            if self.api_semaphore._value < self.api_semaphore_limit:
+            if self.task_semaphore._value < self.task_semaphore_limit:
                 return True
-            if self.api_semaphore_waiters > 0:
+            if self.task_semaphore_waiters > 0:
                 return True
             return False
 
@@ -447,7 +451,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Overall]':<15} " + ('Locked' if self.task_lock.locked() else 'Unlocked')
                 + f"\n{'[Master Lock]':<15} " + ('Locked' if self._master_task_lock.locked() else 'Unlocked')
                 + f"\n{'[Control Lock]':<15} " + (f"Locked" if self._task_lock.locked() else 'Unlocked') + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{self.task_semaphore_limit - self.task_semaphore._value:,}"
+                + f"\n{'[Running]':<15} " + f"{self.task_semaphore_limit - self.task_semaphore._value:,} (Waiting: {len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0:,})"
                 + "```",
             inline=False
             )

@@ -237,7 +237,7 @@ class BotClashClient():
         self._api_logged_in = True
 
         # available_clients = ['clashapi']
-        # for i in range(1,10):
+        # for i in range(1,3):
         #     available_clients.append(f'clashapi{str(i)}')
 
         # keys = []
@@ -271,7 +271,7 @@ class BotClashClient():
         # self._api_logged_in = True
     
     async def api_logout(self):
-        await self.coc_client.close()
+        await self.coc.close()
 
     ############################################################
     #####
