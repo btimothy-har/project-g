@@ -14,7 +14,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, db_Clan, db_AllianceClan, aClanWar
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, db_Clan, db_AllianceClan, aClanWar, aPlayer
 
 from coc_main.utils.components import clash_embed, MenuConfirmation, ClanLinkMenu
 from coc_main.utils.utils import chunks
@@ -480,7 +480,7 @@ class Clans(commands.Cog):
                 )
             return await interaction.edit_original_response(embed=embed)
         
-        embed = await self.clan_composition_embed(interaction,clan)
+        embed = await self.clan_composition_embed(interaction,get_clan)
         return await interaction.edit_original_response(embed=embed)
 
     ##################################################
@@ -1182,10 +1182,12 @@ class Clans(commands.Cog):
             message=f"**Clan Member Composition**",
             thumbnail=clan.badge,
             )            
-        ingame_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
+        get_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members),return_exceptions=True)
+        ingame_members = [member for member in get_members if isinstance(member,aPlayer)]
 
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            clan_members = await asyncio.gather(*(self.client.fetch_clan(m) for m in clan.alliance_members))
+            get_members = await asyncio.gather(*(self.client.fetch_clan(m) for m in clan.alliance_members),return_exceptions=True)
+            clan_members = [member for member in get_members if isinstance(member,aPlayer)]
             townhall_levels = [member.town_hall.level for member in clan_members]
             townhall_levels.sort(reverse=True)
             average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
