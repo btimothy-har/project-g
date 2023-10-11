@@ -1,3 +1,4 @@
+import asyncio
 import os
 import discord
 import pendulum
@@ -21,7 +22,7 @@ from .autocomplete import autocomplete_eligible_accounts, autocomplete_store_ite
 from mee6rank.mee6rank import Mee6Rank
 
 from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbreviation
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan, db_Player
 
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidMember
@@ -177,14 +178,14 @@ class Bank(commands.Cog):
                     amount=round((available_for_distribution) / len(alliance_clans)),
                     user_id=self.bot.user.id,
                     comment=f"EOS to {clan.tag} {clan.name}."
-                    )      
-                                  
-        alliance_members = await self.client.fetch_members_by_season()
+                    )
+                
+        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
            
         await self.current_account.deposit(
-            amount=round(len(alliance_members) * 25000),
+            amount=round(len(member_tags) * 25000),
             user_id=self.bot.user.id,
-            comment=f"EOS new funds: {len(alliance_members)} members."
+            comment=f"EOS new funds: {len(member_tags)} members."
             )
     
     async def apply_bank_taxes(self):
@@ -269,8 +270,8 @@ class Bank(commands.Cog):
             return
         
         reward_per_trophy = 20
-
-        alliance_members = await self.client.fetch_members_by_season()
+        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
+        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))
         
         async for player in AsyncIter(alliance_members):
             if not player.is_member:
@@ -581,7 +582,7 @@ class Bank(commands.Cog):
         else:
             total_balance = sum([account['balance'] for id,account in leaderboard])
 
-        alliance_members = await self.client.fetch_members_by_season()        
+        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
 
         embed = await clash_embed(
             context=context,
@@ -590,7 +591,7 @@ class Bank(commands.Cog):
                 + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
                 + f"\n`{'Reserve':<10}` {self.reserve_account.balance:,} {currency}"
                 + f"\n`{'Total':<10}` {total_balance:,} {currency}"
-                + f"\n\nNew Monthly Balance (est.): {len(alliance_members) * 25000:,}",
+                + f"\n\nNew Monthly Balance (est.): {len(member_tags) * 25000:,}",
             timestamp=pendulum.now()
             )
         return embed
