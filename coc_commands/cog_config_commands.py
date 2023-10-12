@@ -23,47 +23,56 @@ from .views.create_recruiting_reminder import CreateRecruitingReminder, Recruiti
 bot_client = BotClashClient()
 
 async def autocomplete_guild_clan_panels(interaction:discord.Interaction,current:str):
-    panels = [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=interaction.guild.id)]
-    if current:
-        sel_panels = [p for p in panels if current.lower() in str(p).lower()]
-    else:
-        sel_panels = panels
+    try:
+        panels = [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=interaction.guild.id)]
+        if current:
+            sel_panels = [p for p in panels if current.lower() in str(p).lower()]
+        else:
+            sel_panels = panels
 
-    return [
-        app_commands.Choice(
-            name=str(panel),
-            value=str(panel.channel_id))
-        for panel in random.sample(sel_panels,min(5,len(sel_panels)))
-        ]
+        return [
+            app_commands.Choice(
+                name=str(panel),
+                value=str(panel.channel_id))
+            for panel in random.sample(sel_panels,min(5,len(sel_panels)))
+            ]
+    except:
+        bot_client.coc_main_log.exception(f"Error in autocomplete_guild_clan_panels")
 
 async def autocomplete_guild_apply_panels(interaction:discord.Interaction,current:str):
-    panels = [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=interaction.guild.id)]
-    if current:
-        sel_panels = [p for p in panels if current.lower() in str(p).lower()]
-    else:
-        sel_panels = panels
+    try:
+        panels = [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=interaction.guild.id)]
+        if current:
+            sel_panels = [p for p in panels if current.lower() in str(p).lower()]
+        else:
+            sel_panels = panels
 
-    return [
-        app_commands.Choice(
-            name=str(panel),
-            value=str(panel.channel_id))
-        for panel in random.sample(sel_panels,min(5,len(sel_panels)))
-        ]
+        return [
+            app_commands.Choice(
+                name=str(panel),
+                value=str(panel.channel_id))
+            for panel in random.sample(sel_panels,min(5,len(sel_panels)))
+            ]
+    except:
+        bot_client.coc_main_log.exception(f"Error in autocomplete_guild_apply_panels")
 
 async def autocomplete_guild_recruiting_reminders(interaction:discord.Interaction,current:str):
-    panels = RecruitingReminder.get_by_guild(interaction.guild.id)
+    try:
+        panels = RecruitingReminder.get_by_guild(interaction.guild.id)
 
-    if current:
-        sel_panels = [p for p in panels if current.lower() in str(p).lower()]
-    else:
-        sel_panels = panels
+        if current:
+            sel_panels = [p for p in panels if current.lower() in str(p).lower()]
+        else:
+            sel_panels = panels
 
-    return [
-        app_commands.Choice(
-            name=str(panel),
-            value=str(panel.channel_id))
-        for panel in random.sample(sel_panels,min(5,len(sel_panels)))
-        ]
+        return [
+            app_commands.Choice(
+                name=str(panel),
+                value=str(panel._channel))
+            for panel in random.sample(sel_panels,min(5,len(sel_panels)))
+            ]
+    except:
+        bot_client.coc_main_log.exception(f"Error in autocomplete_guild_recruiting_reminders")
 
 ############################################################
 ############################################################

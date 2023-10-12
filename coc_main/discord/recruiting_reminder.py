@@ -58,7 +58,7 @@ class RecruitingReminder():
         self._is_new = False
     
     def __str__(self):
-        return f"{self.ad_name}: every {self.interval}hr(s) for {getattr(self.remind_user,'name','Unknown')} in {getattr(self.channel,'name','Unknown Channel')}."
+        return f"{self.ad_name}: every {self.interval}hr(s) for {getattr(self.remind_user,'display_name','Unknown')} in {getattr(self.channel,'name','Unknown Channel')}"
     
     ##################################################
     ### CREATE / DELETE

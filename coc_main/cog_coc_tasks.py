@@ -70,6 +70,7 @@ class ClashOfClansTasks(commands.Cog):
         self.refresh_lock = asyncio.Lock()
         self.last_task_refresh = None
 
+        self.recruiting_loop_started = False
         self.refresh_recruiting_lock = asyncio.Lock()
 
         self.api_maintenance = False
@@ -150,6 +151,7 @@ class ClashOfClansTasks(commands.Cog):
                             break
                         await asyncio.sleep(1)        
             self.refresh_recruiting_reminders.start()
+            self.recruiting_loop_started = True
 
     ##################################################
     ### COG LOAD
@@ -159,6 +161,9 @@ class ClashOfClansTasks(commands.Cog):
         self.refresh_coc_tasks.cancel()
         self.coc_data_queue.cancel()
         self.controller_task.cancel()
+
+        if self.recruiting_loop_started:
+            self.refresh_recruiting_reminders.cancel()
 
         self.coc_main_log.info(f"Stopped Clash Data Loop.")
 
