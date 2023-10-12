@@ -87,7 +87,7 @@ class ClanMemberFeed():
             title=f"**{self.player.name}** ({self.player.tag})",
             message=(f"{self.player.discord_user_str}\n" if self.player.discord_user else "")
                 + (f"{self.player.member_description}\n" if self.player.is_member else "")
-                + f"{EmojisClash.EXP} {self.player.exp_level}\u3000{self.player.town_hall.emote} {self.player.town_hall.description}\u3000{EmojisLeagues.get(self.feed.player.league.name)} {self.feed.player.trophies}\n"
+                + f"{EmojisClash.EXP} {self.player.exp_level}\u3000{self.player.town_hall.emote} {self.player.town_hall.description}\u3000{EmojisLeagues.get(self.player.league.name)} {self.player.trophies}\n"
                 + (f"{self.player.hero_description}" if self.player.town_hall.level >= 7 else ""),
             show_author=False,
             success=False,
