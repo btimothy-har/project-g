@@ -5,8 +5,6 @@ import unicodedata
 from typing import *
 from redbot.core.bot import Red
 
-webhook_img_url = "https://i.imgur.com/TZF5r54.png"
-
 async def convert_seconds_to_str(seconds):
     dtime = seconds                      
     dtime_days,dtime = divmod(dtime,86400)

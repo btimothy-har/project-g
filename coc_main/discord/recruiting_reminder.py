@@ -129,13 +129,14 @@ class RecruitingReminder():
             
             try:
                 post_embed = await self.embed()
-                view = RecruitingPostPrompt(self)
+                view = RecruitingPostPrompt(self.id)
 
                 webhook = await get_bot_webhook(bot_client.bot,self.channel)
                 if isinstance(self.channel,discord.Thread):
                     self.active_reminder = await webhook.send(
                         wait=True,
                         username=bot_client.bot.user.name,
+                        avatar_url=bot_client.bot.user.display_avatar.url,
                         content=getattr(self.remind_user,'mention',''),
                         embed=post_embed,
                         view=view,
@@ -145,6 +146,7 @@ class RecruitingReminder():
                     self.active_reminder = await webhook.send(
                         wait=True,
                         username=bot_client.bot.user.name,
+                        avatar_url=bot_client.bot.user.display_avatar.url,
                         content=getattr(self.remind_user,'mention',''),
                         embed=post_embed,
                         view=view,
@@ -170,7 +172,7 @@ class RecruitingReminder():
                 return await self.delete()
             
             post_embed = await self.embed()
-            view = RecruitingPostPrompt(self)
+            view = RecruitingPostPrompt(self.id)
             webhook = await get_bot_webhook(bot_client.bot,self.channel)
             if isinstance(self.channel,discord.Thread):
                 self.active_reminder = await webhook.edit_message(
@@ -236,6 +238,7 @@ class RecruitingReminder():
     def last_posted(self,timestamp:pendulum.DateTime):
         self._last_posted = timestamp.int_timestamp
         db_RecruitingPost.objects(id=self.id).update_one(set__last_posted=timestamp.int_timestamp)
+        bot_client.coc_main_log.info(f"Reminder {self.id} {self.ad_name}: last_posted updated to {timestamp}.")
     
     @property
     def next_reminder(self) -> Optional[pendulum.DateTime]:
@@ -256,6 +259,7 @@ class RecruitingReminder():
     def last_user(self,user_id:int):
         self._last_user = user_id
         db_RecruitingPost.objects(id=self.id).update_one(set__last_user=user_id)
+        bot_client.coc_main_log.info(f"Reminder {self.id} {self.ad_name}: last_user updated to {user_id}.")
 
     @property
     def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
@@ -281,6 +285,7 @@ class RecruitingReminder():
         else:
             self._active_reminder = message.id
         db_RecruitingPost.objects(id=self.id).update_one(set__active_reminder=self._active_reminder)
+        bot_client.coc_main_log.info(f"Reminder {self.id} {self.ad_name}: active_reminder updated to {getattr(message,'id',None)}.")
 
     @property
     def logs(self) -> list:
@@ -295,8 +300,8 @@ class RecruitingReminder():
         db_RecruitingPost.objects(id=self.id).update_one(push__logs=new_log)
 
 class RecruitingPostPrompt(discord.ui.View):
-    def __init__(self,post:RecruitingReminder):
-        self.post = post
+    def __init__(self,post_id:str):
+        self.post_id = post_id
         self.button = DiscordButton(
             function=self._post_confirmed,
             label="Confirm Completed",
@@ -310,11 +315,13 @@ class RecruitingPostPrompt(discord.ui.View):
     async def _post_confirmed(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
-
-        async with self.post.lock:
+        
+        post = RecruitingReminder(self.post_id)
+        
+        async with post.lock:
             now = pendulum.now()
 
-            embed = await self.post.embed()
+            embed = await post.embed()
             embed.add_field(
                 name="Posted By",
                 value=f"{interaction.user.mention}"
@@ -328,8 +335,8 @@ class RecruitingPostPrompt(discord.ui.View):
             
             await interaction.edit_original_response(embed=embed,view=self)
 
-            self.post.last_posted = now
-            self.post.last_user = interaction.user.id
-            self.post.active_reminder = None
-            self.post.logs = interaction
+            post.last_posted = now
+            post.last_user = interaction.user.id
+            post.active_reminder = None
+            post.logs = interaction
         self.stop()        

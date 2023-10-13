@@ -19,6 +19,7 @@ from coc_main.utils.checks import is_admin, has_manage_server
 
 from .views.create_application_panel import CreateApplicationMenu
 from .views.create_recruiting_reminder import CreateRecruitingReminder, RecruitingReminder
+from coc_main.discord.mongo_discord import db_RecruitingPost
 
 bot_client = BotClashClient()
 
@@ -68,7 +69,7 @@ async def autocomplete_guild_recruiting_reminders(interaction:discord.Interactio
         return [
             app_commands.Choice(
                 name=str(panel),
-                value=str(panel._channel))
+                value=str(panel.id))
             for panel in random.sample(sel_panels,min(5,len(sel_panels)))
             ]
     except:
@@ -855,7 +856,7 @@ class ClashServerConfig(commands.Cog):
         
         await reminder.delete()
         embed = await clash_embed(
-            context=reminder,
+            context=interaction,
             message=f"Recruiting Reminder deleted.",
             success=True
             )

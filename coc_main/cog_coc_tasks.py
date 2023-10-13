@@ -393,7 +393,7 @@ class ClashOfClansTasks(commands.Cog):
                 if not loop.loop_active:
                     await loop.start()
     
-    @tasks.loop(minutes=5.0)
+    @tasks.loop(minutes=15.0)
     async def refresh_recruiting_reminders(self):
         if self.refresh_recruiting_lock.locked():
             return
