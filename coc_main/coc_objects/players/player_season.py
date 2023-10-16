@@ -233,10 +233,17 @@ class aPlayerSeason():
         self.town_hall = player.town_hall.level
             
         if bank_cog and player.hero_strength > self.player.hero_strength:
-            asyncio.create_task(bank_cog.member_hero_upgrade_reward(
-                player=player,
-                cached_value=self.player.hero_strength
-                ))
+            #only sum hero levels above minimum
+            elig_upgrade_levels = 0
+            async for h in AsyncIter(player.heroes):
+                if h.level > h.min_level:
+                    elig_upgrade_levels += h.level - getattr(self.player.get_hero(h.name),'level',0)
+
+            if elig_upgrade_levels > 0:
+                asyncio.create_task(bank_cog.member_hero_upgrade_reward(
+                    player=player,
+                    levels=elig_upgrade_levels
+                    ))
 
         updated += await self.attacks.update_stat(
             player=player,

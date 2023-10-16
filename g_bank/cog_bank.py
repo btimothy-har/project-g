@@ -53,7 +53,7 @@ class Bank(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 2
+    __release__ = 3
 
     def __init__(self,bot:Red):
         self.bot = bot
@@ -248,7 +248,7 @@ class Bank(commands.Cog):
             comment = f"Townhall Bonus for {player.name} ({player.tag}): TH{cached_value} to TH{player.town_hall.level}."
             )
     
-    async def member_hero_upgrade_reward(self,player:aPlayer,cached_value:int):
+    async def member_hero_upgrade_reward(self,player:aPlayer,levels:int):
         if not self.use_rewards:
             return
         if not player.is_member:
@@ -257,12 +257,12 @@ class Bank(commands.Cog):
         if not member:
             return
         
-        reward = 1000 * (player.hero_strength - cached_value)
+        reward = 1000 * levels
         await bank.deposit_credits(member,reward)
         await self.current_account.withdraw(
             amount = reward,
             user_id = self.bot.user.id,
-            comment = f"Hero Bonus for {player.name} ({player.tag}): {cached_value} to {player.hero_strength}"
+            comment = f"Hero Bonus for {player.name} ({player.tag}): {levels} upgraded."
             )
     
     async def member_legend_rewards(self):
@@ -1160,6 +1160,63 @@ class Bank(commands.Cog):
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
+
+    ##################################################
+    ### USER REDEEM
+    ##################################################
+    @commands.command(name="redeem")
+    @commands.guild_only()
+    async def command_item_redeem(self,ctx:commands.Context):
+        """
+        Redeems an item from your inventory!
+        """
+
+        inv = UserInventory(ctx.author)
+        inv_check = len([i for i in inv.inventory if i.guild_id == ctx.guild.id]) > 0
+
+        if not inv_check:
+            return await ctx.reply("You don't have any items to redeem from this server.")
+        
+        # Assassins Guild
+        if ctx.guild.id == 1132581106571550831:
+            role = ctx.guild.get_role(1163325808941727764)
+            await ctx.author.add_roles(role)
+            return await ctx.reply(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
+        
+        # ARIX
+        if ctx.guild.id == 688449973553201335:
+            role = ctx.guild.get_role(1163327086262485094)
+            await ctx.author.add_roles(role)
+            return await ctx.reply(f"Please open a ticket in <#798930079111053372> to redeem your item!")
+
+    @app_commands.command(
+        name="redeem",
+        description="Redeems an item from your inventory!"
+        )
+    @app_commands.guild_only()
+    async def app_command_redeem_user(self,interaction:discord.Interaction):        
+        
+        await interaction.response.defer()
+
+        member = interaction.guild.get_member(interaction.user.id)
+
+        inv = UserInventory(member)
+        inv_check = len([i for i in inv.inventory if i.guild_id == interaction.guild.id]) > 0
+
+        if not inv_check:
+            return await interaction.followup.send("You don't have any items to redeem from this server.")
+        
+        # Assassins Guild
+        if interaction.guild.id == 1132581106571550831:
+            role = interaction.guild.get_role(1163325808941727764)
+            await member.add_roles(role)
+            return await interaction.followup.send(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
+        
+        # ARIX
+        if interaction.guild.id == 688449973553201335:
+            role = interaction.guild.get_role(1163327086262485094)
+            await member.add_roles(role)
+            return await interaction.followup.send(f"Please open a ticket in <#798930079111053372> to redeem your item!")
     
     ##################################################
     ### STORE MANAGER
@@ -1271,7 +1328,7 @@ class Bank(commands.Cog):
     @app_commands.check(is_admin)
     @app_commands.autocomplete(item=autocomplete_distribute_items)
     @app_commands.describe(
-        item="Select an item to redeem. Only Basic items can be distributed.",
+        item="Select an item to redeem.",
         user="Select a user to redeem from."
         )
     async def app_command_redeem_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
