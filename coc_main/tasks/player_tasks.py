@@ -52,7 +52,7 @@ class PlayerLoop(TaskLoop):
                         raise asyncio.CancelledError
                     
                     if self.task_lock.locked():
-                        if self.defer_count > 10:
+                        if self.defer_count > 20:
                             async with self.task_lock:
                                 await asyncio.sleep(0)
                         else:
@@ -120,11 +120,11 @@ class PlayerLoop(TaskLoop):
     def sleep_time(self):
         if self.deferred:
             if self.defer_count < 3:
+                return 90
+            if self.defer_count < 11:
                 return 60
-            if self.defer_count < 8:
-                return 30
-            if self.defer_count >= 8:
-                return 30
+            if self.defer_count >= 11:
+                return 20
         
         if self.api_error:
             self.api_error = False
