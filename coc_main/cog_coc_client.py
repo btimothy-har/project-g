@@ -46,8 +46,10 @@ class ClashOfClansClient(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
-        self.semaphore_limit = int(bot_client.num_keys * 1)
+        self.semaphore_limit = int(bot_client.rate_limit)
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
+
+        self.api_lock = asyncio.Semaphore(2)
 
         self.player_api = deque(maxlen=10000)
         self.clan_api = deque(maxlen=10000)
@@ -159,7 +161,7 @@ class ClashOfClansClient(commands.Cog):
     ##### COC: PLAYERS
     #####
     ############################################################
-    async def fetch_player(self,tag:str,no_cache=False) -> aPlayer:
+    async def fetch_player(self,tag:str,no_cache=False,enforce_lock=False) -> aPlayer:
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)        
@@ -174,11 +176,15 @@ class ClashOfClansClient(commands.Cog):
                 return cached
         try:
             async with self.client_semaphore:
-                await asyncio.sleep(1/self.semaphore_limit)
+                if enforce_lock:
+                    async with self.api_lock:
+                        await asyncio.sleep(1/self.semaphore_limit)
+
                 st = pendulum.now()
                 player = await self.client.coc.get_player(n_tag,cls=aPlayer)
                 diff = pendulum.now() - st
                 self.player_api.append(diff.total_seconds())
+
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
@@ -223,7 +229,7 @@ class ClashOfClansClient(commands.Cog):
     ##### COC: CLANS
     #####
     ############################################################
-    async def fetch_clan(self,tag:str,no_cache:bool=False) -> aClan:
+    async def fetch_clan(self,tag:str,no_cache:bool=False,enforce_lock=False) -> aClan:
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
@@ -240,9 +246,13 @@ class ClashOfClansClient(commands.Cog):
 
         try:
             async with self.client_semaphore:
-                await asyncio.sleep(1/self.semaphore_limit)
+                if enforce_lock:
+                    async with self.api_lock:
+                        await asyncio.sleep(1/self.semaphore_limit)
+
                 st = pendulum.now()
                 clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+
                 diff = pendulum.now() - st
                 self.clan_api.append(diff.total_seconds())
         except coc.NotFound as exc:
@@ -300,12 +310,12 @@ class ClashOfClansClient(commands.Cog):
     async def get_clan_war(self,clan:aClan) -> aClanWar:
         api_war = None
         try:
-            async with self.client_semaphore:
-                await asyncio.sleep(1/self.semaphore_limit)
+            async with self.client_semaphore:                
                 st = pendulum.now()
                 api_war = await self.client.coc.get_clan_war(clan.tag)
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
+
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
@@ -320,12 +330,12 @@ class ClashOfClansClient(commands.Cog):
 
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
         try:
-            async with self.client_semaphore:
-                await asyncio.sleep(1/self.semaphore_limit)
+            async with self.client_semaphore:                
                 st = pendulum.now()
                 api_group = await self.client.coc.get_league_group(clan.tag)
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
+
         except coc.NotFound:
             pass
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -344,12 +354,12 @@ class ClashOfClansClient(commands.Cog):
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
         api_raid = None
         try:
-            async with self.client_semaphore:
-                await asyncio.sleep(1/self.semaphore_limit)
+            async with self.client_semaphore:               
                 st = pendulum.now()
                 raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
                 diff = pendulum.now() - st
                 self.raid_api.append(diff.total_seconds())
+
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
@@ -387,14 +397,44 @@ class ClashOfClansClient(commands.Cog):
             inline=False
             )
         embed.add_field(
-            name="**Response Time**",
+            name="**Player API**",
             value="```ini"
-                + f"\n{'[Player]':<10} {self.player_api_avg:.3f}s (last: {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s)"
-                + f"\n{'[Clan]':<10} {self.clan_api_avg:.3f}s (last: {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s)"
-                + f"\n{'[War]':<10} {self.war_api_avg:.3f}s (last: {(self.war_api[-1] if len(self.war_api) > 0 else 0):.3f}s)"
-                + f"\n{'[Raid]':<10} {self.raid_api_avg:.3f}s (last: {(self.raid_api[-1] if len(self.raid_api) > 0 else 0):.3f}s)"
+                + f"\n{'[Last]':<6} {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s"
+                + f"\n{'[Avg]':<6} {self.player_api_avg:.3f}s"
+                + f"\n{'[Min]':<6} {(min(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
+                + f"\n{'[Max]':<6} {(max(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
+                + "```",
+            inline=True
+            )
+        embed.add_field(
+            name="**Clan API**",
+            value="```ini"
+                + f"\n{'[Last]':<6} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s"
+                + f"\n{'[Avg]':<6} {self.clan_api_avg:.3f}s"
+                + f"\n{'[Min]':<6} {(min(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
+                + f"\n{'[Max]':<6} {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
+                + "```",
+            inline=True
+            )
+        embed.add_field(
+            name="**Clan War API**",
+            value="```ini"
+                + f"\n{'[Last]':<6} {(self.war_api[-1] if len(self.war_api) > 0 else 0):.3f}s"
+                + f"\n{'[Avg]':<6} {self.war_api_avg:.3f}s"
+                + f"\n{'[Min]':<6} {(min(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
+                + f"\n{'[Max]':<6} {(max(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
                 + "```",
             inline=False
+            )
+        embed.add_field(
+            name="**Capital Raids API**",
+            value="```ini"
+                + f"\n{'[Last]':<6} {(self.raid_api[-1] if len(self.raid_api) > 0 else 0):.3f}s"
+                + f"\n{'[Avg]':<6} {self.raid_api_avg:.3f}s"
+                + f"\n{'[Min]':<6} {(min(self.raid_api) if len(self.raid_api) > 0 else 0):.3f}s"
+                + f"\n{'[Max]':<6} {(max(self.raid_api) if len(self.raid_api) > 0 else 0):.3f}s"
+                + "```",
+            inline=True
             )
         return embed
     

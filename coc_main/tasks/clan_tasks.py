@@ -54,17 +54,21 @@ class ClanLoop(TaskLoop):
                         raise asyncio.CancelledError
                     
                     if self.task_lock.locked():
-                        async with self.task_lock:
-                            await asyncio.sleep(0)
-                    
-                    if not self.loop_active:
-                        raise asyncio.CancelledError
+                        if self.defer_count > 10:
+                            async with self.task_lock:
+                                await asyncio.sleep(0)
+                        else:
+                            self.defer_count += 1
+                            self.deferred = True
+                            continue
 
                     async with self.task_semaphore:
+                        self.deferred = False
+                        self.defer_count = 0
                         st = pendulum.now()
                         try:
                             async with self.api_semaphore:
-                                clan = await self.coc_client.fetch_clan(self.tag,no_cache=True)
+                                clan = await self.coc_client.fetch_clan(self.tag,no_cache=True,enforce_lock=True)
                         except InvalidTag as exc:
                             raise asyncio.CancelledError from exc
 
@@ -123,6 +127,14 @@ class ClanLoop(TaskLoop):
     
     @property
     def sleep_time(self):
+        if self.deferred:
+            if self.defer_count < 3:
+                return 60
+            if self.defer_count < 8:
+                return 30
+            if self.defer_count >= 8:
+                return 15
+        
         if self.api_error:
             self.api_error = False
             return 600

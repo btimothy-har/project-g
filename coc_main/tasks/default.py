@@ -36,6 +36,9 @@ class TaskLoop():
         
         self.api_error = False
         self.error_reports = 0
+
+        self.deferred = False
+        self.defer_count = 0
     
     def __del__(self):
         if self.task:

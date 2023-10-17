@@ -63,8 +63,8 @@ class ClashOfClansTasks(commands.Cog):
 
         # DATA QUEUE
         self.queue_lock = asyncio.Lock()
-        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.num_keys * 0.025))
-        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.num_keys * 0.025))
+        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.05))
+        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.05))
 
         # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
@@ -83,7 +83,7 @@ class ClashOfClansTasks(commands.Cog):
         self.task_semaphore_limit = 100000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
-        self.api_semaphore_limit = int(bot_client.num_keys * 0.8)
+        self.api_semaphore_limit = int(bot_client.rate_limit * 0.8)
         self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
@@ -314,7 +314,7 @@ class ClashOfClansTasks(commands.Cog):
     
     async def load_clan_queue(self):        
         async def fetch_clan(clan_tag):
-            await self.client.fetch_clan(clan_tag)
+            await self.client.fetch_clan(clan_tag,enforce_lock=True)
             bot_client.clan_cache.remove_from_queue(clan_tag)
         
         clan_queue = bot_client.clan_cache.queue.copy()
@@ -330,7 +330,7 @@ class ClashOfClansTasks(commands.Cog):
         
     async def load_player_queue(self):
         async def fetch_player(player_tag):
-            await self.client.fetch_player(player_tag)
+            await self.client.fetch_player(player_tag,enforce_lock=True)
             bot_client.player_cache.remove_from_queue(player_tag)
         
         player_queue = bot_client.player_cache.queue.copy()
