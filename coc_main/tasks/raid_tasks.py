@@ -46,6 +46,11 @@ class ClanRaidLoop(TaskLoop):
         except:
             pass
     
+    @property
+    def task_lock(self) -> asyncio.Lock:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog._master_task_lock
+    
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
@@ -53,61 +58,61 @@ class ClanRaidLoop(TaskLoop):
         try:
             while self.loop_active:
                 try:
-                    st = pendulum.now()
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
-                    if self.master_lock.locked():
-                        async with self.master_lock:
+                    if self.task_lock.locked():
+                        async with self.task_lock:
                             await asyncio.sleep(0)
                     
+                    if self.clan and st.day_of_week not in [5,6,7,1]:
+                        continue
+                    
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
-                    work_start = pendulum.now()
-                    if self.clan and st.day_of_week not in [5,6,7,1]:
-                        continue
+                    async with self.task_semaphore:
+                        st = pendulum.now()
+                        try:
+                            self.clan = await self.coc_client.fetch_clan(tag=self.tag)
+                        except InvalidTag:
+                            raise asyncio.CancelledError
 
-                    try:
-                        self.clan = await self.coc_client.fetch_clan(tag=self.tag)
-                    except InvalidTag:
-                        raise asyncio.CancelledError
-
-                    current_raid = await self.coc_client.get_raid_weekend(clan=self.clan)
-                    if not current_raid:
-                        continue
-                    if current_raid.do_i_save:
-                        current_raid.save_to_database()
-                
-                    #Current Raid Management
-                    if current_raid.state in ['ongoing']:
-                        await asyncio.gather(*(self._setup_raid_reminder(current_raid,r) for r in self.clan.capital_raid_reminders))
-                            
-                    #Raid State Changes
-                    if self.cached_state and current_raid.state != self.cached_state:
-                        
-                        #Raid Started
-                        if current_raid.state in ['ongoing'] and current_raid.start_time != self.cached_raid.start_time:
-                            current_raid.starting_trophies = self.clan.capital_points
+                        current_raid = await self.coc_client.get_raid_weekend(clan=self.clan)
+                        if not current_raid:
+                            continue
+                        if current_raid.do_i_save:
                             current_raid.save_to_database()
-                        
-                        #Raid Ended
-                        if current_raid.state in ['ended']:
-                            self.clan = await self.coc_client.fetch_clan(tag=self.tag,no_cache=True)
-
-                            current_raid.ending_trophies = self.clan.capital_points
-                            current_raid.save_to_database()
-
-                            if current_raid.attack_count > 0:
-                                await RaidResultsFeed.send_results(self.clan,current_raid)
+                    
+                        #Current Raid Management
+                        if current_raid.state in ['ongoing']:
+                            await asyncio.gather(*(self._setup_raid_reminder(current_raid,r) for r in self.clan.capital_raid_reminders))
+                                
+                        #Raid State Changes
+                        if self.cached_state and current_raid.state != self.cached_state:
                             
-                            if self.clan.is_alliance_clan:
-                                bank_cog = bot_client.bot.get_cog("Bank")
-                                if bank_cog:
-                                    await asyncio.gather(*(bank_cog.raid_bank_rewards(m) for m in current_raid.members))
+                            #Raid Started
+                            if current_raid.state in ['ongoing'] and current_raid.start_time != self.cached_raid.start_time:
+                                current_raid.starting_trophies = self.clan.capital_points
+                                current_raid.save_to_database()
+                            
+                            #Raid Ended
+                            if current_raid.state in ['ended']:
+                                self.clan = await self.coc_client.fetch_clan(tag=self.tag,no_cache=True)
 
-                    self.cached_state = current_raid.state
-                    self.cached_raid = current_raid
+                                current_raid.ending_trophies = self.clan.capital_points
+                                current_raid.save_to_database()
+
+                                if current_raid.attack_count > 0:
+                                    await RaidResultsFeed.send_results(self.clan,current_raid)
+                                
+                                if self.clan.is_alliance_clan:
+                                    bank_cog = bot_client.bot.get_cog("Bank")
+                                    if bank_cog:
+                                        await asyncio.gather(*(bank_cog.raid_bank_rewards(m) for m in current_raid.members))
+
+                        self.cached_state = current_raid.state
+                        self.cached_raid = current_raid
                 
                 except ClashAPIError as exc:
                     self.api_error = True
@@ -117,23 +122,18 @@ class ClanRaidLoop(TaskLoop):
 
                 finally:
                     if not self.loop_active:
-                        return                
+                        raise asyncio.CancelledError  
+                    
                     et = pendulum.now()
-
                     try:
-                        work_time = et.int_timestamp - work_start.int_timestamp
-                        self.work_time.append(work_time)
+                        run_time = et - st
+                        self.run_time.append(run_time.total_seconds())
                     except:
                         pass
-                    try:
-                        run_time = et.int_timestamp-st.int_timestamp
-                        self.run_time.append(run_time)
-                    except:
-                        pass
-
-                    self.data_log.debug(
-                        f"{self.tag}: Raid State for {self.clan} updated. Runtime: {run_time} seconds."
-                        )
+                    else:
+                        self.data_log.debug(
+                            f"{self.tag}: Raid State for {self.clan} updated. Runtime: {run_time.total_seconds()} seconds."
+                            )
                     await asyncio.sleep(self.sleep_time)
                         
         except asyncio.CancelledError:
@@ -193,11 +193,16 @@ class ClanRaidLoop(TaskLoop):
     def sleep_time(self):
         if not self.clan:
             return 30
+        
         if pendulum.now().day_of_week not in [5,6,7,1]:
             return 3600
-        elif self.api_error:
+        
+        if self.api_error:
             self.api_error = False
-            return 1800
-        elif pendulum.now().day_of_week in [5,1] and getattr(self.cached_raid,'state',None) == 'ongoing': #Friday and Monday
+            return 900 #15mins
+        
+        #Friday and Monday
+        if pendulum.now().day_of_week in [5,1] and getattr(self.cached_raid,'state',None) == 'ongoing':
             return 300 #5mins
+        
         return 600 #10mins

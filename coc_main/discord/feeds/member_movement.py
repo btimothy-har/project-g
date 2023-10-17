@@ -42,14 +42,17 @@ class ClanMemberFeed():
 
     @classmethod
     async def member_join(cls,clan:aClan,player_tag:str):
-        if len(clan.member_feed) == 0:
-            return
-        
-        feed = cls(clan,player_tag)
-        await feed.fetch_player()
-        embed = await feed.join_embed()
+        try:
+            if len(clan.member_feed) == 0:
+                return
+            
+            feed = cls(clan,player_tag)
+            await feed.fetch_player()
+            embed = await feed.join_embed()
 
-        await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
+            await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Member Join Feed.")
     
     async def join_embed(self):
         embed = await clash_embed(
@@ -72,14 +75,17 @@ class ClanMemberFeed():
     
     @classmethod
     async def member_leave(cls,clan:aClan,player_tag:str):
-        if len(clan.member_feed) == 0:
-            return
+        try:
+            if len(clan.member_feed) == 0:
+                return
         
-        feed = cls(clan,player_tag)
-        await feed.fetch_player()
-        embed = await feed.leave_embed()
+            feed = cls(clan,player_tag)
+            await feed.fetch_player()
+            embed = await feed.leave_embed()
 
-        await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
+            await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Member Leave Feed.")
     
     async def leave_embed(self):
         embed = await clash_embed(
@@ -100,20 +106,23 @@ class ClanMemberFeed():
         return embed
     
     async def send_to_discord(self,embed,data_feed:db_ClanDataFeed):
-        channel = bot_client.bot.get_channel(data_feed.channel_id)
-        if not channel:
-            return
-        webhook = await get_bot_webhook(bot_client.bot,channel)
-        if isinstance(channel,discord.Thread):
-            await webhook.send(
-                username=self.clan.name,
-                avatar_url=self.clan.badge,
-                embed=embed,
-                thread=channel
-                )
-        else:
-            await webhook.send(
-                username=self.clan.name,
-                avatar_url=self.clan.badge,
-                embed=embed
-                )
+        try:
+            channel = bot_client.bot.get_channel(data_feed.channel_id)
+            if not channel:
+                return
+            webhook = await get_bot_webhook(bot_client.bot,channel)
+            if isinstance(channel,discord.Thread):
+                await webhook.send(
+                    username=self.clan.name,
+                    avatar_url=self.clan.badge,
+                    embed=embed,
+                    thread=channel
+                    )
+            else:
+                await webhook.send(
+                    username=self.clan.name,
+                    avatar_url=self.clan.badge,
+                    embed=embed
+                    )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error sending Member Feed to Discord.")

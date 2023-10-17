@@ -3,7 +3,6 @@ import asyncio
 import coc
 import pendulum
 import logging
-import random
 
 from typing import *
 from mongoengine import *
@@ -55,25 +54,37 @@ class ClashOfClansTasks(commands.Cog):
 
     def __init__(self,bot:Red):
         self.bot = bot
-        self.last_coc_task_error = None
 
+        self.api_maintenance = False
+
+        # TASK CONTROLLER
         self.controller_task = None
         self.task_lock_timestamp = None
 
-        self._master_task_lock = asyncio.Lock()
-        self._task_lock = asyncio.Lock()
-        self.task_semaphore_limit = 1000
-        self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
-
+        # DATA QUEUE
         self.queue_lock = asyncio.Lock()
+        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.02))
+        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.02))
 
+        # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
         self.last_task_refresh = None
 
+        # RECRUITING TASKS
         self.recruiting_loop_started = False
         self.refresh_recruiting_lock = asyncio.Lock()
+        
+        # BACKGROUND OBJECT TASKS
+        self.last_coc_task_error = None
 
-        self.api_maintenance = False
+        self._master_task_lock = asyncio.Lock()
+        self._task_lock = asyncio.Lock()
+
+        self.task_semaphore_limit = 100000
+        self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
+
+        self.api_semaphore_limit = int(bot_client.rate_limit * 0.1)
+        self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -104,11 +115,34 @@ class ClashOfClansTasks(commands.Cog):
     @property
     def api_semaphore_waiters(self) -> int:
         return len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0
+    
+    @property
+    def player_api_avg(self) -> float:
+        cog = self.bot.get_cog('ClashOfClansClient')
+        return cog.player_api_avg
+
+    @property
+    def clan_api_avg(self) -> float:
+        cog = self.bot.get_cog('ClashOfClansClient')
+        return cog.clan_api_avg
+    
+    @property
+    def war_api_avg(self) -> float:
+        cog = self.bot.get_cog('ClashOfClansClient')
+        return cog.war_api_avg
+    
+    @property
+    def raid_api_avg(self) -> float:
+        cog = self.bot.get_cog('ClashOfClansClient')
+        return cog.raid_api_avg
 
     ##################################################
     ### COG LOAD
     ##################################################
     async def cog_load(self):
+        asyncio.create_task(self.start_task_cog())
+    
+    async def start_task_cog(self):
         while True:
             if getattr(bot_client,'_api_logged_in',False):
                 break
@@ -120,14 +154,6 @@ class ClashOfClansTasks(commands.Cog):
             self.clash_maintenance_start,
             self.clash_maintenance_complete
             )
-
-        self.api_semaphore_limit = int((len(bot_client.coc.http._keys)*25))
-        self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
-
-        self.clan_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 20))
-        self.player_queue_semaphore = asyncio.Semaphore(int(self.api_semaphore_limit / 20))
-        
-        self.coc_main_log.info(f"Found {len(bot_client.coc.http._keys):,} API Keys, setting semaphore limit at {self.api_semaphore_limit:,}.")
 
         self.controller_task = asyncio.create_task(self.coc_task_controller())
         self.refresh_discord_tasks.start()
@@ -160,6 +186,7 @@ class ClashOfClansTasks(commands.Cog):
         self.refresh_discord_tasks.cancel()
         self.refresh_coc_tasks.cancel()
         self.coc_data_queue.cancel()
+
         self.controller_task.cancel()
 
         if self.recruiting_loop_started:
@@ -265,7 +292,7 @@ class ClashOfClansTasks(commands.Cog):
                 bot_client.coc_main_log.exception(f"Error in Clash Task Controller")
 
             finally:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.25)
 
     @tasks.loop(seconds=60)
     async def coc_data_queue(self):
@@ -291,6 +318,11 @@ class ClashOfClansTasks(commands.Cog):
             bot_client.clan_cache.remove_from_queue(clan_tag)
         
         clan_queue = bot_client.clan_cache.queue.copy()
+        # async for p in AsyncIter(clan_queue):
+        #     try:
+        #         await fetch_clan(p)
+        #     except Exception as exc:
+        #         continue
         bounded_gather(*(fetch_clan(c) for c in clan_queue),
             semaphore=self.clan_queue_semaphore,
             return_exceptions=True
@@ -302,6 +334,11 @@ class ClashOfClansTasks(commands.Cog):
             bot_client.player_cache.remove_from_queue(player_tag)
         
         player_queue = bot_client.player_cache.queue.copy()
+        # async for p in AsyncIter(player_queue):
+        #     try:
+        #         await fetch_player(p)
+        #     except Exception as exc:
+        #         continue
         bounded_gather(*(fetch_player(p) for p in player_queue),
             semaphore=self.player_queue_semaphore,
             return_exceptions=True
@@ -445,10 +482,11 @@ class ClashOfClansTasks(commands.Cog):
 
     async def status_embed(self):
         embed = await clash_embed(self.bot,
-            title="**Clash of Clans Data Report**",
+            title="**Clash of Clans Data Status**",
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
                 + f"\n\nRefresh Task: " + ("Running" if self.refresh_lock.locked() else "Not Running")
-                + f"\nLast Refresh: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
+                + f"\nLast Refresh: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None"),
+            timestamp=pendulum.now()
             )
         embed.add_field(
             name="**Tasks Client**",
@@ -465,7 +503,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} {len(bot_client.coc.http._keys)}"
-                + f"\n{'[API Requests]':<15} {self.api_semaphore._value:,} / {self.api_semaphore_limit} (Waiting: {self.api_semaphore_waiters:,})"
+                + f"\n{'[API Requests]':<15} {self.api_semaphore_limit - self.api_semaphore._value:,} / {self.api_semaphore_limit} (Waiting: {self.api_semaphore_waiters:,})"
                 + "```",
             inline=False
             )
@@ -474,8 +512,8 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(bot_client.player_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Work Time]':<15} {round(PlayerLoop.worktime_avg())}s (min: {round(PlayerLoop.worktime_min())}s, max: {round(PlayerLoop.worktime_max())}s)"
-                + f"\n{'[Run Time]':<15} {round(PlayerLoop.runtime_avg())}s (min: {round(PlayerLoop.runtime_min())}s, max: {round(PlayerLoop.runtime_max())}s)"
+                + f"\n{'[Response]':<15} {self.player_api_avg:.2f}s"
+                + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg())}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
@@ -484,8 +522,8 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(bot_client.clan_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Work Time]':<15} {round(ClanLoop.worktime_avg())}s (min: {round(ClanLoop.worktime_min())}s, max: {round(ClanLoop.worktime_max())}s)"
-                + f"\n{'[Run Time]':<15} {round(ClanLoop.runtime_avg())}s (min: {round(ClanLoop.runtime_min())}s, max: {round(ClanLoop.runtime_max())}s)"
+                + f"\n{'[Response]':<15} {self.clan_api_avg:.2f}s"
+                + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg())}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
@@ -494,8 +532,8 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_ClanWar.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanWarLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Work Time]':<15} {round(ClanWarLoop.worktime_avg())}s"
-                + f"\n{'[Run Time]':<15} {round(ClanWarLoop.runtime_avg())}s"
+                + f"\n{'[Response]':<15} {self.war_api_avg:.2f}s"
+                + f"\n{'[Runtime]':<15} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
@@ -504,8 +542,8 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_RaidWeekend.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanRaidLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Work Time]':<15} {round(ClanRaidLoop.worktime_avg())}s"
-                + f"\n{'[Run Time]':<15} {round(ClanRaidLoop.runtime_avg())}s"
+                + f"\n{'[Response]':<15} {self.raid_api_avg:.2f}s"
+                + f"\n{'[Runtime]':<15} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )        
@@ -597,6 +635,7 @@ class RefreshStatus(DefaultView):
         button = DiscordButton(
             function=self._refresh_embed,
             emoji=EmojisUI.REFRESH,
+            label="Refresh",
             )
 
         super().__init__(context,timeout=9999999)

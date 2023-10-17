@@ -30,31 +30,37 @@ class RaidResultsFeed():
     
     @classmethod
     async def send_results(cls,clan:aClan,raid_weekend:aRaidWeekend):
-        a = cls(clan,raid_weekend)
+        try:
+            a = cls(clan,raid_weekend)
 
-        image = await a.get_results_image()
-        await asyncio.gather(*(a.send_to_discord(feed,image) for feed in a.feeds))        
+            image = await a.get_results_image()
+            await asyncio.gather(*(a.send_to_discord(feed,image) for feed in a.feeds))
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Raid Results Feed for {clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}")
         
     async def send_to_discord(self,feed:db_ClanDataFeed,file:discord.File):
-        channel = bot_client.bot.get_channel(feed.channel_id)
-        if not channel:
-            return
+        try:
+            channel = bot_client.bot.get_channel(feed.channel_id)
+            if not channel:
+                return
 
-        webhook = await get_bot_webhook(bot_client.bot,channel)
-        if isinstance(channel,discord.Thread):
-            await webhook.send(
-                username=self.clan.name,
-                avatar_url=self.clan.badge,
-                file=file,
-                thread=channel
-                )
-            
-        else:
-            await webhook.send(
-                username=self.clan.name,
-                avatar_url=self.clan.badge,
-                file=file
-                )
+            webhook = await get_bot_webhook(bot_client.bot,channel)
+            if isinstance(channel,discord.Thread):
+                await webhook.send(
+                    username=self.clan.name,
+                    avatar_url=self.clan.badge,
+                    file=file,
+                    thread=channel
+                    )
+                
+            else:
+                await webhook.send(
+                    username=self.clan.name,
+                    avatar_url=self.clan.badge,
+                    file=file
+                    )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error sending Raid Results Feed for {self.clan.name} - {self.raid_weekend.start_time.format('DD MMM YYYY')}")
     
     async def get_results_image(self):
         base_path = str(Path(__file__).parent)

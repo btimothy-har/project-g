@@ -6,6 +6,7 @@ from typing import *
 from mongoengine import *
 
 from redbot.core import bank
+from redbot.core.utils import AsyncIter
 
 from .item import ShopItem
 
@@ -87,7 +88,20 @@ class UserInventory():
                 else:
                     await self.user.add_roles(item.assigns_role)
             else:
-                await self.user.add_roles(item.assigns_role)        
+                if item.exclusive_role:
+                    if item.category == 'Uncategorized':
+                        similar_items = ShopItem.get_by_guild(item.guild_id)
+                    else:
+                        similar_items = ShopItem.get_by_category(item.guild_id,item.category)
+
+                    roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
+
+                    #remove_role_from_user
+                    async for role in AsyncIter(roles_from_similar_items):
+                        if role in self.user.roles:
+                            await self.user.remove_roles(role)
+                
+                await self.user.add_roles(item.assigns_role)
         return item
 
     async def gift_item(self,item:InventoryItem,recipient:discord.Member):        

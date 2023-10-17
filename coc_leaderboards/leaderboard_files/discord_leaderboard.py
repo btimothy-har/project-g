@@ -391,6 +391,7 @@ class ClanWarLeaderboard(Leaderboard):
             season=season.id
             ).only('tag')
         
+        lb_players = []
         lb_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag) for p in query_players))
 
         async for p in AsyncIter(lb_players):
@@ -472,6 +473,8 @@ class ResourceLootLeaderboard(Leaderboard):
             season=season.id,
             loot_darkelixir__season_total__gt=0
             ).only('tag')
+        
+        all_players = []
         all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag) for p in query_players))
         
         iter_players = AsyncIter(all_players)
@@ -552,9 +555,10 @@ class DonationsLeaderboard(Leaderboard):
             donations_sent__season_total__gt=0
             ).only('tag')
         
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(p.tag) for p in query_players))
+        all_players = []
+        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag) for p in query_players))
+        
         iter_players = AsyncIter(all_players)
-
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
@@ -628,9 +632,10 @@ class ClanGamesLeaderboard(Leaderboard):
             clangames__score__gt=0
             ).only('tag')
         
+        all_players = []
         all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag) for p in query_players))
+
         iter_players = AsyncIter(all_players)
-    
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
