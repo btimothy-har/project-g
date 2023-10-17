@@ -63,8 +63,8 @@ class ClashOfClansTasks(commands.Cog):
 
         # DATA QUEUE
         self.queue_lock = asyncio.Lock()
-        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.02))
-        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.02))
+        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.num_keys * 0.025))
+        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.num_keys * 0.025))
 
         # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
@@ -83,7 +83,7 @@ class ClashOfClansTasks(commands.Cog):
         self.task_semaphore_limit = 100000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
-        self.api_semaphore_limit = int(bot_client.rate_limit * 0.1)
+        self.api_semaphore_limit = int(bot_client.num_keys * 0.8)
         self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:

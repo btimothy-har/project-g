@@ -35,20 +35,7 @@ class aPlayer(coc.Player,BasicPlayer):
         BasicPlayer.__init__(self)
         coc.Player.__init__(self,**kwargs)
 
-        if self.is_new:
-            self.first_seen = pendulum.now()
-            #self.client.cog.coc_data_log.info(f"{self}: New Player Detected")
-        
         self.town_hall_level = self.town_hall
-
-        if self.cached_name != self.name:
-            self.cached_name = self.name
-        
-        if self.cached_xp_level != self.exp_level:
-            self.cached_xp_level = self.exp_level
-        
-        if self.cached_townhall != self.town_hall_level:
-            self.cached_townhall = self.town_hall_level        
 
         self.town_hall = aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
         self.clan_castle = sum([a.value for a in self.achievements if a.name=='Empire Builder'])

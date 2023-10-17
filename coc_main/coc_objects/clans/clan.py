@@ -31,21 +31,6 @@ class aClan(coc.Clan,BasicClan):
         self.badge = getattr(self.badge,'url',"")
         self.war_league_name = getattr(self.war_league,'name',"")
 
-        if self.name != self.cached_name:
-            self.cached_name = self.name
-
-        if self.badge != self.cached_badge:
-            self.cached_badge = self.badge
-        
-        if self.level != self.cached_level:
-            self.cached_level = self.level
-        
-        if self.capital_hall != self.cached_capital_hall:
-            self.cached_capital_hall = self.capital_hall
-        
-        if self.war_league_name != self.cached_war_league:
-            self.cached_war_league = self.war_league_name
-
     ##################################################
     ### DATA FORMATTERS
     ##################################################

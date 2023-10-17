@@ -46,7 +46,7 @@ class ClashOfClansClient(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
-        self.semaphore_limit = int(bot_client.rate_limit * 0.25)
+        self.semaphore_limit = int(bot_client.num_keys * 1)
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
 
         self.player_api = deque(maxlen=10000)
@@ -187,7 +187,16 @@ class ClashOfClansClient(commands.Cog):
             else:
                 raise ClashAPIError(exc) from exc
         
-        await self.client.player_cache.set(player.tag,player)        
+        if player.is_new:
+            player.first_seen = pendulum.now()        
+        if player.cached_name != player.name:
+            player.cached_name = player.name        
+        if player.cached_xp_level != player.exp_level:
+            player.cached_xp_level = player.exp_level        
+        if player.cached_townhall != player.town_hall_level:
+            player.cached_townhall = player.town_hall_level
+        
+        await self.client.player_cache.set(player.tag,player)
         return player
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
@@ -243,6 +252,17 @@ class ClashOfClansClient(commands.Cog):
                 return cached
             else:
                 raise ClashAPIError(exc) from exc
+        
+        if clan.name != clan.cached_name:
+            clan.cached_name = clan.name
+        if clan.badge != clan.cached_badge:
+            clan.cached_badge = clan.badge        
+        if clan.level != clan.cached_level:
+            clan.cached_level = clan.level        
+        if clan.capital_hall != clan.cached_capital_hall:
+            clan.cached_capital_hall = clan.capital_hall        
+        if clan.war_league_name != clan.cached_war_league:
+            clan.cached_war_league = clan.war_league_name
             
         await self.client.clan_cache.set(clan.tag,clan)
         return clan
@@ -369,10 +389,10 @@ class ClashOfClansClient(commands.Cog):
         embed.add_field(
             name="**Response Time**",
             value="```ini"
-                + f"\n{'[Player]':<10} {self.player_api_avg:.2f}s (max: {(max(self.player_api) if len(self.player_api) > 0 else 0):.2f}s)"
-                + f"\n{'[Clan]':<10} {self.clan_api_avg:.2f}s (max: {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.2f}s)"
-                + f"\n{'[War]':<10} {self.war_api_avg:.2f}s (max: {(max(self.war_api) if len(self.war_api) > 0 else 0):.2f}s)"
-                + f"\n{'[Raid]':<10} {self.raid_api_avg:.2f}s (max: {(max(self.raid_api) if len(self.raid_api) > 0 else 0):.2f}s)"
+                + f"\n{'[Player]':<10} {self.player_api_avg:.3f}s (last: {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s)"
+                + f"\n{'[Clan]':<10} {self.clan_api_avg:.3f}s (last: {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s)"
+                + f"\n{'[War]':<10} {self.war_api_avg:.3f}s (last: {(self.war_api[-1] if len(self.war_api) > 0 else 0):.3f}s)"
+                + f"\n{'[Raid]':<10} {self.raid_api_avg:.3f}s (last: {(self.raid_api[-1] if len(self.raid_api) > 0 else 0):.3f}s)"
                 + "```",
             inline=False
             )
