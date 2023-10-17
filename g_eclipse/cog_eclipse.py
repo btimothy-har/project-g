@@ -58,6 +58,13 @@ class ECLIPSE(commands.Cog):
         return self.bot.get_cog("ClashOfClansClient")
 
     async def cog_load(self):
+        asyncio.create_task(self.start_eclipse_cog())
+    
+    async def start_eclipse_cog(self):
+        while True:
+            if getattr(bot_client,'_api_logged_in',False):
+                break
+            await asyncio.sleep(1)
         await eWarBase.load_all()
     
     async def cog_command_error(self,ctx,error):

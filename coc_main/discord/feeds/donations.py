@@ -53,36 +53,41 @@ class ClanDonationFeed():
 
     @classmethod
     async def start_feed(cls,clan:aClan,cached_clan:aClan):
+        try:
+            feed = cls(clan,cached_clan)
+            if len(feed.clan.donation_feed) == 0:
+                return
+            
+            calc_member_donation = []
+            async for member in AsyncIter(feed.clan.members):
+                cached_member = feed.cached_clan.get_member(member.tag)
+                calc_member_donation.append(MemberDonationDelta(member,cached_member))
+            
+            feed.raw_data = calc_member_donation
 
-        feed = cls(clan,cached_clan)
-        if len(feed.clan.donation_feed) == 0:
-            return
-        
-        calc_member_donation = []
-        async for member in AsyncIter(feed.clan.members):
-            cached_member = feed.cached_clan.get_member(member.tag)
-            calc_member_donation.append(MemberDonationDelta(member,cached_member))
-        
-        feed.raw_data = calc_member_donation
-
-        if len([m for m in feed.raw_data if (m.donated_chg + m.received_chg) > 0]) > 0:
-            embed = await feed.embed()
-            await asyncio.gather(*(feed.send_to_discord(embed,feed_data) for feed_data in feed.clan.donation_feed))
+            if len([m for m in feed.raw_data if (m.donated_chg + m.received_chg) > 0]) > 0:
+                embed = await feed.embed()
+                await asyncio.gather(*(feed.send_to_discord(embed,feed_data) for feed_data in feed.clan.donation_feed))
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Donation Feed.")
     
     async def send_to_discord(self,embed,data_feed:db_ClanDataFeed):
-        channel = bot_client.bot.get_channel(data_feed.channel_id)
-        if channel:
-            webhook = await get_bot_webhook(bot_client.bot,channel)
-            if isinstance(channel,discord.Thread):
-                await webhook.send(
-                    username=self.clan.name,
-                    avatar_url=self.clan.badge,
-                    embed=embed,
-                    thread=channel
-                    )
-            else:
-                await webhook.send(
-                    username=self.clan.name,
-                    avatar_url=self.clan.badge,
-                    embed=embed
-                    )
+        try:
+            channel = bot_client.bot.get_channel(data_feed.channel_id)
+            if channel:
+                webhook = await get_bot_webhook(bot_client.bot,channel)
+                if isinstance(channel,discord.Thread):
+                    await webhook.send(
+                        username=self.clan.name,
+                        avatar_url=self.clan.badge,
+                        embed=embed,
+                        thread=channel
+                        )
+                else:
+                    await webhook.send(
+                        username=self.clan.name,
+                        avatar_url=self.clan.badge,
+                        embed=embed
+                        )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error sending Donation Feed to Discord.")

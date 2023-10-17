@@ -48,17 +48,18 @@ class PlayerLoop(TaskLoop):
         try:
             while self.loop_active:
                 try:
-                    st = pendulum.now()
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
                     if self.task_lock.locked():
                         async with self.task_lock:
                             await asyncio.sleep(0)
-                    
-                    async with self.task_semaphore:                        
-                        work_start = pendulum.now()
 
+                    if not self.loop_active:
+                        raise asyncio.CancelledError
+                    
+                    async with self.task_semaphore:
+                        st = pendulum.now()
                         try:
                             async with self.api_semaphore:
                                 self.cached_player = await self.coc_client.fetch_player(self.tag,no_cache=True)
@@ -79,23 +80,17 @@ class PlayerLoop(TaskLoop):
                 finally:
                     if not self.loop_active:
                         raise asyncio.CancelledError
-                                    
+                    
                     et = pendulum.now()
-
                     try:
-                        work_time = et.int_timestamp - work_start.int_timestamp
-                        self.work_time.append(work_time)
+                        run_time = et - st
+                        self.run_time.append(run_time.total_seconds())
                     except:
                         pass
-                    try:
-                        run_time = et.int_timestamp - st.int_timestamp
-                        self.run_time.append(run_time)
-                    except:
-                        pass
-
-                    self.main_log.debug(
-                        f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time} seconds."
-                        )
+                    else:
+                        self.main_log.debug(
+                            f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time.total_seconds()} seconds."
+                            )
                     await asyncio.sleep(self.sleep_time)
 
         except asyncio.CancelledError:
@@ -119,17 +114,20 @@ class PlayerLoop(TaskLoop):
     ##################################################
     @property
     def sleep_time(self):
-        if not self.cached_player:
-            sleep = 30
-        elif self.api_error:
-            sleep = 600
+        if self.api_error:
             self.api_error = False
-        elif self.cached_player.is_member:
-            sleep = random.randint(60,120) #1-2min
-        elif self.cached_player.clan.is_alliance_clan or self.cached_player.clan.is_registered_clan or self.cached_player.clan.is_active_league_clan:
-            sleep = random.randint(60,180) #1-3min
-        elif self.cached_player.discord_user in [u.id for u in bot_client.bot.users]:
-            sleep = random.randint(180,300) #3-5min
-        else:
-            sleep = random.randint(300,600) #5-10min
-        return sleep
+            return 600
+        
+        if not self.cached_player:
+            return 10
+        
+        if self.cached_player.is_member:
+            return random.randint(60,120) #1-2min
+
+        if self.cached_player.clan.is_alliance_clan or self.cached_player.clan.is_registered_clan or self.cached_player.clan.is_active_league_clan:
+            return random.randint(60,180) #1-3min
+        
+        if self.cached_player.discord_user in [u.id for u in bot_client.bot.users]:
+            return random.randint(180,300) #3-5min
+        
+        return random.randint(300,900) #5-15min

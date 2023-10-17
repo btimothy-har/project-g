@@ -31,31 +31,37 @@ class CapitalContributionFeed():
     
     @classmethod
     async def send_feed_update(cls,player:BasicPlayer,amount:int):
-        if not player.clan:
-            return
-        
-        if len(player.clan.capital_contribution_feed) == 0:
-            return        
-        feed = cls(player,amount)
-        embed = await feed.embed()
+        try:
+            if not player.clan:
+                return
+            
+            if len(player.clan.capital_contribution_feed) == 0:
+                return        
+            feed = cls(player,amount)
+            embed = await feed.embed()
 
-        await asyncio.gather(*(feed.send_to_discord(embed,feed_data) for feed_data in player.clan.capital_contribution_feed))
+            await asyncio.gather(*(feed.send_to_discord(embed,feed_data) for feed_data in player.clan.capital_contribution_feed))
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Capital Contribution Feed.")
     
     async def send_to_discord(self,embed,data_feed:db_ClanDataFeed):
-        channel = bot_client.bot.get_channel(data_feed.channel_id)
-        if not channel:
-            return
-        webhook = await get_bot_webhook(bot_client.bot,channel)
-        if isinstance(channel,discord.Thread):
-            await webhook.send(
-                username=self.player.clan.name,
-                avatar_url=self.player.clan.badge,
-                embed=embed,
-                thread=channel
-                )
-        else:
-            await webhook.send(
-                username=self.player.clan.name,
-                avatar_url=self.player.clan.badge,
-                embed=embed
-                )
+        try:
+            channel = bot_client.bot.get_channel(data_feed.channel_id)
+            if not channel:
+                return
+            webhook = await get_bot_webhook(bot_client.bot,channel)
+            if isinstance(channel,discord.Thread):
+                await webhook.send(
+                    username=self.player.clan.name,
+                    avatar_url=self.player.clan.badge,
+                    embed=embed,
+                    thread=channel
+                    )
+            else:
+                await webhook.send(
+                    username=self.player.clan.name,
+                    avatar_url=self.player.clan.badge,
+                    embed=embed
+                    )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error sending Capital Contribution Feed to Discord.")

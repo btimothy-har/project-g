@@ -79,6 +79,13 @@ class Leaderboards(commands.Cog):
         return bot_client.bot.get_cog("ClashOfClansClient")
     
     async def cog_load(self):
+        asyncio.create_task(self.start_leaderboards_cog())
+    
+    async def start_leaderboards_cog(self):
+        while True:
+            if getattr(bot_client,'_api_logged_in',False):
+                break
+            await asyncio.sleep(1)
         self.update_leaderboards.start()
     
     async def cog_unload(self):

@@ -33,7 +33,6 @@ class TaskLoop():
         self._active = False
 
         self.run_time = deque(maxlen=100)
-        self.work_time = deque(maxlen=100)
         
         self.api_error = False
         self.error_reports = 0
@@ -69,11 +68,6 @@ class TaskLoop():
     def task_lock(self) -> asyncio.Lock:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.task_lock
-    
-    @property
-    def master_lock(self) -> asyncio.Lock:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog._master_task_lock
     
     @property
     def api_semaphore(self) -> asyncio.Semaphore:
@@ -129,51 +123,20 @@ class TaskLoop():
     @classmethod
     def runtime_min(cls) -> int:
         try:
-            return min([i.run_time[-1] for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
+            return min([min(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
         except:
             return 0
     
     @classmethod
     def runtime_max(cls) -> int:
         try:
-            return max([i.run_time[-1] for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
+            return max([max(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
         except:
-            return 0    
+            return 0 
+           
     @classmethod
     def runtime_avg(cls) -> int:
         try:
-            return sum([i.run_time[-1] for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0]) / len([i for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
+            return sum([sum(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0]) / sum([len(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
         except ZeroDivisionError:
             return 0
-    
-    @classmethod
-    def worktime_min(cls) -> int:
-        try:
-            return min([i.work_time[-1] for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except:
-            return 0
-    
-    @classmethod
-    def worktime_max(cls) -> int:
-        try:
-            return max([i.work_time[-1] for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except:
-            return 0    
-    @classmethod
-    def worktime_avg(cls) -> int:
-        try:
-            return sum([i.work_time[-1] for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0]) / len([i for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except ZeroDivisionError:
-            return 0
-    
-    @staticmethod
-    def degraded_sleep_time(runtime:int) -> int:
-        if runtime > 60:
-            return min(math.ceil(runtime * 3),600)
-        #if runtime exceeds 45 seconds, degrade sleep to x2.5
-        elif runtime > 45:
-            return math.ceil(runtime * 2.5)
-        #if runtime exceeds 30 seconds, degrade sleep to x2
-        elif runtime > 30:
-            return math.ceil(runtime * 2)
-        return 0

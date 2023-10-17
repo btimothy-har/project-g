@@ -6,8 +6,11 @@ import pendulum
 from typing import *
 from mongoengine import *
 
+from collections import deque
+
 from discord.ext import tasks
 from redbot.core import commands
+from redbot.core.bot import Red
 from .api_client import BotClashClient, aClashSeason
 
 from .coc_objects.clans.clan import aClan, db_Clan, db_AllianceClan, db_WarLeagueClanSetup
@@ -19,6 +22,7 @@ from .coc_objects.events.raid_weekend import aRaidWeekend
 from .exceptions import InvalidTag, ClashAPIError, InvalidAbbreviation
 
 from .utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
+from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI
 
 bot_client = BotClashClient()
 
@@ -31,27 +35,24 @@ bot_client = BotClashClient()
 ############################################################
 class ClashOfClansClient(commands.Cog):
     """
-    API Client connector for Clash of Clans
+    API Client Manager for Clash of Clans.
 
-    This cog uses the [coc.py Clash of Clans API wrapper](https://cocpy.readthedocs.io/en/latest/).
-
-    Client parameters are stored RedBot's API framework, using the `[p]set api clashapi` command. The accepted parameters are as follows:
-    - `username` : API Username
-    - `password` : API Password
-    - `keys` : Number of keys to use. Defaults to 1.
-
-    You can register for a Username and Password at https://developer.clashofclans.com.
-
-    This cog also includes support for the Clash DiscordLinks service. If you have a username and password, set them with `[p]set api clashlinks` (parameters: `username` and `password`).
-
-    The use of Clash DiscordLinks is optional.
+    This cog provides a wrapper for key COC API calls, facilitates the cache/API interaction, and tracks API response time(s).
     """
 
     __author__ = bot_client.author
     __version__ = bot_client.version
 
-    def __init__(self,bot):
+    def __init__(self,bot:Red):
         self.bot = bot
+
+        self.semaphore_limit = int(bot_client.rate_limit * 0.25)
+        self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
+
+        self.player_api = deque(maxlen=10000)
+        self.clan_api = deque(maxlen=10000)
+        self.war_api = deque(maxlen=1000)
+        self.raid_api = deque(maxlen=1000)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -60,11 +61,40 @@ class ClashOfClansClient(commands.Cog):
     @property
     def client(self) -> BotClashClient:
         return bot_client
+    
+    @property
+    def api_maintenance(self) -> bool:
+        cog = self.bot.get_cog("ClashOfClansTasks")
+        return cog.api_maintenance
+    
+    @property
+    def client_semaphore_waiters(self) -> int:
+        return len(self.client_semaphore._waiters) if self.client_semaphore._waiters else 0
+
+    @property
+    def player_api_avg(self) -> float:
+        return sum(self.player_api)/len(self.player_api) if len(self.player_api) > 0 else 0
+
+    @property
+    def clan_api_avg(self) -> float:
+        return sum(self.clan_api)/len(self.clan_api) if len(self.clan_api) > 0 else 0
+
+    @property
+    def war_api_avg(self) -> float:
+        return sum(self.war_api)/len(self.war_api) if len(self.war_api) > 0 else 0
+    
+    @property
+    def raid_api_avg(self) -> float:
+        return sum(self.raid_api)/len(self.raid_api) if len(self.raid_api) > 0 else 0
 
     ##################################################
     ### COG LOAD
     ##################################################
     async def cog_load(self):
+        self.bot_status_update_loop.start()
+        asyncio.create_task(self.start_client_cog())
+    
+    async def start_client_cog(self):
         war_tasks = asyncio.create_task(aClanWar.load_all())
         raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
 
@@ -91,6 +121,9 @@ class ClashOfClansClient(commands.Cog):
             bot_client.player_cache.add_many_to_queue(player_tags),
             bot_client.clan_cache.add_many_to_queue(clan_tags)
             )
+        
+    async def cog_unload(self):
+        self.bot_status_update_loop.cancel()
 
     ############################################################
     #####
@@ -140,7 +173,12 @@ class ClashOfClansClient(commands.Cog):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
         try:
-            player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+            async with self.client_semaphore:
+                await asyncio.sleep(1/self.semaphore_limit)
+                st = pendulum.now()
+                player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+                diff = pendulum.now() - st
+                self.player_api.append(diff.total_seconds())
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
@@ -192,7 +230,12 @@ class ClashOfClansClient(commands.Cog):
                 return cached
 
         try:
-            clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+            async with self.client_semaphore:
+                await asyncio.sleep(1/self.semaphore_limit)
+                st = pendulum.now()
+                clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+                diff = pendulum.now() - st
+                self.clan_api.append(diff.total_seconds())
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -237,7 +280,12 @@ class ClashOfClansClient(commands.Cog):
     async def get_clan_war(self,clan:aClan) -> aClanWar:
         api_war = None
         try:
-            api_war = await self.client.coc.get_clan_war(clan.tag)
+            async with self.client_semaphore:
+                await asyncio.sleep(1/self.semaphore_limit)
+                st = pendulum.now()
+                api_war = await self.client.coc.get_clan_war(clan.tag)
+                diff = pendulum.now() - st
+                self.war_api.append(diff.total_seconds())
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
@@ -252,7 +300,12 @@ class ClashOfClansClient(commands.Cog):
 
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
         try:
-            api_group = await self.client.coc.get_league_group(clan.tag)
+            async with self.client_semaphore:
+                await asyncio.sleep(1/self.semaphore_limit)
+                st = pendulum.now()
+                api_group = await self.client.coc.get_league_group(clan.tag)
+                diff = pendulum.now() - st
+                self.war_api.append(diff.total_seconds())
         except coc.NotFound:
             pass
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -271,7 +324,12 @@ class ClashOfClansClient(commands.Cog):
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
         api_raid = None
         try:
-            raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+            async with self.client_semaphore:
+                await asyncio.sleep(1/self.semaphore_limit)
+                st = pendulum.now()
+                raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+                diff = pendulum.now() - st
+                self.raid_api.append(diff.total_seconds())
         except coc.PrivateWarLog:
             return None
         except coc.NotFound as exc:
@@ -286,3 +344,74 @@ class ClashOfClansClient(commands.Cog):
             return None        
         raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
         return raid_weekend
+    
+    ############################################################
+    #####
+    ##### STATUS REPORT
+    #####
+    ############################################################ 
+    async def status_embed(self):
+        embed = await clash_embed(self.bot,
+            title="**Clash of Clans API**",
+            message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}",
+            timestamp=pendulum.now()
+            )
+        embed.add_field(
+            name="**API Client**",
+            value="```ini"
+                + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
+                + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
+                + f"\n{'[API Limit]':<15} {bot_client.rate_limit:,}"
+                + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit} (Waiting: {self.client_semaphore_waiters:,})"
+                + "```",
+            inline=False
+            )
+        embed.add_field(
+            name="**Response Time**",
+            value="```ini"
+                + f"\n{'[Player]':<10} {self.player_api_avg:.2f}s (max: {(max(self.player_api) if len(self.player_api) > 0 else 0):.2f}s)"
+                + f"\n{'[Clan]':<10} {self.clan_api_avg:.2f}s (max: {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.2f}s)"
+                + f"\n{'[War]':<10} {self.war_api_avg:.2f}s (max: {(max(self.war_api) if len(self.war_api) > 0 else 0):.2f}s)"
+                + f"\n{'[Raid]':<10} {self.raid_api_avg:.2f}s (max: {(max(self.raid_api) if len(self.raid_api) > 0 else 0):.2f}s)"
+                + "```",
+            inline=False
+            )
+        return embed
+    
+    @commands.group(name="cocapi")
+    @commands.is_owner()
+    async def command_group_coc_api_client(self,ctx):
+        """Manage the Clash of Clans API Client."""
+        if not ctx.invoked_subcommand:
+            pass
+    
+    @command_group_coc_api_client.command(name="status")
+    @commands.is_owner()
+    async def _status_report(self,ctx:commands.Context):
+        """Status of the Clash of Clans API Client."""
+        embed = await self.status_embed()
+        view = RefreshStatus(ctx)
+        await ctx.reply(embed=embed,view=view)
+
+class RefreshStatus(DefaultView):
+    def __init__(self,context:Union[discord.Interaction,commands.Context]):
+
+        button = DiscordButton(
+            function=self._refresh_embed,
+            emoji=EmojisUI.REFRESH,
+            label="Refresh",
+            )
+
+        super().__init__(context,timeout=9999999)
+        self.is_active = True
+
+        self.add_item(button)
+    
+    @property
+    def client_cog(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    async def _refresh_embed(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        embed = await self.client_cog.status_embed()
+        await interaction.followup.edit_message(interaction.message.id,embed=embed)

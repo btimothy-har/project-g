@@ -50,7 +50,6 @@ class ClanLoop(TaskLoop):
         try:
             while self.loop_active:
                 try:
-                    st = pendulum.now()
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
@@ -58,9 +57,11 @@ class ClanLoop(TaskLoop):
                         async with self.task_lock:
                             await asyncio.sleep(0)
                     
-                    async with self.task_semaphore:                        
-                        work_start = pendulum.now()
+                    if not self.loop_active:
+                        raise asyncio.CancelledError
 
+                    async with self.task_semaphore:
+                        st = pendulum.now()
                         try:
                             async with self.api_semaphore:
                                 clan = await self.coc_client.fetch_clan(self.tag,no_cache=True)
@@ -69,8 +70,7 @@ class ClanLoop(TaskLoop):
 
                         if clan.is_alliance_clan or clan.is_registered_clan or clan.is_active_league_clan or len(clan.discord_feeds) > 0:
                             if not self.cached_clan:
-                                async for m in AsyncIter(clan.members):
-                                    bot_client.player_cache.add_to_queue(m.tag)
+                                await bot_client.player_cache.add_many_to_queue([m.tag for m in clan.members])
                                         
                             else:
                                 members_joined = [m for m in clan.members if m.tag not in [n.tag for n in self.cached_clan.members]]
@@ -94,22 +94,15 @@ class ClanLoop(TaskLoop):
                         raise asyncio.CancelledError
                     
                     et = pendulum.now()
-
                     try:
-                        work_time = et.int_timestamp - work_start.int_timestamp
-                        self.work_time.append(work_time)
+                        run_time = et - st
+                        self.run_time.append(run_time.total_seconds())
                     except:
                         pass
-
-                    try:
-                        run_time = et.int_timestamp - st.int_timestamp
-                        self.run_time.append(run_time)
-                    except:
-                        pass
-
-                    self.main_log.debug(
-                        f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time} seconds."
-                        )
+                    else:
+                        self.main_log.debug(
+                            f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time.total_seconds()} seconds."
+                            )
                     await asyncio.sleep(self.sleep_time)
 
         except asyncio.CancelledError:
@@ -130,15 +123,17 @@ class ClanLoop(TaskLoop):
     
     @property
     def sleep_time(self):
-        if not self.cached_clan:
-            sleep = 30
-        elif self.api_error:
-            sleep = 600
+        if self.api_error:
             self.api_error = False
-        elif self.cached_clan.is_alliance_clan or len(self.cached_clan.discord_feeds) > 0:
-            sleep = random.randint(60,180) #1-3min
-        elif self.cached_clan.is_registered_clan or self.cached_clan.is_active_league_clan:
-            sleep = random.randint(180,300) #3-5min
-        else:
-            sleep = random.randint(300,600) #5-10min
-        return sleep
+            return 600
+        
+        if not self.cached_clan:
+            return 10
+        
+        if self.cached_clan.is_alliance_clan or len(self.cached_clan.discord_feeds) > 0:
+            return random.randint(120,300) #2-3min
+        
+        if self.cached_clan.is_registered_clan or self.cached_clan.is_active_league_clan:
+            return random.randint(180,300) #3-5min
+        
+        return random.randint(300,900) #5-15min

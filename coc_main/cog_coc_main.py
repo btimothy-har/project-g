@@ -1,3 +1,4 @@
+import coc
 import os
 import discord
 import pendulum
@@ -5,8 +6,9 @@ import pendulum
 from typing import *
 from mongoengine import *
 
-from redbot.core import commands, app_commands
+from redbot.core import Config, commands, app_commands
 from redbot.core.data_manager import cog_data_path
+from redbot.core.utils import AsyncIter
 
 from .api_client import BotClashClient
 
@@ -32,6 +34,8 @@ class ClashOfClansMain(commands.Cog):
 
     You can register for a Username and Password at https://developer.clashofclans.com.
 
+    You may also add multiple API Logins by binding additional logins to clashapi1, clashapi2, etc up to clashapi29. To use multiple logins, use the `[p]reloadkeys` command and reload the cog.
+
     This cog also includes support for the Clash DiscordLinks service. If you have a username and password, set them with `[p]set api clashlinks` (parameters: `username` and `password`).
 
     The use of Clash DiscordLinks is optional.
@@ -43,6 +47,13 @@ class ClashOfClansMain(commands.Cog):
     def __init__(self,bot):
         self.bot = bot
         self.client = None
+
+        self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
+        default_global = {
+            "client_keys":[],
+            "throttler":0
+            }
+        self.config.register_global(**default_global)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -63,8 +74,17 @@ class ClashOfClansMain(commands.Cog):
         self.bot.coc_imggen_path = f"{cog_data_path(self)}/imggen"
         if not os.path.exists(self.bot.coc_imggen_path):
             os.makedirs(self.bot.coc_imggen_path)
+
+        keys = await self.config.client_keys()
+        throttler = await self.config.throttler()
             
-        self.client = await BotClashClient.initialize(self.bot,self.__author__,self.__version__)
+        self.client = await BotClashClient.initialize(
+            bot=self.bot,
+            author=self.__author__,
+            version=self.__version__,
+            client_keys=keys,
+            throttler=throttler
+            )
     
     ##################################################
     ### COG LOAD
@@ -81,6 +101,50 @@ class ClashOfClansMain(commands.Cog):
         """
         await ctx.invoke(self.bot.get_command("reload"),'coc_commands', 'coc_leaderboards', 'g_eclipse', 'g_bank')
         await ctx.message.delete()
+    
+    @commands.command(name="reloadkeys")
+    @commands.is_owner()
+    async def command_reload_keys(self,ctx:commands.Context):
+
+        msg = await ctx.reply(f"Reloading keys...")
+        available_clients = ['clashapi']
+        for i in range(1,30):
+            available_clients.append(f'clashapi{str(i)}')
+
+        keys = []
+        async for client in AsyncIter(available_clients):
+            try:
+                clashapi_login = await self.bot.get_shared_api_tokens(client)
+            except:
+                continue
+            if clashapi_login.get("username") is None:
+                continue
+            if clashapi_login.get("password") is None:
+                continue
+
+            client = coc.Client(
+                key_count=int(clashapi_login.get("keys",1)),
+                key_names='Created for Project G, from coc.py',
+                )
+            await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
+            keys.extend(client.http._keys)
+            await client.close()
+
+        await self.config.client_keys.set(keys)
+        await msg.edit(content=f"Found {len(keys)} keys. To login with these keys, reload the cog.")
+    
+    @commands.command(name="cocthrottler")
+    @commands.is_owner()
+    async def command_toggle_throttler(self,ctx:commands.Context):
+
+        current_throttler = await self.config.throttler()
+        if current_throttler in [0,1]:
+            await self.config.throttler.set(2)
+            await ctx.reply(f"Batch Throttler enabled. Reload the cog to take effect.")
+
+        if current_throttler == 2:
+            await self.config.throttler.set(1)
+            await ctx.reply(f"Basic Throttler enabled. Reload the cog to take effect.")
     
     ##################################################
     ### REPORT BUTTON

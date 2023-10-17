@@ -27,6 +27,7 @@ class db_ShopItem(Document):
     category = StringField(default="")
     buy_message = StringField(default="")
 
+    exclusive_role = BooleanField(default=False)
     required_role = IntField(default=0)
     show_in_store = BooleanField(default=True)
     disabled = BooleanField(default=False)
@@ -59,7 +60,12 @@ class ShopItem():
         self.id = str(database_entry.id)
 
         self.guild_id = database_entry.guild_id
-        self.type = database_entry.type
+
+        if database_entry.type in ['roleadd','rolebidirectional']:
+            self.type = 'role'
+            db_ShopItem.objects(id=self.id).update_one(type='role')
+        else:
+            self.type = database_entry.type
 
         self.name = database_entry.name
         self.price = database_entry.price
@@ -68,6 +74,7 @@ class ShopItem():
         self.description = database_entry.description        
         self.buy_message = database_entry.buy_message
         
+        self.exclusive_role = database_entry.exclusive_role
         self._required_role = database_entry.required_role
         self.show_in_store = database_entry.show_in_store
         self.disabled = database_entry.disabled
@@ -95,6 +102,7 @@ class ShopItem():
             description=self.description,
             category=self._category,
             buy_message=self.buy_message,
+            exclusive_role=self.exclusive_role,
             required_role=self._required_role,
             show_in_store=self.show_in_store,
             disabled=self.disabled,            
@@ -167,13 +175,13 @@ class ShopItem():
         item = db_ShopItem(
             guild_id=kwargs.get('guild_id'),
             type=kwargs.get('type'),
-
             name=kwargs.get('name'),
             price=kwargs.get('price'),
             stock=kwargs.get('stock') if kwargs.get('stock') else -1,
             description=kwargs.get('description') if kwargs.get('description') else "",
             category=kwargs.get('category') if kwargs.get('category') else "",
             buy_message=kwargs.get('buy_message') if kwargs.get('buy_message') else "",
+            exclusive_role=kwargs.get('exclusive_role') if kwargs.get('exclusive_role') else False,
             required_role=kwargs.get('required_role') if kwargs.get('required_role') else 0,
             show_in_store=False,
             disabled=False,            
@@ -225,7 +233,7 @@ class NewShopItem():
             return False
         if self.stock is None:
             return False
-        if self.type in ['roleadd','rolebidirectional']:
+        if self.type in ['roleadd','rolebidirectional','roleexclusive']:
             if self.associated_role is None:
                 return False
         if self.type == 'random':
@@ -234,15 +242,20 @@ class NewShopItem():
         return True
     
     async def save_item(self):
+        if self.type in ['roleadd','rolebidirectional','roleexclusive']:
+            ctype = 'role'
+        else:
+            ctype = self.type
         item = await ShopItem.create(
             guild_id=self.guild_id,
-            type=self.type,
+            type=ctype,
             name=self.name,
             price=self.price,
             stock=self.stock,
             description=self.description,
             category=self.category,
             buy_message=self.buy_message,
+            exclusive_role=self.type == 'roleexclusive',
             required_role=getattr(self.required_role,'id',None),
             role_id=getattr(self.associated_role,'id',None),
             bidirectional_role=self.bidirectional_role,

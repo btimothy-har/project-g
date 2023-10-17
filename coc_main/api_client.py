@@ -1,4 +1,3 @@
-import asyncio
 import os
 import logging
 import pendulum
@@ -96,6 +95,7 @@ class BotClashClient():
             self.bot = bot
 
             self.last_status_update = None
+            self.client_keys = []
 
             self.coc_main_log = coc_main_logger
             self.coc_data_log = coc_data_logger
@@ -141,15 +141,25 @@ class BotClashClient():
             self.discordlinks_client = None
     
     @classmethod
-    async def initialize(cls,bot,author,version):
+    async def initialize(cls,
+        bot:Red,
+        author:str,
+        version:str,
+        client_keys:Optional[List[str]]=None,
+        throttler:Optional[int]=None):
+
         instance = cls(bot)
+
         if instance._is_initialized:
             return instance
+
         instance.author = author
         instance.version = version
-        
-        await instance.api_login()
+        instance.client_keys = client_keys or []
+        instance.throttler = throttler or 0
+
         await instance.database_login()
+        await instance.api_login()
         await instance.discordlinks_login()
 
         instance._is_initialized = True
@@ -219,57 +229,49 @@ class BotClashClient():
     ##### CLIENT API LOGIN / LOGOUT
     #####
     ############################################################
-    async def api_login(self):        
-        clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
+    async def api_login(self):
+        try:
+            await self.api_login_keys()
+        except:
+            clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
 
-        if clashapi_login.get("username") is None:
-            raise LoginNotSet(f"Clash API Username is not set.")
+            if clashapi_login.get("username") is None:
+                raise LoginNotSet(f"Clash API Username is not set.")
+            if clashapi_login.get("password") is None:
+                raise LoginNotSet(f"Clash API Password is not set.")
+            
+            throttler = coc.BatchThrottler if self.throttler == 2 else coc.BasicThrottler
+            str_throttler = "Batch" if self.throttler == 2 else "Basic"
+
+            self.bot.coc_client = coc.EventsClient(
+                key_count=int(clashapi_login.get("keys",1)),
+                key_names='Created for Project G, from coc.py',
+                load_game_data=coc.LoadGameData(always=True),
+                throttler=throttler,
+                cache_max_size=None
+                )
+            await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
+            self.coc_main_log.info(f"Logged into Clash API client with Username/Password. Using {str_throttler} throttler.")
         
-        if clashapi_login.get("password") is None:
-            raise LoginNotSet(f"Clash API Password is not set.")
+        self.num_keys = len(self.coc.http._keys)
+        self.rate_limit = self.num_keys * 30        
+        self._api_logged_in = True  
 
+    async def api_login_keys(self):
+        if len(self.client_keys) == 0:
+            raise LoginNotSet(f"Clash API Keys are not set.")
+        
+        throttler = coc.BasicThrottler if self.throttler == 1 else coc.BatchThrottler
+        str_throttler = "Basic" if self.throttler == 1 else "Batch"
+                
         self.bot.coc_client = coc.EventsClient(
-            key_count=int(clashapi_login.get("keys",1)),
-            key_names='Created for Project G, from coc.py',
-            load_game_data=coc.LoadGameData(always=True)
+            load_game_data=coc.LoadGameData(always=True),
+            throttler=throttler,
+            cache_max_size=None
             )
-        await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))        
-        self._api_logged_in = True
+        await self.bot.coc_client.login_with_tokens(*self.client_keys)
+        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys. Using {str_throttler} throttler.")
 
-        # available_clients = ['clashapi']
-        # for i in range(1,3):
-        #     available_clients.append(f'clashapi{str(i)}')
-
-        # keys = []
-
-        # async for client in AsyncIter(available_clients):
-        #     try:
-        #         clashapi_login = await self.bot.get_shared_api_tokens(client)
-        #     except:
-        #         continue
-
-        #     if clashapi_login.get("username") is None:
-        #         continue
-        #     if clashapi_login.get("password") is None:
-        #         continue
-
-        #     client = coc.Client(
-        #         key_count=int(clashapi_login.get("keys",1)),
-        #         key_names='Created for Project G, from coc.py',
-        #         )
-        #     await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
-        #     keys.extend(client.http._keys)
-        #     await client.close()
-
-        # if len(keys) == 0:
-        #     raise LoginNotSet(f"No Clash API keys were found.")
-
-        # self.bot.coc_client = coc.EventsClient(
-        #     load_game_data=coc.LoadGameData(always=True)
-        #     )
-        # await self.bot.coc_client.login_with_tokens(*keys)
-        # self._api_logged_in = True
-    
     async def api_logout(self):
         await self.coc.close()
 

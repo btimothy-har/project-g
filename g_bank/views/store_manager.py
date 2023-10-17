@@ -256,7 +256,7 @@ class StoreManager(DefaultView):
             if self.new_item.type in ['cash','basic']:
                 self.add_item(self.buy_message_button)
 
-            if self.new_item.type in ['roleadd','rolebidirectional']:
+            if self.new_item.type in ['roleadd','rolebidirectional','roleexclusive']:
                 self.add_item(self.associated_role_selector)
             
             if self.new_item.type == 'random':
@@ -295,7 +295,7 @@ class StoreManager(DefaultView):
             title=f"**Store Manager: {self.guild.name}**",
             message="```Add Item```"
                 + "\n**You are adding...**"
-                + f"\n\n`{'Type:':<15}` {'role' if self.new_item.type in ['rolebidirectional','roleadd'] else self.new_item.type}"
+                + f"\n\n`{'Type:':<15}` {'role' if self.new_item.type in ['rolebidirectional','roleadd','roleexclusive'] else self.new_item.type}"
                 + f"\n\n`{'Name:':<15}` {self.new_item.name}"
                 + f"\n`{'Price:':<15}` {self.new_item.price:,}"
                 + f"\n`{'Stock:':<15}` {self.new_item.stock if self.new_item.stock != -1 else 'Infinite'}"
@@ -303,9 +303,12 @@ class StoreManager(DefaultView):
                 + f"\n`{'Category:':<15}` {self.new_item.category}"
                 + f"\n`{'Description:':<15}` {self.new_item.description}"
                 + (f"\n\n`{'Buy Message:':<15}` {self.new_item.buy_message}" if self.new_item.type in ['cash','basic'] else "")
-                + (f"\n\n`{'Assigns Role:':<15}` {getattr(self.new_item.associated_role,'mention',None)}" if self.new_item.type in ['rolebidirectional','roleadd'] else "")
-                + (f"\n`{'Add-only:':<15}` {self.new_item.type == 'roleadd'}" if self.new_item.type in ['rolebidirectional','roleadd'] else "")
+                + (f"\n\n`{'Assigns Role:':<15}` {getattr(self.new_item.associated_role,'mention',None)}" if self.new_item.type in ['rolebidirectional','roleadd','roleexclusive'] else "")
+                + (f"\n`{'Add-only:':<15}` {self.new_item.type in ['roleadd','roleexclusive']}" if self.new_item.type in ['rolebidirectional','roleadd','roleexclusive'] else "")
                 )
+        
+        if self.new_item.type == 'roleexclusive':
+            embed.description += f"\n\nNote: You are recommended to specify a Category, otherwise this will remove **ALL** Roles granted via the Shop."
 
         if self.new_item.type == 'random':
             item_msg = f"\n\n`{'Contains Items':<30}`"
@@ -422,6 +425,12 @@ class StoreManager(DefaultView):
             label='Role Item (Add-Only)',
             value='roleadd',
             description="Assigns a Role on purchase.")
+            )
+        select_options.append(
+            discord.SelectOption(
+            label='Role Item (Exclusive Add-Only)',
+            value='roleexclusive',
+            description="Assigns a Role on purchase, and removes any other Roles granted by items in this category.")
             )
         select_options.append(
             discord.SelectOption(
