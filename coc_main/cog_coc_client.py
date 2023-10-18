@@ -26,6 +26,29 @@ from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI
 
 bot_client = BotClashClient()
 
+class RequestCounter():
+    def __init__(self):
+        self._archive = deque(maxlen=60)
+        self._count = 0
+        self._timestamp = pendulum.now()
+        self._lock = asyncio.Lock()
+
+    @property
+    def current_average(self) -> float:
+        diff = pendulum.now() - self._timestamp
+        return self._count / diff.total_seconds() if self._count > 0 else 0
+    
+    async def increment(self):
+        async with self._lock:
+            self._count += 1
+    
+    async def reset(self):
+        async with self._lock:
+            diff = pendulum.now() - self._timestamp
+            self._archive.append(self._count / diff.total_seconds())
+            self._count = 0
+            self._timestamp = pendulum.now()
+
 ############################################################
 ############################################################
 #####
@@ -46,14 +69,20 @@ class ClashOfClansClient(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
+        self.counter = RequestCounter()
+
         self.semaphore_limit = int(bot_client.rate_limit)
+        self.delay_time = 1/self.semaphore_limit
+        
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
-
-        self.api_lock = asyncio.Semaphore(2)
-
-        self.throttle_time = deque(maxlen=1000)
+        self.api_lock = asyncio.Semaphore(int(min(bot_client.rate_limit/1000),1))
+        
         self.player_api = deque(maxlen=10000)
+        self.player_throttle = deque(maxlen=10000)
+
         self.clan_api = deque(maxlen=10000)
+        self.clan_throttle = deque(maxlen=10000)
+        
         self.war_api = deque(maxlen=1000)
         self.raid_api = deque(maxlen=1000)
 
@@ -73,10 +102,6 @@ class ClashOfClansClient(commands.Cog):
     @property
     def client_semaphore_waiters(self) -> int:
         return len(self.client_semaphore._waiters) if self.client_semaphore._waiters else 0
-    
-    @property
-    def throttle_time_avg(self) -> float:
-        return sum(self.throttle_time)/len(self.throttle_time) if len(self.throttle_time) > 0 else 0
 
     @property
     def player_api_avg(self) -> float:
@@ -138,7 +163,7 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################    
     @commands.Cog.listener("on_shard_connect")
-    async def status_on_connect(self, shard_id):
+    async def status_on_connect(self,shard_id):
         await self.bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.listening,
@@ -161,13 +186,18 @@ class ClashOfClansClient(commands.Cog):
                 f"Error in Bot Status Loop"
                 )
     
+    @tasks.loop(seconds=59)
+    async def reset_counter(self):
+        await self.counter.reset()
+    
     ############################################################
     #####
     ##### COC: PLAYERS
     #####
     ############################################################
     async def fetch_player(self,tag:str,no_cache=False,enforce_lock=False) -> aPlayer:
-        ot = pendulum.now()
+
+        player = None
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)        
@@ -180,20 +210,24 @@ class ClashOfClansClient(commands.Cog):
         if not no_cache and isinstance(cached,aPlayer):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
-        try:
+            
+        try:            
             async with self.client_semaphore:
+                ot = pendulum.now()
                 if enforce_lock:
                     async with self.api_lock:
-                        await asyncio.sleep(1/self.semaphore_limit)
+                        await asyncio.sleep(self.delay_time)
 
                 st = pendulum.now()
                 diff = st - ot
-                self.throttle_time.append(diff.total_seconds())
+                self.player_throttle.append(diff.total_seconds())
 
                 player = await self.client.coc.get_player(n_tag,cls=aPlayer)
 
                 diff = pendulum.now() - st
                 self.player_api.append(diff.total_seconds())
+
+                return player
 
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
@@ -202,18 +236,19 @@ class ClashOfClansClient(commands.Cog):
                 return cached
             else:
                 raise ClashAPIError(exc) from exc
-        
-        if player.is_new:
-            player.first_seen = pendulum.now()        
-        if player.cached_name != player.name:
-            player.cached_name = player.name        
-        if player.cached_xp_level != player.exp_level:
-            player.cached_xp_level = player.exp_level        
-        if player.cached_townhall != player.town_hall_level:
-            player.cached_townhall = player.town_hall_level
-        
-        await self.client.player_cache.set(player.tag,player)
-        return player
+        finally:
+            if player:
+                await self.client.player_cache.set(player.tag,player)
+                await self.counter.increment()
+                
+                if player.is_new:
+                    player.first_seen = pendulum.now()        
+                if player.cached_name != player.name:
+                    player.cached_name = player.name        
+                if player.cached_xp_level != player.exp_level:
+                    player.cached_xp_level = player.exp_level        
+                if player.cached_townhall != player.town_hall_level:
+                    player.cached_townhall = player.town_hall_level
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         if not season or season.id not in [s.id for s in bot_client.tracked_seasons]:
@@ -240,7 +275,8 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_clan(self,tag:str,no_cache:bool=False,enforce_lock=False) -> aClan:
-        ot = pendulum.now()
+        
+        clan = None
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
@@ -249,26 +285,30 @@ class ClashOfClansClient(commands.Cog):
             cached = self.client.clan_cache.get(n_tag)
         except:
             cached = None
+
         if no_cache:
-            pass        
+            pass
         elif isinstance(cached,aClan):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
 
         try:
             async with self.client_semaphore:
+                ot = pendulum.now()            
                 if enforce_lock:
                     async with self.api_lock:
-                        await asyncio.sleep(1/self.semaphore_limit)
+                        await asyncio.sleep(self.delay_time)
 
                 st = pendulum.now()
                 diff = st - ot
-                self.throttle_time.append(diff.total_seconds())
+                self.clan_throttle.append(diff.total_seconds())
 
                 clan = await self.client.coc.get_clan(n_tag,cls=aClan)
 
                 diff = pendulum.now() - st
                 self.clan_api.append(diff.total_seconds())
+
+                return clan
 
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
@@ -277,20 +317,21 @@ class ClashOfClansClient(commands.Cog):
                 return cached
             else:
                 raise ClashAPIError(exc) from exc
+        finally:
+            if clan:
+                await self.client.clan_cache.set(clan.tag,clan)
+                await self.counter.increment()
         
-        if clan.name != clan.cached_name:
-            clan.cached_name = clan.name
-        if clan.badge != clan.cached_badge:
-            clan.cached_badge = clan.badge        
-        if clan.level != clan.cached_level:
-            clan.cached_level = clan.level        
-        if clan.capital_hall != clan.cached_capital_hall:
-            clan.cached_capital_hall = clan.capital_hall        
-        if clan.war_league_name != clan.cached_war_league:
-            clan.cached_war_league = clan.war_league_name
-            
-        await self.client.clan_cache.set(clan.tag,clan)
-        return clan
+                if clan.name != clan.cached_name:
+                    clan.cached_name = clan.name
+                if clan.badge != clan.cached_badge:
+                    clan.cached_badge = clan.badge        
+                if clan.level != clan.cached_level:
+                    clan.cached_level = clan.level        
+                if clan.capital_hall != clan.cached_capital_hall:
+                    clan.cached_capital_hall = clan.capital_hall        
+                if clan.war_league_name != clan.cached_war_league:
+                    clan.cached_war_league = clan.war_league_name
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
         try:
@@ -323,18 +364,21 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################    
     async def get_clan_war(self,clan:aClan) -> aClanWar:
-        ot = pendulum.now()
         api_war = None
         try:
-            async with self.client_semaphore:                
+            async with self.client_semaphore:
                 st = pendulum.now()
-                diff = st - ot
-                self.throttle_time.append(diff.total_seconds())
 
                 api_war = await self.client.coc.get_clan_war(clan.tag)
 
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
+
+            if not api_war or getattr(api_war,'state','notInWar') == 'notInWar':
+                return None        
+            
+            clan_war = await aClanWar.create_from_api(api_war)
+            return clan_war
 
         except coc.PrivateWarLog:
             return None
@@ -342,53 +386,56 @@ class ClashOfClansClient(commands.Cog):
             raise InvalidTag(clan.tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc) from exc
+        finally:
+            if api_war:
+                await self.counter.increment()
         
-        if not api_war or getattr(api_war,'state','notInWar') == 'notInWar':
-            return None        
-        clan_war = await aClanWar.create_from_api(api_war)
-        return clan_war
-
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
-        ot = pendulum.now()
+        api_group = None
         try:
-            async with self.client_semaphore:                
+            async with self.client_semaphore:          
                 st = pendulum.now()
-                diff = st - ot
-                self.throttle_time.append(diff.total_seconds())
 
                 api_group = await self.client.coc.get_league_group(clan.tag)
 
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
 
+            if api_group and api_group.state in ['preparation','inWar','ended','warEnded']:
+                league_group = await WarLeagueGroup.from_api(clan,api_group)
+                return league_group
+
         except coc.NotFound:
             pass
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc)
-        else:
-            if api_group and api_group.state in ['preparation','inWar','ended','warEnded']:
-                league_group = await WarLeagueGroup.from_api(clan,api_group)
-                return league_group
-        return None
-    
+        finally:
+            if api_group:
+                await self.counter.increment()
+            
     ############################################################
     #####
     ##### COC: RAID WEEKEND
     #####
     ############################################################ 
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
-        ot = pendulum.now()
         api_raid = None
         try:
             async with self.client_semaphore:
                 st = pendulum.now()
-                diff = st - ot
-                self.throttle_time.append(diff.total_seconds())
 
                 raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
-                
+                    
                 diff = pendulum.now() - st
                 self.raid_api.append(diff.total_seconds())
+
+                if len(raidloggen) == 0:
+                    return None
+                api_raid = raidloggen[0]
+                if not api_raid:
+                    return None        
+                raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
+                return raid_weekend
 
         except coc.PrivateWarLog:
             return None
@@ -396,14 +443,9 @@ class ClashOfClansClient(commands.Cog):
             raise InvalidTag(self.tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc) from exc
-        
-        if len(raidloggen) == 0:
-            return None
-        api_raid = raidloggen[0]
-        if not api_raid:
-            return None        
-        raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
-        return raid_weekend
+        finally:
+            if api_raid:
+                await self.counter.increment()
     
     ############################################################
     #####
@@ -416,36 +458,40 @@ class ClashOfClansClient(commands.Cog):
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}",
             timestamp=pendulum.now()
             )
+
         embed.add_field(
             name="**API Client**",
             value="```ini"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
-                + f"\n{'[API Limit]':<15} {bot_client.rate_limit:,}"
-                + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit} (Waiting: {self.client_semaphore_waiters:,})"
-                + f"\n{'[Throttle Rate]':<15} {self.throttle_time_avg:.3f}s (max: {max(self.throttle_time) if len(self.throttle_time) > 0 else 0:.3f}s)"
+                + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit:,}"
                 + "```",
             inline=False
             )
+        
+        avg_throttle = sum(self.player_throttle)/len(self.player_throttle) if len(self.player_throttle) > 0 else 0
+        max_throttle = max(self.player_throttle) if len(self.player_throttle) > 0 else 0
         embed.add_field(
             name="**Player API**",
             value="```ini"
-                + f"\n{'[Last]':<6} {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s"
-                + f"\n{'[Avg]':<6} {self.player_api_avg:.3f}s"
-                + f"\n{'[Min]':<6} {(min(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
-                + f"\n{'[Max]':<6} {(max(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
+                + f"\n{'[Last]':<10} {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s"
+                + f"\n{'[Mean]':<10} {self.player_api_avg:.3f}s"
+                + f"\n{'[Min/Max]':<10} {(min(self.player_api) if len(self.player_api) > 0 else 0):.3f}s ~ {(max(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
+                + f"\n{'[Throttle]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
                 + "```",
-            inline=True
+            inline=False
             )
+        avg_throttle = sum(self.clan_throttle)/len(self.clan_throttle) if len(self.clan_throttle) > 0 else 0
+        max_throttle = max(self.clan_throttle) if len(self.clan_throttle) > 0 else 0
         embed.add_field(
             name="**Clan API**",
             value="```ini"
-                + f"\n{'[Last]':<6} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s"
-                + f"\n{'[Avg]':<6} {self.clan_api_avg:.3f}s"
-                + f"\n{'[Min]':<6} {(min(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
-                + f"\n{'[Max]':<6} {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
+                + f"\n{'[Last]':<10} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s"
+                + f"\n{'[Mean]':<10} {self.clan_api_avg:.3f}s"
+                + f"\n{'[Min/Max]':<10} {(min(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s ~ {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
+                + f"\n{'[Throttle]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
                 + "```",
-            inline=True
+            inline=False
             )
         embed.add_field(
             name="**Clan War API**",
@@ -455,7 +501,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[Min]':<6} {(min(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
                 + f"\n{'[Max]':<6} {(max(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
                 + "```",
-            inline=False
+            inline=True
             )
         embed.add_field(
             name="**Capital Raids API**",
@@ -466,6 +512,25 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[Max]':<6} {(max(self.raid_api) if len(self.raid_api) > 0 else 0):.3f}s"
                 + "```",
             inline=True
+            )
+        
+        if len(self.counter._archive) > 0:
+            last_rate = self.counter._archive[-1]
+            avg_rate = sum(self.counter._archive)/len(self.counter._archive)
+            max_rate = max(self.counter._archive)
+        else:
+            last_rate = 0
+            avg_rate = 0
+            max_rate = 0
+        embed.add_field(
+            name="**Request Rate (per second)**",
+            value="```ini"
+                + f"\n{'[Now]':<6} {self.counter.current_average:.2f}"
+                + f"\n{'[Last]':<6} {last_rate:.2f}"
+                + f"\n{'[Avg]':<6} {avg_rate:.2f}"
+                + f"\n{'[Max]':<6} {max_rate:.2f}"
+                + "```",
+            inline=False
             )
         return embed
     

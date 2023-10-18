@@ -238,16 +238,20 @@ class UserStore(DefaultView):
 
         purchase_button = self.purchase_button
         can_buy = await self.current_item.can_i_buy(self.guild.get_member(interaction.user.id))
-        if not can_buy:
+        if not can_buy or not can_spend:
             purchase_button.disabled = True
-            if self.current_item.required_role and self.current_item.required_role not in user.roles:
+            if not can_spend:
+                purchase_button.label = f"You cannot afford this item."
+
+            elif self.current_item.required_role and self.current_item.required_role.id not in [r.id for r in user.roles]:
                 purchase_button.label = f"You are missing a Required Role for this Item."
+
             elif isinstance(self.current_item.stock,int) and self.current_item.stock < 1:
                 purchase_button.label = "This item is out of stock."
-            elif not can_spend:
-                purchase_button.label = f"You cannot afford this item."
+
             else:
                 purchase_button.label = "You cannot purchase this item."
+
             purchase_button.style = discord.ButtonStyle.grey
         
         self.clear_items()

@@ -120,16 +120,15 @@ class ShopItem():
         if self.disabled:
             return False
         if self.required_role:
-            if self.required_role not in [r.id for r in member.roles]:
+            if self.required_role.id not in [r.id for r in member.roles]:
                 return False
         if isinstance(self.stock,int) and self.stock < 1:
             return False
-        if self.type == 'role' and not self.bidirectional_role:
-            if self.role_id in [r.id for r in member.roles]:
+        if self.type == 'role':
+            if self.bidirectional_role:
+                pass
+            elif self.role_id in [r.id for r in member.roles]:
                 return False
-        can_spend = await bank.can_spend(member,self.price)
-        if not can_spend:
-            return False
         return True
 
     @property

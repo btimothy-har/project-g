@@ -127,7 +127,7 @@ class aGuildClocks():
             await new_channel.edit(position=0)
             self.season_channel = new_channel.id
     
-        season_ch_name = f"📅 {bot_client.current_season.description} "
+        season_ch_name = f"📅 {bot_client.current_season.short_description} "
         time_to_end = bot_client.current_season.time_to_end(now)
 
         if time_to_end.days > 0:

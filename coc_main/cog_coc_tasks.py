@@ -83,7 +83,7 @@ class ClashOfClansTasks(commands.Cog):
         self.task_semaphore_limit = 100000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
-        self.api_semaphore_limit = int(bot_client.rate_limit * 0.8)
+        self.api_semaphore_limit = int(bot_client.rate_limit * 0.9)
         self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
