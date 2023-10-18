@@ -83,7 +83,7 @@ class ClashOfClansTasks(commands.Cog):
         self.task_semaphore_limit = 100000
         self.task_semaphore = asyncio.Semaphore(self.task_semaphore_limit)
 
-        self.api_semaphore_limit = int(bot_client.rate_limit * 0.9)
+        self.api_semaphore_limit = int(bot_client.rate_limit * 0.5)
         self.api_semaphore = asyncio.Semaphore(self.api_semaphore_limit)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
@@ -373,7 +373,7 @@ class ClashOfClansTasks(commands.Cog):
                 async for clan in alliance_clans:
                     if clan not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
                         await self.create_war_task(clan)
-                        
+
                     if clan not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
                         await self.create_raid_task(clan)
                 
