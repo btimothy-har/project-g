@@ -47,21 +47,23 @@ class PlayerLoop(TaskLoop):
     async def _loop_task(self):
         try:
             while self.loop_active:
+                self.completed = False
                 st = None
                 et = None
+                wt = 0                
+
                 try:
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
                     if self.task_lock.locked():
-                        rand = random.randint(1,110)
-                        if self.defer_count > 20 or rand % 10 == 0:
-                            async with self.task_lock:
-                                await asyncio.sleep(0)
-                        else:
+                        if self.to_defer:
                             self.defer_count += 1
                             self.deferred = True
                             continue
+                        else:
+                            async with self.task_lock:
+                                await asyncio.sleep(0)                        
                     
                     async with self.task_semaphore:
                         self.deferred = False
@@ -69,14 +71,22 @@ class PlayerLoop(TaskLoop):
                         st = pendulum.now()
                         try:
                             async with self.api_semaphore:
+                                t1 = pendulum.now()
                                 self.cached_player = await self.coc_client.fetch_player(self.tag,no_cache=True,enforce_lock=True)
+                                diff = pendulum.now() - t1
+                                wt += diff.total_seconds()
                         except InvalidTag as exc:
                             db_Player.objects(tag=self.tag).delete()
                             db_PlayerStats.objects(tag=self.tag).delete()
                             db_WarLeaguePlayer.objects(tag=self.tag).delete()
                             raise asyncio.CancelledError from exc
 
+                        t1 = pendulum.now()
                         await self.cached_player.stat_update()
+                        diff = pendulum.now() - t1
+                        wt += diff.total_seconds()
+
+                    self.completed = True
                         
                 except ClashAPIError as exc:
                     self.api_error = True
@@ -88,16 +98,16 @@ class PlayerLoop(TaskLoop):
                     if not self.loop_active:
                         raise asyncio.CancelledError
                                         
-                    et = pendulum.now()
-                    try:
+                    if self.completed:
+                        et = pendulum.now()                     
                         run_time = et - st
+
                         self.run_time.append(run_time.total_seconds())
-                    except:
-                        pass
-                    else:
+                        self.work_time.append(wt)
                         self.main_log.debug(
                             f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time.total_seconds()} seconds."
                             )
+                        
                     await asyncio.sleep(self.sleep_time)
 
         except asyncio.CancelledError:
@@ -122,12 +132,7 @@ class PlayerLoop(TaskLoop):
     @property
     def sleep_time(self):
         if self.deferred:
-            if self.defer_count < 3:
-                return 90
-            if self.defer_count < 11:
-                return 60
-            if self.defer_count >= 11:
-                return 20
+            return 60
         
         if self.api_error:
             self.api_error = False

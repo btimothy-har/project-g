@@ -494,7 +494,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Overall]':<15} " + ('Locked' if self.task_lock.locked() else 'Unlocked')
                 + f"\n{'[Master Lock]':<15} " + ('Locked' if self._master_task_lock.locked() else 'Unlocked')
                 + f"\n{'[Control Lock]':<15} " + (f"Locked" if self._task_lock.locked() else 'Unlocked') + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{self.task_semaphore_limit - self.task_semaphore._value:,} (Waiting: {len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0:,})"
+                + f"\n{'[Running]':<15} " + f"{self.task_semaphore_limit - self.task_semaphore._value:,}"
                 + "```",
             inline=False
             )
@@ -512,8 +512,9 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(bot_client.player_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Response]':<15} {self.player_api_avg:.2f}s"
+                + f"\n{'[Deferred]':<15} {len([i for i in PlayerLoop.loops() if i.deferred]):,}"
                 + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg())}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
+                + f"\n{'[Worktime]':<15} {round(PlayerLoop.worktime_avg())}s ({round(PlayerLoop.worktime_min())}s - {round(PlayerLoop.worktime_max())}s)"
                 + "```",
             inline=False
             )
@@ -522,8 +523,9 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(bot_client.clan_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Response]':<15} {self.clan_api_avg:.2f}s"
+                + f"\n{'[Deferred]':<15} {len([i for i in ClanLoop.loops() if i.deferred]):,}"
                 + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg())}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
+                + f"\n{'[Worktime]':<15} {round(ClanLoop.worktime_avg())}s ({round(ClanLoop.worktime_min())}s - {round(ClanLoop.worktime_max())}s)"
                 + "```",
             inline=False
             )
@@ -532,7 +534,6 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_ClanWar.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanWarLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Response]':<15} {self.war_api_avg:.2f}s"
                 + f"\n{'[Runtime]':<15} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
@@ -542,7 +543,6 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Database]':<15} {len(db_RaidWeekend.objects()):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanRaidLoop.loops() if i.loop_active]):,}"
-                + f"\n{'[Response]':<15} {self.raid_api_avg:.2f}s"
                 + f"\n{'[Runtime]':<15} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True

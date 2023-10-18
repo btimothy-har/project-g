@@ -59,6 +59,7 @@ class ClanRaidLoop(TaskLoop):
             while self.loop_active:
                 st = None
                 et = None
+                
                 try:
                     if not self.loop_active:
                         raise asyncio.CancelledError
@@ -67,7 +68,7 @@ class ClanRaidLoop(TaskLoop):
                         async with self.task_lock:
                             await asyncio.sleep(0)
                     
-                    if self.clan and st.day_of_week not in [5,6,7,1]:
+                    if self.clan and pendulum.now().day_of_week not in [5,6,7,1]:
                         continue
                     
                     if not self.loop_active:

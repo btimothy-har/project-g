@@ -82,6 +82,10 @@ class ShopItem():
         self.role_id = database_entry.role_id
         self.bidirectional_role = database_entry.bidirectional_role
         self.random_items = database_entry.random_items
+
+        if self._category == 'Discord Colors' and self.guild_id == 1132581106571550831:
+            self.price = 2500
+            db_ShopItem.objects(id=self.id).update_one(price=2500)
     
     def __str__(self):
         return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,}) (Stock: {self.stock})"

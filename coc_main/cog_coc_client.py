@@ -49,7 +49,7 @@ class ClashOfClansClient(commands.Cog):
         self.semaphore_limit = int(bot_client.rate_limit)
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
 
-        self.api_lock = asyncio.Semaphore(5)
+        self.api_lock = asyncio.Semaphore(2)
 
         self.player_api = deque(maxlen=10000)
         self.clan_api = deque(maxlen=10000)
