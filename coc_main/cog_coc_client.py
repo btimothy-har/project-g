@@ -51,6 +51,7 @@ class ClashOfClansClient(commands.Cog):
 
         self.api_lock = asyncio.Semaphore(2)
 
+        self.throttle_time = deque(maxlen=1000)
         self.player_api = deque(maxlen=10000)
         self.clan_api = deque(maxlen=10000)
         self.war_api = deque(maxlen=1000)
@@ -72,6 +73,10 @@ class ClashOfClansClient(commands.Cog):
     @property
     def client_semaphore_waiters(self) -> int:
         return len(self.client_semaphore._waiters) if self.client_semaphore._waiters else 0
+    
+    @property
+    def throttle_time_avg(self) -> float:
+        return sum(self.throttle_time)/len(self.throttle_time) if len(self.throttle_time) > 0 else 0
 
     @property
     def player_api_avg(self) -> float:
@@ -162,6 +167,7 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_player(self,tag:str,no_cache=False,enforce_lock=False) -> aPlayer:
+        ot = pendulum.now()
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)        
@@ -181,7 +187,11 @@ class ClashOfClansClient(commands.Cog):
                         await asyncio.sleep(1/self.semaphore_limit)
 
                 st = pendulum.now()
+                diff = st - ot
+                self.throttle_time.append(diff.total_seconds())
+
                 player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+
                 diff = pendulum.now() - st
                 self.player_api.append(diff.total_seconds())
 
@@ -230,6 +240,7 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_clan(self,tag:str,no_cache:bool=False,enforce_lock=False) -> aClan:
+        ot = pendulum.now()
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(tag):
             raise InvalidTag(tag)
@@ -251,10 +262,14 @@ class ClashOfClansClient(commands.Cog):
                         await asyncio.sleep(1/self.semaphore_limit)
 
                 st = pendulum.now()
+                diff = st - ot
+                self.throttle_time.append(diff.total_seconds())
+
                 clan = await self.client.coc.get_clan(n_tag,cls=aClan)
 
                 diff = pendulum.now() - st
                 self.clan_api.append(diff.total_seconds())
+
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
@@ -308,11 +323,16 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################    
     async def get_clan_war(self,clan:aClan) -> aClanWar:
+        ot = pendulum.now()
         api_war = None
         try:
             async with self.client_semaphore:                
                 st = pendulum.now()
+                diff = st - ot
+                self.throttle_time.append(diff.total_seconds())
+
                 api_war = await self.client.coc.get_clan_war(clan.tag)
+
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
 
@@ -329,10 +349,15 @@ class ClashOfClansClient(commands.Cog):
         return clan_war
 
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
+        ot = pendulum.now()
         try:
             async with self.client_semaphore:                
                 st = pendulum.now()
+                diff = st - ot
+                self.throttle_time.append(diff.total_seconds())
+
                 api_group = await self.client.coc.get_league_group(clan.tag)
+
                 diff = pendulum.now() - st
                 self.war_api.append(diff.total_seconds())
 
@@ -352,11 +377,16 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################ 
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
+        ot = pendulum.now()
         api_raid = None
         try:
-            async with self.client_semaphore:               
+            async with self.client_semaphore:
                 st = pendulum.now()
+                diff = st - ot
+                self.throttle_time.append(diff.total_seconds())
+
                 raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+                
                 diff = pendulum.now() - st
                 self.raid_api.append(diff.total_seconds())
 
@@ -393,6 +423,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
                 + f"\n{'[API Limit]':<15} {bot_client.rate_limit:,}"
                 + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit} (Waiting: {self.client_semaphore_waiters:,})"
+                + f"\n{'[Throttle Rate]':<15} {self.throttle_time_avg:.3f}s (max: {max(self.throttle_time_avg) if len(self.throttle_time) > 0 else 0:.3f}s)"
                 + "```",
             inline=False
             )
