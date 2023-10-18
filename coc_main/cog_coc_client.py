@@ -124,6 +124,7 @@ class ClashOfClansClient(commands.Cog):
     ##################################################
     async def cog_load(self):
         self.bot_status_update_loop.start()
+        self.reset_counter.start()
         asyncio.create_task(self.start_client_cog())
     
     async def start_client_cog(self):
@@ -156,6 +157,7 @@ class ClashOfClansClient(commands.Cog):
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
+        self.reset_counter.cancel()
 
     ############################################################
     #####
