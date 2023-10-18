@@ -39,7 +39,7 @@ class UserStore(DefaultView):
             default=True if cat == self.current_category else False,
             label=cat,
             value=cat)
-            for cat in self.store_categories
+            for cat in self.store_categories if len([i for i in self.store_items if i.category == cat]) > 0
             ]
         item_select = DiscordSelectMenu(
             function=self._view_category_callback,
@@ -209,7 +209,7 @@ class UserStore(DefaultView):
         cat_items = [i for i in self.store_items if i.category == self.current_category][:25]
         
         for item in sorted(cat_items,key=lambda x: x.price):
-            embed.description += f"\n\n**{item}**: {item.price} {await bank.get_currency_name()}"
+            embed.description += f"\n\n**{item.name}**: {item.price} {await bank.get_currency_name()}"
             embed.description += f"\n{item.description}"
 
         # + "\n\n**Standard** items are added to your inventory on purchase. Check your inventory with `/inventory`."
