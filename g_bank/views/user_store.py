@@ -304,7 +304,12 @@ class UserStore(DefaultView):
             message=f"**You have: {bal:,} {currency}**\n"
                 + f"```{self.current_item.name}```"
                 )
-        
+
+        item_embed.add_field(
+            name="Category",
+            value=f"{self.current_item.category}",
+            inline=False
+            )        
         item_embed.add_field(
             name="Price",
             value=f"{self.current_item.price:,} {currency}",

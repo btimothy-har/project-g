@@ -57,6 +57,8 @@ class ClanWarLoop(TaskLoop):
     async def _loop_task(self):
         try:
             while self.loop_active:
+                st = None
+                et = None
                 try:
                     if not self.loop_active:
                         raise asyncio.CancelledError

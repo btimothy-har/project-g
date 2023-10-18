@@ -49,12 +49,15 @@ class ClanLoop(TaskLoop):
     async def _loop_task(self):
         try:
             while self.loop_active:
+                st = None
+                et = None
                 try:
                     if not self.loop_active:
                         raise asyncio.CancelledError
                     
                     if self.task_lock.locked():
-                        if self.defer_count > 20:
+                        rand = random.randint(1,110)
+                        if self.defer_count > 20 or rand % 10 == 0:
                             async with self.task_lock:
                                 await asyncio.sleep(0)
                         else:

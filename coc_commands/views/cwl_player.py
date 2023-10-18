@@ -88,15 +88,14 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-
         self.accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in self.member.account_tags))
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
         
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)        
+        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
         self.signup_main_menu(remove_signups=len(existing_signups) > 0)
-        embeds = await self.signup_embed()
+        embeds = await self.signup_embed(existing_signups)
 
         if isinstance(self.ctx,discord.Interaction):
             await self.ctx.edit_original_response(embeds=embeds, view=self)
@@ -115,7 +114,9 @@ class CWLPlayerMenu(DefaultView):
         
         self.add_signup_menu()
         self._ph_save_button.reference = 'add'
-        embeds = await self.signup_embed()
+
+        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
+        embeds = await self.signup_embed(existing_signups)        
         signup_embed = await self.signup_instruction_embed()
         
         await interaction.edit_original_response(embeds=embeds,view=self)
@@ -128,7 +129,7 @@ class CWLPlayerMenu(DefaultView):
         
         self.remove_signup_menu(existing_signups)
         self._ph_save_button.reference = 'remove'
-        embeds = await self.signup_embed()
+        embeds = await self.signup_embed(existing_signups)
         remove_embed = await self.unregister_instruction_embed()
 
         await interaction.edit_original_response(embeds=embeds,view=self)
@@ -142,7 +143,7 @@ class CWLPlayerMenu(DefaultView):
         existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
         
         self.signup_main_menu(remove_signups=len(existing_signups) > 0)
-        embed = await self.signup_embed()
+        embed = await self.signup_embed(existing_signups)
         await interaction.edit_original_response(embeds=embed,view=self)
     
     async def _callback_group_signup(self,interaction:discord.Interaction,select:DiscordSelectMenu):
@@ -153,9 +154,11 @@ class CWLPlayerMenu(DefaultView):
                 player = await self.client.fetch_player(player_tag)
                 self.user_registration[player_tag] = NewRegistration(player.war_league_season(self.season),select.reference)
 
+        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
+
         self.add_signup_menu()
         self._ph_save_button.reference = 'add'
-        embed = await self.signup_embed()
+        embed = await self.signup_embed(existing_signups)
         await interaction.edit_original_response(embeds=embed,view=self)
     
     async def _callback_group_unregister(self,interaction:discord.Interaction,select:DiscordSelectMenu):
@@ -176,7 +179,7 @@ class CWLPlayerMenu(DefaultView):
         else:
             self.remove_signup_menu(existing_signups)
             self._ph_save_button.reference = 'remove'
-            embeds = await self.signup_embed()
+            embeds = await self.signup_embed(existing_signups)
             select.disabled = False
             await interaction.edit_original_response(embeds=embeds,view=self)
     
@@ -203,10 +206,12 @@ class CWLPlayerMenu(DefaultView):
         
         for item in self.children:
             item.disabled = False
+        
+        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
 
         self._ph_save_button.label = "Saved!"
         self._ph_save_button.disabled = True
-        embeds = await self.signup_embed()
+        embeds = await self.signup_embed(existing_signups)
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     ##################################################
@@ -287,7 +292,7 @@ class CWLPlayerMenu(DefaultView):
             label=str(account),
             value=account.tag,
             emoji=EmojisTownHall.get(account.town_hall.level),
-            description=account.member_description_no_emoji,
+            description=account.clan_description,
             default=False)
             for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 14 and i <=25]
         
@@ -295,7 +300,7 @@ class CWLPlayerMenu(DefaultView):
             label=str(account),
             value=account.tag,
             emoji=EmojisTownHall.get(account.town_hall.level),
-            description=account.member_description_no_emoji,
+            description=account.clan_description,
             default=False)
             for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 12 and i <=25]
         
@@ -303,7 +308,7 @@ class CWLPlayerMenu(DefaultView):
             label=str(account),
             value=account.tag,
             emoji=EmojisTownHall.get(account.town_hall.level),
-            description=account.member_description_no_emoji,
+            description=account.clan_description,
             default=False)
             for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 10 and i <=25]
 
@@ -311,7 +316,7 @@ class CWLPlayerMenu(DefaultView):
             label=str(account),
             value=account.tag,
             emoji=EmojisTownHall.get(account.town_hall.level),
-            description=account.member_description_no_emoji,
+            description=account.clan_description,
             default=False)
             for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 4 and i <=25]
         
@@ -363,7 +368,7 @@ class CWLPlayerMenu(DefaultView):
                 )
             self.add_item(group_4_selector)
     
-    def remove_signup_menu(self,accounts:List[WarLeaguePlayer]=None):
+    def remove_signup_menu(self,accounts:List[WarLeaguePlayer]=[]):
         self.clear_items()
         back_button = DiscordButton(
             function=self._reset_signups,
@@ -378,10 +383,10 @@ class CWLPlayerMenu(DefaultView):
         self.add_item(self._close_button())
 
         registered_accounts = [discord.SelectOption(
-            label=str(cwl_player.player),
+            label=f"{cwl_player.name} ({cwl_player.tag})",
             value=cwl_player.tag,
             emoji=EmojisTownHall.get(cwl_player.town_hall),
-            description=cwl_player.member_description_no_emoji,
+            description=CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group),
             default=False)
             for cwl_player in accounts
             if getattr(cwl_player.roster_clan,'roster_open',True)
@@ -401,7 +406,7 @@ class CWLPlayerMenu(DefaultView):
     ##################################################
     ### SIGNUP CONTENT HELPERS
     ##################################################
-    async def signup_embed(self,existing_signups:List[WarLeaguePlayer]=None):
+    async def signup_embed(self,existing_signups:List[WarLeaguePlayer]=[]):
         embed_1_ct = 0
         embed_2_ct = 0
         embed = await clash_embed(
@@ -417,8 +422,7 @@ class CWLPlayerMenu(DefaultView):
             context=self.ctx,
             message=f"*Accounts 11-20 are shown below.\nIf you have more than 20 accounts, these may not be reflected.*",
             show_author=False
-            )
-        
+            )        
         player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in existing_signups))
         async for a in AsyncIter(player_accounts):
             cwl_player = a.war_league_season(self.season)

@@ -92,7 +92,7 @@ class UserInventory():
                     if item.category == 'Uncategorized':
                         similar_items = ShopItem.get_by_guild(item.guild_id)
                     else:
-                        similar_items = ShopItem.get_by_category(item.guild_id,item.category)
+                        similar_items = ShopItem.get_by_guild_category(item.guild_id,item.category)
 
                     roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
 
