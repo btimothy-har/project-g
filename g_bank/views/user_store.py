@@ -64,7 +64,7 @@ class UserStore(DefaultView):
 
         select_options = [discord.SelectOption(
             default=True if item.id == getattr(self.current_item,'id',None) else False,
-            label=f"{item}",
+            label=f"{item.name}",
             value=item.id,
             description=item.description)
             for item in select_items
@@ -209,7 +209,7 @@ class UserStore(DefaultView):
         cat_items = [i for i in self.store_items if i.category == self.current_category][:25]
         
         for item in sorted(cat_items,key=lambda x: x.price):
-            embed.description += f"\n\n**{item.name}**: {item.price} {await bank.get_currency_name()}"
+            embed.description += f"\n\n**{item.name}**: {item.price:,} {await bank.get_currency_name()}"
             embed.description += f"\n{item.description}"
 
         # + "\n\n**Standard** items are added to your inventory on purchase. Check your inventory with `/inventory`."
