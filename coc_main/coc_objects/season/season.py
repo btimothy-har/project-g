@@ -109,7 +109,7 @@ class aClashSeason():
     @property
     def database_attributes(self) -> Optional[dSeason]:
         try:
-            return dSeason.objects.get(tag=self.tag)
+            return dSeason.objects.get(tag=self.id)
         except DoesNotExist:
             return None
     
