@@ -262,7 +262,7 @@ class NewShopItem():
             exclusive_role=self.type == 'roleexclusive',
             required_role=getattr(self.required_role,'id',None),
             role_id=getattr(self.associated_role,'id',None),
-            bidirectional_role=self.bidirectional_role,
+            bidirectional_role=self.type == 'rolebidirectional',
             random_items=self.random_items
             )
         return item
