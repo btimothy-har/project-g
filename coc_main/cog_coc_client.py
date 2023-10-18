@@ -423,7 +423,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
                 + f"\n{'[API Limit]':<15} {bot_client.rate_limit:,}"
                 + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit} (Waiting: {self.client_semaphore_waiters:,})"
-                + f"\n{'[Throttle Rate]':<15} {self.throttle_time_avg:.3f}s (max: {max(self.throttle_time_avg) if len(self.throttle_time) > 0 else 0:.3f}s)"
+                + f"\n{'[Throttle Rate]':<15} {self.throttle_time_avg:.3f}s (max: {max(self.throttle_time) if len(self.throttle_time) > 0 else 0:.3f}s)"
                 + "```",
             inline=False
             )
