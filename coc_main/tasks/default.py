@@ -34,6 +34,7 @@ class TaskLoop():
         self._active = False
 
         self.run_time = deque(maxlen=100)
+        self.api_time = deque(maxlen=100)
         self.work_time = deque(maxlen=100)
         
         self.api_error = False
@@ -149,15 +150,13 @@ class TaskLoop():
         try:
             return min([min(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
         except:
-            return 0
-    
+            return 0    
     @classmethod
     def runtime_max(cls) -> int:
         try:
             return max([max(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
         except:
-            return 0 
-           
+            return 0            
     @classmethod
     def runtime_avg(cls) -> int:
         try:
@@ -170,18 +169,35 @@ class TaskLoop():
         try:
             return min([min(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
         except:
-            return 0
-    
+            return 0    
     @classmethod
     def worktime_max(cls) -> int:
         try:
             return max([max(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
         except:
-            return 0 
-           
+            return 0            
     @classmethod
     def worktime_avg(cls) -> int:
         try:
             return sum([sum(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0]) / sum([len(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
+        except ZeroDivisionError:
+            return 0
+    
+    @classmethod
+    def apitime_min(cls) -> int:
+        try:
+            return min([min(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
+        except:
+            return 0    
+    @classmethod
+    def apitime_max(cls) -> int:
+        try:
+            return max([max(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
+        except:
+            return 0            
+    @classmethod
+    def apitime_avg(cls) -> int:
+        try:
+            return sum([sum(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0]) / sum([len(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
         except ZeroDivisionError:
             return 0

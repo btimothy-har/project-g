@@ -513,8 +513,9 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(bot_client.player_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Deferred]':<15} {len([i for i in PlayerLoop.loops() if i.deferred]):,}"
-                + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg())}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
-                + f"\n{'[Worktime]':<15} {round(PlayerLoop.worktime_avg())}s ({round(PlayerLoop.worktime_min())}s - {round(PlayerLoop.worktime_max())}s)"
+                + f"\n{'[Run Time]':<15} {round(PlayerLoop.runtime_avg(),1)}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
+                + f"\n{'[API Time]':<15} {round(PlayerLoop.apitime_avg(),1)}s ({round(PlayerLoop.apitime_min())}s - {round(PlayerLoop.apitime_max())}s)"
+                + f"\n{'[Work Time]':<15} {round(PlayerLoop.worktime_avg(),1)}s ({round(PlayerLoop.worktime_min())}s - {round(PlayerLoop.worktime_max())}s)"
                 + "```",
             inline=False
             )
@@ -524,8 +525,9 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.clan_cache):,} / {len(db_Clan.objects()):,} (Queue: {len(bot_client.clan_cache.queue):,})"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Deferred]':<15} {len([i for i in ClanLoop.loops() if i.deferred]):,}"
-                + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg())}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
-                + f"\n{'[Worktime]':<15} {round(ClanLoop.worktime_avg())}s ({round(ClanLoop.worktime_min())}s - {round(ClanLoop.worktime_max())}s)"
+                + f"\n{'[Run Time]':<15} {round(ClanLoop.runtime_avg(),1)}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
+                + f"\n{'[API Time]':<15} {round(ClanLoop.apitime_avg(),1)}s ({round(ClanLoop.apitime_min())}s - {round(ClanLoop.apitime_max())}s)"
+                + f"\n{'[Work Time]':<15} {round(ClanLoop.worktime_avg(),1)}s ({round(ClanLoop.worktime_min())}s - {round(ClanLoop.worktime_max())}s)"
                 + "```",
             inline=False
             )

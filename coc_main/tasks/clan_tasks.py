@@ -52,7 +52,6 @@ class ClanLoop(TaskLoop):
                 self.completed = False
                 st = None
                 et = None
-                wt = 0
 
                 try:
                     if not self.loop_active:
@@ -76,7 +75,7 @@ class ClanLoop(TaskLoop):
                                 t1 = pendulum.now()
                                 clan = await self.coc_client.fetch_clan(self.tag,no_cache=True,enforce_lock=True)
                                 diff = pendulum.now() - t1
-                                wt += diff.total_seconds()
+                                self.api_time.append(diff.total_seconds())
                         except InvalidTag as exc:
                             raise asyncio.CancelledError from exc
 
@@ -96,7 +95,7 @@ class ClanLoop(TaskLoop):
                                     )
                         self.cached_clan = clan
                         diff = pendulum.now() - t1
-                        wt += diff.total_seconds()
+                        self.work_time.append(diff.total_seconds())
 
                         self.completed = True
                         
@@ -115,7 +114,6 @@ class ClanLoop(TaskLoop):
                         run_time = et - st
 
                         self.run_time.append(run_time.total_seconds())
-                        self.work_time.append(wt)
                         self.main_log.debug(
                             f"{self.tag}: Clan {self.cached_clan} updated. Runtime: {run_time.total_seconds()} seconds."
                             )
@@ -141,7 +139,7 @@ class ClanLoop(TaskLoop):
     @property
     def sleep_time(self):
         if self.deferred:
-            return 60
+            return random.randint(30,90)
         
         if self.api_error:
             self.api_error = False

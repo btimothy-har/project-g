@@ -49,8 +49,7 @@ class PlayerLoop(TaskLoop):
             while self.loop_active:
                 self.completed = False
                 st = None
-                et = None
-                wt = 0                
+                et = None           
 
                 try:
                     if not self.loop_active:
@@ -74,7 +73,7 @@ class PlayerLoop(TaskLoop):
                                 t1 = pendulum.now()
                                 self.cached_player = await self.coc_client.fetch_player(self.tag,no_cache=True,enforce_lock=True)
                                 diff = pendulum.now() - t1
-                                wt += diff.total_seconds()
+                                self.api_time.append(diff.total_seconds())
                         except InvalidTag as exc:
                             db_Player.objects(tag=self.tag).delete()
                             db_PlayerStats.objects(tag=self.tag).delete()
@@ -84,7 +83,7 @@ class PlayerLoop(TaskLoop):
                         t1 = pendulum.now()
                         await self.cached_player.stat_update()
                         diff = pendulum.now() - t1
-                        wt += diff.total_seconds()
+                        self.work_time.append(diff.total_seconds())
 
                     self.completed = True
                         
@@ -103,7 +102,6 @@ class PlayerLoop(TaskLoop):
                         run_time = et - st
 
                         self.run_time.append(run_time.total_seconds())
-                        self.work_time.append(wt)
                         self.main_log.debug(
                             f"{self.tag}: Player {self.cached_player} updated. Runtime: {run_time.total_seconds()} seconds."
                             )
@@ -132,7 +130,7 @@ class PlayerLoop(TaskLoop):
     @property
     def sleep_time(self):
         if self.deferred:
-            return 60
+            return random.randint(30,90)
         
         if self.api_error:
             self.api_error = False
