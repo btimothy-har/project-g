@@ -121,6 +121,9 @@ class UserStore(DefaultView):
         if isinstance(interaction,discord.Interaction):
             if not interaction.response.is_done():
                 await interaction.response.defer()
+        
+        self.current_category = None
+        self.current_item = None
 
         self.clear_items()
         self.add_item(self.home_button)
@@ -183,6 +186,7 @@ class UserStore(DefaultView):
         await interaction.response.defer()
 
         self.current_category = menu.values[0]
+        self.current_item = None
 
         self.clear_items()
         self.add_item(self.home_button)

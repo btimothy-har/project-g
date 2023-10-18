@@ -274,7 +274,8 @@ class StoreManager(DefaultView):
             title=f"**Store Manager: {self.guild.name}**",
             message="```**Item Added**```"
                 + f"\n\n**Type**: `{item.type}`"
-                + (f"\n**Add-only**: `{item.bidirectional_role}`" if item.type in ['role','roleexclusive'] else "")
+                + (f"\n**Bi-Directional**: `{item.bidirectional_role}`" if item.type in ['role','roleexclusive','rolebidirectional'] else "")
+                + (f"\n**Exclusive**: `{item.exclusive_role}`" if item.type in ['role','roleexclusive','rolebidirectional'] else "")
                 + f"\n\n**Name**: `{item.name}`"
                 + f"\n**Price**: `{item.price:,}`"
                 + f"\n**Stock**: `{item.stock}`"
