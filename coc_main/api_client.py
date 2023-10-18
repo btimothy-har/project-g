@@ -43,6 +43,10 @@ class DataCache():
         return len(self.cache)
     
     @property
+    def keys(self):
+        return list(self.cache.keys())
+    
+    @property
     def values(self):
         return list(self.cache.values())
     

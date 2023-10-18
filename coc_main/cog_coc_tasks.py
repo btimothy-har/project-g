@@ -347,30 +347,33 @@ class ClashOfClansTasks(commands.Cog):
     @tasks.loop(seconds=30)
     async def refresh_coc_tasks(self):
         def predicate_clan_not_in_loop(clan):
-            if clan.tag not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
+            if clan not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
                 return True
             return False        
         def predicate_player_not_in_loop(player):
-            return player.tag not in [i.tag for i in PlayerLoop.loops() if i.loop_active]
+            return player not in [i.tag for i in PlayerLoop.loops() if i.loop_active]
         
         if self.refresh_lock.locked():
             return
         
         try:
             async with self.refresh_lock:
-                clans = AsyncIter(bot_client.clan_cache.values)
+                c_copy = bot_client.clan_cache.keys.copy()
+                clans = AsyncIter(c_copy)
                 async for clan in clans.filter(predicate_clan_not_in_loop):
-                    await self.create_clan_task(clan.tag)
+                    await self.create_clan_task(clan)
 
-                players = AsyncIter(bot_client.player_cache.values)
+                p_copy = bot_client.player_cache.keys.copy()
+                players = AsyncIter(p_copy)
                 async for player in players.filter(predicate_player_not_in_loop):
-                    await self.create_player_task(player.tag)
+                    await self.create_player_task(player)
                 
                 alliance_tags = [db.tag for db in db_AllianceClan.objects().only('tag')]
                 alliance_clans = AsyncIter(alliance_tags)
                 async for clan in alliance_clans:
                     if clan not in [i.tag for i in ClanWarLoop.loops() if i.loop_active]:
                         await self.create_war_task(clan)
+                        
                     if clan not in [i.tag for i in ClanRaidLoop.loops() if i.loop_active]:
                         await self.create_raid_task(clan)
                 

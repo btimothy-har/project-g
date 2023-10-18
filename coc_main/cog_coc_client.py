@@ -72,10 +72,11 @@ class ClashOfClansClient(commands.Cog):
         self.counter = RequestCounter()
 
         self.semaphore_limit = int(bot_client.rate_limit)
-        self.delay_time = 1/self.semaphore_limit
+        self.delay_time = max((1/self.semaphore_limit),0.001)
         
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
-        self.api_lock = asyncio.Semaphore(int(min(bot_client.rate_limit/1000,1)))
+        self.api_lock = asyncio.Semaphore(int(max(bot_client.rate_limit/1000,1)))
+        #self.api_lock = asyncio.Semaphore()
         
         self.player_api = deque(maxlen=10000)
         self.player_throttle = deque(maxlen=10000)

@@ -631,7 +631,7 @@ class ClanSettingsMenu(DefaultView):
     
     async def _callback_save_war_reminder(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        await self.clan.create_war_reminder(
+        await self.clan.create_clan_war_reminder(
             channel=self.wrem_channel,
             war_types=self.wrem_type,
             interval=self.wrem_interval
@@ -882,7 +882,7 @@ class ClanSettingsMenu(DefaultView):
     
     async def _callback_save_raid_reminder(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        await self.clan.create_raid_reminder(
+        await self.clan.create_capital_raid_reminder(
             channel=self.rrem_channel,
             interval=self.rrem_interval
             )        
