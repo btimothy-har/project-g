@@ -80,25 +80,62 @@ class RequestCounter():
 class ClientThrottler:
     def __init__(self,cog:BotClashClient,rate_limit:int,concurrent_requests:int=1):
         self.cog = cog
-
         self.base_sleep = 1 / rate_limit
         self.sleep_time = 0
-
+        
         self._lock = asyncio.Lock()
         self._semaphore = asyncio.Semaphore(concurrent_requests)
+        self._throttle = False
+    
+    @property
+    def start_throttle(self) -> bool:
+        all_times = []
+        if len(self.cog.player_api) > 0:
+            all_times.extend(list(self.cog.player_api)[-100:])
+        if len(self.cog.clan_api) > 0:
+            all_times.extend(list(self.cog.clan_api)[-100:])
+        
+        avg_100 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
+        if avg_100 > 1.5:
+            return True
+        return False
+    
+    @property
+    def release_throttle(self) -> bool:
+        all_times = []
+        if len(self.cog.player_api) > 0:
+            all_times.extend(list(self.cog.player_api)[-300:])
+        if len(self.cog.clan_api) > 0:
+            all_times.extend(list(self.cog.clan_api)[-300:])
+        
+        avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
+        if avg_300 <= 1.5:
+            return True
+        return False
 
     async def __aenter__(self):
-        async with self._semaphore:
-            if self.cog.last_api_time > 1.5:
-                async with self._lock:
-                    self.sleep_time += (self.base_sleep * 0.1)
-                    await asyncio.sleep(self.sleep_time)
+        # semaphore restricts number of concurrent requests
+        await self._semaphore.acquire()
 
-            else:
-                self.sleep_time = 0
+        # activate throttle if average response time is > 1.5 seconds
+        if self.start_throttle:
+            self._throttle = True
+        
+        # while throttle is active, requests are serialized and throttled with a delay
+        if self._throttle:
+            # lock serializes requests
+            async with self._lock:
+                # delay increases by 10% each request
+                self.sleep_time += (self.base_sleep * 0.1)
+                await asyncio.sleep(self.sleep_time)
+        else:
+            # if average response time is < 1.5 seconds, requests are not serialized and throttled
+            self.sleep_time = 0
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        pass
+        self._semaphore.release()
+        if self.release_throttle:
+            self._throttle = False
 
 ############################################################
 ############################################################
@@ -125,7 +162,7 @@ class ClashOfClansClient(commands.Cog):
         self.semaphore_limit = int(bot_client.rate_limit)
         
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
-        self.api_lock = ClientThrottler(self,bot_client.rate_limit,20)
+        self.api_lock = ClientThrottler(self,bot_client.rate_limit,30)
         
         self.player_api = deque(maxlen=10000)
         self.player_throttle = deque(maxlen=100)
@@ -152,16 +189,6 @@ class ClashOfClansClient(commands.Cog):
     @property
     def client_semaphore_waiters(self) -> int:
         return len(self.client_semaphore._waiters) if self.client_semaphore._waiters else 0
-    
-    @property
-    def last_api_time(self) -> float:
-        all_times = []
-        if len(self.player_api) > 0:
-            all_times.extend(list(self.player_api)[-100:])
-        if len(self.clan_api) > 0:
-            all_times.extend(list(self.clan_api)[-100:])
-        #return average
-        return sum(all_times)/len(all_times) if len(all_times) > 0 else 0
 
     @property
     def player_api_avg(self) -> float:
