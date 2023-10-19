@@ -212,8 +212,9 @@ class CWLRosterMenu(DefaultView):
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
         unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
         async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            p.roster_clan = self.clan
-            self.modified_to_save.append(p)
+            cwl_player = p.war_league_season(self.season)
+            cwl_player.roster_clan = self.clan
+            self.modified_to_save.append(cwl_player)
             if len(self.clan.participants) >= 15:
                 break
         
@@ -224,15 +225,16 @@ class CWLRosterMenu(DefaultView):
     async def _callback_autofill_30(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
         
-        eligible_participants = WarLeaguePlayer.signups_by_group(
+        eligible_participants = await WarLeaguePlayer.signups_by_group(
             season=self.season,
             group=CWLLeagueGroups.from_league_name(self.clan.league)
             ) 
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
         unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
         async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            p.roster_clan = self.clan
-            self.modified_to_save.append(p)
+            cwl_player = p.war_league_season(self.season)
+            cwl_player.roster_clan = self.clan
+            self.modified_to_save.append(cwl_player)
             if len(self.clan.participants) >= 30:
                 break
         
@@ -278,7 +280,7 @@ class CWLRosterMenu(DefaultView):
             self.members_only = True
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             await self._callback_filter_members(interaction,button)
@@ -295,7 +297,7 @@ class CWLRosterMenu(DefaultView):
             self.max_heroes = True
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             await self._callback_filter_max_heroes(interaction,button)
@@ -312,7 +314,7 @@ class CWLRosterMenu(DefaultView):
             self.max_offense = True
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             await self._callback_filter_max_offense(interaction,button)
@@ -329,7 +331,7 @@ class CWLRosterMenu(DefaultView):
             self.not_yet_rostered = True
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             await self._callback_filter_not_rostered(interaction,button)
@@ -341,11 +343,11 @@ class CWLRosterMenu(DefaultView):
         self.th_filter = [int(th) for th in list.values]
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             self.th_filter = []
-            self.add_player_menu()
+            await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     async def _callback_filter_group(self,interaction:discord.Interaction,list:DiscordSelectMenu):
@@ -353,18 +355,18 @@ class CWLRosterMenu(DefaultView):
         self.group_filter = [int(i) for i in list.values]
 
         embeds = await self.clan_embed()
-        chk = self.add_player_menu()
+        chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("There were no players found based on that filter request.",ephemeral=True)
             self.group_filter = []
-            self.add_player_menu()
+            await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     async def _callback_filter_randomize(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
         embeds = await self.clan_embed()
-        self.add_player_menu()
+        await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     async def _callback_add_help(self,interaction:discord.Interaction,button:DiscordButton):
@@ -526,7 +528,7 @@ class CWLRosterMenu(DefaultView):
         all_participants, eligible_participants = await self.get_eligible_participants()
 
         sample = random.sample(eligible_participants,min(25,len(eligible_participants)))
-        sampled_players = await asyncio.gather(*(p.get_full_player() for p in sample))
+        sampled_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in sample))
 
         select_participants = []
         async for a in AsyncIter(sorted(sampled_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
@@ -879,7 +881,10 @@ class CWLRosterMenu(DefaultView):
         signups = await WarLeaguePlayer.signups_by_season(self.season)
         participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in signups))
 
-        return [p.war_league_season(self.season) for p in participants], sorted(
-            [p.war_league_season(self.season) for p in participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
-            key=lambda x:(x.town_hall.level,x.hero_strength),
-            reverse=True)
+        all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+        eligible_participants = sorted(
+            [p for p in participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
+            key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True
+            )
+
+        return [p.war_league_season(self.season) for p in all_participants], [p.war_league_season(self.season) for p in eligible_participants]
