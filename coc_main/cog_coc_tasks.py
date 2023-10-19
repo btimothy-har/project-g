@@ -344,7 +344,7 @@ class ClashOfClansTasks(commands.Cog):
             return_exceptions=True
             )
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=5.0)
     async def refresh_coc_tasks(self):
         def predicate_clan_not_in_loop(clan):
             if clan not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
