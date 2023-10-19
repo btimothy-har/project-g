@@ -251,6 +251,7 @@ class BotClashClient():
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='Created for Project G, from coc.py',
                 load_game_data=coc.LoadGameData(always=True),
+                throttle_limit=40,
                 throttler=throttler,
                 cache_max_size=None
                 )
@@ -270,6 +271,7 @@ class BotClashClient():
                 
         self.bot.coc_client = coc.EventsClient(
             load_game_data=coc.LoadGameData(always=True),
+            throttle_limit=40,
             throttler=throttler,
             cache_max_size=None
             )

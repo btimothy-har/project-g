@@ -502,15 +502,6 @@ class ClashOfClansTasks(commands.Cog):
             inline=False
             )
         embed.add_field(
-            name="**API Client**",
-            value="```ini"
-                + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
-                + f"\n{'[API Keys]':<15} {len(bot_client.coc.http._keys)}"
-                + f"\n{'[API Requests]':<15} {self.api_semaphore_limit - self.api_semaphore._value:,} / {self.api_semaphore_limit} (Waiting: {self.api_semaphore_waiters:,})"
-                + "```",
-            inline=False
-            )
-        embed.add_field(
             name="**Players**",
             value="```ini"
                 + f"\n{'[Mem/DB/Queue]':<15} {len(bot_client.player_cache):,} / {len(db_Player.objects()):,} (Queue: {len(bot_client.player_cache.queue):,})"
