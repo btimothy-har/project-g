@@ -344,28 +344,21 @@ class ClashOfClansTasks(commands.Cog):
             return_exceptions=True
             )
 
-    @tasks.loop(seconds=30)
-    async def refresh_coc_tasks(self):
-        def predicate_clan_not_in_loop(clan):
-            if clan not in [i.tag for i in ClanLoop.loops() if i.loop_active]:
-                return True
-            return False        
-        def predicate_player_not_in_loop(player):
-            return player not in [i.tag for i in PlayerLoop.loops() if i.loop_active]
-        
+    @tasks.loop(seconds=60)
+    async def refresh_coc_tasks(self):        
         if self.refresh_lock.locked():
             return
         
         try:
             async with self.refresh_lock:
                 c_copy = bot_client.clan_cache.keys.copy()
-                clans = AsyncIter(c_copy)
-                async for clan in clans.filter(predicate_clan_not_in_loop):
+                clans = [i for i in c_copy if i not in [i.tag for i in ClanLoop.loops() if i.loop_active]]
+                async for clan in AsyncIter(clans):
                     await self.create_clan_task(clan)
 
                 p_copy = bot_client.player_cache.keys.copy()
-                players = AsyncIter(p_copy)
-                async for player in players.filter(predicate_player_not_in_loop):
+                players = [i for i in p_copy if i not in [i.tag for i in PlayerLoop.loops() if i.loop_active]]
+                async for player in AsyncIter(players):
                     await self.create_player_task(player)
                 
                 alliance_tags = [db.tag for db in db_AllianceClan.objects().only('tag')]
