@@ -220,7 +220,7 @@ class ClanApplyMenu(discord.ui.View):
     def apply_button(self):
         apply_button = DiscordButton(
             function=self._callback_apply,
-            label="Click to Apply",
+            label="Click here to apply to any of our Clans!",
             style=discord.ButtonStyle.blurple
             )
         return apply_button
