@@ -90,19 +90,21 @@ class ClientThrottler:
     @property
     def start_throttle(self) -> bool:
         all_times = []
+        index_range = bot_client.num_keys
         if len(self.cog.last_api_response) > 0:
-            all_times.extend(list(self.cog.last_api_response)[-100:])        
+            all_times.extend(list(self.cog.last_api_response)[-index_range:])        
         
         avg_100 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_100 > 1.5:
+        if avg_100 > 1.8:
             return True
         return False
     
     @property
     def release_throttle(self) -> bool:
         all_times = []
+        index_range = bot_client.num_keys * 1.5
         if len(self.cog.last_api_response) > 0:
-            all_times.extend(list(self.cog.last_api_response)[-300:])
+            all_times.extend(list(self.cog.last_api_response)[-index_range:])
         
         avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
         if avg_300 <= 1.5:
@@ -158,7 +160,7 @@ class ClashOfClansClient(commands.Cog):
         self.semaphore_limit = int(bot_client.rate_limit)
         
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
-        self.api_lock = ClientThrottler(self,bot_client.rate_limit,60)
+        self.api_lock = ClientThrottler(self,bot_client.rate_limit,bot_client.num_keys)
         
         self.last_api_response = deque(maxlen=500)
 
@@ -574,7 +576,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[Last]':<10} {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s"
                 + f"\n{'[Mean]':<10} {self.player_api_avg:.3f}s"
                 + f"\n{'[Min/Max]':<10} {(min(self.player_api) if len(self.player_api) > 0 else 0):.3f}s ~ {(max(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
-                + f"\n{'[Throttle]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
+                + f"\n{'[Wait]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
                 + "```",
             inline=False
             )
@@ -586,7 +588,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[Last]':<10} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s"
                 + f"\n{'[Mean]':<10} {self.clan_api_avg:.3f}s"
                 + f"\n{'[Min/Max]':<10} {(min(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s ~ {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
-                + f"\n{'[Throttle]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
+                + f"\n{'[Wait]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
                 + "```",
             inline=False
             )
