@@ -76,6 +76,11 @@ class TaskLoop():
         return cog.task_lock
     
     @property
+    def api_maintenance(self) -> asyncio.Lock:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.api_maintenance
+    
+    @property
     def api_semaphore(self) -> asyncio.Semaphore:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.api_semaphore
@@ -128,6 +133,9 @@ class TaskLoop():
     
     @property
     def to_defer(self) -> bool:
+        if self.api_maintenance:
+            return True
+        
         if self.defer_count < 4:
             rand = random.randint(1,11000) #0.01%
             if rand % 10 == 0:

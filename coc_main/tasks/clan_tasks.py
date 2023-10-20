@@ -59,7 +59,8 @@ class ClanLoop(TaskLoop):
                     
                     if self.task_lock.locked():
                         if self.to_defer:
-                            self.defer_count += 1
+                            if not self.api_maintenance:
+                                self.defer_count += 1
                             self.deferred = True
                             continue
                         else:
