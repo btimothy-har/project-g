@@ -90,7 +90,7 @@ class ClientThrottler:
     @property
     def start_throttle(self) -> bool:
         all_times = []
-        index_range = bot_client.num_keys
+        index_range = int(bot_client.num_keys)
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])        
         
@@ -102,7 +102,7 @@ class ClientThrottler:
     @property
     def release_throttle(self) -> bool:
         all_times = []
-        index_range = bot_client.num_keys * 1.5
+        index_range = int(bot_client.num_keys * 1.5)
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])
         
@@ -160,7 +160,7 @@ class ClashOfClansClient(commands.Cog):
         self.semaphore_limit = int(bot_client.rate_limit)
         
         self.client_semaphore = asyncio.Semaphore(self.semaphore_limit)
-        self.api_lock = ClientThrottler(self,bot_client.rate_limit,bot_client.num_keys)
+        self.api_lock = ClientThrottler(self,bot_client.rate_limit,int(bot_client.num_keys))
         
         self.last_api_response = deque(maxlen=500)
 
