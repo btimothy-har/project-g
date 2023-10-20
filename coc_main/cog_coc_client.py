@@ -90,24 +90,24 @@ class ClientThrottler:
     @property
     def start_throttle(self) -> bool:
         all_times = []
-        index_range = int(bot_client.num_keys)
+        index_range = 100
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])        
         
         avg_100 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_100 > 1.8:
+        if avg_100 > 1.5:
             return True
         return False
     
     @property
     def release_throttle(self) -> bool:
         all_times = []
-        index_range = int(bot_client.num_keys * 1.5)
+        index_range = 200
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])
         
         avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_300 <= 1.5:
+        if avg_300 <= 1:
             return True
         return False
 
