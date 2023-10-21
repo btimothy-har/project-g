@@ -1094,8 +1094,8 @@ class Bank(commands.Cog):
         )
     @app_commands.guild_only()
     @app_commands.describe(
-        select_clan="Select a Member to view inventories for. Only usable by Bank Admins.")
-    async def app_command_user_inventory(self,interaction:discord.Interaction,user:Optional[discord.Member]):
+        member="Select a Member to view inventories for. Only usable by Bank Admins.")
+    async def app_command_user_inventory(self,interaction:discord.Interaction,member:Optional[discord.Member]):
         
         await interaction.response.defer()
 
