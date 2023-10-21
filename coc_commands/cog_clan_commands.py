@@ -1132,14 +1132,14 @@ class Clans(commands.Cog):
             await select_clan.new_leader(new_leader.id)
             complete_embed = await clash_embed(
                 context=interaction,
-                title=f"Change Leader: **{select_clan.title}**",
-                message=f"Leader: <@{select_clan.leader}>"
+                title=f"Leader Changed: **{select_clan.title}**",
+                message=f"New Leader: <@{select_clan.leader}>"
                     + f"\n\n{select_clan.long_description}"
                     + f"\n\n>>> {select_clan.c_description}",
                 url=select_clan.share_link,
                 success=True,
                 thumbnail=select_clan.badge)
-            return await interaction.edit_original_response(embed=complete_embed,view=None)
+            return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
     ##################################################
     ### CLANSET / CONFIG

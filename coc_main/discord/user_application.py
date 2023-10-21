@@ -249,7 +249,7 @@ class ClanApplyMenuUser(DefaultView):
             application = db_ClanApplication.objects.get(pk=app_id)
             channel = interaction.guild.get_channel(application.ticket_channel)
             if channel:
-                interaction.response.edit_message
+                await channel.set_permissions(interaction.user,read_messages=True)
                 await interaction.followup.send(
                     f"{self.member.mention} Your application has been created in {channel.mention}.",
                     ephemeral=True
@@ -323,7 +323,6 @@ class ClanApplyMenuUser(DefaultView):
     #     await member.sync_clan_roles()
 
 async def listener_user_application(channel:discord.TextChannel,application_id:str):
-
     newline = "\n"
     coc_client = bot_client.bot.get_cog("ClashOfClansClient")
 
@@ -445,8 +444,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
     for th in accounts_townhalls:
         channel_name += f"-th{th}"
     
-    await channel.edit(name=channel_name.lower())    
-    await channel.set_permissions(member,read_messages=True)    
+    await channel.edit(name=channel_name.lower())
     async for c in AsyncIter(clans):
         try:
             link = db_ClanGuildLink.objects.get(tag=c.tag,guild_id=channel.guild.id)
@@ -455,7 +453,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         else:
             coleader_role = channel.guild.get_role(link.coleader_role)        
             if coleader_role:
-                await channel.set_permissions(coleader_role,read_messages=True)
+                await channel.send(f"{application.bot_prefix}add {coleader_role.mention}")
                 if len(channel.threads) > 0:
                     thread = channel.threads[0]
                     await thread.send(
