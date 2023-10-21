@@ -90,7 +90,7 @@ class ClientThrottler:
     @property
     def start_throttle(self) -> bool:
         all_times = []
-        index_range = 100
+        index_range = bot_client.num_keys
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])        
         
@@ -102,12 +102,12 @@ class ClientThrottler:
     @property
     def release_throttle(self) -> bool:
         all_times = []
-        index_range = 200
+        index_range = int(bot_client.num_keys * 1.5)
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])
         
         avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_300 <= 1:
+        if avg_300 <= 1.2:
             return True
         return False
 
@@ -563,7 +563,7 @@ class ClashOfClansClient(commands.Cog):
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
                 + f"\n{'[API Requests]':<15} {self.semaphore_limit - self.client_semaphore._value:,} / {self.semaphore_limit:,}"
-                + f"\n{'[API Throttle]':<15} {'On' if self.api_lock._throttle else 'Off'} ({self.api_lock.sleep_time:.2f}s)"
+                + f"\n{'[API Throttle]':<15} {'On' if self.api_lock._throttle else 'Off'} ({self.api_lock.sleep_time*1000:.2f}ms)"
                 + "```",
             inline=False
             )

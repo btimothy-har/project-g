@@ -1071,14 +1071,20 @@ class Bank(commands.Cog):
     ##################################################
     @commands.command(name="inventory")
     @commands.guild_only()
-    async def command_user_inventory(self,ctx:commands.Context):
+    async def command_user_inventory(self,ctx:commands.Context,user:Optional[discord.Member]):
         """
         Display your inventory.
 
         Your inventory, like your Bank Balances, are considered global and will contain items from different server stores.
         """
+        
+        target = None
+        if is_bank_admin(ctx) and user:
+            target = user
+        else:
+            target = ctx.author
 
-        inventory = UserInventory(ctx.author)
+        inventory = UserInventory(target)
         embed = await inventory.get_embed(ctx)
         await ctx.reply(embed=embed)
     
@@ -1087,11 +1093,19 @@ class Bank(commands.Cog):
         description="Display your inventory."
         )
     @app_commands.guild_only()
-    async def app_command_user_inventory(self,interaction:discord.Interaction):
+    @app_commands.describe(
+        select_clan="Select a Member to view inventories for. Only usable by Bank Admins.")
+    async def app_command_user_inventory(self,interaction:discord.Interaction,user:Optional[discord.Member]):
         
         await interaction.response.defer()
 
-        inventory = UserInventory(interaction.user)
+        target = None
+        if is_bank_admin(interaction) and user:
+            target = user
+        else:
+            target = interaction.guild.get_member(interaction.user.id)
+
+        inventory = UserInventory(target)
         embed = await inventory.get_embed(interaction)
         await interaction.followup.send(embed=embed)
     
