@@ -1129,7 +1129,7 @@ class Clans(commands.Cog):
             return await interaction.edit_original_response(embeds=[embed,cancel_embed],view=None)
         
         if confirm_view.confirmation:
-            await clan.new_leader(new_leader.id)
+            await select_clan.new_leader(new_leader.id)
             complete_embed = await clash_embed(
                 context=interaction,
                 title=f"Change Leader: **{select_clan.title}**",

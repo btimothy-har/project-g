@@ -1100,8 +1100,8 @@ class Bank(commands.Cog):
         await interaction.response.defer()
 
         target = None
-        if is_bank_admin(interaction) and user:
-            target = user
+        if is_bank_admin(interaction) and member:
+            target = member
         else:
             target = interaction.guild.get_member(interaction.user.id)
 
