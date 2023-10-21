@@ -90,7 +90,7 @@ class ClientThrottler:
     @property
     def start_throttle(self) -> bool:
         all_times = []
-        index_range = bot_client.num_keys
+        index_range = int(bot_client.num_keys / 2)
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])        
         
@@ -102,7 +102,7 @@ class ClientThrottler:
     @property
     def release_throttle(self) -> bool:
         all_times = []
-        index_range = int(bot_client.num_keys * 1.5)
+        index_range = int((bot_client.num_keys / 2) * 1.5)
         if len(self.cog.last_api_response) > 0:
             all_times.extend(list(self.cog.last_api_response)[-index_range:])
         
@@ -131,9 +131,9 @@ class ClientThrottler:
             self.sleep_time = 0
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        self._semaphore.release()
         if self.release_throttle:
             self._throttle = False
+        self._semaphore.release()
 
 ############################################################
 ############################################################
