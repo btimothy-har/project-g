@@ -1318,7 +1318,7 @@ class Clans(commands.Cog):
             clangames__score__gt=0
             ).only('tag')
         
-        players = await asyncio.gather(*(self.fetch_player(p.tag) for p in query))
+        players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in query))
 
         embed = await clash_embed(
             context=context,
