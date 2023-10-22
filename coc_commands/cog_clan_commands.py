@@ -1088,7 +1088,7 @@ class Clans(commands.Cog):
 
         select_clan = await self.client.fetch_clan(clan)
 
-        if not self.check_change_leader(interaction.guild,clan,interaction.user.id):
+        if not self.check_change_leader(interaction.guild,select_clan,interaction.user.id):
             embed = await clash_embed(
                 context=interaction,
                 message=f"You do not have permission to change the Leader of **{clan.title}**.",
