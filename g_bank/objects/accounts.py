@@ -142,7 +142,7 @@ class MasterAccount(BankAccount):
         return cls._cache[id]
     
     def __init__(self,id):
-        if id not in ['current','sweep','reserve']:
+        if id not in ['current','sweep','reserve','arix']:
             raise ValueError("Invalid Master Account ID.")
         super().__init__(id)
         if self._is_new:

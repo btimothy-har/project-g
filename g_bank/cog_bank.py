@@ -22,7 +22,7 @@ from .autocomplete import autocomplete_eligible_accounts, autocomplete_store_ite
 from mee6rank.mee6rank import Mee6Rank
 
 from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbreviation
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan, db_Player
+from coc_main.cog_coc_client import ClashOfClansClient, aClashSeason, aPlayer, aClan, db_Player
 
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidMember
@@ -65,6 +65,7 @@ class Bank(commands.Cog):
         self.current_account = MasterAccount('current')
         self.sweep_account = MasterAccount('sweep')
         self.reserve_account = MasterAccount('reserve')
+        self.arix_account = MasterAccount('arix')
         self.eligible_boost_servers = [1132581106571550831,688449973553201335,680798075685699691]
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
@@ -167,7 +168,13 @@ class Bank(commands.Cog):
                     amount=round(clan_balance * 0.1),
                     user_id=self.bot.user.id,
                     comment=f"EOS to Reserve Account."
-                    )                
+                    )
+                if 688449973553201335 in [s.id for s in clan.linked_servers]:
+                    await clan.bank_account.withdraw(
+                        amount=round(clan_balance * 0.3),
+                        user_id=self.bot.user.id,
+                        comment=f"EOS to AriX Account."
+                        )
             if available_for_distribution > 0:
                 await clan.bank_account.deposit(
                     amount=round((available_for_distribution) / len(alliance_clans)),
@@ -292,6 +299,34 @@ class Bank(commands.Cog):
                     user_id=self.bot.user.id,
                     comment=f"Legend Rewards for {player.name} {player.tag}."
                     )
+    
+    async def member_clangames_rewards(self,season:aClashSeason):
+        if not self.use_rewards:
+            return
+        
+        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
+        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))
+        
+        async for player in AsyncIter(alliance_members):
+            if not player.is_member:
+                continue            
+
+            member = self.bot.get_user(player.discord_user)
+            if not member:
+                continue
+
+            player_season = player.get_season_stats(season)
+
+            if player_season.clangames.clan_tag == player_season.home_clan_tag:
+                reward = round(4000 * (player_season.clangames.score / 4000))
+
+                if reward > 0:
+                    await bank.deposit_credits(member,reward)
+                    await self.current_account.withdraw(
+                        amount=reward,
+                        user_id=self.bot.user.id,
+                        comment=f"Clan Games Rewards for {player.name} {player.tag}."
+                        )
     
     async def war_bank_rewards(self,player:aWarPlayer):
         if not self.use_rewards:
@@ -590,7 +625,8 @@ class Bank(commands.Cog):
             message=f"`{'Current':<10}` {self.current_account.balance:,} {currency}"
                 + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
                 + f"\n`{'Reserve':<10}` {self.reserve_account.balance:,} {currency}"
-                + f"\n`{'Total':<10}` {total_balance:,} {currency}"
+                + f"\n`{'AriX':<10}` {self.arix_account.balance:,} {currency}"
+                + f"\n\n`{'In Circulation':<15}` {total_balance:,} {currency}"
                 + f"\n\nNew Monthly Balance (est.): {len(member_tags) * 25000:,}",
             timestamp=pendulum.now()
             )
@@ -745,7 +781,7 @@ class Bank(commands.Cog):
 
         await interaction.response.defer()
 
-        if select_account in ['current','sweep','reserve']:
+        if select_account in ['current','sweep','reserve','arix']:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You don't have permission to do this.")
             account = MasterAccount(select_account)
@@ -810,6 +846,13 @@ class Bank(commands.Cog):
                 user_id=ctx.author.id,
                 comment=f"Manual Deposit."
                 )
+        
+        elif account_type_or_clan_abbreviation in ['arix']:
+            await self.arix_account.deposit(
+                amount=amount,
+                user_id=ctx.author.id,
+                comment=f"Manual Deposit."
+                )
             
         else:
             try:
@@ -858,6 +901,13 @@ class Bank(commands.Cog):
                 comment=f"Manual Deposit."
                 )
             return await interaction.followup.send(f"Deposited {amount:,} to Reserve Account.",ephemeral=True)
+        
+        elif select_account in ['arix']:
+            await self.arix_account.deposit(
+                amount=amount,
+                user_id=interaction.user.id,
+                comment=f"Manual Deposit."
+                )
             
         else:
             try:
@@ -899,6 +949,13 @@ class Bank(commands.Cog):
         
         elif account_type_or_clan_abbreviation in ['reserve']:
             await self.reserve_account.withdraw(
+                amount=amount,
+                user_id=ctx.author.id,
+                comment=f"Manual Withdrawal."
+                )
+        
+        elif account_type_or_clan_abbreviation in ['arix']:
+            await self.arix_account.withdraw(
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Withdrawal."
@@ -951,6 +1008,14 @@ class Bank(commands.Cog):
                 comment=f"Manual Withdrawal."
                 )
             return await interaction.followup.send(f"Withdrew {amount:,} from Reserve Account.",ephemeral=True)
+        
+        elif select_account in ['arix']:
+            await self.arix_account.withdraw(
+                amount=amount,
+                user_id=interaction.user.id,
+                comment=f"Manual Withdrawal."
+                )
+            return await interaction.followup.send(f"Withdrew {amount:,} from Reserve Account.",ephemeral=True)
             
         else:
             try:
@@ -977,7 +1042,7 @@ class Bank(commands.Cog):
 
         Funds are withdrawn from Global or Clan Accounts.
         """
-        if account_type_or_clan_abbreviation in ['current','sweep','reserve']:
+        if account_type_or_clan_abbreviation in ['current','sweep','reserve','arix']:
             if not is_bank_admin(ctx):
                 return await ctx.reply("You don't have permission to do this.")
             
@@ -1028,7 +1093,7 @@ class Bank(commands.Cog):
         if not user and not role:
             return await interaction.followup.send(f"You need to provide at least a User or a Role.")
 
-        if select_account in ['current','sweep','reserve']:
+        if select_account in ['current','sweep','reserve','arix']:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
             account = MasterAccount(select_account)

@@ -19,7 +19,7 @@ async def autocomplete_eligible_accounts(interaction:discord.Interaction,current
     try:
         sel_accounts = []
         if is_bank_admin(interaction):
-            master_accounts = ['current','sweep','reserve']
+            master_accounts = ['current','sweep','reserve','arix']
             if current:
                 sel_accounts.extend([a for a in master_accounts if current.lower() in a])
             else:

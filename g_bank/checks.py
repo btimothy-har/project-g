@@ -17,7 +17,7 @@ def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
     
     if user.id in bot.owner_ids:
         return True    
-    if user.id in [664425813608759302]:
+    if user.id in [664425813608759302,721330428111486996,632934232800362506]:
         return True
     if guild:    
         fin_role = guild.get_role(1136578130312695889) #fin ministry
