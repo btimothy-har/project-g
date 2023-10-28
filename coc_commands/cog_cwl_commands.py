@@ -701,6 +701,7 @@ class ClanWarLeagues(commands.Cog):
         
         player = await self.client.fetch_player(player_tag)
         cwl_player = player.war_league_season(season)
+        original_roster = cwl_player.roster_clan
         
         if getattr(cwl_player,'league_clan',None):
             embed = await clash_embed(
@@ -711,7 +712,6 @@ class ClanWarLeagues(commands.Cog):
             return embed
 
         cwl_player.admin_remove()
-        original_roster = cwl_player.roster_clan
 
         if original_roster:
             original_roster_length = len(original_roster.participants)
