@@ -520,12 +520,14 @@ class WarLeaguePlayer(BasicPlayer):
         self.save()
         cwl_role = self.roster_clan.league_clan_role
         if cwl_role:
+            member = None
             try:
                 member = await bot_client.bot.get_or_fetch_member(cwl_role.guild,self.discord_user)
             except discord.NotFound:
                 pass
             else:
-                await member.add_roles(cwl_role,'CWL Roster Finalized')
+                if member:
+                    await member.add_roles(cwl_role,reason='CWL Roster Finalized')
     
     ##################################################
     ### CLASS / STATIC METHODS

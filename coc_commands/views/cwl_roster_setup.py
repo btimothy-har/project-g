@@ -196,6 +196,7 @@ class CWLRosterMenu(DefaultView):
         await interaction.response.defer()
         
         embeds = await self.clan_embed()
+        self.clear_items()
         chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("Oops! No one seems to have signed up for CWL yet.",ephemeral=True)

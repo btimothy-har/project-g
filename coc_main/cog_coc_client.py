@@ -538,11 +538,11 @@ class ClashOfClansClient(commands.Cog):
             if raidloggen:
                 await self.counter.increment_received()
 
-            if len(raidloggen) > 0:
-                api_raid = raidloggen[0]
-                if api_raid:
-                    raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
-                    return raid_weekend            
+                if len(raidloggen) > 0:
+                    api_raid = raidloggen[0]
+                    if api_raid:
+                        raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
+                        return raid_weekend
             return None                
             
     ############################################################
