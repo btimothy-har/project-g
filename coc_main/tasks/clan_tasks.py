@@ -86,6 +86,7 @@ class ClanLoop(TaskLoop):
 
     @property
     def delay_multiplier(self) -> float:
+        return 1
         if not self.cached_clan:
             return 1
         if self.feed_count > 0:

@@ -365,6 +365,7 @@ class PlayerLoop(TaskLoop):
     
     @property
     def delay_multiplier(self) -> float:
+        return 1
         if not self.cached_player:
             return 1
         if self.cached_player.is_member:
