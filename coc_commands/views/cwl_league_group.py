@@ -8,7 +8,7 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClanWar
+from coc_main.cog_coc_client import ClashOfClansClient, aClanWar, aPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.helpers import clan_war_embed
@@ -65,6 +65,9 @@ class CWLClanGroupMenu(DefaultView):
     async def _callback_league_group(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
+        for item in self.children:
+            item.disabled = True
+
         self.clan = None
         self.war = None
 
@@ -81,6 +84,9 @@ class CWLClanGroupMenu(DefaultView):
 
     async def _callback_league_table(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
+
+        for item in self.children:
+            item.disabled = True
 
         self.clan = None
         self.war = None
@@ -99,6 +105,11 @@ class CWLClanGroupMenu(DefaultView):
     async def _callback_select_clan(self,interaction:discord.Interaction,select:Optional[DiscordSelectMenu]=None):
         if not interaction.response.is_done():
             await interaction.response.defer()
+
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.edit_original_response(view=self)
 
         if select:
             self.clan = self.league_group.get_clan(select.values[0])
@@ -132,6 +143,7 @@ class CWLClanGroupMenu(DefaultView):
     
     async def _callback_clan_stats(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
+
         self.clan_nav = 'stats'
         self.war = None
         await self._callback_select_clan(interaction)
@@ -144,6 +156,9 @@ class CWLClanGroupMenu(DefaultView):
     
     async def _callback_select_war(self,interaction:discord.Interaction,select:DiscordSelectMenu):
         await interaction.response.defer()
+        for item in self.children:
+            item.disabled = True
+            
         self.clan_nav = None
         self.war = aClanWar(select.values[0])
 
@@ -286,7 +301,7 @@ class CWLClanGroupMenu(DefaultView):
     
     async def _content_clan_roster(self):
         get_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.master_roster),return_exceptions=True)
-        roster_players = [p for p in get_players if not isinstance(p,Exception)]
+        roster_players = [p for p in get_players if isinstance(p,aPlayer)]
         roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(
@@ -302,10 +317,10 @@ class CWLClanGroupMenu(DefaultView):
                 + '\n'.join([
                     f"{EmojisTownHall.get(player.town_hall.level)}"
                     + f"`"
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Barbarian King'),'level','')):>3}" if player.get_hero('Barbarian King') else f"{'':<3}"))
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Archer Queen'),'level','')):>3}" if player.get_hero('Archer Queen') else f"{'':<3}"))
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Grand Warden'),'level','')):>3}" if player.get_hero('Grand Warden') else f"{'':<3}"))
-                    + (f"{'':^2}" + (f"{str(getattr(player.get_hero('Royal Champion'),'level','')):>3}" if player.get_hero('Royal Champion') else f"{'':<3}"))
+                    + f"{'':^2}" + f"{str(getattr(player.barbarian_king,'level','')):>3}"
+                    + f"{'':^2}" + f"{str(getattr(player.archer_queen,'level','')):>3}"
+                    + f"{'':^2}" + f"{str(getattr(player.grand_warden,'level','')):>3}"
+                    + f"{'':^2}" + f"{str(getattr(player.royal_champion,'level','')):>3}"
                     + f"\u200E{'':<2}{re.sub('[_*/]','',player.clean_name)[:15]:<15}`"
                     for player in roster_players
                     ]),

@@ -27,19 +27,8 @@ class PlayerProfileMenu(DefaultView):
         self.current_page = "summary"
         self.current_account = self.accounts[0]
 
-        self.current_warstats = aClanWarSummary.for_player(
-            player_tag=self.current_account.tag,
-            war_log=aClanWar.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
-        
-        self.current_raidstats = aSummaryRaidStats.for_player(
-            player_tag=self.current_account.tag,
-            raid_log=aRaidWeekend.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
+        self.current_warstats = None
+        self.current_raidstats = None
         
         self.summary_button = DiscordButton(
             function=self._callback_summary,
@@ -106,6 +95,20 @@ class PlayerProfileMenu(DefaultView):
             else:
                 self.message = await self.ctx.reply(embed=embed,view=None)
             return
+        
+        self.current_warstats = aClanWarSummary.for_player(
+            player_tag=self.current_account.tag,
+            war_log=await aClanWar.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
+        
+        self.current_raidstats = aSummaryRaidStats.for_player(
+            player_tag=self.current_account.tag,
+            raid_log=await aRaidWeekend.for_player(
+                player_tag=self.current_account.tag,
+                season=bot_client.current_season
+                ))
             
         self.is_active = True
         self.summary_button.disabled = True
@@ -190,14 +193,14 @@ class PlayerProfileMenu(DefaultView):
 
         self.current_warstats = aClanWarSummary.for_player(
             player_tag=self.current_account.tag,
-            war_log=aClanWar.for_player(
+            war_log=await aClanWar.for_player(
                 player_tag=self.current_account.tag,
                 season=bot_client.current_season
                 ))
         
         self.current_raidstats = aSummaryRaidStats.for_player(
             player_tag=self.current_account.tag,
-            raid_log=aRaidWeekend.for_player(
+            raid_log=await aRaidWeekend.for_player(
                 player_tag=self.current_account.tag,
                 season=bot_client.current_season
                 ))
@@ -250,7 +253,7 @@ class PlayerProfileMenu(DefaultView):
             td, th, tm, ts = s_convert_seconds_to_str(player.current_season.time_in_home_clan)
             embed.add_field(
                 name="**Current Season Stats with AriX**",
-                value=(f"{player.home_clan.emoji} {td} days spent in {player.home_clan.name}\n\n" if player.home_clan.tag else "")
+                value=(f"{player.home_clan.emoji} {td} days spent in {player.home_clan.name}\n\n" if player.home_clan else "")
                     + f"**Activity**\n"
                     + f"{EmojisClash.ATTACK} {player.current_season.attacks}\u3000{EmojisClash.DEFENSE} {player.current_season.defenses}\n"
                     + f"**Donations**\n"
@@ -581,7 +584,7 @@ class PlayerProfileMenu(DefaultView):
             select_options = [discord.SelectOption(
                 label=f"{account.name} | {account.tag}",
                 value=account.tag,
-                description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
+                description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if getattr(account.home_clan,'tag',None) else ""),
                 emoji=account.town_hall.emoji,
                 default=account.tag == self.current_account.tag)
                 for account in self.accounts

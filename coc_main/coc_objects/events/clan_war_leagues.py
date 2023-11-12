@@ -7,6 +7,7 @@ import pendulum
 from typing import *
 from mongoengine import *
 
+from functools import cached_property
 from collections import defaultdict
 from functools import cached_property
 from redbot.core.utils import AsyncIter
@@ -21,7 +22,7 @@ from ..players.base_player import BasicPlayer
 
 from .mongo_events import db_WarLeagueGroup, db_WarLeagueClan, db_WarLeaguePlayer
 
-from ...utils.constants.coc_constants import ClanWarType, WarResult, MultiplayerLeagues, WarState
+from ...utils.constants.coc_constants import ClanWarType, WarResult, MultiplayerLeagues, WarState, CWLLeagueGroups
 
 from ...exceptions import InvalidTag, ClashAPIError
 
@@ -29,11 +30,6 @@ bot_client = client()
 
 class WarLeagueGroup():
     _cache = {}
-
-    @classmethod
-    def by_season(cls,season:aClashSeason):
-        query = db_WarLeagueGroup.objects(season=season.id).only('group_id')
-        return [cls(db_group.group_id,season) for db_group in query]
 
     def __new__(cls,group_id:str):
         if group_id not in cls._cache:
@@ -45,91 +41,54 @@ class WarLeagueGroup():
     def __init__(self,group_id:str):
         if self._is_new:
             self.id = group_id
-            self.load()
+
+            if not self._database:
+                raise Exception
+        
         self._is_new = False
-    
-    def load(self):
-        self.season = None
-        self._state = ""
-        self.league = ""
-        self.number_of_rounds = 0
-        self.rounds = []
-        self._clans = []
-        try:
-            wl_group = db_WarLeagueGroup.objects.get(group_id=self.id).to_mongo().to_dict()
-        except DoesNotExist:
-            raise
-        else:
-            self.season = aClashSeason(wl_group.get('season'))
-            self._state = wl_group.get('state')
-            self.league = wl_group.get('league')
-            self.number_of_rounds = wl_group.get('number_of_rounds')
-            self.rounds = wl_group.get('rounds')
-            self._clans = wl_group.get('clans')
-    
-    ##################################################
-    ### CLASS / STATIC METHODS
-    ##################################################
-    @classmethod
-    async def from_api(cls,clan:BasicClan,api_data:coc.ClanWarLeagueGroup):
-        combined = f"{pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY')}-{''.join(sorted([clan.tag for clan in api_data.clans]))}"
-        group_id = hashlib.sha256(combined.encode()).hexdigest()
-        
-        db_WarLeagueGroup.objects(group_id=group_id).update(
-            set__season=pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY'),
-            set__state=api_data.state,
-            set__league=clan.war_league.name,
-            set__number_of_rounds=api_data.number_of_rounds,
-            set__clans=[clan.tag for clan in api_data.clans],
-            upsert=True)
 
-        war_ids_by_rounds = []
-        async for round in AsyncIter(api_data.rounds):
-            wars_in_round = await asyncio.gather(*(cls.get_league_war(group_id,tag) for tag in round))
-            war_ids_by_rounds.append([war.war_id for war in wars_in_round if war is not None])
-        
-        db_WarLeagueGroup.objects(group_id=group_id).update(
-            set__rounds=war_ids_by_rounds,
-            upsert=True)
-        
-        group = cls(group_id)
-        group.load()
-
-        await asyncio.gather(*(WarLeagueClan.from_api(group,league_clan) for league_clan in api_data.clans))
-
-        bot_client.coc_data_log.debug(f"CWL Group: {group_id}"
-            + f"\nLeague: {group.league}"
-            + f"\nClans: {'; '.join([f'{clan.name} {clan.tag}' for clan in group.clans])}"
-            )
-        return group
-    
-    @staticmethod
-    async def get_league_war(group_id:str,war_tag:str) -> Optional[aClanWar]:
-        api_war = None
-        try:
-            api_war = await bot_client.coc.get_league_war(war_tag)
-        except coc.NotFound as exc:
-            raise InvalidTag(war_tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            raise ClashAPIError(exc) from exc
-
-        if api_war.clan and api_war.opponent:
-            clan_war = await aClanWar.create_from_api(api_war,league_group_id=group_id)
-            return clan_war
-        return None
-    
-    ##################################################
-    ### DATA FORMATTERS
-    ##################################################
     def __str__(self) -> str:
         return self.season.description + ': ' + ', '.join([f"{clan.name} {clan.tag}" for clan in self.clans])
 
     def __hash__(self) -> int:
         return self.id
     
+    ##################################################
+    ### DATABASE ATTRIBUTES
+    ##################################################
+    @property
+    def _database(self) -> Optional[db_WarLeagueGroup]:
+        try:
+            return db_WarLeagueGroup.objects.get(group_id=self.id)
+        except DoesNotExist:
+            return None
+    
+    @cached_property
+    def season(self) -> aClashSeason:
+        return aClashSeason(self._database.season)
+    
+    @cached_property
+    def league(self) -> str:
+        return self._database.league
+    
+    @cached_property
+    def number_of_rounds(self) -> int:
+        return self._database.number_of_rounds
+    
+    @cached_property
+    def rounds(self) -> List[List[str]]:
+        return self._database.rounds
+    
+    @cached_property
+    def clan_tags(self) -> List[str]:
+        return self._database.clans
+    
+    ##################################################
+    ### OBJECT ATTRIBUTES
+    ##################################################
     @property
     def clans(self) -> List['WarLeagueClan']:
-        return sorted([WarLeagueClan(c,self.season) for c in self._clans],key=lambda x: x.level,reverse=True)
+        return [WarLeagueClan(c,self.season) for c in self._database.clans]
     
     @property
     def wars(self) -> List[aClanWar]:
@@ -137,30 +96,28 @@ class WarLeagueGroup():
     
     @property
     def state(self) -> str:
-        if len(self.rounds) == self.number_of_rounds:
-            ref_states = [WarState.PREPARATION,WarState.INWAR,WarState.WAR_ENDED]
-        else:
-            ref_states = [WarState.PREPARATION,WarState.INWAR]
-
-        for i, round in enumerate(reversed(self.rounds)):
-            if any([aClanWar(war_id).state in ref_states for war_id in round]):
-                last_round = self.rounds[-1]
-                war = aClanWar(last_round[0])
-                return war.state
+        if len([w for w in self.wars if w.state == WarState.INWAR]) > 0:
+            return WarState.INWAR
+        if len([w for w in self.wars if w.state == WarState.PREPARATION]) > 0:
+            return WarState.INWAR
+        return WarState.WAR_ENDED        
     
     @property
     def current_round(self) -> int:
-        if len(self.rounds) == self.number_of_rounds:
-            ref_states = [WarState.PREPARATION,WarState.INWAR,WarState.WAR_ENDED]
-        else:
-            ref_states = [WarState.PREPARATION,WarState.INWAR]
-
         for i, round in enumerate(reversed(self.rounds)):
-            if any([aClanWar(war_id).state in ref_states for war_id in round]):
+            if any([aClanWar(war_id).state in self.state for war_id in round]):
                 return len(self.rounds) - i
+    
+    ##################################################
+    ### CLASS / STATIC METHODS
+    ##################################################
+    @classmethod
+    def by_season(cls,season:aClashSeason):
+        query = db_WarLeagueGroup.objects(season=season.id).only('group_id')
+        return [cls(db_group.group_id,season) for db_group in query]
   
     def get_clan(self,tag:str) -> Optional['WarLeagueClan']:
-        if tag in self._clans:
+        if tag in self.clan_tags:
             return WarLeagueClan(tag,self.season)
         return None    
     
@@ -170,6 +127,55 @@ class WarLeagueGroup():
     def get_round(self,round:int) -> List[aClanWar]:
         return [aClanWar(war_id) for war_id in self.rounds[round-1]]
     
+    ##################################################
+    ### CREATE FROM API
+    ##################################################
+    @classmethod
+    async def from_api(cls,clan:BasicClan,api_data:coc.ClanWarLeagueGroup):
+        async def get_league_war(group_id:str,war_tag:str) -> Optional[aClanWar]:
+            api_war = None
+            try:
+                api_war = await bot_client.coc.get_league_war(war_tag)
+            except coc.NotFound as exc:
+                raise InvalidTag(war_tag) from exc
+            except (coc.Maintenance,coc.GatewayError) as exc:
+                raise ClashAPIError(exc) from exc
+            if api_war.clan and api_war.opponent:
+                clan_war = await aClanWar.create_from_api(api_war,league_group_id=group_id)
+                return clan_war
+            return None
+        
+        def _save_to_db():
+            db_WarLeagueGroup.objects(group_id=group_id).update_one(
+                set__season=pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY'),
+                set__league=clan.war_league.name,
+                set__number_of_rounds=api_data.number_of_rounds,
+                set__clans=[clan.tag for clan in api_data.clans],
+                set__rounds=war_ids_by_rounds,
+                upsert=True
+                )
+    
+        combined = f"{pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY')}-{''.join(sorted([clan.tag for clan in api_data.clans]))}"
+        group_id = hashlib.sha256(combined.encode()).hexdigest()
+
+        war_ids_by_rounds = []
+        async for round in AsyncIter(api_data.rounds):
+            wars_in_round = await asyncio.gather(*(get_league_war(group_id,tag) for tag in round))
+            war_ids_by_rounds.append([war.war_id for war in wars_in_round if war is not None])
+        
+        await bot_client.run_in_thread(_save_to_db)        
+        
+        group = cls(group_id)
+        group.rounds = war_ids_by_rounds
+
+        await asyncio.gather(*(WarLeagueClan.from_api(group,league_clan) for league_clan in api_data.clans))
+
+        bot_client.coc_data_log.debug(f"CWL Group: {group_id}"
+            + f"\nLeague: {group.league}"
+            + f"\nClans: {'; '.join([f'{clan.name} {clan.tag}' for clan in group.clans])}"
+            )
+        return group
+    
     
 ##################################################
 #####
@@ -178,14 +184,6 @@ class WarLeagueGroup():
 ##################################################
 class WarLeagueClan(BasicClan):
     _cache = {}
-
-    @classmethod
-    async def participating_by_season(cls,season:aClashSeason):
-        query = db_WarLeagueClan.objects(season=season.id,is_participating=True).only('tag')
-        ret_clans = [cls(db_clan.tag,season) for db_clan in query]
-        return sorted(list(set(ret_clans)),
-            key=lambda x:(x.level,MultiplayerLeagues.get_index(x.war_league_name)),
-            reverse=True)
 
     def __new__(cls,clan_tag:str,season:aClashSeason):
         if (clan_tag,season.id) not in cls._cache:
@@ -198,98 +196,77 @@ class WarLeagueClan(BasicClan):
         if self._is_new:
             self.tag = clan_tag
             self.season = season
-            self.load()
-        super().__init__(tag=self.tag)
-        
-        bot_client.clan_cache.add_to_queue(self.tag)
+            self._lock = asyncio.Lock()
+            
+            super().__init__(tag=self.tag)
+    
         self._is_new = False
     
-    def load(self):
-        self.name = None
-
-        self._is_participating = False        
-        self._roster_open = True
-        self._participants = []
-
-        self._league_group = None
-        self._master_roster = []
-        
-        if self.tag == None:
-            return
-        try:
-            db_clan = db_WarLeagueClan.objects.get(cwl_id=self.db_id).to_mongo().to_dict()
-        except DoesNotExist:
-            pass
-        else:
-            self.name = db_clan.get('name',None)
-            self._is_participating = db_clan.get('is_participating',False)
-            self._roster_open = db_clan.get('roster_open',True)
-            self._league_group = db_clan.get('league_group',None)
-            self._master_roster = db_clan.get('master_roster',[])
+    def __str__(self):
+        return f"CWL Clan {self.season.id} {self.name} ({self.tag})"
     
-    @classmethod
-    async def from_api(cls,league_group:WarLeagueGroup,api_data:coc.ClanWarLeagueClan):
-        cwl_id = {'season':league_group.season.id,'tag':api_data.tag}
-        
-        bot_client.clan_cache.add_to_queue(api_data.tag)
-    
-        db_WarLeagueClan.objects(cwl_id=cwl_id).update_one(
-            set__season=league_group.season.id,
-            set__tag=api_data.tag,
-            set__name=api_data.name,
-            set__league_group=league_group.id,
-            set__master_roster=[m.tag for m in api_data.members],
-            upsert=True)
-        
-        await asyncio.gather(*[WarLeaguePlayer.from_api(league_group,api_data.tag,member) for member in api_data.members],return_exceptions=True)
-        
-        instance = cls(api_data.tag,league_group.season)
-        instance.load()
-        return instance
-    
-    async def finalize_roster(self):
-        self.roster_open = False
-        role = self.league_clan_role
-        async for m in AsyncIter(role.members):
-            await m.remove_roles(role,reason='CWL Roster Finalized')
-        await asyncio.gather(*(m.finalize() for m in self.participants))
-
     ##################################################
-    ### DATA FORMATTERS
+    ### GLOBAL ATTRIBUTES
     ##################################################
     @property
     def db_id(self) -> dict:
-        return {'season':self.season.id,'tag':self.tag}
-    @property
-    def clan_str(self) -> str:
-        return super().__str__()
+        return {
+            'season':self.season.id,
+            'tag':self.tag
+            }
     
-    ##################################################
-    ### OBJECT REFERENCES
-    ##################################################    
     @property
-    def league_group(self) -> Optional[WarLeagueGroup]:
-        return WarLeagueGroup(self._league_group) if self._league_group else None
+    def _database(self) -> Optional[db_WarLeagueClan]:
+        try:
+            return db_WarLeagueClan.objects.get(cwl_id=self.db_id)
+        except DoesNotExist:
+            return None
+
+    @property
+    def status(self) -> str:
+        if self.league_group:
+            return "CWL Started"
+        if not self.roster_open:
+            return "Roster Finalized"
+        if self.is_participating:
+            return "Roster Pending"
+        return "Not Participating"
     
     @property
     def league(self) -> str:
         return self.league_group.league if self.league_group else self.war_league_name
-      
+    
+    @cached_property
+    def _name(self) -> str:
+        return getattr(self._database,'name',None)
+
     @property
-    def participants(self) -> List['WarLeaguePlayer']:
-        query = db_WarLeaguePlayer.objects(
-            (Q(season=self.season.id) & Q(registered=True) & Q(roster_clan=self.tag))
-            ).only('tag')
-        
-        ret_players = [WarLeaguePlayer(db_player.tag,self.season) for db_player in query]
-        
-        in_memory = [p for p in WarLeaguePlayer._cache.values() if p.season == self.season and getattr(p.roster_clan,'tag',None) == self.tag]
-        ret_players.extend(in_memory)
-        return sorted(list(set(ret_players)), key=lambda x:(x.town_hall_level),reverse=True)
+    def name(self) -> str:
+        if self._name:
+            return self._name
+        return BasicClan(self.tag).name
+    
+    ##################################################
+    ### CWL ATTRIBUTES
+    ### These are usable only during CWL
+    ##################################################
+    @cached_property
+    def league_group_id(self) -> str:
+        return getattr(self._database,'league_group','')
+    
+    @property
+    def league_group(self) -> Optional[WarLeagueGroup]:
+        return WarLeagueGroup(self.league_group_id) if self.league_group_id else None    
+    
+    @cached_property
+    def master_roster_tags(self) -> List[str]:
+        return getattr(self._database,'master_roster',[])
     
     @property
     def master_roster(self) -> List['WarLeaguePlayer']:
-        return sorted([WarLeaguePlayer(tag,self.season) for tag in self._master_roster],key=lambda m:(m.town_hall,m.name),reverse=True)
+        return sorted([WarLeaguePlayer(tag,self.season) for tag in self.master_roster_tags],
+            key=lambda x:(x.town_hall_level),
+            reverse=True)
 
     @property
     def master_lineup(self) -> Dict[int,int]:
@@ -344,54 +321,163 @@ class WarLeagueClan(BasicClan):
             return round(sum(getattr(member.best_opponent_attack,'destruction',0) for war in self.league_wars for member in war.get_opponent(self.tag).members))
         return 0
     
+    ##################################################
+    ### CWL SETUP ATTRIBUTES
+    ### These are usable during CWL setup
+    ##################################################
+    @cached_property
+    def is_participating(self) -> bool:
+        return getattr(self._database,'is_participating',False)
+    
+    @cached_property
+    def roster_open(self) -> bool:
+        return getattr(self._database,'roster_open',False)
+    
+    @cached_property
+    def _participant_tags(self) -> List[str]:
+        query = db_WarLeaguePlayer.objects(
+            (Q(season=self.season.id) & Q(registered=True) & Q(roster_clan=self.tag))
+            ).only('tag')
+        return [db_player.tag for db_player in query]
+    
     @property
-    def status(self) -> str:
-        if self.league_group:
-            return "CWL Started"
-        if not self.roster_open:
-            return "Roster Finalized"
-        if self.is_participating:
-            return "Roster Pending"
-        return "Not Participating"
-
-    # @property
-    # def war_stats(self) :
-    #     if hasattr(self,'_war_stats') and pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp > 10800:
-    #         del self._war_stats
-    #     return self._war_stats
-    # @cached_property
-    # def _war_stats(self):
-    #     return aSummaryWarStats.for_clan(
-    #         clan_tag=self.tag,
-    #         war_log=self.all_wars if self.all_wars else []
-    #         )
+    def participant_tags(self) -> List[str]:
+        return list(set(self._participant_tags))
+    
+    @property
+    def participants(self) -> List['WarLeaguePlayer']:
+        ret_players = [WarLeaguePlayer(tag,self.season) for tag in self.participant_tags]
+        
+        in_memory = [p for p in WarLeaguePlayer._cache.values() if p.season == self.season and p.roster_clan_tag == self.tag]
+        ret_players.extend(in_memory)
+        return sorted(list(set(ret_players)), key=lambda x:(x.town_hall_level),reverse=True)
     
     ##################################################
-    ### ATTRIBUTES
-    ##################################################    
-    @property
-    def is_participating(self) -> bool:
-        return self._is_participating
-    @is_participating.setter
-    def is_participating(self,is_participating:bool):
-        self._is_participating = is_participating
-        db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
-            set__season=self.season.id,
-            set__tag=self.tag,
-            set__is_participating=is_participating,
-            upsert=True)
+    ### CLAN METHODS
+    ##################################################
+    async def enable_for_war_league(self):
+        def _save_to_db():
+            db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__is_participating=self.is_participating,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicClan(self.tag))} was activated for {self.season.description} CWL."
+                )
+        async with self._lock:
+            self.is_participating = True
+            await bot_client.run_in_thread(_save_to_db)
 
-    @property
-    def roster_open(self) -> bool:
-        return self._roster_open
-    @roster_open.setter
-    def roster_open(self,roster_open:bool):
-        self._roster_open = roster_open
-        db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
-            set__season=self.season.id,
-            set__tag=self.tag,
-            set__roster_open=roster_open,
-            upsert=True)
+    async def disable_for_war_league(self):
+        def _save_to_db():
+            db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__is_participating=self.is_participating,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicClan(self.tag))} was removed from {self.season.description} CWL."
+                )
+        async with self._lock:
+            self.is_participating = False
+            await bot_client.run_in_thread(_save_to_db)
+
+    async def open_roster(self):
+        def _save_to_db():
+            db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__roster_open=self.roster_open,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicClan(self.tag))} opened roster for {self.season.description} CWL."
+                )
+        async with self._lock:
+            self.roster_open = True
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def close_roster(self):
+        def _save_to_db():
+            db_WarLeagueClan.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__roster_open=self.roster_open,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicClan(self.tag))} closed roster for {self.season.description} CWL."
+                )
+        async with self._lock:
+            self.roster_open = False
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def reset_roster(self):
+        def _query_from_db():
+            query = db_WarLeaguePlayer.objects(
+                (Q(season=self.season.id) & Q(registered=True) & Q(roster_clan=self.tag))
+                ).only('tag')
+            return [db_player.tag for db_player in query]
+        self._participant_tags = await bot_client.run_in_thread(_query_from_db)
+
+    async def finalize_roster(self):
+        await self.close_roster()
+        role = self.league_clan_role
+        async for m in AsyncIter(role.members):
+            await m.remove_roles(role,reason='CWL Roster Finalized')
+        await asyncio.gather(*(m.finalize() for m in self.participants))
+    
+    ##################################################
+    ### CREATE FROM API
+    ##################################################    
+    @classmethod
+    async def from_api(cls,league_group:WarLeagueGroup,api_data:coc.ClanWarLeagueClan):
+        def _save_to_db():
+            db_WarLeagueClan.objects(cwl_id=cwl_id).update_one(
+                set__season=league_group.season.id,
+                set__tag=api_data.tag,
+                set__name=api_data.name,
+                set__league_group=league_group.id,
+                set__master_roster=[m.tag for m in api_data.members],
+                upsert=True
+                )
+            
+        cwl_id = {
+            'season':league_group.season.id,
+            'tag':api_data.tag
+            }          
+        bot_client.clan_cache.add_to_queue(api_data.tag)
+        await bot_client.run_in_thread(_save_to_db)
+
+        await asyncio.gather(*[WarLeaguePlayer.from_api(league_group,api_data.tag,member) for member in api_data.members],return_exceptions=True)
+        
+        clan = cls(api_data.tag,league_group.season)
+        clan.league_group_id = league_group.id
+        clan._name = api_data.name
+        clan.master_roster_tags = [m.tag for m in api_data.members] 
+        return clan
+
+    ##################################################
+    ### CLASS QUERIES
+    ##################################################
+    @classmethod
+    async def participating_by_season(cls,season:aClashSeason):
+        def _db_query():
+            query = db_WarLeagueClan.objects(
+                season=season.id,
+                is_participating=True
+                ).only('tag')
+            return [db_clan.tag for db_clan in query]
+        
+        clan_tags = await bot_client.run_in_thread(_db_query)
+        ret_clans = [cls(t,season) for t in clan_tags]
+
+        return sorted(list(set(ret_clans)),
+            key=lambda x:(x.level,MultiplayerLeagues.get_index(x.war_league_name)),
+            reverse=True)
 
 ##################################################
 #####
@@ -400,29 +486,6 @@ class WarLeagueClan(BasicClan):
 ##################################################
 class WarLeaguePlayer(BasicPlayer):
     _cache = {}
-
-    @classmethod
-    async def get_by_user(cls,season:aClashSeason,user_id:int,only_registered=False):
-        if only_registered:
-            query = db_WarLeaguePlayer.objects(season=season.id,discord_user=user_id,registered=True).only('tag')
-        else:
-            query = db_WarLeaguePlayer.objects(season=season.id,discord_user=user_id).only('tag')
-        ret_players = [cls(db_player.tag,season) for db_player in query]
-        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
-    
-    @classmethod
-    async def signups_by_group(cls,season:aClashSeason,group:int):
-        query = db_WarLeaguePlayer.objects(
-            (Q(season=season.id) &Q(registered=True) & Q(league_group__gt=0)) & (Q(league_group__lte=group) | Q(league_group=99))
-            ).only('tag')        
-        ret_players = [cls(db_player.tag,season) for db_player in query]
-        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
-
-    @classmethod
-    async def signups_by_season(cls,season:aClashSeason):
-        query = db_WarLeaguePlayer.objects(season=season.id,registered=True).only('tag')        
-        ret_players = [cls(db_player.tag,season) for db_player in query]
-        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
 
     def __new__(cls,player_tag:str,season:aClashSeason):
         if (player_tag,season.id) not in cls._cache:
@@ -434,146 +497,71 @@ class WarLeaguePlayer(BasicPlayer):
     def __init__(self,player_tag:str,season:aClashSeason):
         if self._is_new:
             self.tag = player_tag
-            self.season = season            
-            self.load()
+            self.season = season
+            self._lock = asyncio.Lock()
+            
+            super().__init__(tag=self.tag)
 
-        super().__init__(tag=self.tag)
-        bot_client.player_cache.add_to_queue(self.tag)
         self._is_new = False
     
-    def load(self):
-        self.name = None
-
-        self._is_registered = False
-        self._cwl_discord_user = 0
-        self._league_group = 0
-        self._roster_clan = None        
-        self._townhall = 0
-        self._league_clan = None
-        try:
-            cwl_player = db_WarLeaguePlayer.objects.get(cwl_id=self.db_id).to_mongo().to_dict()
-        except DoesNotExist:
-            pass
-        else:
-            self.name = cwl_player.get('name',None)
-            self._is_registered = cwl_player.get('registered',False)
-            self._cwl_discord_user = cwl_player.get('discord_user',0)
-            self._league_group = cwl_player.get('league_group',0)
-            self._roster_clan = cwl_player.get('roster_clan',None)
-            self._townhall = cwl_player.get('townhall',0)
-            self._league_clan = cwl_player.get('league_clan',None)
-            if cwl_player.get('season','') != self.season.id or cwl_player.get('tag','') != self.tag:
-                self.save()
-    
-    def save(self):
-        try:
-            cwl_player = db_WarLeaguePlayer.objects.get(cwl_id=self.db_id)
-        except DoesNotExist:
-            cwl_player = db_WarLeaguePlayer(cwl_id=self.db_id)
-        cwl_player.season = self.season.id
-        cwl_player.tag = self.tag
-        cwl_player.name = self.name
-        cwl_player.registered = self._is_registered
-        cwl_player.discord_user = self._cwl_discord_user
-        cwl_player.league_group = self._league_group
-        cwl_player.roster_clan = self._roster_clan
-        cwl_player.save()
-
-        bot_client.coc_data_log.info(f'Player {self}: attributes saved to database.'
-            + f"\nRegistered: {self._is_registered}"
-            + f"\nDiscord User: {self._cwl_discord_user}"
-            + f"\nLeague Group: {self._league_group}"
-            + f"\nRoster Clan: {self._roster_clan}"
-            )
-    
-    @property
-    def discord_user(self) -> int:
-        if self._cwl_discord_user > 0:
-            return self._cwl_discord_user
-        else:
-            return super().discord_user
-    
-    def signup(self,discord_user:int,league_group:int):
-        self._is_registered = True
-        self._cwl_discord_user = discord_user
-        self._league_group = league_group
-    
-    def unregister(self):
-        self._is_registered = False
-        self._league_group = 0
-        self._roster_clan = None
-    
-    def admin_add(self,league_clan:str):
-        if not self.is_registered:
-            self.is_registered = True
-            self._cwl_discord_user = super().discord_user
-        self._roster_clan = league_clan
-        self.save()
-    
-    def admin_remove(self):
-        self._is_registered = False
-        self._league_group = 0
-        self._roster_clan = None
-        self.save()    
-    
-    async def finalize(self):
-        self.save()
-        cwl_role = self.roster_clan.league_clan_role
-        if cwl_role:
-            member = None
-            try:
-                member = await bot_client.bot.get_or_fetch_member(cwl_role.guild,self.discord_user)
-            except discord.NotFound:
-                pass
-            else:
-                if member:
-                    await member.add_roles(cwl_role,reason='CWL Roster Finalized')
-    
-    ##################################################
-    ### CLASS / STATIC METHODS
-    ##################################################    
-    @classmethod
-    async def from_api(cls,league_group:WarLeagueGroup,clan_tag:str,api_data:coc.ClanWarLeagueClanMember):
-        cwl_id = {'season':league_group.season.id,'tag':api_data.tag}
-
-        bot_client.player_cache.add_to_queue(api_data.tag)
-        try:
-            cwl_player = db_WarLeaguePlayer.objects.get(cwl_id=cwl_id)
-        except DoesNotExist:
-            cwl_player = db_WarLeaguePlayer(cwl_id=cwl_id)
-        finally:
-            cwl_player.name = api_data.name
-            cwl_player.townhall = api_data.town_hall
-            cwl_player.league_clan = clan_tag
-            cwl_player.save()
-
-        instance = cls(api_data.tag,league_group.season)
-        instance.load()
-        return instance
-    
-    ##################################################
-    ### DATA FORMATTERS
-    ##################################################
     def __str__(self):
-        return f"CWL {self.season.id} {self.name} {self.name}"
+        return f"CWL {self.season.id} {self.name} {self.tag}"
     
+    ##################################################
+    ### GLOBAL ATTRIBUTES
+    ##################################################
     @property
     def player_str(self):
         return super().__str__()
 
     @property
     def db_id(self):
-        return {'season':self.season.id,'tag':self.tag}
-
-    ##################################################
-    ### OBJECT REFERENCES
-    ##################################################    
+        return {
+            'season':self.season.id,
+            'tag':self.tag
+            }
+    
     @property
-    def town_hall(self):
-        if self._townhall > 0:
-            return self._townhall 
-        return self.cached_townhall
-            
+    def _database(self) -> Optional[db_WarLeaguePlayer]:
+        try:
+            return db_WarLeaguePlayer.objects.get(cwl_id=self.db_id)
+        except DoesNotExist:
+            return None
+    
+    @cached_property
+    def _name(self) -> str:
+        return getattr(self._database,'name',None)
+
+    @property
+    def name(self) -> str:
+        if self._name:
+            return self._name
+        return BasicPlayer(self.tag).name
+    
+    @cached_property
+    def _war_league_townhall(self) -> int:
+        return getattr(self._database,'townhall',0)
+    
+    @property
+    def town_hall(self) -> int:
+        if self._war_league_townhall > 0:
+            return self._war_league_townhall
+        return BasicPlayer(self.tag).town_hall_level
+    
+    @property
+    def town_hall_level(self) -> int:
+        return self.town_hall
+    
+    @cached_property
+    def _war_league_discord_user(self) -> int:
+        return getattr(self._database,'discord_user',0)
+    
+    @property
+    def discord_user(self) -> int:
+        if self._war_league_discord_user > 0:
+            return self._war_league_discord_user
+        return BasicPlayer(self.tag).discord_user
+    
     @property
     def league(self):
         if self.league_clan:
@@ -589,12 +577,22 @@ class WarLeaguePlayer(BasicPlayer):
             return self.league_clan
         elif self.roster_clan:
             return self.roster_clan
-        else:
-            return None
+        return None
     
+    ##################################################
+    ### CWL ATTRIBUTES
+    ### These are usable only during CWL
+    ##################################################
+    @cached_property
+    def league_clan_tag(self) -> Optional[str]:
+        league_clan = getattr(self._database,'league_clan','')
+        if len(league_clan) > 0:
+            return league_clan
+        return None
+        
     @property
     def league_clan(self):
-        return WarLeagueClan(self._league_clan,self.season) if self._league_clan else None
+        return WarLeagueClan(self.league_clan_tag,self.season) if self.league_clan_tag else None
     
     @property
     def current_war(self):
@@ -618,6 +616,7 @@ class WarLeaguePlayer(BasicPlayer):
         if hasattr(self, '_war_stats') and pendulum.now().int_timestamp - self._war_stats.timestamp.int_timestamp > 10800:
             del self._war_stats
         return self._war_stats
+    
     @cached_property
     def _war_stats(self):
         return aClanWarSummary.for_player(
@@ -626,29 +625,244 @@ class WarLeaguePlayer(BasicPlayer):
             )
     
     ##################################################
-    ### ATTRIBUTES
-    ##################################################        
-    @property
-    def is_registered(self):
-        return self._is_registered
-    @is_registered.setter
-    def is_registered(self,value:bool):
-        self._is_registered = value
+    ### CWL SET UP ATTRIBUTES
+    ### These are usable only during CWL registration
+    ##################################################
+    @cached_property
+    def roster_clan_tag(self) -> Optional[str]:
+        roster_clan = getattr(self._database,'roster_clan','')
+        if len(roster_clan) > 0:
+            return roster_clan
+        return None
     
     @property
-    def league_group(self):
-        return self._league_group
-    @league_group.setter
-    def league_group(self,value:int):
-        self._league_group = value
+    def roster_clan(self):
+        return WarLeagueClan(self.roster_clan_tag,self.season) if self.roster_clan_tag else None
+    
+    @cached_property
+    def is_registered(self) -> bool:
+        return getattr(self._database,'registered',False)
+    
+    #This is the league group that the player has registered to participate in.
+    @cached_property
+    def league_group(self) -> int:
+        return getattr(self._database,'league_group',0)
+    
+    ##################################################
+    ### PLAYER METHODS
+    ##################################################
+    async def register(self,discord_user:int,league_group:int):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__registered=self.is_registered,
+                set__discord_user=self._war_league_discord_user,
+                set__league_group=self.league_group,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))} {self.discord_user} registered for {self.season.description} CWL in {CWLLeagueGroups.get_description_no_emoji(league_group)} (Group {league_group})."
+                )
+        
+        async with self._lock:
+            self.is_registered = True
+            self._war_league_discord_user = discord_user
+            self.league_group = league_group
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def unregister(self):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__registered=self.is_registered,
+                set__league_group=self.league_group,
+                set__roster_clan=self.roster_clan_tag,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))} unregistered from {self.season.description} CWL."
+                )
+        
+        async with self._lock:
+            if self.roster_clan:
+                self.roster_clan._participant_tags.remove(self.tag)
+            self.is_registered = False
+            self.league_group = 0
+            self.roster_clan_tag = None
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def admin_add(self,league_clan:str):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__registered=self.is_registered,
+                set__roster_clan=self.roster_clan_tag,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))} was added by an admin to {self.season.description} CWL with {self.roster_clan.name} ({self.roster_clan.tag})."
+                )
+            
+        async with self._lock:
+            self.is_registered = True
+            if self.roster_clan:
+                self.roster_clan._participant_tags.remove(self.tag)
 
-    @property
-    def roster_clan(self) -> Optional[WarLeagueClan]:
-        return WarLeagueClan(self._roster_clan,self.season) if self._roster_clan else None
-    @roster_clan.setter
-    def roster_clan(self,league_clan=None):
-        if not self.roster_clan or getattr(self.roster_clan,'roster_open',True):
-            if league_clan:
-                self._roster_clan = league_clan.tag
+            self.roster_clan_tag = league_clan
+            self.roster_clan._participant_tags.append(self.tag)
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def admin_remove(self):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__registered=self.is_registered,
+                set__league_group=self.league_group,
+                set__roster_clan=self.roster_clan_tag,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))} was removed by an admin from {self.season.description} CWL."
+                )
+            
+        async with self._lock:
+            if self.roster_clan:
+                self.roster_clan._participant_tags.remove(self.tag)
+
+            self.is_registered = False
+            self.league_group = 0
+            self.roster_clan_tag = None
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def save_roster_clan(self):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__roster_clan=self.roster_clan_tag,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))} was rostered in {self.season.description} CWL: {self.roster_clan.name} ({self.roster_clan.tag})."
+                )
+        async with self._lock:
+            await bot_client.run_in_thread(_save_to_db)
+    
+    async def reset_roster_clan(self):
+        def _db_query():
+            try:
+                return db_WarLeaguePlayer.objects.get(cwl_id=self.db_id)
+            except DoesNotExist:
+                return None
+            
+        async with self._lock:
+            del self.roster_clan_tag
+            db = await bot_client.run_in_thread(_db_query)
+            self.roster_clan_tag = getattr(db,'roster_clan',None)
+    
+    async def finalize(self):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=self.db_id).update_one(
+                set__season=self.season.id,
+                set__tag=self.tag,
+                set__registered=self.is_registered,
+                set__discord_user=self.discord_user,
+                set__roster_clan=self.roster_clan_tag,
+                set__league_group=self.league_group,
+                upsert=True
+                )
+            bot_client.coc_data_log.info(
+                f"{str(BasicPlayer(self.tag))}: {self.season.description} CWL roster has been finalized with {self.roster_clan.name} ({self.roster_clan.tag})."
+                )
+        
+        async with self._lock:
+            await bot_client.run_in_thread(_save_to_db)
+            cwl_role = self.roster_clan.league_clan_role
+            if cwl_role:
+                try:
+                    member = await bot_client.bot.get_or_fetch_member(cwl_role.guild,self.discord_user)
+                except discord.NotFound:
+                    pass
+                else:
+                    await member.add_roles(cwl_role,'CWL Roster Finalized')
+    
+    ##################################################
+    ### CLASS / STATIC METHODS
+    ##################################################
+    @classmethod
+    async def from_api(cls,league_group:WarLeagueGroup,clan_tag:str,api_data:coc.ClanWarLeagueClanMember):
+        def _save_to_db():
+            db_WarLeaguePlayer.objects(cwl_id=cwl_id).update_one(
+                set__season=league_group.season.id,
+                set__tag=api_data.tag,
+                set__name=api_data.name,
+                set__townhall=api_data.town_hall,
+                set__league_clan=clan_tag,
+                upsert=True
+                )
+            
+        cwl_id = {
+            'season':league_group.season.id,
+            'tag':api_data.tag
+            }
+
+        bot_client.player_cache.add_to_queue(api_data.tag)
+        await bot_client.run_in_thread(_save_to_db)
+
+        player = cls(api_data.tag,league_group.season)
+        player._name = api_data.name
+        player.league_clan_tag = clan_tag
+        player._war_league_townhall = api_data.town_hall        
+        return player
+
+    ##################################################
+    ### CLASS QUERIES
+    ##################################################
+    @classmethod
+    async def get_by_user(cls,season:aClashSeason,user_id:int,only_registered=False):
+        def _db_query():
+            if only_registered:
+                query = db_WarLeaguePlayer.objects(
+                    season=season.id,
+                    discord_user=user_id,
+                    registered=True
+                    ).only('tag')
             else:
-                self._roster_clan = None
+                query = db_WarLeaguePlayer.objects(
+                    season=season.id,
+                    discord_user=user_id
+                    ).only('tag')
+            return [db_player.tag for db_player in query]
+        
+        qq = await bot_client.run_in_thread(_db_query)
+        ret_players = [cls(q,season) for q in qq]
+        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
+    
+    @classmethod
+    async def signups_by_group(cls,season:aClashSeason,group:int):
+        def _db_query():
+            query = db_WarLeaguePlayer.objects(
+                (Q(season=season.id) &Q(registered=True) & Q(league_group__gt=0)) & (Q(league_group__lte=group) | Q(league_group=99))
+                ).only('tag')
+            return [db_player.tag for db_player in query]
+        
+        qq = await bot_client.run_in_thread(_db_query)
+        ret_players = [cls(q,season) for q in qq]
+        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
+
+    @classmethod
+    async def signups_by_season(cls,season:aClashSeason):
+        def _db_query():
+            query = db_WarLeaguePlayer.objects(
+                season=season.id,
+                registered=True
+                ).only('tag')
+            return [db_player.tag for db_player in query]
+        
+        qq = await bot_client.run_in_thread(_db_query)
+        ret_players = [cls(q,season) for q in qq]
+        return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)

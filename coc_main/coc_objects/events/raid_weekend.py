@@ -22,6 +22,8 @@ from .mongo_events import db_RaidWeekend
 from ...utils.constants.coc_emojis import EmojisClash
 from ...utils.constants.ui_emojis import EmojisUI
 
+bot_client = client()
+
 ##################################################
 #####
 ##### DATABASE
@@ -39,35 +41,41 @@ class aRaidWeekend():
         return sorted(ret, key=lambda w:(w.start_time),reverse=True)
 
     @classmethod
-    def for_player(cls,player_tag:str,season:aClashSeason):
-        if season:
-            query = db_RaidWeekend.objects(
-                Q(members__tag=player_tag) &
-                Q(start_time__gte=season.season_start.int_timestamp) &
-                Q(start_time__lte=season.season_end.int_timestamp)
-                ).only('raid_id')
-        else:
-            query = db_RaidWeekend.objects(
-                Q(members__tag=player_tag)
-                ).only('raid_id')
+    async def for_player(cls,player_tag:str,season:aClashSeason):
+        def _db_query():
+            if season:
+                query = db_RaidWeekend.objects(
+                    Q(members__tag=player_tag) &
+                    Q(start_time__gte=season.season_start.int_timestamp) &
+                    Q(start_time__lte=season.season_end.int_timestamp)
+                    ).only('raid_id')
+            else:
+                query = db_RaidWeekend.objects(
+                    Q(members__tag=player_tag)
+                    ).only('raid_id')
+            return [q.raid_id for q in query]
         
-        ret_raids = [cls(raid_id=raid.raid_id) for raid in query]
+        raids = await bot_client.run_in_thread(_db_query)
+        ret_raids = [cls(raid_id=r) for r in raids]
         return sorted(ret_raids, key=lambda w:(w.start_time),reverse=True)
 
     @classmethod
-    def for_clan(cls,clan_tag:str,season:aClashSeason):
-        if season:
-            query = db_RaidWeekend.objects(
-                Q(clan_tag=clan_tag) &
-                Q(start_time__gte=season.season_start.int_timestamp) &
-                Q(start_time__lte=season.season_end.int_timestamp)
-                ).only('raid_id')
-        else:
-            query = db_RaidWeekend.objects(
-                Q(clan_tag=clan_tag)
-                ).only('raid_id')
+    async def for_clan(cls,clan_tag:str,season:aClashSeason):
+        def _db_query():
+            if season:
+                query = db_RaidWeekend.objects(
+                    Q(clan_tag=clan_tag) &
+                    Q(start_time__gte=season.season_start.int_timestamp) &
+                    Q(start_time__lte=season.season_end.int_timestamp)
+                    ).only('raid_id')
+            else:
+                query = db_RaidWeekend.objects(
+                    Q(clan_tag=clan_tag)
+                    ).only('raid_id')
+            return [q.raid_id for q in query]
         
-        ret_raids = [cls(raid_id=raid.raid_id) for raid in query]
+        raids = await bot_client.run_in_thread(_db_query)
+        ret_raids = [cls(raid_id=r) for r in raids]
         return sorted(ret_raids, key=lambda w:(w.start_time),reverse=True)
 
     def __new__(cls,raid_id:str):
@@ -172,35 +180,42 @@ class aRaidWeekend():
         raid_weekend.members = [aRaidMember(raid_weekend,data=member) for member in data.members]
 
         if raid_weekend.do_i_save:
-            raid_weekend.save_to_database()
+            await raid_weekend.save_to_database()
         
         return raid_weekend
     
-    def save_to_database(self):
-        self._last_save = pendulum.now()
-        db_raid = db_RaidWeekend(
-            raid_id = self.raid_id,
-            clan_tag = self.clan_tag,
-            clan_name = self.clan_name,
-            clan_badge = self.clan_badge,
-            clan_level = self.clan_level,
-            starting_trophies = self.starting_trophies,
-            ending_trophies = self.ending_trophies,
-            is_alliance_raid = self.is_alliance_raid,
-            state = self.state,
-            start_time = self.start_time.int_timestamp,
-            end_time = self.end_time.int_timestamp,
-            total_loot = self.total_loot,
-            attack_count = self.attack_count,
-            destroyed_district_count = self.destroyed_district_count,
-            offensive_reward = self.offensive_reward,
-            defensive_reward = self.defensive_reward,
-            attack_log = [r.to_json() for r in self.attack_log],
-            defense_log = [r.to_json() for r in self.defense_log],
-            members = [m.to_json() for m in self.members],
-            last_save = self._last_save.int_timestamp
-            )
-        db_raid.save()    
+    async def save_to_database(self):
+        def _db_save():
+            db_raid = db_RaidWeekend(
+                raid_id = self.raid_id,
+                clan_tag = self.clan_tag,
+                clan_name = self.clan_name,
+                clan_badge = self.clan_badge,
+                clan_level = self.clan_level,
+                starting_trophies = self.starting_trophies,
+                ending_trophies = self.ending_trophies,
+                is_alliance_raid = self.is_alliance_raid,
+                state = self.state,
+                start_time = self.start_time.int_timestamp,
+                end_time = self.end_time.int_timestamp,
+                total_loot = self.total_loot,
+                attack_count = self.attack_count,
+                destroyed_district_count = self.destroyed_district_count,
+                offensive_reward = self.offensive_reward,
+                defensive_reward = self.defensive_reward,
+                attack_log = [r.to_json() for r in self.attack_log],
+                defense_log = [r.to_json() for r in self.defense_log],
+                members = [m.to_json() for m in self.members],
+                last_save = timestamp.int_timestamp
+                )
+            db_raid.save()
+            return db_raid
+        
+        timestamp = pendulum.now()
+        db_raid = await bot_client.run_in_thread(_db_save)
+        self._last_save = timestamp
+        self._found_in_db = True
+        return db_raid
 
     @property
     def do_i_save(self):
@@ -253,13 +268,11 @@ class aRaidClan(BasicClan):
         json = kwargs.get('json',None)
         game = kwargs.get('data',None)
 
-        super().__init__()
-
         if json:
             self.tag = json['tag']
-            self.name = json['name']
-            self.badge = json.get('badge',None)
-            self.level = json.get('level',0)
+            self._name = json['name']
+            self._badge = json.get('badge',None)
+            self._level = json.get('level',0)
             self.attack_count = json['attack_count']
             self.district_count = json['district_count']
             self.destroyed_district_count = json['districts_destroyed']
@@ -268,14 +281,28 @@ class aRaidClan(BasicClan):
 
         if game:
             self.tag = game.tag
-            self.name = game.name
-            self.badge = game.badge.url
-            self.level = game.level
+            self._name = game.name
+            self._badge = game.badge.url
+            self._level = game.level
             self.attack_count = game.attack_count
             self.district_count = game.district_count
             self.destroyed_district_count = game.destroyed_district_count
             self.districts = [aRaidDistrict(self.raid,self,data=district) for district in game.districts]
             self.attacks = [aRaidAttack(self.raid, self, data=attack) for district in game.districts for attack in district.attacks]
+        
+        super().__init__(self.tag)
+    
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def badge(self) -> str:
+        return self._badge
+
+    @property
+    def level(self) -> int:
+        return self._level
     
     def to_json(self):
         return {
@@ -417,22 +444,26 @@ class aRaidMember(BasicPlayer):
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
 
-        super().__init__()
-
         if json_data:
             self.tag = json_data['tag']
-            self.name = json_data['name']
+            self._name = json_data['name']
             self.attack_count = json_data['attack_count']
             self.capital_resources_looted = json_data['resources_looted']
         if game_data:
             data = game_data
             self.tag = data.tag
-            self.name = data.name
+            self._name = data.name
             self.attack_count = data.attack_count
             self.capital_resources_looted = data.capital_resources_looted
 
         self.medals_earned = (self.raid.offensive_reward * self.attack_count) + self.raid.defensive_reward
         self._attacks = None
+
+        super().__init__(self.tag)
+    
+    @property
+    def name(self) -> str:
+        return self._name
     
     def to_json(self) -> dict:
         return {

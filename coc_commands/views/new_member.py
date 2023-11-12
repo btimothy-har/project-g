@@ -10,7 +10,7 @@ from coc_main.api_client import BotClashClient, CacheNotReady, NoClansRegistered
 from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
 
 from coc_main.discord.member import aMember
-from coc_main.discord.guild import aGuild
+from coc_main.discord.guild import aGuild, ClanGuildLink
 
 from coc_main.utils.components import DiscordButton, DefaultView, MultipleChoiceSelectionMenu, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
@@ -76,6 +76,8 @@ class NewMemberMenu(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=main_embed,view=self)
         
+        await self.member.refresh_clash_link(force=True)
+
         try:
             if len(self.member.account_tags) == 0:
                 await self._manual_tag_entry()
@@ -108,9 +110,9 @@ class NewMemberMenu(DefaultView):
         dropdown_list = [discord.SelectOption(
             label=f"{account.name} | {account.tag}",
             value=f"{account.tag}",
-            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
+            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
             emoji=f"{account.town_hall.emoji}")
-            for account in player_accounts
+            for account in player_accounts[:25]
             ]
         account_select_menu = DiscordSelectMenu(
             function=self._callback_menu_tags,
@@ -242,8 +244,9 @@ class NewMemberMenu(DefaultView):
         await self._finish_add()
 
     async def _select_home_clan(self,account:aPlayer):        
-        guild = aGuild(self.guild.id)
-        guild_clans = await asyncio.gather(*(self.client.fetch_clan(c.tag) for c in guild.clan_links))
+        linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
+        guild_clans = await asyncio.gather(*(self.client.fetch_clan(c.tag) for c in linked_clans))
+
         alliance_clans = sorted([c for c in guild_clans if c.is_alliance_clan],key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
             raise NoClansRegistered()
@@ -263,7 +266,7 @@ class NewMemberMenu(DefaultView):
             )
         home_clan_select_view = MultipleChoiceSelectionMenu(context=self.ctx,timeout=120,timeout_function=self.on_timeout)
         for clan in alliance_clans:
-            home_clan_select_view.add_list_item(reference=clan.tag,label=clan.name[:80],emoji=clan.emoji)            
+            home_clan_select_view.add_list_item(reference=clan.tag,label=clan.clean_name[:80],emoji=clan.emoji)            
             homeclan_embed.add_field(
                 name=f"{clan.title}",
                 value=f"Members: {clan.alliance_member_count}\u3000Recruiting: {clan.recruitment_level_emojis}",
@@ -278,7 +281,7 @@ class NewMemberMenu(DefaultView):
         
         else:
             home_clan = [clan for clan in alliance_clans if clan.tag == home_clan_select_view.return_value][0]
-            account.new_member(self.member.user_id,home_clan)
+            await account.new_member(self.member.user_id,home_clan)
             self.menu_summary.append(NewMember(account,home_clan))
             self.added_count += 1        
     

@@ -77,13 +77,12 @@ class CWLRosterMenu(DefaultView):
             await self.ctx.send(embed=timeout_embed,view=None)
         self.stop_menu()
 
-        for cwl_player in self.modified_to_save:
-            cwl_player.load()
+        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
     
     ##################################################
     ### MENUS START
     ##################################################
-    async def setup_roster(self):        
+    async def start(self):        
         self.is_active = True
         await self.add_main_menu()
         embeds = await self.clan_embed()
@@ -95,48 +94,36 @@ class CWLRosterMenu(DefaultView):
             self.message = await self.ctx.reply(embeds=embeds, view=self)
     
     ##################################################
-    ### MAIN BUTTON CALLBACKS
+    ### HOME BUTTON
     ##################################################
     async def _callback_home(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
-        embeds = await self.clan_embed()
+        embeds = await self.clan_embed() 
         await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
-    
-    async def _callback_main_help(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.defer(ephemeral=True)
 
+    ##################################################
+    ### EXIT BUTTON
+    ##################################################
+    async def _callback_exit(self,interaction:discord.Interaction,button:DiscordButton):
+        self.stop_menu()
         embed = await clash_embed(
             context=self.ctx,
-            title="**CWL Rostering Help**",
-            message="This menu allows you, as a roster manager, to view and modify the roster for a participating clan for the upcoming CWL season."
-                + "\n\n"
-                + "__**On this Menu**__"
-                + f"\n\n**{EmojisUI.ADD} ADD PLAYERS**"
-                + f"\n> Switches over to the Menu to add individual players to the roster. There will be a separate Help menu available."
-                + f"\n\n**{EmojisUI.DOWNLOAD} SAVE**"
-                + f"\n> Saves any changes you've made to the roster. This **does not** finalize the roster, can the roster can still be modified."
-                + f"\n\n**{EmojisUI.REFRESH} RESET**"
-                + f"\n> Removes any changes you've made in this session."
-                + f"\n\n**AUTOFILL 15/30**"
-                + f"\n> Automatically fills the roster with the highest eligible accounts, sorted by Town Hall and Hero Levels, taking into account registration preference (League Group). "
-                + "This will **not** overwrite any accounts that have already been rostered, whether in this Clan or another Clan. "
-                + f"\n> \n> You are recommended to autofill with the highest-ranked clan first."
-                + f"\n> - Autofill 15 fills up to 15 participants."
-                + f"\n> - Autofill 30 fills up to 30 participants."
-                + f"\n> \n> **Autofill will not fill participants who registered for Lazy CWL.**"
-                + f"\n\n**{EmojisUI.TASK_CHECK} FINALIZE**"
-                + f"\n> Finalizes the roster, assigns the CWL roles to members, and makes it available for viewing. Once finalized, a roster cannot be modified through this panel. Rosters can only be finalized with a minimum of 15 participants.",
-            )
-        await interaction.followup.send(embed=embed,ephemeral=True)
+            message=f"**Menu closed**")
+        await interaction.response.edit_message(embed=embed,view=None)
 
+        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
+
+    ##################################################
+    ### SAVE BUTTON
+    ##################################################
     async def _callback_save(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        for cwl_player in self.modified_to_save:
-            cwl_player.save()
-
+        
+        await asyncio.gather(*(cwl_player.save_roster_clan() for cwl_player in self.modified_to_save))
+        await self.clan.reset_roster()
         await self.add_main_menu()
 
         self._ph_save_button.label = "Saved!"
@@ -145,25 +132,9 @@ class CWLRosterMenu(DefaultView):
         embeds = await self.clan_embed()
         await interaction.edit_original_response(embeds=embeds,view=self)
 
-    async def _callback_reset(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.defer()
-
-        for cwl_player in self.modified_to_save:
-            cwl_player.load()
-        
-        await self.add_main_menu()
-        
-        self._ph_reset_button.label = "Roster Reset"
-        self._ph_reset_button.disabled = True
-
-        if len(self.clan.participants) < 15:
-            self._ph_finalize_button.disabled = True
-        else:
-            self._ph_finalize_button.disabled = False
-
-        embeds = await self.clan_embed()
-        await interaction.edit_original_response(embeds=embeds,view=self)
-        
+    ##################################################
+    ### FINALIZE BUTTON
+    ##################################################
     async def _callback_finalize(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
@@ -172,26 +143,32 @@ class CWLRosterMenu(DefaultView):
             item.disabled = True
         await interaction.edit_original_response(view=self)
 
-        for cwl_player in self.modified_to_save:
-            cwl_player.save()
-        for cwl_player in self.clan.participants:
-            cwl_player.save()
         await self.clan.finalize_roster()
-
+        await self.clan.reset_roster()
         await self.add_main_menu()
+
         embeds = await self.clan_embed()
         await interaction.edit_original_response(embeds=embeds,view=self)
-        
-    async def _callback_exit(self,interaction:discord.Interaction,button:DiscordButton):
-        self.stop_menu()
-        embed = await clash_embed(
-            context=self.ctx,
-            message=f"**Menu closed**")
-        await interaction.response.edit_message(embed=embed,view=None)
 
-        for cwl_player in self.modified_to_save:
-            cwl_player.load()
-    
+    ##################################################
+    ### RESET BUTTON
+    ##################################################
+    async def _callback_reset(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+
+        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
+        await self.add_main_menu()
+        
+        self._ph_reset_button.label = "Roster Reset"
+        self._ph_reset_button.disabled = True
+
+        embeds = await self.clan_embed()
+        await interaction.edit_original_response(embeds=embeds,view=self)
+
+    ##################################################
+    ### ADD PLAYER BUTTON
+    ### Opens the menu to add players
+    ##################################################
     async def _callback_add_player_menu(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
         
@@ -199,55 +176,61 @@ class CWLRosterMenu(DefaultView):
         self.clear_items()
         chk = await self.add_player_menu()
         if not chk:
-            await interaction.followup.send("Oops! No one seems to have signed up for CWL yet.",ephemeral=True)
+            await interaction.followup.send("Oops! There doesn't seem to be anyone eligible for CWL.",ephemeral=True)
             return await self._callback_home(interaction,button)
         await interaction.edit_original_response(embeds=embeds,view=self)
 
+    ##################################################
+    ### AUTOFILL BUTTONS
+    ### Triggers autofill for 15/30 players
+    ##################################################
     async def _callback_autofill_15(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        
-        eligible_participants = await WarLeaguePlayer.signups_by_group(
-            season=self.season,
-            group=CWLLeagueGroups.from_league_name(self.clan.league)
-            )
-        participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
-        unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
-        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            cwl_player = p.war_league_season(self.season)
-            cwl_player.roster_clan = self.clan
-            self.modified_to_save.append(cwl_player)
-            if len(self.clan.participants) >= 15:
-                break
-        
+
+        await self.autofill_participants(15)
+
         embeds = await self.clan_embed()
         await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)        
     
     async def _callback_autofill_30(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        
-        eligible_participants = await WarLeaguePlayer.signups_by_group(
-            season=self.season,
-            group=CWLLeagueGroups.from_league_name(self.clan.league)
-            ) 
-        participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
-        unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
-        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            cwl_player = p.war_league_season(self.season)
-            cwl_player.roster_clan = self.clan
-            self.modified_to_save.append(cwl_player)
-            if len(self.clan.participants) >= 30:
-                break
+
+        await self.autofill_participants(30)
         
         embeds = await self.clan_embed()
         await self.add_main_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
 
+    ##################################################
+    ### ADD PLAYER (LIST)
+    ### Adds players to the roster.
+    ##################################################
+    async def _callback_add_player(self,interaction:discord.Interaction,list:DiscordSelectMenu):
+        await interaction.response.defer()
+        tags = AsyncIter(list.values)
+        async for t in tags:
+            if len(self.clan.participants) >= 35:
+                await interaction.followup.send("This clan already has 35 players in roster. You cannot add more.",ephemeral=True)
+                break
+            player = WarLeaguePlayer(t,self.season)
+            player.roster_clan_tag = self.clan.tag
+            self.modified_to_save.append(player)
+            
+        embeds = await self.clan_embed()
+        await self.add_player_menu()
+        await interaction.edit_original_response(embeds=embeds,view=self)
+
+    ##################################################
+    ### REMOVE PLAYER (LIST)
+    ### Removes players from the roster.
+    ##################################################
     async def _callback_remove_player(self,interaction:discord.Interaction,list:DiscordSelectMenu):
         await interaction.response.defer()
-        for player_tag in list.values:
-            player = WarLeaguePlayer(player_tag,self.season)
-            player.roster_clan = None
+        tags = AsyncIter(list.values)
+        async for t in tags:
+            player = WarLeaguePlayer(t,self.season)
+            player.roster_clan_tag = None
             self.modified_to_save.append(player)
        
         embeds = await self.clan_embed()
@@ -255,22 +238,13 @@ class CWLRosterMenu(DefaultView):
         await interaction.edit_original_response(embeds=embeds,view=self)    
 
     ##################################################
-    ### ADD PLAYER MENU CALLBACKS
+    ### FILTER BUTTONS
+    ### Buttons to handle filtering when adding players
     ##################################################
-    async def _callback_add_player(self,interaction:discord.Interaction,list:DiscordSelectMenu):
-        await interaction.response.defer()
-        for player_tag in list.values:
-            if len(self.clan.participants) >= 35:
-                await interaction.followup.send("This clan already has 35 players in roster. You cannot add more.",ephemeral=True)
-                break
-            player = WarLeaguePlayer(player_tag,self.season)
-            self.modified_to_save.append(player)
-            player.roster_clan = self.clan
-       
-        embeds = await self.clan_embed()
-        await self.add_player_menu()
-        await interaction.edit_original_response(embeds=embeds,view=self)    
     
+    ##################################################
+    ### Filter to Members only
+    ##################################################
     async def _callback_filter_members(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -288,6 +262,9 @@ class CWLRosterMenu(DefaultView):
             return
         await interaction.edit_original_response(embeds=embeds,view=self)
     
+    ##################################################
+    ### Filter to Max Heroes only
+    ##################################################
     async def _callback_filter_max_heroes(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -305,6 +282,9 @@ class CWLRosterMenu(DefaultView):
             return
         await interaction.edit_original_response(embeds=embeds,view=self)
 
+    ##################################################
+    ### Filter to Max Offense only
+    ##################################################
     async def _callback_filter_max_offense(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -322,6 +302,9 @@ class CWLRosterMenu(DefaultView):
             return
         await interaction.edit_original_response(embeds=embeds,view=self)
     
+    ##################################################
+    ### Filter to Not Rostered
+    ##################################################
     async def _callback_filter_not_rostered(self,interaction:discord.Interaction,button:DiscordButton):
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -339,6 +322,9 @@ class CWLRosterMenu(DefaultView):
             return
         await interaction.edit_original_response(embeds=embeds,view=self)
     
+    ##################################################
+    ### Filter by Townhall
+    ##################################################
     async def _callback_filter_th(self,interaction:discord.Interaction,list:DiscordSelectMenu):
         await interaction.response.defer()
         self.th_filter = [int(th) for th in list.values]
@@ -351,6 +337,9 @@ class CWLRosterMenu(DefaultView):
             await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
+    ##################################################
+    ### Filter by League Group
+    ##################################################
     async def _callback_filter_group(self,interaction:discord.Interaction,list:DiscordSelectMenu):
         await interaction.response.defer()
         self.group_filter = [int(i) for i in list.values]
@@ -363,12 +352,45 @@ class CWLRosterMenu(DefaultView):
             await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
+    ##################################################
+    ### Randomize the Drop Down
+    ##################################################
     async def _callback_filter_randomize(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
         embeds = await self.clan_embed()
         await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
+
+    
+    ##################################################
+    ### HELP BUTTONS
+    ##################################################
+    async def _callback_main_help(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer(ephemeral=True)
+        embed = await clash_embed(
+            context=self.ctx,
+            title="**CWL Rostering Help**",
+            message="This menu allows you, as a roster manager, to view and modify the roster for a participating clan for the upcoming CWL season."
+                + "\n\n"
+                + "__**On this Menu**__"
+                + f"\n\n**{EmojisUI.ADD} ADD PLAYERS**"
+                + f"\n> Switches over to the Menu to add individual players to the roster. There will be a separate Help menu available."
+                + f"\n\n**{EmojisUI.DOWNLOAD} SAVE**"
+                + f"\n> Saves any changes you've made to the roster. This **does not** finalize the roster, and the roster can still be modified."
+                + f"\n\n**{EmojisUI.REFRESH} RESET**"
+                + f"\n> Removes any changes you've made in this session."
+                + f"\n\n**AUTOFILL 15/30**"
+                + f"\n> Automatically fills the roster with the highest eligible accounts, sorted by Town Hall and Hero Levels, taking into account registration preference (League Group). "
+                + "This will **not** overwrite any accounts that have already been rostered, whether in this Clan or another Clan. "
+                + f"\n> \n> You are recommended to autofill with the highest-ranked clan first."
+                + f"\n> - Autofill 15 fills up to 15 participants."
+                + f"\n> - Autofill 30 fills up to 30 participants."
+                + f"\n> \n> **Autofill will not fill participants who registered for Lazy CWL.**"
+                + f"\n\n**{EmojisUI.TASK_CHECK} FINALIZE**"
+                + f"\n> Saves the Roster, assigns the CWL roles to members, and makes it available for viewing. The roster cannot be further modified. Rosters can only be finalized with a minimum of 15 participants.",
+                )
+        await interaction.followup.send(embed=embed,ephemeral=True)
     
     async def _callback_add_help(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
@@ -395,255 +417,323 @@ class CWLRosterMenu(DefaultView):
         await interaction.followup.send(embed=embed,ephemeral=True)
     
     ##################################################
-    ### MENU HELPERS
+    ### LOAD MAIN MENU ITEMS
     ##################################################
     async def add_main_menu(self):
-        self.clear_items()
-        #row 1
+        def _add_main_menu(clan_participants:List[aPlayer]):
+            self.clear_items()
+            #row 1
+            if not self.clan.roster_open:
+                finalized_button = DiscordButton(
+                    function=self._callback_home,
+                    label="This Roster has already been finalized!",
+                    style=discord.ButtonStyle.secondary,
+                    row=0
+                    )
+                finalized_button.disabled = True
+                self.add_item(finalized_button)
+            
+            else:
+                add_player_button = DiscordButton(
+                    function=self._callback_add_player_menu,
+                    label="Add Players",
+                    emoji=EmojisUI.ADD,
+                    style=discord.ButtonStyle.secondary,
+                    row=0
+                    )
+                if len(clan_participants) >= 35:
+                    add_player_button.disabled = True
+                self.add_item(add_player_button)  
 
-        if not self.clan.roster_open:
-            finalized_button = DiscordButton(
-                function=self._callback_home,
-                label="This Roster has already been finalized!",
-                style=discord.ButtonStyle.secondary,
-                row=0
-                )
-            finalized_button.disabled = True
-            self.add_item(finalized_button)
-        
-        else:
-            add_player_button = DiscordButton(
-                function=self._callback_add_player_menu,
-                label="Add Players",
-                emoji=EmojisUI.ADD,
-                style=discord.ButtonStyle.secondary,
-                row=0
-                )
-            if len(self.clan.participants) >= 35:
-                add_player_button.disabled = True
-            self.add_item(add_player_button)  
+                self._ph_save_button = DiscordButton(
+                    function=self._callback_save,
+                    label="Save",
+                    emoji=EmojisUI.DOWNLOAD,
+                    style=discord.ButtonStyle.secondary,
+                    row=0
+                    )
+                self.add_item(self._ph_save_button)
 
-            self._ph_save_button = DiscordButton(
-                function=self._callback_save,
-                label="Save",
-                emoji=EmojisUI.DOWNLOAD,
-                style=discord.ButtonStyle.secondary,
-                row=0
-                )
-            self.add_item(self._ph_save_button)
+                self._ph_reset_button = DiscordButton(
+                    function=self._callback_reset,
+                    label="Reset",
+                    emoji=EmojisUI.REFRESH,
+                    style=discord.ButtonStyle.secondary,
+                    row=0
+                    )
+                self.add_item(self._ph_reset_button)                      
 
-            self._ph_reset_button = DiscordButton(
-                function=self._callback_reset,
-                label="Reset",
-                emoji=EmojisUI.REFRESH,
-                style=discord.ButtonStyle.secondary,
-                row=0
-                )
-            self.add_item(self._ph_reset_button)                      
+                autofill_button_15 = DiscordButton(
+                    function=self._callback_autofill_15,
+                    label="Autofill 15",
+                    style=discord.ButtonStyle.secondary,
+                    row=1
+                    )
+                if len(clan_participants) >= 15:
+                    autofill_button_15.disabled = True
+                self.add_item(autofill_button_15)
 
-            autofill_button_15 = DiscordButton(
-                function=self._callback_autofill_15,
-                label="Autofill 15",
-                style=discord.ButtonStyle.secondary,
-                row=1
-                )
-            if len(self.clan.participants) >= 15:
-                autofill_button_15.disabled = True
-            self.add_item(autofill_button_15)
+                autofill_button_30 = DiscordButton(
+                    function=self._callback_autofill_30,
+                    label="Autofill 30",
+                    style=discord.ButtonStyle.secondary,
+                    row=1
+                    )
+                if len(clan_participants) >= 30:
+                    autofill_button_30.disabled = True
+                self.add_item(autofill_button_30)
+                #row3
 
-            autofill_button_30 = DiscordButton(
-                function=self._callback_autofill_30,
-                label="Autofill 30",
-                style=discord.ButtonStyle.secondary,
-                row=1
-                )
-            if len(self.clan.participants) >= 30:
-                autofill_button_30.disabled = True
-            self.add_item(autofill_button_30)
-            #row3
-
-            #remove player
-            if len(self.clan.participants) > 0:
-                select_participants = []
-                async for cwl_player in AsyncIter(self.clan.participants):
-                    player = await self.client.fetch_player(cwl_player.tag)
-                    select_participants.append(discord.SelectOption(
+                #remove player
+                if len(clan_participants) > 0:
+                    select_participants = [discord.SelectOption(
                         label=str(player),
                         value=player.tag,
                         emoji=player.town_hall.emoji,
                         description=f"{round((player.hero_strength/player.max_hero_strength)*100)}% "
                             + f"| {round((player.troop_strength/player.max_troop_strength)*100)}% "
                             + f"| {round((player.spell_strength/player.max_spell_strength)*100)}% "
-                            + (f"| Current Roster: {cwl_player.roster_clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
-                        default=False))
-                
-                self.add_item(DiscordSelectMenu(
-                    function=self._callback_remove_player,
-                    options=select_participants[:15],
-                    placeholder=f"Remove Participants (1-15)",
-                    min_values=0,
-                    max_values=len(select_participants[:15]),
-                    row=2
-                    ))            
-                if len(select_participants) > 15:
+                            + (f"| Current Roster: {player.war_league_season(self.season).roster_clan.name[:12]}" if player.war_league_season(self.season).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(player.war_league_season(self.season).league_group)}"),
+                        default=False)
+                        for player in clan_participants
+                        ]
+                    
                     self.add_item(DiscordSelectMenu(
                         function=self._callback_remove_player,
-                        options=select_participants[15:35],
-                        placeholder=f"Remove Participants (16-35)",
+                        options=select_participants[:15],
+                        placeholder=f"Remove Participants (1-15)",
                         min_values=0,
-                        max_values=len(select_participants[15:35]),
-                        row=3
-                        ))
-                    
-        self._ph_finalize_button = DiscordButton(
-            function=self._callback_finalize,
-            label="Finalize",
-            emoji=EmojisUI.TASK_CHECK,
-            style=discord.ButtonStyle.green,
-            row=4
-            )
-        if len(self.clan.participants) < 15:
-            self._ph_finalize_button.disabled = True
-        if not self.clan.roster_open:
-            self._ph_finalize_button.disabled = True
-        self.add_item(self._ph_finalize_button)
-                    
-        self.add_item(DiscordButton(
-            function=self._callback_exit,
-            emoji=EmojisUI.LOGOUT,
-            label="Exit",
-            style=discord.ButtonStyle.red,
-            row=4
-            ))
-        
-        self.add_item(DiscordButton(
-            function=self._callback_main_help,
-            emoji=EmojisUI.HELP,
-            label="Help",
-            style=discord.ButtonStyle.blurple,
-            row=4
-            ))
+                        max_values=len(select_participants[:15]),
+                        row=2
+                        ))            
+                    if len(select_participants) > 15:
+                        self.add_item(DiscordSelectMenu(
+                            function=self._callback_remove_player,
+                            options=select_participants[15:35],
+                            placeholder=f"Remove Participants (16-35)",
+                            min_values=0,
+                            max_values=len(select_participants[15:35]),
+                            row=3
+                            ))
+                        
+            self._ph_finalize_button = DiscordButton(
+                function=self._callback_finalize,
+                label="Finalize",
+                emoji=EmojisUI.TASK_CHECK,
+                style=discord.ButtonStyle.green,
+                row=4
+                )
+            if len(clan_participants) < 15:
+                self._ph_finalize_button.disabled = True
+            if not self.clan.roster_open:
+                self._ph_finalize_button.disabled = True
+            self.add_item(self._ph_finalize_button)
+                        
+            self.add_item(DiscordButton(
+                function=self._callback_exit,
+                emoji=EmojisUI.LOGOUT,
+                label="Exit",
+                style=discord.ButtonStyle.red,
+                row=4
+                ))
+            
+            self.add_item(DiscordButton(
+                function=self._callback_main_help,
+                emoji=EmojisUI.HELP,
+                label="Help",
+                style=discord.ButtonStyle.blurple,
+                row=4
+                ))
+            
+        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.participants))
+        _add_main_menu(participants)
     
+    ##################################################
+    ### LOAD ADD PLAYER MENU ITEMS
+    ##################################################
     async def add_player_menu(self):
-        self.clear_items()
-        all_participants, eligible_participants = await self.get_eligible_participants()
-
-        sample = random.sample(eligible_participants,min(25,len(eligible_participants)))
-        sampled_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in sample))
-
-        select_participants = []
-        async for a in AsyncIter(sorted(sampled_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            cwl_player = a.war_league_season(self.season)
-            select_participants.append(discord.SelectOption(
+        def _add_player_menu(all_participants:List[aPlayer],eligible_participants:List[aPlayer]):
+            self.clear_items()
+            sampled_players = sorted(
+                random.sample(eligible_participants,min(25,len(eligible_participants))),
+                key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True
+                )
+            
+            select_participants = [discord.SelectOption(
                 label=str(a),
                 value=a.tag,
                 emoji=a.town_hall.emoji,
                 description=(f"{round((a.hero_strength/a.max_hero_strength)*100)}% " if a.max_hero_strength > 0 else "0% ")
                     + f"| " + (f"{round((a.troop_strength/a.max_troop_strength)*100)}% " if a.max_troop_strength > 0 else "0% ")
                     + f"| " + (f"{round((a.spell_strength/a.max_spell_strength)*100)}% " if a.max_spell_strength > 0 else "0% ")
-                    + (f"| Current Roster: {cwl_player.roster_clan.name[:12]}" if cwl_player.roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group)}"),
-                default=False))
-        if len(select_participants) == 0:
-            return False
-        
-        self.add_item(DiscordSelectMenu(
-            function=self._callback_add_player,
-            options=select_participants,
-            placeholder=f"Select Players to add (filtered: {len(select_participants)} of {len(all_participants)}).",
-            min_values=0,
-            max_values=len(select_participants),
-            row=0
-            ))        
-        #row2
-        #filter by th
-        select_th = [discord.SelectOption(
-            label=f"TH{th}",
-            value=th,
-            emoji=EmojisTownHall.get(th),
-            default=th in self.th_filter)
-            for th in sorted(list(set([p.town_hall_level for p in all_participants])),reverse=True)]
-        if len(select_th) > 0:
+                    + (f"| Current Roster: {a.war_league_season(self.season).roster_clan.name[:12]}" if a.war_league_season(self.season).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(a.war_league_season(self.season).league_group)}"),
+                default=False)
+                for a in sampled_players
+                ]
+            
             self.add_item(DiscordSelectMenu(
-                function=self._callback_filter_th,
-                options=select_th,
-                placeholder=f"Filter by TH Level",
+                function=self._callback_add_player,
+                options=select_participants,
+                placeholder=f"Select Players to add (filtered: {len(select_participants)} of {len(all_participants)}).",
                 min_values=0,
-                max_values=len(select_th),
-                row=1
+                max_values=len(select_participants),
+                row=0
                 ))
-        
-        select_group = [discord.SelectOption(
-            label=CWLLeagueGroups.get_description_no_emoji(i),
-            value=i,
-            emoji=CWLLeagueGroups.league_groups_emoji.get(i),
-            default=i in self.group_filter)
-            for i in [1,2,9,99]]
-        self.add_item(DiscordSelectMenu(
-            function=self._callback_filter_group,
-            options=select_group,
-            placeholder=f"Filter by League Group",
-            min_values=0,
-            max_values=len(select_group),
-            row=2
-            ))
-        
-        #row1
-        #filter members only
-        self.add_item(DiscordButton(
-            function=self._callback_filter_members,
-            label="Members Only" if not self.members_only else "All Participants",
-            emoji=EmojisUI.FILTER,
-            style=discord.ButtonStyle.secondary,
-            row=3
-            ))
-        #filter max heroes only
-        self.add_item(DiscordButton(
-            function=self._callback_filter_max_heroes,
-            label="Max Heroes Only" if not self.max_heroes else "All Hero Levels",
-            emoji=EmojisUI.FILTER,
-            style=discord.ButtonStyle.secondary,
-            row=3
-            ))
-        #filter max offense only
-        self.add_item(DiscordButton(
-            function=self._callback_filter_max_offense,
-            label="Max Offense Only" if not self.max_offense else "All Offense Levels",
-            emoji=EmojisUI.FILTER,
-            style=discord.ButtonStyle.secondary,
-            row=3
-            ))
-        
-        self.add_item(DiscordButton(
-            function=self._callback_filter_not_rostered,
-            label="Not Yet Rostered" if not self.not_yet_rostered else "All Players",
-            emoji=EmojisUI.FILTER,
-            style=discord.ButtonStyle.secondary,
-            row=3
-            ))        
-        
-        self.add_item(DiscordButton(
-            function=self._callback_home,
-            label="Back to Main Page",
-            emoji=EmojisUI.GREEN_FIRST,
-            style=discord.ButtonStyle.secondary,
-            row=4
-            ))
-        self.add_item(DiscordButton(
-            function=self._callback_filter_randomize,
-            label="Randomize",
-            emoji=EmojisUI.REFRESH,
-            style=discord.ButtonStyle.secondary,
-            row=4
-            ))
-        self.add_item(DiscordButton(
-            function=self._callback_add_help,
-            emoji=EmojisUI.HELP,
-            label="Help",
-            style=discord.ButtonStyle.blurple,
-            row=4
-            ))
+            #row2
+            #filter by th
+            select_th = [discord.SelectOption(
+                label=f"TH{th}",
+                value=th,
+                emoji=EmojisTownHall.get(th),
+                default=th in self.th_filter)
+                for th in sorted(list(set([p.town_hall_level for p in all_participants])),reverse=True)]
+            if len(select_th) > 0:
+                self.add_item(DiscordSelectMenu(
+                    function=self._callback_filter_th,
+                    options=select_th,
+                    placeholder=f"Filter by TH Level",
+                    min_values=0,
+                    max_values=len(select_th),
+                    row=1
+                    ))
+            
+            select_group = [discord.SelectOption(
+                label=CWLLeagueGroups.get_description_no_emoji(i),
+                value=i,
+                emoji=CWLLeagueGroups.league_groups_emoji.get(i),
+                default=i in self.group_filter)
+                for i in [1,2,9,99]]
+            self.add_item(DiscordSelectMenu(
+                function=self._callback_filter_group,
+                options=select_group,
+                placeholder=f"Filter by League Group",
+                min_values=0,
+                max_values=len(select_group),
+                row=2
+                ))
+            
+            #row1
+            #filter members only
+            self.add_item(DiscordButton(
+                function=self._callback_filter_members,
+                label="Members Only" if not self.members_only else "All Participants",
+                emoji=EmojisUI.FILTER,
+                style=discord.ButtonStyle.secondary,
+                row=3
+                ))
+            #filter max heroes only
+            self.add_item(DiscordButton(
+                function=self._callback_filter_max_heroes,
+                label="Max Heroes Only" if not self.max_heroes else "All Hero Levels",
+                emoji=EmojisUI.FILTER,
+                style=discord.ButtonStyle.secondary,
+                row=3
+                ))
+            #filter max offense only
+            self.add_item(DiscordButton(
+                function=self._callback_filter_max_offense,
+                label="Max Offense Only" if not self.max_offense else "All Offense Levels",
+                emoji=EmojisUI.FILTER,
+                style=discord.ButtonStyle.secondary,
+                row=3
+                ))
+            
+            self.add_item(DiscordButton(
+                function=self._callback_filter_not_rostered,
+                label="Not Yet Rostered" if not self.not_yet_rostered else "All Players",
+                emoji=EmojisUI.FILTER,
+                style=discord.ButtonStyle.secondary,
+                row=3
+                ))        
+            
+            self.add_item(DiscordButton(
+                function=self._callback_home,
+                label="Back to Main Page",
+                emoji=EmojisUI.GREEN_FIRST,
+                style=discord.ButtonStyle.secondary,
+                row=4
+                ))
+            self.add_item(DiscordButton(
+                function=self._callback_filter_randomize,
+                label="Randomize",
+                emoji=EmojisUI.REFRESH,
+                style=discord.ButtonStyle.secondary,
+                row=4
+                ))
+            self.add_item(DiscordButton(
+                function=self._callback_add_help,
+                emoji=EmojisUI.HELP,
+                label="Help",
+                style=discord.ButtonStyle.blurple,
+                row=4
+                ))
+        all_participants, eligible_participants = await self.get_eligible_participants()
+        if len(eligible_participants) == 0:
+            return False
+        _add_player_menu(all_participants,eligible_participants)
         return True
+    
+    async def get_eligible_participants(self) -> Tuple[List[aPlayer],List[aPlayer]]:
+        def eligible_for_rostering(player:aPlayer):
+            if not player.war_league_season(self.season).roster_clan or player.war_league_season(self.season).roster_clan.roster_open:
+                return True
+            return False
+        def pred_members_only(player:aPlayer):
+            if self.members_only:
+                return player.is_member
+            return True
+        def pred_max_heroes_only(player:aPlayer):
+            if self.max_heroes:
+                return player.hero_strength == player.max_hero_strength
+            return True
+        def pred_max_offense_only(player:aPlayer):
+            if self.max_offense:
+                if player.hero_strength != player.max_hero_strength:
+                    return False
+                if player.troop_strength != player.max_troop_strength:
+                    return False
+                if player.spell_strength != player.max_spell_strength:
+                    return False
+            return True
+        def pred_not_yet_rostered(player:aPlayer):
+            if self.not_yet_rostered:
+                return not player.war_league_season(self.season).roster_clan
+            return True
+        def pred_townhall_levels(player:aPlayer):
+            if len(self.th_filter) > 0:
+                return player.town_hall.level in self.th_filter
+            return True
+        def pred_registration_group(player:aPlayer):
+            if len(self.group_filter) > 0:
+                return player.war_league_season(self.season).league_group in self.group_filter
+            return True
+        
+        signups = await WarLeaguePlayer.signups_by_season(self.season)
+        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in signups))
 
+        all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+        eligible_participants = sorted(
+            [p for p in participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
+            key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True
+            )
+        return all_participants, eligible_participants
+
+    async def autofill_participants(self,max_participants:int):
+        eligible_participants = await WarLeaguePlayer.signups_by_group(
+            season=self.season,
+            group=CWLLeagueGroups.from_league_name(self.clan.league)
+            )
+        
+        participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
+        unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
+
+        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
+            cwl_player = p.war_league_season(self.season)
+            cwl_player.roster_clan_tag = self.clan.tag
+            self.modified_to_save.append(cwl_player)
+            if len(self.clan.participants) >= max_participants:
+                break
+    
     ##################################################
     ### CONTENT HELPERS
     ##################################################
@@ -663,29 +753,32 @@ class CWLRosterMenu(DefaultView):
             context=self.ctx,
             show_author=False,
             )
-        participants = AsyncIter(self.clan.participants[:35])
-        async for i,p in participants.enumerate(start=1):
-            player = await self.client.fetch_player(p.tag)
+        
+        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.participants[:35]))
+        
+        a_participants = AsyncIter(participants)
+        async for i,p in a_participants.enumerate(start=1):
             if i <= 15:
                 embed_1.add_field(
-                    name=f"{i}\u3000**{player.title}**",
-                    value=f"\u200b\u3000\u3000{player.hero_description}",
+                    name=f"{i}\u3000**{p.title}**",
+                    value=f"\u200b\u3000\u3000{p.hero_description}",
                     inline=False
                     )
             elif i <= 30:
                 embed_2.add_field(
-                    name=f"{i}\u3000**{player.title}**",
-                    value=f"\u200b\u3000\u3000{player.hero_description}",
+                    name=f"{i}\u3000**{p.title}**",
+                    value=f"\u200b\u3000\u3000{p.hero_description}",
                     inline=False
                     )
             elif i <= 35:
                 embed_3.add_field(
-                    name=f"{i}\u3000**{player.title}**",
-                    value=f"\u200b\u3000\u3000{player.hero_description}",
+                    name=f"{i}\u3000**{p.title}**",
+                    value=f"\u200b\u3000\u3000{p.hero_description}",
                     inline=False
                     )
             else:
-                break        
+                break
+
         if len(embed_1) + len(embed_2) + len(embed_3) >= 6000:
             embed_1 = await clash_embed(
                 context=self.ctx,
@@ -702,29 +795,30 @@ class CWLRosterMenu(DefaultView):
                 context=self.ctx,
                 show_author=False,
                 )
-            participants = AsyncIter(self.clan.participants[:35])
-            async for i,p in participants.enumerate(start=1):
-                player = await self.client.fetch_player(p.tag)
+            
+            a_participants = AsyncIter(participants)
+            async for i,p in a_participants.enumerate(start=1):
                 if i <= 15:
                     embed_1.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description}",
                         inline=False
                         )
                 elif i <= 30:
                     embed_2.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description}",
                         inline=False
                         )
                 elif i <= 35:
                     embed_3.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description}",
                         inline=False
                         )
                 else:
                     break
+
         if len(embed_1) + len(embed_2) + len(embed_3) >= 6000:
             embed_1 = await clash_embed(
                 context=self.ctx,
@@ -741,29 +835,30 @@ class CWLRosterMenu(DefaultView):
                 context=self.ctx,
                 show_author=False,
                 )
-            participants = AsyncIter(self.clan.participants[:35])
-            async for i,p in participants.enumerate(start=1):
-                player = await self.client.fetch_player(p.tag)
+            
+            a_participants = AsyncIter(participants)
+            async for i,p in a_participants.enumerate(start=1):
                 if i <= 15:
                     embed_1.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description_no_emoji}",
                         inline=False
                         )
                 elif i <= 30:
                     embed_2.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description_no_emoji}",
                         inline=False
                         )
                 elif i <= 35:
                     embed_3.add_field(
-                        name=f"{i}\u3000TH{player.town_hall.level}\u3000**{str(player)}**",
-                        value=f"\u200b\u3000\u3000{player.hero_description_no_emoji}",
+                        name=f"{i}\u3000TH{p.town_hall.level}\u3000**{str(p)}**",
+                        value=f"\u200b\u3000\u3000{p.hero_description_no_emoji}",
                         inline=False
                         )
                 else:
                     break
+
         if len(self.clan.participants) > 30:
             return [embed_1,embed_2,embed_3]
         elif len(self.clan.participants) > 15:
@@ -843,49 +938,3 @@ class CWLRosterMenu(DefaultView):
                 )
             collect_embeds[i] = embed        
         return list(collect_embeds.values())
-    
-    async def get_eligible_participants(self):
-        def eligible_for_rostering(player:aPlayer):
-            if not player.war_league_season(self.season).roster_clan or player.war_league_season(self.season).roster_clan.roster_open:
-                return True
-            return False
-        def pred_members_only(player:aPlayer):
-            if self.members_only:
-                return player.is_member
-            return True
-        def pred_max_heroes_only(player:aPlayer):
-            if self.max_heroes:
-                return player.hero_strength == player.max_hero_strength
-            return True
-        def pred_max_offense_only(player:aPlayer):
-            if self.max_offense:
-                if player.hero_strength != player.max_hero_strength:
-                    return False
-                if player.troop_strength != player.max_troop_strength:
-                    return False
-                if player.spell_strength != player.max_spell_strength:
-                    return False
-            return True
-        def pred_not_yet_rostered(player:aPlayer):
-            if self.not_yet_rostered:
-                return not player.war_league_season(self.season).roster_clan
-            return True
-        def pred_townhall_levels(player:aPlayer):
-            if len(self.th_filter) > 0:
-                return player.town_hall.level in self.th_filter
-            return True
-        def pred_registration_group(player:aPlayer):
-            if len(self.group_filter) > 0:
-                return player.war_league_season(self.season).league_group in self.group_filter
-            return True
-        
-        signups = await WarLeaguePlayer.signups_by_season(self.season)
-        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in signups))
-
-        all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
-        eligible_participants = sorted(
-            [p for p in participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
-            key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True
-            )
-
-        return [p.war_league_season(self.season) for p in all_participants], [p.war_league_season(self.season) for p in eligible_participants]

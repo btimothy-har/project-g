@@ -17,7 +17,7 @@ from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.utils.checks import is_admin
 from coc_main.utils.components import clash_embed
 
-from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive, DiscordLeaderboard
+from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive, DiscordLeaderboard, db_Leaderboard
 
 lb_type_selector = [
     app_commands.Choice(name="Clan War Triples", value=1),
@@ -28,7 +28,8 @@ lb_type_selector = [
 
 async def autocomplete_leaderboard_selector(interaction:discord.Interaction,current:str):
     try:
-        guild_leaderboards = list(DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id))
+        guild_leaderboards = await DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id)
+        
         if current:
             sel_lb = [p for p in guild_leaderboards if current.lower() in str(p).lower()]
         else:
@@ -60,7 +61,7 @@ class Leaderboards(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 1
+    __release__ = 2
 
     def __init__(self,bot:Red):
         self.bot = bot
@@ -79,14 +80,16 @@ class Leaderboards(commands.Cog):
         return bot_client.bot.get_cog("ClashOfClansClient")
     
     async def cog_load(self):
-        asyncio.create_task(self.start_leaderboards_cog())
-    
-    async def start_leaderboards_cog(self):
-        while True:
-            if getattr(bot_client,'_api_logged_in',False):
-                break
-            await asyncio.sleep(1)
-        self.update_leaderboards.start()
+        async def start_cog():
+            while True:
+                if getattr(bot_client,'_api_logged_in',False):
+                    break
+                await asyncio.sleep(1)
+                
+            await bot_client.bot.wait_until_red_ready()
+            self.update_leaderboards.start()
+
+        asyncio.create_task(start_cog())    
     
     async def cog_unload(self):
         self.update_leaderboards.cancel()
@@ -147,17 +150,6 @@ class Leaderboards(commands.Cog):
         description="Group to set up Clash Leaderboards.",
         guild_only=True
         )
-    
-    ##################################################
-    ### LEADERBOARD / DELETE-ARCHIVE
-    ##################################################
-    @command_group_clash_leaderboards.command(name="delete-archive")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_list_delete_lb_archive(self,ctx):
-
-        db_Leaderboard_Archive.objects.delete()
-        await ctx.tick()
 
     ##################################################
     ### LEADERBOARD / LIST
@@ -170,7 +162,9 @@ class Leaderboards(commands.Cog):
             context=context,
             title="**Server Leaderboards**"
             )
-        async for lb in AsyncIter(DiscordLeaderboard.get_guild_leaderboards(guild.id)):
+        
+        lbs = await DiscordLeaderboard.get_guild_leaderboards(guild.id)
+        async for lb in AsyncIter(lbs):
             embed.add_field(
                 name=f"**{getattr(lb.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await lb.fetch_message(),'jump_url','')}"
@@ -189,6 +183,9 @@ class Leaderboards(commands.Cog):
         """
         List all Leaderboards setup in this server.
         """
+
+        await ctx.reply(db_Leaderboard.objects())
+    
         embed = await self.helper_list_guild_leaderboards(ctx,ctx.guild)
         await ctx.reply(embed=embed)        
     
@@ -299,9 +296,8 @@ class Leaderboards(commands.Cog):
         context:Union[discord.Interaction,commands.Context],
         leaderboard_id:str) -> discord.Embed:  
 
-        try:
-            lb = DiscordLeaderboard.get_by_id(leaderboard_id)
-        except DoesNotExist:
+        lb = await DiscordLeaderboard.get_by_id(leaderboard_id)
+        if not lb:
             embed = await clash_embed(
                 context=context,
                 message=f"Leaderboard with ID `{leaderboard_id}` does not exist.",
@@ -319,10 +315,7 @@ class Leaderboards(commands.Cog):
                 )
             return embed
 
-        message = await lb.fetch_message()
-        if message:
-            await message.delete()        
-        lb.delete()
+        await lb.delete()
 
         embed = await clash_embed(
             context=context,
@@ -365,7 +358,7 @@ class Leaderboards(commands.Cog):
         async with self.leaderboard_lock:
             st = pendulum.now()
             bot_client.coc_main_log.info("Updating Leaderboards...")
-            all_leaderboards = DiscordLeaderboard.get_all_leaderboards()
+            all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
             await asyncio.gather(*(lb.update_leaderboard() for lb in all_leaderboards))
             
             et = pendulum.now()

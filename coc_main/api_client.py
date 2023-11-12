@@ -2,6 +2,7 @@ import os
 import logging
 import pendulum
 import random
+import asyncio
 
 import coc
 from coc.ext import discordlinks
@@ -9,8 +10,11 @@ from coc.ext import discordlinks
 from typing import *
 from mongoengine import *
 
+from art import text2art
+from concurrent.futures import ThreadPoolExecutor
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
+from redbot.core.utils.chat_formatting import humanize_list
 
 from .coc_objects.season.mongo_season import dSeason
 from .coc_objects.season.season import aClashSeason
@@ -50,13 +54,8 @@ class DataCache():
     def values(self):
         return list(self.cache.values())
     
-    async def set(self,key,value):
+    def set(self,key,value):
         self.cache[key] = value
-    
-    async def add_many_to_queue(self,keys:List[str]):
-        aiter = AsyncIter(keys)
-        async for key in aiter:
-            self.add_to_queue(key)
 
     def get(self,key):
         return self.cache.get(key,None)
@@ -66,9 +65,13 @@ class DataCache():
             del self.cache[key]
 
     def add_to_queue(self,key:str):
-        if key not in self.queue:
-            if key not in self.cache:
-                self.queue.append(key)
+        if key not in self.queue and key not in self.cache:
+            self.queue.append(key)
+    
+    async def add_many_to_queue(self,keys:List[str]):
+        aiter = AsyncIter(keys)
+        async for key in aiter:
+            self.add_to_queue(key)
 
     def remove_from_queue(self,key:str):
         if key in self.queue:
@@ -97,6 +100,11 @@ class BotClashClient():
         
         if not self._is_initialized:
             self.bot = bot
+            self.api_maintenance = False
+            self._current_season = None
+            self._tracked_seasons = []
+
+            self.thread_pool = ThreadPoolExecutor(max_workers=16)
 
             self.last_status_update = None
             self.client_keys = []
@@ -144,6 +152,15 @@ class BotClashClient():
             self.discordlinks_sandbox = False
             self.discordlinks_client = None
     
+    def run_in_thread(self, func, *args):
+        def _run_func(func, *args):
+            try:
+                return func(*args)
+            except Exception as exc:
+                self.coc_main_log.exception(f"Error in thread: {exc}")
+        loop = asyncio.get_running_loop()
+        return loop.run_in_executor(self.thread_pool, _run_func, func, *args)
+    
     @classmethod
     async def initialize(cls,
         bot:Red,
@@ -165,14 +182,13 @@ class BotClashClient():
         await instance.database_login()
         await instance.api_login()
         await instance.discordlinks_login()
+        await instance.load_seasons()
 
         instance._is_initialized = True
         return instance
     
     async def shutdown(self):
         await self.api_logout()
-        await self._events_handler.stop()
-        await self._data_cache.logout()
 
         for handler in self.discordlinks_log.handlers:
             self.discordlinks_log.removeHandler(handler)
@@ -187,29 +203,51 @@ class BotClashClient():
     #####
     ##### CLASH SEASONS
     #####
-    ##################################################    
-    @property    
-    def current_season(self) -> aClashSeason:
-        try:
-            current_season = aClashSeason(dSeason.objects.get(s_is_current=True).only('s_id').s_id)
-        except:
-            current_season = None
+    ##################################################  
+    async def load_seasons(self):
+        def _find_current():
+            try:
+                s = dSeason.objects.get(s_is_current=True)
+            except DoesNotExist:
+                s = None
+            return getattr(s,'s_id',None)
+
+        def _find_tracked():
+            s = dSeason.objects(s_is_current=False).only('s_id')
+            return [ss.s_id for ss in s]
         
-        if not current_season:
-            current_season = aClashSeason.get_current_season()
-            current_season.is_current = True
-        return current_season
-    @current_season.setter
-    def current_season(self,season:aClashSeason):
-        season.is_current = True
-        season.save()
+        def _delete_invalid(ss):
+            dSeason.objects(s_id=ss).delete()
+        
+        season_id = await self.run_in_thread(_find_current)
+        if season_id:
+            self._current_season = aClashSeason(str(season_id))
+        else:
+            self._current_season = aClashSeason.get_current_season()
+            await self._current_season.set_as_current()
+        
+        self.coc_main_log.info(f"Current Season: {self.current_season.description}")
+
+        tracked_seasons = await self.run_in_thread(_find_tracked)
+        aiter = AsyncIter(tracked_seasons)
+        async for ss in aiter:
+            try:
+                s = aClashSeason(str(ss))
+            except:
+                await self.run_in_thread(_delete_invalid,ss)
+                self.coc_main_log.warning(f"Invalid Season: {ss} deleted.")
+            else:
+                self._tracked_seasons.append(s)
+
+        self.coc_main_log.info(f"Tracked Seasons: {humanize_list([ss.description for ss in self.tracked_seasons])}")
+    
+    @property
+    def current_season(self) -> aClashSeason:
+        return self._current_season
     
     @property
     def tracked_seasons(self) -> list[aClashSeason]:
-        non_current_seasons = [aClashSeason(ss.s_id) for ss in dSeason.objects(s_is_current=False).only('s_id')]
-        tracked = [s for s in non_current_seasons if s.season_start <= pendulum.now()]
-        tracked.sort(key=lambda x:x.season_start,reverse=True)
-        return tracked
+        return sorted(self._tracked_seasons,key=lambda x:x.season_start,reverse=True)
 
     ##################################################
     #####
@@ -260,7 +298,14 @@ class BotClashClient():
         
         self.num_keys = len(self.coc.http._keys)
         self.rate_limit = self.num_keys * 30        
-        self._api_logged_in = True  
+        self._api_logged_in = True
+
+        self.bot.coc_client.add_events(
+            clash_maintenance_start,
+            clash_maintenance_complete,
+            end_of_trophy_season,
+            end_of_clan_games
+            )
 
     async def api_login_keys(self):
         if len(self.client_keys) == 0:
@@ -467,3 +512,48 @@ class BotClashClient():
         else:
             self.last_status_update = pendulum.now()
             self.coc_main_log.info(f"Bot Status Updated: {text}.")
+
+@coc.ClientEvents.maintenance_start()
+async def clash_maintenance_start():
+    client = BotClashClient()
+    client.api_maintenance = True
+
+    client.coc_main_log.warning(f"Clash Maintenance Started.\n"
+        + text2art("Clash Maintenance Started",font="small")
+        )
+    await client.update_bot_status(
+        cooldown=0,
+        text="Clash Maintenance!"
+        )
+
+@coc.ClientEvents.maintenance_completion()
+async def clash_maintenance_complete(time_started):
+    client = BotClashClient()
+    client.api_maintenance = False
+
+    maint_start = pendulum.instance(time_started)
+    maint_end = pendulum.now()
+
+    client.coc_main_log.warning(f"Clash Maintenance Completed. Maintenance took: {maint_end.diff(maint_start).in_minutes()} minutes. Sync loops unlocked.\n"
+        + text2art("Clash Maintenance Completed",font="small")
+        )
+    await client.update_bot_status(
+        cooldown=0,
+        text="Clash of Clans!"
+        )
+
+@coc.ClientEvents.new_season_start()
+async def end_of_trophy_season():
+    await asyncio.sleep(1800)
+    client = BotClashClient()
+    cog = client.bot.get_cog("Bank")
+    if cog:
+        await cog.member_legend_rewards()
+
+@coc.ClientEvents.clan_games_end()
+async def end_of_clan_games(self):
+    await asyncio.sleep(900)
+    client = BotClashClient()
+    cog = client.bot.get_cog("Bank")
+    if cog:
+        await cog.member_clan_games_rewards()

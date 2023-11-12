@@ -4,22 +4,54 @@ import pendulum
 import urllib
 import asyncio
 
+from typing import *
+
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-from redbot.core.utils import AsyncIter
+from .clan_feed import ClanDataFeed
 
 from ...api_client import BotClashClient as client
 
-from ...coc_objects.clans.clan import aClan, db_ClanDataFeed
+from ...coc_objects.clans.clan import BasicClan, aClan
 from ...coc_objects.events.raid_weekend import aRaidWeekend
+
+from ...discord.mongo_discord import db_ClanDataFeed
 
 from ...utils.constants.coc_emojis import EmojisClash
 from ...utils.components import clash_embed, get_bot_webhook
 
 bot_client = client()
 
+type = 3
+
 class RaidResultsFeed():
+    @staticmethod
+    async def feeds_for_clan(clan:BasicClan) -> List[db_ClanDataFeed]:
+        def _get_from_db():
+            return db_ClanDataFeed.objects(tag=clan.tag,type=type)
+        
+        feeds = await bot_client.run_in_thread(_get_from_db)
+        return feeds
+    
+    @staticmethod
+    async def create_feed(clan:BasicClan,channel:Union[discord.TextChannel,discord.Thread]) -> db_ClanDataFeed:
+        def _create_in_db():
+            feed = db_ClanDataFeed(
+                tag=clan.tag,
+                type=type,
+                guild_id=channel.guild.id,
+                channel_id=channel.id
+                )
+            feed.save()
+            return feed        
+        feed = await bot_client.run_in_thread(_create_in_db)
+        return feed
+    
+    @staticmethod
+    async def delete_feed(feed_id:str):
+        await ClanDataFeed.delete_feed(feed_id)
+    
     def __init__(self,clan:aClan,raid_weekend:aRaidWeekend):
         self.clan = clan
         self.raid_weekend = raid_weekend

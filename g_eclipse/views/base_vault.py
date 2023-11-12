@@ -1,5 +1,6 @@
 import discord
 import pendulum
+import asyncio
 
 from typing import *
 from ..components import eclipse_embed
@@ -16,7 +17,6 @@ class BaseVaultMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction]):
         
-        self.dump_message = None
         self.vault_mode = False
         self.base_th = 0
         self.base_index = 0
@@ -68,9 +68,10 @@ class BaseVaultMenu(DefaultView):
             pass
         
         self.stop_menu()
-        if self.dump_message:
-            await self.dump_message.delete()
-            self.dump_message = None        
+    
+    @property
+    def cog(self):
+        return self.bot.get_cog("ECLIPSE")
     
     ####################################################################################################
     #####
@@ -142,10 +143,6 @@ class BaseVaultMenu(DefaultView):
             view=None
             )
         self.stop_menu()
-
-        if self.dump_message:
-            await self.dump_message.delete()
-            self.dump_message = None
 
     async def _callback_home(self,interaction:discord.Interaction,button:Union[DiscordButton,DiscordSelectMenu],no_base=None):
         if not interaction.response.is_done():
@@ -276,7 +273,7 @@ class BaseVaultMenu(DefaultView):
 
         button.disabled = True
         await interaction.edit_original_response(view=self)
-        self.all_bases[self.base_index].add_claim(self.user.id)
+        await self.all_bases[self.base_index].add_claim(self.user.id)
 
         embed1 = await self._browse_bases_embed()
         embed2 = await self._show_base_embed()
@@ -301,7 +298,7 @@ class BaseVaultMenu(DefaultView):
 
         button.disabled = True
         await interaction.edit_original_response(view=self)
-        self.all_bases[self.base_index].remove_claim(self.user.id)
+        await self.all_bases[self.base_index].remove_claim(self.user.id)
 
         del self.all_bases[self.base_index]
         self.base_index = 0
@@ -382,12 +379,10 @@ class BaseVaultMenu(DefaultView):
         return embed
     
     async def _show_base_embed(self):
-        if self.dump_message:
-            await self.dump_message.delete()
-            self.dump_message = None
-
         show_base = self.all_bases[self.base_index]
         embed,file = await show_base.base_embed()
+
+        dump_task = asyncio.create_task(self.cog.dump_channel.send(file=file))        
 
         embed.add_field(
             name=f"🔍 Bookmarked by: {len(show_base.claims)} member(s)",
@@ -399,10 +394,11 @@ class BaseVaultMenu(DefaultView):
             name="**Base Link**",
             value=f"[Click here to open in-game.]({show_base.base_link})",
             inline=False
-            )        
-        dump_channel = self.bot.get_channel(1079665410770739201)
-        self.dump_message = await dump_channel.send(file=file)
-        embed.set_image(url=self.dump_message.attachments[0].url)
+            )
+        
+        dump_message = await dump_task
+        embed.set_image(url=dump_message.attachments[0].url)
+        self.cog.dump_messages.append(dump_message.id)
         return embed
 
     async def _send_base_link_embed(self):

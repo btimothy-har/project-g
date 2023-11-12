@@ -1,17 +1,27 @@
+import asyncio
 import discord
+import re
+import coc
+import pendulum
 
 from typing import *
 from mongoengine import *
 
+from redbot.core.utils import AsyncIter
+
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client
 
+from ..coc_objects.players.player import aPlayer, db_Player
 from ..coc_objects.clans.clan import aClan
 
-from .mongo_discord import db_GuildApplyPanel
-from .user_application import ClanApplyMenuUser
+from .mongo_discord import db_GuildApplyPanel, db_ClanApplication
+from .clan_link import ClanGuildLink
+from .helpers import account_recruiting_summary
 
-from ..utils.components import DiscordButton, DiscordSelectMenu
+from ..utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed
+from ..utils.constants.coc_emojis import EmojisClash
+from ..exceptions import InvalidTag, ClashAPIError
 
 bot_client = client()
 
@@ -21,6 +31,29 @@ bot_client = client()
 #####
 ##################################################
 class GuildApplicationPanel():
+
+    @classmethod
+    async def get_for_guild(cls,guild_id:int):
+        def _query_db():
+            return [db for db in db_GuildApplyPanel.objects(server_id=guild_id)]
+        db = await bot_client.run_in_thread(_query_db)
+        return [cls(panel) for panel in db]
+
+    @classmethod
+    async def get_panel(cls,guild_id:int,channel_id:int):
+        def _query_db():
+            try:
+                return db_GuildApplyPanel.objects.get(
+                    server_id=guild_id,
+                    channel_id=channel_id
+                    )
+            except DoesNotExist:
+                return None
+            
+        db = await bot_client.run_in_thread(_query_db)
+        if db:
+            return cls(db)
+        return None
     
     @classmethod
     def get_from_id(cls,panel_id:dict):
@@ -28,22 +61,7 @@ class GuildApplicationPanel():
             panel = db_GuildApplyPanel.objects.get(panel_id=panel_id)
         except DoesNotExist:
             return None
-        return cls(panel)
-    
-    @classmethod
-    def get_panel(cls,guild_id:int,channel_id:int):
-        try:
-            panel = db_GuildApplyPanel.objects.get(
-                server_id=guild_id,
-                channel_id=channel_id
-                )
-        except DoesNotExist:
-            return None
-        return cls(panel)
-
-    # @classmethod
-    # async def get_guild_panels(cls,guild_id:int):
-    #     return [cls(link) for link in db_GuildApplyPanel.objects(server_id=guild_id)]    
+        return cls(panel) 
 
     def __init__(self,database_entry:db_GuildApplyPanel):        
         self.id = database_entry.panel_id
@@ -70,48 +88,51 @@ class GuildApplicationPanel():
         return f"Application Panel (Channel: {getattr(self.channel,'name','Unknown Channel')})"
     
     @classmethod
-    async def create(cls,guild_id:int,channel_id:int):
-        panel_id = {'guild':guild_id,'channel':channel_id}
+    async def create(cls,guild_id:int,channel_id:int,**kwargs):
 
-        try:
-            panel = db_GuildApplyPanel.objects.get(
-                server_id=guild_id,
-                channel_id=channel_id
+        def _save_to_db():
+            panel_id = {'guild':guild_id,'channel':channel_id}
+            db_GuildApplyPanel.objects(panel_id=panel_id).update_one(
+                set__server_id=guild_id,
+                set__channel_id=channel_id,
+                set__select_clans=select_clans,
+                set__ticket_prefix=ticket_prefix,
+                set__listener_channel=listener_channel,
+                set__text_q1=text_q1,
+                set__placeholder_q1=placeholder_q1,
+                set__text_q2=text_q2,
+                set__placeholder_q2=placeholder_q2,
+                set__text_q3=text_q3,
+                set__placeholder_q3=placeholder_q3,
+                set__text_q4=text_q4,
+                set__placeholder_q4=placeholder_q4,
+                upsert=True
                 )
-        except DoesNotExist:
-            panel = db_GuildApplyPanel(
-                panel_id = panel_id,
-                server_id = guild_id,
-                channel_id = channel_id
-                )
-            panel.save()
+            return db_GuildApplyPanel.objects.get(panel_id=panel_id)
+
+        select_clans = kwargs.get('select_clans',False)
+        ticket_prefix = kwargs.get('ticket_prefix','.')
+        listener_channel = kwargs.get('listener_channel',0)
+        text_q1 = kwargs.get('text_q1','')
+        placeholder_q1 = kwargs.get('placeholder_q1','')
+        text_q2 = kwargs.get('text_q2','')
+        placeholder_q2 = kwargs.get('placeholder_q2','')
+        text_q3 = kwargs.get('text_q3','')
+        placeholder_q3 = kwargs.get('placeholder_q3','')
+        text_q4 = kwargs.get('text_q4','')
+        placeholder_q4 = kwargs.get('placeholder_q4','')
+        
+        panel = await bot_client.run_in_thread(_save_to_db)
         return cls(panel)
 
     async def delete(self):
-        db_GuildApplyPanel.objects(panel_id=self.id).delete()
+        def _delete_in_db():
+            db_GuildApplyPanel.objects(panel_id=self.id).delete()
+        
         message = await self.fetch_message()
         if message:
-            await message.delete()
-    
-    def save(self):
-        db_panel = db_GuildApplyPanel(
-            panel_id = self.id,
-            server_id = self.guild_id,
-            channel_id = self.channel_id,
-            message_id = self.message_id,
-            select_clans = self.can_user_select_clans,
-            ticket_prefix = self.tickettool_prefix,
-            listener_channel = self._tickettool_channel,
-            text_q1 = self.text_q1,
-            placeholder_q1 = self.placeholder_q1,
-            text_q2 = self.text_q2,
-            placeholder_q2 = self.placeholder_q2,
-            text_q3 = self.text_q3,
-            placeholder_q3 = self.placeholder_q3,
-            text_q4 = self.text_q4,
-            placeholder_q4 = self.placeholder_q4
-            )
-        db_panel.save()
+            await message.delete()        
+        await bot_client.run_in_thread(_delete_in_db)
 
     @property
     def guild(self) -> Optional[discord.Guild]:
@@ -136,6 +157,9 @@ class GuildApplicationPanel():
         return None
     
     async def send_to_discord(self,embed:discord.Embed,view:discord.ui.View):
+        def _update_db(message:discord.Message):
+            db_GuildApplyPanel.objects(panel_id=self.id).update_one(set__message_id=message.id)
+
         try:
             if not self.channel:
                 await self.delete()
@@ -147,7 +171,7 @@ class GuildApplicationPanel():
                     embed=embed,
                     view=view
                     )
-                db_GuildApplyPanel.objects(panel_id=self.id).update_one(set__message_id=message.id)
+                await bot_client.run_in_thread(_update_db,message)
             else:
                 message = await message.edit(
                     embed=embed,
@@ -191,11 +215,6 @@ class ClanApplyMenu(discord.ui.View):
             )
             for clan in self.clans
             ]
-        # if self.panel.guild_id == 1132581106571550831:
-        #     dropdown_options.append(discord.SelectOption(
-        #         label=f"I am an existing member of WOL/RTD.",
-        #         value="rtd_onboarding"
-        #         ))
         dropdown_menu = DiscordSelectMenu(
             function=self._callback_select_clan,
             options=dropdown_options,
@@ -236,3 +255,389 @@ class ClanApplyMenu(discord.ui.View):
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
         await ClanApplyMenuUser.start_user_application(interaction)
+
+##################################################
+#####
+##### APPLICAITON MENU FOR USER
+#####
+##################################################
+class ClanApplyMenuUser(DefaultView):
+    
+    @classmethod
+    async def start_user_application(cls,interaction:discord.Interaction,clan_tags:Optional[List[str]]=None):
+        view = cls(interaction,clan_tags)
+        await view.start()
+
+    def __init__(self,
+        context:discord.Interaction,
+        applied_to_tags:Optional[List[str]]=None):
+
+        self.clan_tags = applied_to_tags
+        self.clans = []
+
+        self.member = context.guild.get_member(context.user.id)
+        super().__init__(context,timeout=300)
+    
+    @property
+    def coc_client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    async def on_timeout(self):
+        try:
+            await self.ctx.followup.edit_message(self.message.id,content=f"Sorry, you timed out!",view=None)
+        except:
+            pass        
+        self.stop_menu()
+    
+    def clan_application_modal(self,panel:GuildApplicationPanel,default_tags:list[str] = []):
+        apply_modal = DiscordModal(
+            function=self._callback_complete_application,
+            title=f"Member Application",
+            )
+        question_tag = discord.ui.TextInput(
+            label="Your Clash Player Tags, separated by spaces.",
+            default=" ".join(default_tags),
+            style=discord.TextStyle.short,
+            placeholder="Example: #LJC8V0GCJ #8G9L8JV2R",
+            required=True
+            )
+        apply_modal.add_item(question_tag)
+        
+        if len(str(panel.text_q1)) > 0:
+            question_1 = discord.ui.TextInput(
+                label=str(panel.text_q1),
+                style=discord.TextStyle.long,
+                placeholder=str(panel.placeholder_q1),
+                required=True
+                )
+            apply_modal.add_item(question_1)
+        
+        if len(str(panel.text_q2)) > 0:
+            question_2 = discord.ui.TextInput(
+                label=str(panel.text_q2),
+                style=discord.TextStyle.long,
+                placeholder=str(panel.placeholder_q2),
+                required=True
+                )
+            apply_modal.add_item(question_2)
+        
+        if len(str(panel.text_q3)) > 0:
+            question_3 = discord.ui.TextInput(
+                label=str(panel.text_q3),
+                style=discord.TextStyle.long,
+                placeholder=str(panel.placeholder_q3),
+                required=True
+                )
+            apply_modal.add_item(question_3)
+        
+        if len(str(panel.text_q4)) > 0:
+            question_4 = discord.ui.TextInput(
+                label=str(panel.text_q4),
+                style=discord.TextStyle.long,
+                placeholder=str(panel.placeholder_q4),
+                required=True
+                )
+            apply_modal.add_item(question_4)
+        return apply_modal
+
+    ##################################################
+    #####
+    ##### STANDARD APPLICATION FUNCTIONS
+    #####
+    ##################################################
+    async def start(self):
+        def _get_player_tags():
+            return [db.tag for db in db_Player.objects(discord_user=self.member.id).only('tag')]
+
+        if self.clan_tags:
+            self.clans = await asyncio.gather(*(self.coc_client.fetch_clan(tag=tag) for tag in self.clan_tags))
+
+        self.is_active = True
+        dropdown_options = []
+
+        account_tags = await bot_client.run_in_thread(_get_player_tags)
+        get_accounts = await asyncio.gather(*(self.coc_client.fetch_player(tag=a) for a in account_tags[:10]),return_exceptions=True)
+        accounts = [a for a in get_accounts if isinstance(a,aPlayer)]
+        
+        dropdown_options.extend([
+            discord.SelectOption(
+                label=f"{player.clean_name}" + " | " + f"{player.tag}",
+                value=player.tag,
+                emoji=player.town_hall.emoji
+                )
+            for player in sorted(accounts,key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+            ])
+        dropdown_options.append(
+            discord.SelectOption(
+                label=f"The account I want to apply with is not listed.",
+                value="not_listed"
+                )
+            )
+        dropdown_menu = DiscordSelectMenu(
+            function=self._callback_application,
+            options=dropdown_options,
+            placeholder="Select one or more Account(s) to apply with.",
+            min_values=1,
+            max_values=len(dropdown_options)
+            )
+        self.add_item(dropdown_menu)
+        
+        self.message = await self.ctx.followup.send(
+            wait=True,
+            content=f"Hey, {self.member.mention}!"
+                + f"\n\nI found the following Accounts linked to your User ID. Please select the Account(s) you would like to apply with.",
+            view=self,
+            ephemeral=True
+            )
+    
+    async def _callback_application(self,interaction:discord.Interaction,select:discord.ui.Select):
+        default_tags = [i for i in select.values if i != 'not_listed']
+
+        panel = await GuildApplicationPanel.get_panel(self.guild.id,self.channel.id)
+        modal = self.clan_application_modal(panel,default_tags)
+        await interaction.response.send_modal(modal)
+        await interaction.followup.delete_message(interaction.message.id)
+    
+    async def _callback_complete_application(self,interaction:discord.Interaction,modal:DiscordModal):
+        def _save_application():
+            new_application = db_ClanApplication(
+                applicant_id = self.member.id,
+                guild_id = self.member.guild.id,
+                created = pendulum.now().int_timestamp,
+                tags = tags_chk,
+                clans = [c.tag for c in self.clans],
+                answer_q1 = [getattr(q1,'label',''),getattr(q1,'value','')],
+                answer_q2 = [getattr(q2,'label',''),getattr(q2,'value','')],
+                answer_q3 = [getattr(q3,'label',''),getattr(q3,'value','')],
+                answer_q4 = [getattr(q4,'label',''),getattr(q4,'value','')],
+                bot_prefix = getattr(panel,'ticket_prefix','')
+                )
+            application = new_application.save()
+            return str(application.pk)
+        
+        def _query_application(pk):
+            try:
+                return db_ClanApplication.objects.get(pk=app_id)
+            except DoesNotExist:
+                return None
+        
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(
+            content=f"{self.member.mention} Please wait while I process your application...",
+            ephemeral=True
+            )
+
+        accounts = []
+        q_tags = [q for q in modal.children if q.label == "Your Clash Player Tags, separated by spaces."][0]
+        tags = re.split('[^a-zA-Z0-9]', q_tags.value)
+
+        q1 = modal.children[1] if len(modal.children) > 1 else None
+        q2 = modal.children[2] if len(modal.children) > 2 else None
+        q3 = modal.children[3] if len(modal.children) > 3 else None
+        q4 = modal.children[4] if len(modal.children) > 4 else None
+
+        tags_chk = []
+        async for a in AsyncIter(tags):
+            if not coc.utils.is_valid_tag(a):
+                continue
+            ntag = coc.utils.correct_tag(a)
+            try:
+                player = await self.coc_client.fetch_player(tag=ntag)
+            except InvalidTag:
+                continue
+            except ClashAPIError:
+                tags_chk.append(ntag)
+            else:
+                tags_chk.append(player.tag)
+                accounts.append(player)
+                if player.discord_user == 0:
+                    player.discord_user = self.member.id
+        
+        if len(self.clans) == 0:
+            eligible_townhalls = set([a.town_hall.level for a in accounts])
+            linked_clans = await ClanGuildLink.get_for_guild(interaction.guild.id)
+            guild_clans = await asyncio.gather(*(self.coc_client.fetch_clan(tag=c.tag) for c in linked_clans))
+
+            async for clan in AsyncIter(guild_clans):
+                recruiting_ths = set(clan.recruitment_level)
+                if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
+                    self.clans.append(clan)
+        
+        panel = await GuildApplicationPanel.get_panel(interaction.guild.id,interaction.channel.id)
+        app_id = await bot_client.run_in_thread(_save_application)
+
+        if getattr(panel,'listener_channel',None):
+            channel = interaction.guild.get_channel(panel.listener_channel)
+            if channel:
+                await channel.send(f"{getattr(panel,'tickettool_prefix','')}ticket {app_id} {self.member.id}")
+
+        if interaction.guild.id == 680798075685699691:
+            await panel.listener_channel.send(
+                f"Tags: {tags_chk}"
+                )
+            
+        channel_found = False
+
+        now = pendulum.now()
+        while True:
+            rt = pendulum.now()
+            if rt.int_timestamp - now.int_timestamp > 60:
+                break
+            application = await bot_client.run_in_thread(_query_application,app_id)
+            channel = interaction.guild.get_channel(application.ticket_channel)
+            if channel:
+                await channel.set_permissions(interaction.user,read_messages=True)
+                await interaction.followup.send(
+                    f"{self.member.mention} Your application has been created in {channel.mention}.",
+                    ephemeral=True
+                    )
+                channel_found = True
+                break
+            await asyncio.sleep(1)
+        
+        if not channel_found:
+            await interaction.followup.send(
+                f"{self.member.mention} An error seems to have occurred. Please contact a Moderator via DMs.",
+                ephemeral=True
+                )
+
+async def listener_user_application(channel:discord.TextChannel,application_id:str):
+    def _db_query() -> Optional[db_ClanApplication]:
+        try:
+            return db_ClanApplication.objects.get(pk=application_id)
+        except DoesNotExist:
+            return None
+        
+    def _update_ticket_channel(application_id,channel_id):
+        db_ClanApplication.objects(pk=application_id).update_one(set__ticket_channel=channel_id)
+        
+    newline = "\n"
+    coc_client = bot_client.bot.get_cog("ClashOfClansClient")
+
+    application = await bot_client.run_in_thread(_db_query)
+    if not application:
+        embed = await clash_embed(
+            context=bot_client.bot,
+            message=f"**Could not find application.**",
+            success=False
+            )
+        return await channel.send(embed=embed)
+    
+    account_tasks = await asyncio.gather(*(coc_client.fetch_player(tag=i) for i in application.tags),return_exceptions=True)
+    clan_tasks = await asyncio.gather(*(coc_client.fetch_clan(tag=i) for i in application.clans),return_exceptions=True)
+    
+    member = channel.guild.get_member(application.applicant_id)    
+    clans = [c for c in clan_tasks if isinstance(c,aClan)]
+
+    application_embed = await clash_embed(
+        context=bot_client.bot,
+        title=f"{member.display_name}",
+        message=f"`{member.id}`"
+            + f"\n**Joined Discord**"
+            + f"\n<t:{int(member.created_at.timestamp())}:f>"
+            + f"\n\n**Joined {member.guild.name}**"
+            + f"\n<t:{int(member.joined_at.timestamp())}:f>"
+            + (f"\n\n**Applied to Clans**" if len(clans) > 0 else "")
+            + (f"\n{newline.join([c.title for c in clans])}" if len(clans) > 0 else "")
+            + f"\n\u200b",
+        thumbnail=member.display_avatar)
+    
+    if application.answer_q1[1]:
+        application_embed.add_field(
+            name=f"**{application.answer_q1[0]}**",
+            value=f"{application.answer_q1[1]}\n\u200b",
+            inline=False
+            )
+    if application.answer_q2[1]:
+        application_embed.add_field(
+            name=f"**{application.answer_q2[0]}**",
+            value=f"{application.answer_q2[1]}\n\u200b",
+            inline=False
+            )
+    if application.answer_q3[1]:
+        application_embed.add_field(
+            name=f"**{application.answer_q3[0]}**",
+            value=f"{application.answer_q3[1]}\n\u200b",
+            inline=False
+            )
+    if application.answer_q4[1]:
+        application_embed.add_field(
+            name=f"**{application.answer_q4[0]}**",
+            value=f"{application.answer_q4[1]}\n\u200b",
+            inline=False
+            )
+ 
+    accounts = sorted([a for a in account_tasks if isinstance(a,aPlayer)],key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+    accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
+
+    member_account_tags = [db.tag for db in db_Player.objects(discord_user=member.id).only('tag')]
+    other_accounts = [tag for tag in member_account_tags if tag not in application.tags]
+
+    if len(accounts) == 0:
+        accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.tags)
+    else:
+        accounts_embed_text = ""
+        async for a in AsyncIter(accounts):
+            accounts_embed_text += account_recruiting_summary(a)
+    
+    accounts_embed = await clash_embed(
+        context=bot_client.bot,
+        title=f"{member.name}",
+        message=accounts_embed_text + "\u200b",
+        thumbnail=member.display_avatar
+        )
+    if len(other_accounts) > 0:
+        list_oa = []
+        other_accounts_embed_text = ""
+        async for a in AsyncIter(other_accounts[:5]):
+            try:
+                account = await coc_client.fetch_player(tag=a)
+            except Exception:
+                continue
+            else:
+                list_oa.append(account)
+        
+        list_oa.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+        async for a in AsyncIter(list_oa):
+            other_accounts_embed_text += f"{a.title}\n\u200b\u3000{EmojisClash.CLAN} {a.clan_description}\n\n"
+
+        accounts_embed.add_field(
+            name=f"**Other Accounts (max. 5)**",
+            value="\n" + other_accounts_embed_text,
+            inline=False
+            )
+        
+    await bot_client.run_in_thread(_update_ticket_channel,application_id,channel.id)
+                
+    await channel.send(embed=application_embed)
+    await channel.send(embed=accounts_embed)
+
+    channel_name = ""
+    if channel.name.startswith('ticket-'):
+        channel_name += f"{re.split('-', channel.name)[1]}-"
+    else:
+        if channel.guild.id == 1132581106571550831: #guild
+            channel_name += f"{re.split('-', channel.name)[0]}-"
+        elif channel.guild.id == 688449973553201335: #arix
+            channel_name += f"{re.split('📝', channel.name)[0]}-"
+    
+    for c in clans:
+        if c.unicode_emoji:
+            channel_name += f"{c.unicode_emoji}"
+        else:
+            channel_name += f"-{c.abbreviation}"
+    
+    for th in accounts_townhalls:
+        channel_name += f"-th{th}"
+    
+    await channel.edit(name=channel_name.lower())
+    async for c in AsyncIter(clans):
+        link = await ClanGuildLink.get_link(c.tag,channel.guild.id)
+        if getattr(link,'coleader_role',None):
+            await channel.send(f"{application.bot_prefix}add {link.coleader_role.mention}")
+            if len(channel.threads) > 0:
+                thread = channel.threads[0]
+                await thread.send(
+                    f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
+                    allowed_mentions=discord.AllowedMentions(roles=True)
+                    )

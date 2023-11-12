@@ -35,9 +35,9 @@ class RemoveMemberMenu(DefaultView):
         super().__init__(context)
 
         if isinstance(member,discord.Member):
-            self.member = aMember(member.id,member.guild.id)
+            self.member = aMember(member.id)
         elif isinstance(member,int):
-            self.member = aMember(member,self.guild.id)
+            self.member = aMember(member)
         if account:
             self.remove_accounts.append(account)
 
@@ -109,7 +109,7 @@ class RemoveMemberMenu(DefaultView):
         dropdown_options = [discord.SelectOption(
             label=f"{account.clean_name}" + " | " + f"{account.tag}",
             value=account.tag,
-            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
+            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
             emoji=account.town_hall.emoji)
             for account in member_accounts
             ]
@@ -210,7 +210,7 @@ class RemoveMemberMenu(DefaultView):
         discord_users = []
 
         async for account in AsyncIter(self.remove_accounts):
-            account.remove_member()
+            await account.remove_member()
             accounts_removed_list.append(f"**{account.title}**")
 
             if account.discord_user not in discord_users:

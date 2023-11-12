@@ -32,8 +32,7 @@ cwl_roster_headers = [
 bot_client = BotClashClient()
 coc_client = bot_client.bot.get_cog('ClashOfClansClient')
 
-async def generate_cwl_roster_export(season:aClashSeason):
-    
+async def generate_cwl_roster_export(season:aClashSeason):    
     report_file = bot_client.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
 
     if pendulum.now() > season.cwl_end:

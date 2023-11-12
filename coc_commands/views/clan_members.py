@@ -8,12 +8,13 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aPlayer
 
 from coc_main.utils.components import clash_embed, handle_command_error, MenuPaginator, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView
 
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisClash
 from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.exceptions import ClashAPIError
 from coc_main.utils.utils import chunks
 
 bot_client = BotClashClient()
@@ -79,9 +80,25 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            registered_members = await asyncio.gather(*(self.coc_client.fetch_player(member) for member in self.clan.alliance_members))
+            rm = await asyncio.gather(
+                *(self.coc_client.fetch_player(member) for member in self.clan.alliance_members),
+                return_exceptions=True
+                )
+            
+            if len([e for e in rm if isinstance(e,ClashAPIError)]) > 0:
+                raise ClashAPIError([e for e in rm if isinstance(e,ClashAPIError)][0])
+            
+            registered_members = [m for m in rm if isinstance(m,aPlayer)]
 
-        self.members_in_clan = await asyncio.gather(*(self.coc_client.fetch_player(member.tag) for member in self.clan.members))
+        mc = await asyncio.gather(
+            *(self.coc_client.fetch_player(member.tag) for member in self.clan.members),
+            return_exceptions=True
+            )
+        
+        if len([e for e in mc if isinstance(e,ClashAPIError)]) > 0:
+            raise ClashAPIError([e for e in mc if isinstance(e,ClashAPIError)][0])
+        
+        self.members_in_clan = [m for m in mc if isinstance(m,aPlayer)]
                                                             
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan
@@ -129,7 +146,7 @@ class ClanMembersMenu(MenuPaginator):
     async def _set_discordlinks_content(self):
         def get_embed_text(lst:list):
             text = "\n".join([
-                (f"{EmojisUI.LOGOUT}" if member.home_clan.tag == self.clan.tag and member.clan.tag != self.clan.tag else (f"{EmojisUI.YES}" if member.home_clan.tag == self.clan.tag else f"{EmojisUI.SPACER}"))
+                (f"{EmojisUI.LOGOUT}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) and getattr(member.clan,'tag',None) != getattr(self.clan,'tag',None) else (f"{EmojisUI.YES}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) else f"{EmojisUI.SPACER}"))
                 + f"{EmojisTownHall.get(member.town_hall.level)}"
                 + f"`{re.sub('[_*/]','',member.name)[:15]:<15}`\u3000" + f"`{'':^1}{member.tag:<11}`\u3000"
                 + (f"`{'':^1}{getattr(self.ctx.guild.get_member(member.discord_user),'display_name','User Not Found')[:14]:<14}`" if member.discord_user else f"`{' Not Linked':<15}`")            
@@ -175,7 +192,7 @@ class ClanMembersMenu(MenuPaginator):
     async def _set_member_ranks_content(self):
         def get_embed_text(lst:list):
             text = "\n".join([
-                (f"{EmojisUI.LOGOUT}" if member.home_clan.tag == self.clan.tag and member.clan.tag != self.clan.tag else (f"{EmojisUI.YES}" if member.home_clan.tag == self.clan.tag else f"{EmojisUI.SPACER}"))
+                (f"{EmojisUI.LOGOUT}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) and getattr(member.clan,'tag',None) != getattr(self.clan,'tag',None) else (f"{EmojisUI.YES}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) else f"{EmojisUI.SPACER}"))
                 + f"{EmojisTownHall.get(member.town_hall.level)}"
                 + f"`{re.sub('[_*/]','',member.name)[:15]:<15}`\u3000" + f"`{'':>1}{str(member.role):<11}`\u3000"
                 + (f"`{'':>1}{member.alliance_rank + '(' + member.home_clan.abbreviation + ')':<14}`" if member.is_member else f"`{'':^15}`")
@@ -220,15 +237,15 @@ class ClanMembersMenu(MenuPaginator):
     async def _set_warstatus_content(self):
         def get_embed_text(lst:list):
             text = "\n".join([
-                (f"{EmojisUI.LOGOUT}" if member.home_clan.tag == self.clan.tag and member.clan.tag != self.clan.tag else (f"{EmojisUI.YES}" if member.home_clan.tag == self.clan.tag else f"{EmojisUI.SPACER}"))
+                (f"{EmojisUI.LOGOUT}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) and getattr(member.clan,'tag',None) != getattr(self.clan,'tag',None) else (f"{EmojisUI.YES}" if getattr(member.home_clan,'tag',None) == getattr(self.clan,'tag',None) else f"{EmojisUI.SPACER}"))
                 + f"{EmojisTownHall.get(member.town_hall.level)}"
                 + f"`{re.sub('[_*/]','',member.name)[:15]:<15}`\u3000"
                 + f"`{member.war_opt_status:^5}`\u3000"
                 + f"`{'':^1}"
-                + (f"{str(getattr(member.get_hero('Barbarian King'),'level','')):>2}" if member.get_hero('Barbarian King') else f"{'':<2}")
-                + (f"{'  ' + str(getattr(member.get_hero('Archer Queen'),'level','')):>4}" if member.get_hero('Archer Queen') else f"{'':<4}")
-                + (f"{'  ' + str(getattr(member.get_hero('Grand Warden'),'level','')):>4}" if member.get_hero('Grand Warden') else f"{'':<4}")
-                + (f"{'  ' + str(getattr(member.get_hero('Royal Champion'),'level','')):>4}" if member.get_hero('Royal Champion') else f"{'':<4}")
+                + f"{str(getattr(member.barbarian_king,'level','')):>2}"
+                + f"{'  ' + str(getattr(member.archer_queen,'level','')):>4}"
+                + f"{'  ' + str(getattr(member.grand_warden,'level','')):>4}"
+                + f"{'  ' + str(getattr(member.royal_champion,'level','')):>4}"
                 + f"{'':^1}`"
                 for member in lst])
             return text

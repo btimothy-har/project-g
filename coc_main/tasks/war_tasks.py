@@ -1,22 +1,117 @@
+import coc
 import asyncio
 import pendulum
+
+from typing import *
 
 from redbot.core.utils import AsyncIter
 
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
+from ..cog_coc_client import ClashOfClansClient
 from ..utils.constants.coc_constants import WarResult, ClanWarType
 
 from .default import TaskLoop
 
-from ..coc_objects.clans.clan import db_ClanEventReminder
+from ..coc_objects.clans.clan import aClan
 from ..coc_objects.events.clan_war import aClanWar
-from ..discord.feeds.reminders import EventReminders
+from ..discord.feeds.reminders import EventReminders, db_ClanEventReminder
 
 bot_client = client()
+default_sleep = 60
 
+############################################################
+############################################################
+#####
+##### DEFAULT WAR TASKS
+#####
+############################################################
+############################################################
+class DefaultWarTasks():        
+
+    @staticmethod
+    async def _war_found(clan:aClan,war:aClanWar):
+        try:
+            await bot_client.player_cache.add_many_to_queue([m.tag for m in war.members])
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error in New War task.")
+
+    @staticmethod
+    async def _war_start(clan:aClan,war:aClanWar):
+        try:
+            await bot_client.player_cache.add_many_to_queue([m.tag for m in war.members])
+            if clan.is_registered_clan and len(clan.abbreviation) > 0:
+                await bot_client.update_bot_status(
+                    cooldown=60,
+                    text=f"{clan.abbreviation} declare war!"
+                    )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error in War Start task.")
+    
+    @staticmethod
+    async def _war_ended(clan:aClan,war:aClanWar):
+        def _get_client() -> ClashOfClansClient:
+            return bot_client.bot.get_cog('ClashOfClansClient')
+        try:
+            await asyncio.sleep(120)
+            coc_client = _get_client()            
+            new_clan = await coc_client.fetch_clan(clan.tag)
+
+            if new_clan.is_registered_clan and len(new_clan.abbreviation) > 0:
+                if war.get_clan(new_clan.tag).result in ['winning','won']:                
+                    if war.type == ClanWarType.RANDOM:
+                        if new_clan.war_win_streak >= 3:
+                            await bot_client.update_bot_status(
+                                cooldown=60,
+                                text=f"{new_clan.abbreviation} on a {new_clan.war_win_streak} streak!"
+                                )
+                        else:
+                            await bot_client.update_bot_status(
+                                cooldown=60,
+                                text=f"{new_clan.abbreviation} with {new_clan.war_wins} War Wins."
+                                )
+                    elif war.type == ClanWarType.CWL:
+                        await bot_client.update_bot_status(
+                            cooldown=60,
+                            text=f"{new_clan.abbreviation} winning in CWL!"
+                            )
+                          
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error in War Ended task.")
+    
+    @staticmethod
+    async def _ongoing_war(clan:aClan,war:aClanWar):
+        try:
+            if war.state != 'inWar':
+                return
+            
+            time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
+            if clan.is_registered_clan and len(clan.abbreviation) > 0 and time_remaining > 3600:
+                await bot_client.update_bot_status(
+                    cooldown=360,
+                    text=f"{clan.abbreviation} {WarResult.ongoing(war.get_clan(clan.tag).result)} in war!"
+                    )
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error in Ongoing War task.")
+    
+    @staticmethod
+    async def _new_attack(war:aClanWar,attack_order:int):
+        return
+
+############################################################
+############################################################
+#####
+##### WAR TASK LOOP
+#####
+############################################################
+############################################################
 class ClanWarLoop(TaskLoop):
     _loops = {}
+    _new_war_events = [DefaultWarTasks._war_found]
+    _war_start_events = [DefaultWarTasks._war_start]
+    _war_ended_events = [DefaultWarTasks._war_ended]
+    _ongoing_war_events = [DefaultWarTasks._ongoing_war]
+    _new_attack_events = []
 
     def __new__(cls,clan_tag:str):
         if clan_tag not in cls._loops:
@@ -30,193 +125,184 @@ class ClanWarLoop(TaskLoop):
         
         if self._is_new:
             super().__init__()
-            self.clan = None
-            self.cached_war = None
-            self.cached_state = None
             self._is_new = False
+            self._lock = asyncio.Lock()
+            self.cached_war = None
+            self.cached_events = {}
     
     async def start(self):
-        await super().start()
-        self.main_log.debug(f"{self.tag}: War Loop started.")
+        i = await super().start()
+        if i:
+            bot_client.coc_main_log.debug(f"{self.tag}: War Loop started.")
     
     async def stop(self):
         await super().stop()
+        self.unlock(self._lock)
         try:
-            self.main_log.debug(f"{self.tag}: War Loop stopped.")
+            bot_client.coc_main_log.debug(f"{self.tag}: War Loop stopped.")
         except:
             pass
     
-    @property
-    def task_lock(self) -> asyncio.Lock:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog._master_task_lock
+    @classmethod
+    def add_war_end_event(cls,event):
+        if event.__name__ not in [e.__name__ for e in cls._war_ended_events]:
+            cls._war_ended_events.append(event)
+            bot_client.coc_main_log.info(f"Registered {event.__name__} {event} to War Ended Events.")
     
+    @classmethod
+    def remove_war_end_event(cls,event):        
+        if event.__name__ in [e.__name__ for e in cls._war_ended_events]:
+            event = [e for e in cls._war_ended_events if e.__name__ == event.__name__][0]
+            cls._war_ended_events.remove(event)
+            bot_client.coc_main_log.info(f"Removed {event.__name__} {event} from War Ended Events.")
+
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
     async def _loop_task(self):
         try:
             while self.loop_active:
-                st = None
-                et = None
-
-                try:
-                    if not self.loop_active:
-                        raise asyncio.CancelledError
-                    
-                    if self.task_lock.locked():
-                        async with self.task_lock:
-                            await asyncio.sleep(0)
-                    
-                    if not self.loop_active:
-                        raise asyncio.CancelledError
-                    
-                    async with self.task_semaphore:
-                        st = pendulum.now()
-                        try:
-                            self.clan = await self.coc_client.fetch_clan(tag=self.tag)
-                        except InvalidTag:
-                            raise asyncio.CancelledError                    
-                        
-                        if not self.clan.public_war_log:
-                            continue
-
-                        if self.clan.is_active_league_clan:
-                            if self.clan.league_clan_channel:
-                                war_league_reminder = [r for r in self.clan.clan_war_reminders if r.channel_id == self.clan.league_clan_channel.id]
-                                if len(war_league_reminder) == 0:
-                                    await self.clan.create_clan_war_reminder(
-                                        channel=self.clan.league_clan_channel,
-                                        war_types=['cwl'],
-                                        interval=[12,8,6,4,3,2,1],
-                                        )
-                        
-                        current_war = await self.coc_client.get_clan_war(clan=self.clan)
-                        if not current_war or current_war.state == 'notInWar':
-                            league_group = await self.coc_client.get_league_group(self.clan)
-
-                            if league_group:
-                                league_clan = league_group.get_clan(self.tag)
-                                current_war = league_clan.current_war
-                        
-                        if not current_war:
-                            continue
-                        
-                        if current_war.do_i_save:
-                            current_war.save_to_database()
-
-                        #Current War Management
-                        if current_war.state in ['inWar','warEnded']:
-                            #new attacks
-                            if self.cached_war:
-                                new_attacks = [a for a in current_war.attacks if a.order not in [ca.order for ca in self.cached_war.attacks]]
-                            await asyncio.gather(*(self._setup_war_reminder(current_war,r) for r in self.clan.clan_war_reminders))
-                        
-                        if current_war.state in ['inWar']:
-                            time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
-
-                            if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0 and time_remaining > 3600:
-                                await bot_client.update_bot_status(
-                                    cooldown=360,
-                                    text=f"{self.clan.abbreviation} {WarResult.ongoing(current_war.get_clan(self.clan.tag).result)} in war!"
-                                    )
-                            
-                        #War State Changes
-                        if self.cached_state and current_war.state != self.cached_state:
-
-                            #War State Changes - new war spin
-                            if current_war.state in ['preparation'] and current_war.preparation_start_time != self.cached_war.preparation_start_time:
-                                await bot_client.player_cache.add_many_to_queue([m.tag for m in current_war.members])
-                        
-                            #War State Changes - war started
-                            if current_war.state in ['inWar']:
-                                if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0:
-                                    await bot_client.update_bot_status(
-                                        cooldown=60,
-                                        text=f"{self.clan.abbreviation} declare war!"
-                                        )
-                            
-                            #War Ended
-                            if current_war.state in ['warEnded']:                            
-                                if self.clan.is_registered_clan and len(self.clan.abbreviation) > 0:
-                                    if current_war.get_clan(self.clan.tag).result in ['winning','won']:
-                                        if current_war.type == ClanWarType.RANDOM:
-                                            if self.clan.war_win_streak >= 3:
-                                                await bot_client.update_bot_status(
-                                                    cooldown=60,
-                                                    text=f"{self.clan.abbreviation} on a {self.clan.war_win_streak} streak!"
-                                                    )
-                                            else:
-                                                await bot_client.update_bot_status(
-                                                    cooldown=60,
-                                                    text=f"{self.clan.abbreviation} with {self.clan.war_wins} War Wins."
-                                                    )
-                                        elif current_war.type == ClanWarType.CWL:
-                                            await bot_client.update_bot_status(
-                                                cooldown=60,
-                                                text=f"{self.clan.abbreviation} with the CWL Win!"
-                                                )
-                                                
-                                if self.clan.is_alliance_clan and current_war.type == ClanWarType.RANDOM:
-                                    war_clan = current_war.get_clan(self.tag)
-                                    bank_cog = bot_client.bot.get_cog("Bank")
-                                    if bank_cog:
-                                        await asyncio.gather(*(bank_cog.war_bank_rewards(m) for m in war_clan.members))
-                        
-                        self.cached_state = current_war.state
-                        self.cached_war = current_war
-                
-                except ClashAPIError as exc:
-                    self.api_error = True
-
-                except asyncio.CancelledError:
-                    await self.stop()
-
-                finally:
-                    if not self.loop_active:
-                        raise asyncio.CancelledError
-                                    
-                    et = pendulum.now()
-                    try:
-                        run_time = et - st
-                        self.run_time.append(run_time.total_seconds())
-                    except:
-                        pass
-                    else:
-                        self.main_log.debug(
-                            f"{self.tag}: War State for {self.clan} updated. Runtime: {run_time.total_seconds()} seconds."
-                            )
-                    await asyncio.sleep(self.sleep_time)
-
+                await asyncio.sleep(10)
+                if self.api_maintenance:
+                    continue                
+                await self._run_single_loop()
+            
         except asyncio.CancelledError:
-            await self.stop()
+            return await self.stop()
 
         except Exception as exc:
-            self.main_log.exception(
-                f"{self.tag}: FATAL WAR LOOP ERROR. Attempting Restart after 300 seconds. {exc}"
+            if not self.loop_active:
+                return await self.stop()
+            
+            bot_client.coc_main_log.exception(
+                f"{self.tag}: FATAL WAR LOOP ERROR. Attempting restart. {exc}"
                 )
-            await self.report_fatal_error(
+            await TaskLoop.report_fatal_error(
                 message="FATAL WAR LOOP ERROR",
                 error=exc,
                 )
-            self.error_loops += 1
             await self.stop()
-            await asyncio.sleep(300)
-            await self.start()
+            return await self.start()
+    
+    async def _run_single_loop(self):
+        if self._lock.locked():
+            return
+        await self._lock.acquire()
+
+        async with self.task_semaphore:
+            st = pendulum.now()
+            try:
+                clan = await self.coc_client.fetch_clan(tag=self.tag)
+            except InvalidTag:
+                raise asyncio.CancelledError
+            except ClashAPIError:
+                return self.unlock(self._lock)
+
+            if not clan.public_war_log:
+                return self.unlock(self._lock)
+            
+            current_war = None
+            try:
+                current_war = await bot_client.coc.get_current_war(self.tag)
+            except (coc.NotFound,coc.Maintenance,coc.GatewayError):
+                return
+            finally:
+                self.loop.call_later(
+                    getattr(current_war,'_response_retry',default_sleep),
+                    self.unlock,
+                    self._lock
+                    )
+            
+            if getattr(current_war,'is_cwl',False):
+                await self._update_league_group(clan)
+                #update previous round
+                previous_round = await bot_client.coc.get_current_war(self.tag,cwl_round=coc.WarRound.previous_war)
+                if previous_round:
+                    cached_round = self.cached_events.get(previous_round.preparation_start_time.raw_time,None)
+                    if cached_round:
+                        await self._dispatch_events(clan,cached_round,previous_round,is_current=False)
+                    self.cached_events[previous_round.preparation_start_time.raw_time] = previous_round
+            
+            if self.cached_war and current_war:
+                old_war = self.cached_war
+                await self._dispatch_events(clan,old_war,current_war,is_current=True)
+            
+            self.cached_war = current_war
+
+            if current_war.state != 'notInWar':
+                self.cached_events[current_war.preparation_start_time.raw_time] = current_war
+
+            et = pendulum.now()
+            runtime = et - st
+            self.run_time.append(runtime.total_seconds())
+
+    async def _dispatch_events(self,clan:aClan,cached_war:coc.ClanWar,new_war:coc.ClanWar,is_current:bool=False):
+        if new_war.state == 'notInWar':
+            return
+        
+        current_war = await aClanWar.create_from_api(new_war)
+
+        if getattr(cached_war,'state',None) != 'preparation' and new_war.state == 'preparation':
+            for event in ClanWarLoop._new_war_events:
+                asyncio.create_task(event(clan,current_war))  
+            
+        #War Started
+        elif getattr(cached_war,'state',None) == 'preparation' and new_war.state == 'inWar':
+            for event in ClanWarLoop._war_start_events:
+                asyncio.create_task(event(clan,current_war))
+
+        #War Ended
+        elif getattr(cached_war,'state',None) == 'inWar' and new_war.state == 'warEnded':
+            for event in ClanWarLoop._war_ended_events:
+                asyncio.create_task(event(clan,current_war))
+               
+        else:
+            for event in ClanWarLoop._ongoing_war_events:
+                asyncio.create_task(event(clan,current_war))
+        
+            new_attacks = [a for a in new_war.attacks if a.order not in [ca.order for ca in getattr(cached_war,'attacks',[])]]
+            for event in ClanWarLoop._new_attack_events:
+                for a in new_attacks:
+                    asyncio.create_task(event(current_war,a.order))
+
+        if is_current:
+            war_reminders = await EventReminders.war_reminders_for_clan(clan)
+            for r in war_reminders:
+                asyncio.create_task(self._setup_war_reminder(clan,current_war, r))
+        
+    async def _update_league_group(self,clan:aClan):
+        war_reminders = await EventReminders.war_reminders_for_clan(clan)
+
+        await self.coc_client.get_league_group(clan)
+
+        if clan.is_active_league_clan and clan.league_clan_channel:
+            war_league_reminder = [r for r in war_reminders if r.channel_id == clan.league_clan_channel.id]
+            if len(war_league_reminder) == 0:
+                await EventReminders.create_war_reminder(
+                    clan=clan,
+                    channel=clan.league_clan_channel,
+                    war_types=['cwl'],
+                    interval=[12,8,6,4,3,2,1],
+                    )
     
     ##################################################
-    ### SUPPORTING FUNCTIONS
+    ### WAR EVENTS
     ##################################################
-    async def _setup_war_reminder(self,current_war:aClanWar,reminder:db_ClanEventReminder):
+    async def _setup_war_reminder(self,clan:aClan,current_war:aClanWar,reminder:db_ClanEventReminder):
+        def _update_reminder(new_tracking:List[int]=[]):
+            reminder.interval_tracker = new_tracking
+            reminder.save()
+
         try:
             time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
 
             if len(reminder.interval_tracker) > 0:
                 next_reminder = max(reminder.interval_tracker)
 
-                if time_remaining < (next_reminder * 3600):
+                #Reminder is overdue
+                if next_reminder > (time_remaining / 3600):
                     channel = bot_client.bot.get_channel(reminder.channel_id)
-                    reminder_clan = current_war.get_clan(self.clan.tag)
+                    reminder_clan = current_war.get_clan(clan.tag)
                     
                     if channel and reminder_clan:        
                         event_reminder = EventReminders(channel_id=reminder.channel_id)
@@ -224,36 +310,16 @@ class ClanWarLoop(TaskLoop):
                         remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
                         
                         await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))                        
-                        await event_reminder.send_war_reminders(self.clan,current_war)
+                        await event_reminder.send_war_reminders(clan,current_war)
 
-                        war_reminder_tracking = reminder.interval_tracker.copy()
-                        war_reminder_tracking.remove(next_reminder)
-                        reminder.interval_tracker = war_reminder_tracking
-                        reminder.save()
-                
             if len(reminder.reminder_interval) > 0:
                 if len(reminder.interval_tracker) != len(reminder.reminder_interval):
                     track = []
-                    for i in reminder.reminder_interval:
-                        if i < (time_remaining / 3600):
-                            track.append(i)
-                    if len(track) > 0:
-                        reminder.interval_tracker = track
-                        reminder.save()
+                    for remind in reminder.reminder_interval:
+                        if remind < (time_remaining / 3600):
+                            track.append(remind)
                         
-        except Exception as exc:
-            self.main_log.exception(f"{self.tag}: Clan War Reminder Error - {exc}")
-    
-    @property
-    def sleep_time(self):
-        if not self.clan:
-            return 30
-        
-        if not self.clan.public_war_log:
-            return 1800 #30mins
-        
-        if self.api_error:
-            self.api_error = False
-            return 900 #15mins
-        
-        return 600
+                    await bot_client.run_in_thread(_update_reminder,track)
+                        
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error in War Reminder task.")

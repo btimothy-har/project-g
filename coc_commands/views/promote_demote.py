@@ -43,8 +43,8 @@ class MemberRankMenu():
             self.guild = self.ctx.guild
         self.message = None
         
-        self.executor = aMember(self.user.id,self.guild.id)
-        self.member = aMember(member.id,self.guild.id)
+        self.executor = aMember(self.user.id)
+        self.member = aMember(member.id)
     
     @property
     def client(self) -> ClashOfClansClient:
@@ -127,7 +127,7 @@ class MemberRankMenu():
                 message=f"You don't seem to have permission to demote {self.member.mention} in any of their clans."
                     + f"\n\n> - Only Leaders can demote Co-Leaders."
                     + f"\n> - Members cannot be demoted."
-                    + f"\n> - Leaders cannot be demoted. To change a Clan Leader, please contact <@644530507505336330>.",
+                    + f"\n> - Only the current Leader of a Clan can assign a new Leader.",
                 success=False
                 )
             if isinstance(self.ctx,discord.Interaction):

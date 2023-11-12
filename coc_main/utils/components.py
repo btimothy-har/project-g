@@ -131,7 +131,7 @@ async def clash_embed(
 #####
 ####################################################################################################
 class DefaultView(discord.ui.View):
-    def __init__(self,context,timeout=120):
+    def __init__(self,context:Union[commands.Context,discord.Interaction],timeout:int=120):
 
         self.is_active = False
         self.waiting_for = False

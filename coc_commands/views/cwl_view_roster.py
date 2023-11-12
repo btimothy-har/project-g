@@ -82,7 +82,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
     async def start(self):
         self.clan = await self.client.fetch_clan(self.league_clan.tag)
 
-        if self.league_clan.status in ['CWL Started']:
+        if self.league_clan.status == 'CWL Started':
             roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
             self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
 
@@ -112,6 +112,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
 
         await self._set_roster_status_content()
         kwargs = self.get_content()
+        
         if isinstance(self.ctx,discord.Interaction):
             await self.ctx.edit_original_response(**kwargs)
             self.message = await self.ctx.original_response()
@@ -255,10 +256,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
             member_text = "\n".join([
                 f"{EmojisTownHall.get(player.town_hall)}"
                 + (f"{EmojisUI.YES}" if player in self.league_clan.participants else f"{EmojisUI.SPACER}")
-                + f"`{'':<1}{getattr(player.get_hero('Barbarian King'),'level',''):>2}"
-                + f"{'':<2}{getattr(player.get_hero('Archer Queen'),'level',''):>2}"
-                + f"{'':<2}{getattr(player.get_hero('Grand Warden'),'level',''):>2}"
-                + f"{'':<2}{getattr(player.get_hero('Royal Champion'),'level',''):>2}"
+                + f"`{'':<1}{getattr(player.barbarian_king,'level',''):>2}"
+                + f"{'':<2}{getattr(player.archer_queen,'level',''):>2}"
+                + f"{'':<2}{getattr(player.grand_warden,'level',''):>2}"
+                + f"{'':<2}{getattr(player.royal_champion,'level',''):>2}"
                 + f"{'':<2}{re.sub('[_*/]','',player.clean_name)[:15]:<15}`"
                 for player in members_chunk]
                 )                

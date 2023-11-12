@@ -49,102 +49,73 @@ class aGuild():
     ##################################################
     @property
     def guild(self) -> discord.Guild:
-        return bot_client.bot.get_guild(self.id)    
+        return bot_client.bot.get_guild(self.id)
+    
     @property
     def name(self) -> str:
         return self.guild.name
     
     ##################################################
-    ### CLAN LINKS
-    ##################################################
-    @property
-    def clan_links(self) -> List[ClanGuildLink]:
-        return [ClanGuildLink(db) for db in db_ClanGuildLink.objects(guild_id=self.id)]
-    
-    ##################################################
     ### CLAN PANELS
     ##################################################
-    @property
-    def clan_panels(self) -> List[GuildClanPanel]:
-        return [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=self.id)]
-
-    async def create_clan_panel(self,channel:discord.TextChannel):
-        await GuildClanPanel.create(self.id,channel.id)
-        #await aGuild.update_clan_panels(self.id)
-    
-    async def delete_clan_panel(self,channel:discord.TextChannel):
-        panel = GuildClanPanel.get_panel(self.id,channel.id)
-        if not panel:
-            return
-        await panel.delete()
-
     async def update_clan_panels(self):
-        while True:
-            if len(self.clan_panels) == 0 or len(self.clan_links) == 0:
-                return
-            linked_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in self.clan_links))
-            embeds = []
-            if self.id == 688449973553201335:
-                arix_rank = {
-                    '#20YLR2LUJ':1,
-                    '#28VUPJRPU':2,
-                    '#2YL99GC9L':3,
-                    '#92G9J8CG':4
-                    }
-                clans = sorted(linked_clans,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
-            else:
-                clans = sorted(linked_clans,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
-            
-            async for clan in AsyncIter(clans):
-                embed = await guild_clan_panel_embed(clan=clan)
-                embeds.append({
-                    'clan':clan,
-                    'embed':embed
-                    }
-                )
-            # Overwrite for Alliance Home Server
-            if self.id in [1132581106571550831,680798075685699691]:
-                family_clans = [c.tag for c in db_AllianceClan.objects()]
-                async for c in AsyncIter(family_clans):
-                    if c not in [c.tag for c in clans]:
-                        clan = await self.coc_client.fetch_clan(c)
-                        if len(clan.linked_servers) == 0:
-                            continue
-                        embed = await guild_clan_panel_embed(
-                            clan=clan,
-                            guild=clan.linked_servers[0]
-                            )
-                        embeds.append({
-                            'clan':clan,
-                            'embed':embed
-                            }
-                        )                
-            async for panel in AsyncIter(self.clan_panels):
-                await panel.send_to_discord(embeds)
-            break
+        guild_panels = await GuildClanPanel.get_for_guild(self.id)
+        linked_clans = await ClanGuildLink.get_for_guild(self.id)
+
+        if len(guild_panels) == 0 or len(linked_clans) == 0:
+            return
+        linked_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in linked_clans))
+        embeds = []
+        if self.id == 688449973553201335:
+            arix_rank = {
+                '#20YLR2LUJ':1,
+                '#28VUPJRPU':2,
+                '#2YL99GC9L':3,
+                '#92G9J8CG':4
+                }
+            clans = sorted(linked_clans,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+        else:
+            clans = sorted(linked_clans,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+        
+        async for clan in AsyncIter(clans):
+            embed = await guild_clan_panel_embed(clan=clan)
+            embeds.append({
+                'clan':clan,
+                'embed':embed
+                }
+            )
+        # Overwrite for Alliance Home Server
+        if self.id in [1132581106571550831,680798075685699691]:
+            family_clans = await self.coc_client.get_alliance_clans()
+            async for clan in AsyncIter(family_clans):
+                if clan.tag not in [c.tag for c in clans]:
+                    linked_servers = await ClanGuildLink.get_links_for_clan(clan.tag)
+                    if len(linked_servers) == 0:
+                        continue
+                    embed = await guild_clan_panel_embed(
+                        clan=clan,
+                        guild=linked_servers[0].guild
+                        )
+                    embeds.append({
+                        'clan':clan,
+                        'embed':embed
+                        }
+                    )                
+        async for panel in AsyncIter(guild_panels):
+            await panel.send_to_discord(embeds)
         
         bot_client.coc_main_log.info(f"Clan Panels for {self.guild.name} ({self.id}) updated.")
 
     ##################################################
     ### APPLICATION PANELS
-    ##################################################    
-    @property
-    def apply_panels(self) -> List[GuildApplicationPanel]:
-        return [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=self.id)]
-    
-    async def create_apply_panel(self,channel:discord.TextChannel):
-        return await GuildApplicationPanel.create(self.id,channel.id)
-    
-    async def delete_apply_panel(self,channel:discord.TextChannel):
-        panel = GuildApplicationPanel.get_panel(self.id,channel.id)
-        if not panel:
-            return
-        await panel.delete()
-
+    ##################################################
     async def update_apply_panels(self):
-        if len(self.apply_panels) == 0 or len(self.clan_links) == 0:
+        guild_panels = await GuildApplicationPanel.get_for_guild(self.id)
+        linked_clans = await ClanGuildLink.get_for_guild(self.id)
+
+        if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        all_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in self.clan_links))
+        all_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in linked_clans))
         if self.id == 688449973553201335:
             arix_rank = {
                 '#20YLR2LUJ':1,
@@ -158,7 +129,7 @@ class aGuild():
 
         embed = await guild_application_panel_embed(guild=self.guild,clans=clans)
 
-        async for panel in AsyncIter(self.apply_panels):
+        async for panel in AsyncIter(guild_panels):
             panel_view = ClanApplyMenu(
                 panel=panel,
                 list_of_clans=clans
@@ -171,22 +142,19 @@ class aGuild():
 
     ##################################################
     ### CLOCKS
-    ##################################################
-    @property
-    def clock_config(self) -> aGuildClocks:
-        return aGuildClocks(self.id)    
-    
+    ##################################################    
     async def update_clocks(self):
-        if self.clock_config.use_channels:
+        clock_config = await aGuildClocks.get_for_guild(self.id)
+        if getattr(clock_config,'use_channels',False):
             await asyncio.gather(
-                self.clock_config.update_season_channel(),
-                self.clock_config.update_raidweekend_channel(),
-                self.clock_config.update_clangames_channel(),
-                self.clock_config.update_warleagues_channel()
+                clock_config.update_season_channel(),
+                clock_config.update_raidweekend_channel(),
+                clock_config.update_clangames_channel(),
+                clock_config.update_warleagues_channel()
                 )        
-        if self.clock_config.use_events:
+        if getattr(clock_config,'use_events',False):
             await asyncio.gather(
-                self.clock_config.update_raidweekend_event(),
-                self.clock_config.update_clangames_event(),
-                self.clock_config.update_warleagues_event()
+                clock_config.update_raidweekend_event(),
+                clock_config.update_clangames_event(),
+                clock_config.update_warleagues_event()
                 )

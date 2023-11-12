@@ -37,9 +37,10 @@ class CWLPlayerMenu(DefaultView):
         self.accounts = []
 
         self._ph_save_button = None        
-        self.user_registration = {}
         self.show_account_stats = None
 
+        self.user_registration = {}
+        self.current_signups = []
         self.live_cwl_accounts = []
         
         super().__init__(context=context,timeout=300)
@@ -93,9 +94,14 @@ class CWLPlayerMenu(DefaultView):
 
         self.is_active = True
         
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-        self.signup_main_menu(remove_signups=len(existing_signups) > 0)
-        embeds = await self.signup_embed(existing_signups)
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
+        
+        self.signup_main_menu()
+        embeds = await self.signup_embed()
 
         if isinstance(self.ctx,discord.Interaction):
             await self.ctx.edit_original_response(embeds=embeds, view=self)
@@ -107,7 +113,8 @@ class CWLPlayerMenu(DefaultView):
                 self.message = await self.ctx.send(embeds=embeds, view=self)
     
     ##################################################
-    ### SIGNUP CALLBACKS
+    ### ADD SIGNUP
+    ### Opens the start signup menu
     ##################################################
     async def _add_signups(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
@@ -115,89 +122,67 @@ class CWLPlayerMenu(DefaultView):
         self.add_signup_menu()
         self._ph_save_button.reference = 'add'
 
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-        embeds = await self.signup_embed(existing_signups)        
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
+        embeds = await self.signup_embed()        
         signup_embed = await self.signup_instruction_embed()
         
         await interaction.edit_original_response(embeds=embeds,view=self)
         await interaction.followup.send(embed=signup_embed,ephemeral=True)
     
+    ##################################################
+    ### REMOVE SIGNUP
+    ### Opens the remove signup menu
+    ##################################################
     async def _remove_signups(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
 
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
         
-        self.remove_signup_menu(existing_signups)
+        self.remove_signup_menu()
         self._ph_save_button.reference = 'remove'
-        embeds = await self.signup_embed(existing_signups)
+        embeds = await self.signup_embed()
         remove_embed = await self.unregister_instruction_embed()
 
         await interaction.edit_original_response(embeds=embeds,view=self)
         await interaction.followup.send(embed=remove_embed,ephemeral=True)
     
-    async def _reset_signups(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.defer()
-
-        self.user_registration = {}
-
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-        
-        self.signup_main_menu(remove_signups=len(existing_signups) > 0)
-        embed = await self.signup_embed(existing_signups)
-        await interaction.edit_original_response(embeds=embed,view=self)
-    
-    async def _callback_group_signup(self,interaction:discord.Interaction,select:DiscordSelectMenu):
-        await interaction.response.defer()
-        
-        if len(select.values) > 0:
-            for player_tag in select.values:
-                player = await self.client.fetch_player(player_tag)
-                self.user_registration[player_tag] = NewRegistration(player.war_league_season(self.season),select.reference)
-
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-
-        self.add_signup_menu()
-        self._ph_save_button.reference = 'add'
-        embed = await self.signup_embed(existing_signups)
-        await interaction.edit_original_response(embeds=embed,view=self)
-    
-    async def _callback_group_unregister(self,interaction:discord.Interaction,select:DiscordSelectMenu):
-        await interaction.response.defer()
-        select.disabled = True
-
-        if len(select.values) > 0:
-            for player_tag in select.values:
-                player = await self.client.fetch_player(player_tag)
-                self.user_registration[player_tag] = NewRegistration(player.war_league_season(self.season),None)
-        
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
-        
-        if len(existing_signups) == 0:
-            self.signup_main_menu(remove_signups=False)
-            embeds = await self.signup_embed()
-            await interaction.edit_original_response(embeds=embeds,view=self)
-        else:
-            self.remove_signup_menu(existing_signups)
-            self._ph_save_button.reference = 'remove'
-            embeds = await self.signup_embed(existing_signups)
-            select.disabled = False
-            await interaction.edit_original_response(embeds=embeds,view=self)
-    
+    ##################################################
+    ### SAVE REGISTRATION
+    ### Saves all pending registrations during this session
+    ##################################################
     async def _save_signups(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
         for item in self.children:
             item.disabled = True
+        
+        await interaction.edit_original_response(view=self)
 
         iter_signups = AsyncIter(self.session_registrations)
         async for player in iter_signups:
             if player.league:
-                player.account.signup(self.member.user_id,player.league)
+                await player.account.register(
+                    self.member.user_id,
+                    player.league
+                    )
             else:
-                player.account.unregister()
-            player.account.save()
+                await player.account.unregister()
         
         self.user_registration = {}
+
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
         
         if button.reference == 'add':
             self.add_signup_menu()
@@ -206,16 +191,95 @@ class CWLPlayerMenu(DefaultView):
         
         for item in self.children:
             item.disabled = False
-        
-        existing_signups = await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True)
 
         self._ph_save_button.label = "Saved!"
         self._ph_save_button.disabled = True
-        embeds = await self.signup_embed(existing_signups)
+        embeds = await self.signup_embed()
         await interaction.edit_original_response(embeds=embeds,view=self)
     
     ##################################################
-    ### SIGNUP MENUS
+    ### RESET SIGNUP
+    ### Triggers a reset of the signup menu
+    ##################################################
+    async def _reset_signups(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+
+        self.user_registration = {}
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
+        
+        self.signup_main_menu()
+        embed = await self.signup_embed()
+        await interaction.edit_original_response(embeds=embed,view=self)
+    
+    ##################################################
+    ### ADD REGISTRATION
+    ### Facilitates the signups of accounts to a League Group
+    ##################################################
+    async def _callback_group_signup(self,interaction:discord.Interaction,select:DiscordSelectMenu):
+        await interaction.response.defer()
+        
+        if len(select.values) > 0:
+            for player_tag in select.values:
+                player = await self.client.fetch_player(player_tag)
+                self.user_registration[player_tag] = NewRegistration(
+                    player.war_league_season(self.season),
+                    select.reference
+                    )
+
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
+
+        self.add_signup_menu()
+        self._ph_save_button.reference = 'add'
+        embed = await self.signup_embed()
+        await interaction.edit_original_response(embeds=embed,view=self)
+
+    ##################################################
+    ### REMOVE REGISTRATION
+    ### Facilitates the removal of accounts from a League Group
+    ##################################################
+    async def _callback_group_unregister(self,interaction:discord.Interaction,select:DiscordSelectMenu):
+        await interaction.response.defer()
+        select.disabled = True
+
+        if len(select.values) > 0:
+            for player_tag in select.values:
+                player = await self.client.fetch_player(player_tag)
+                self.user_registration[player_tag] = NewRegistration(
+                    player.war_league_season(self.season),
+                    None
+                    )
+        
+        self.current_signups = await WarLeaguePlayer.get_by_user(
+            self.season,
+            self.member.user_id,
+            only_registered=True
+            )
+        
+        if len(self.current_signups) == 0:
+            self.signup_main_menu()
+            embeds = await self.signup_embed()
+            await interaction.edit_original_response(embeds=embeds,view=self)
+        else:
+            self.remove_signup_menu()
+            self._ph_save_button.reference = 'remove'
+            embeds = await self.signup_embed()
+            select.disabled = False
+            await interaction.edit_original_response(embeds=embeds,view=self)
+    
+    ####################################################################################################
+    ##### PRE-CWL MENUS
+    ####################################################################################################
+
+    ##################################################
+    ### BUTTONS
     ##################################################
     def _save_signup_button(self):
         return DiscordButton(
@@ -240,12 +304,17 @@ class CWLPlayerMenu(DefaultView):
             style=discord.ButtonStyle.red,
             row=0
             )
-    
-    def signup_main_menu(self,remove_signups:bool=True):
+
+    ##################################################
+    ### MAIN MENU
+    ##################################################
+    def signup_main_menu(self):
         self.clear_items()
         
         self.add_item(self._help_button())
         self.add_item(self._close_button())
+
+        remove_signups = len(self.current_signups) > 0
 
         _add_signups_button = DiscordButton(
             function=self._add_signups,
@@ -271,7 +340,10 @@ class CWLPlayerMenu(DefaultView):
             if not remove_signups:
                 _remove_signups_button.disabled = True
             self.add_item(_remove_signups_button)
-
+        
+    ##################################################
+    ### ADD REGISTRATION MENU
+    ##################################################
     def add_signup_menu(self):
         self.clear_items()
 
@@ -368,7 +440,10 @@ class CWLPlayerMenu(DefaultView):
                 )
             self.add_item(group_4_selector)
     
-    def remove_signup_menu(self,accounts:List[WarLeaguePlayer]=[]):
+    ##################################################
+    ### REMOVE REGISTRATION MENU
+    ##################################################
+    def remove_signup_menu(self):
         self.clear_items()
         back_button = DiscordButton(
             function=self._reset_signups,
@@ -388,7 +463,7 @@ class CWLPlayerMenu(DefaultView):
             emoji=EmojisTownHall.get(cwl_player.town_hall),
             description=CWLLeagueGroups.get_description_no_emoji(cwl_player.league_group),
             default=False)
-            for cwl_player in accounts
+            for cwl_player in self.current_signups
             if getattr(cwl_player.roster_clan,'roster_open',True)
             ]
         if len(registered_accounts) > 0:
@@ -403,10 +478,14 @@ class CWLPlayerMenu(DefaultView):
                 )
             self.add_item(unregister_selector)
     
+    ####################################################################################################
+    ##### PRE-CWL CONTENT 
+    ####################################################################################################
+    
     ##################################################
-    ### SIGNUP CONTENT HELPERS
+    ### PRIMARY EMBED
     ##################################################
-    async def signup_embed(self,existing_signups:List[WarLeaguePlayer]=[]):
+    async def signup_embed(self):
         embed_1_ct = 0
         embed_2_ct = 0
         embed = await clash_embed(
@@ -423,7 +502,7 @@ class CWLPlayerMenu(DefaultView):
             message=f"*Accounts 11-20 are shown below.\nIf you have more than 20 accounts, these may not be reflected.*",
             show_author=False
             )        
-        player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in existing_signups))
+        player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.current_signups))
         async for a in AsyncIter(player_accounts):
             cwl_player = a.war_league_season(self.season)
 
@@ -454,7 +533,7 @@ class CWLPlayerMenu(DefaultView):
                     break
 
         async for account in AsyncIter(self.accounts):
-            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in existing_signups] and account.town_hall_level >= 10:
+            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in self.current_signups] and account.town_hall_level >= 10:
 
                 if embed_1_ct < 10:
                     embed.add_field(
@@ -506,6 +585,9 @@ class CWLPlayerMenu(DefaultView):
             r_embed.append(change_embed)
         return r_embed
 
+    ##################################################
+    ### INSTRUCTION EMBEDS
+    ##################################################
     async def signup_instruction_embed(self):
         embed = await clash_embed(
             context=self.ctx,
@@ -530,6 +612,9 @@ class CWLPlayerMenu(DefaultView):
             )
         return embed
 
+    ##################################################
+    ### HELP EMBEDS
+    ##################################################
     async def _display_help(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
 
@@ -584,10 +669,14 @@ class CWLPlayerMenu(DefaultView):
     ### START LIVE CWL
     ##################################################
     async def show_live_cwl(self):
-        active_league_accounts = [a for a in await WarLeaguePlayer.get_by_user(self.season,self.member.user_id,only_registered=True) if a.league_or_roster_clan]
+        active_league_accounts = [a for a in await WarLeaguePlayer.get_by_user(self.season,self.member.user_id) if a.league_or_roster_clan]
         
         #sort cwl accounts by clan league, then clan name
-        self.live_cwl_accounts = sorted(active_league_accounts,key=lambda x:(MultiplayerLeagues.get_index(x.league),getattr(x.league_or_roster_clan,'name','')),reverse=True)
+        self.live_cwl_accounts = sorted(
+            active_league_accounts,
+            key=lambda x:(MultiplayerLeagues.get_index(x.league),getattr(x.league_or_roster_clan,'name','')),
+            reverse=True
+            )
         
         if len(self.live_cwl_accounts) == 0:
             embed = await clash_embed(
@@ -600,9 +689,9 @@ class CWLPlayerMenu(DefaultView):
                 self.message = await self.ctx.original_response()
             else:
                 try:
-                    self.message = await self.ctx.reply(embed=embed, view=None)
+                    self.message = await self.ctx.reply(embed=embed,view=None)
                 except discord.HTTPException:
-                    self.message = await self.ctx.send(embed=embed, view=None)
+                    self.message = await self.ctx.send(embed=embed,view=None)
             return self.stop_menu()
 
         self.is_active = True
@@ -733,7 +822,10 @@ class CWLPlayerMenu(DefaultView):
             if cwl_player.league_clan:
                 current_war = cwl_player.league_clan.current_war
                 war_player = current_war.get_member(cwl_player.tag) if current_war else None
-                war_stats = aClanWarSummary.for_player(cwl_player.tag,cwl_player.league_clan.league_wars)
+                war_stats = aClanWarSummary.for_player(
+                    cwl_player.tag,
+                    cwl_player.league_clan.league_wars
+                    )
                 e.add_field(
                     name=f"**Current War (Round: {cwl_player.league_clan.current_round})**",
                     value=(f"**War Ends In**: <t:{current_war.end_time.int_timestamp}:R>" if current_war and current_war.state == 'inWar' else f"**War Starts In**: <t:{current_war.start_time.int_timestamp}:R>" if current_war and current_war.state == 'preparation' else "War Ended" if current_war and current_war.state == 'warEnded' else "")
@@ -758,9 +850,11 @@ class CWLPlayerMenu(DefaultView):
         return [embed]
     
     async def player_cwl_stats_overall(self):
-        overall_stats = []
-        async for a in AsyncIter(self.live_cwl_accounts):
-            overall_stats.append(aClanWarSummary.for_player(a.tag,a.league_clan.league_wars))
+        def _get_overall_stats():
+            overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts]
+            return overall_stats
+
+        overall_stats = await bot_client.run_in_thread(_get_overall_stats)
 
         total_wars = sum([x.wars_participated for x in overall_stats])
         total_attacks = sum([x.attack_count for x in overall_stats])
@@ -817,7 +911,6 @@ class CWLPlayerMenu(DefaultView):
         return [embed]
 
     async def player_cwl_stats_warlog(self):
-
         war_stats = aClanWarSummary.for_player(self.show_account_stats.tag,self.show_account_stats.league_clan.league_wars)
 
         embed = await clash_embed(
@@ -833,25 +926,26 @@ class CWLPlayerMenu(DefaultView):
                 + "\u200b",
                 )
         if war_stats.wars_participated > 0:
-            async for war in AsyncIter(war_stats.wars_participated):
+            async for war in AsyncIter(war_stats.war_log):
                 war_member = war.get_member(self.show_account_stats.tag)
-                war_attacks = sorted(war_member.attacks,key=lambda x:(x.order))
-                war_defenses = sorted(war_member.defenses,key=lambda x:(x.order))
-                attack_str = "\n".join(
-                    [f"{EmojisClash.ATTACK}\u3000{EmojisTownHall.get(att.attacker.town_hall)} vs {EmojisTownHall.get(att.defender.town_hall)}\u3000{EmojisClash.STAR} `{att.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{att.destruction:>3}%`"
-                    for att in war_attacks]
-                    )
-                defense_str = "\n".join(
-                    [f"{EmojisClash.DEFENSE}\u3000{EmojisTownHall.get(defe.attacker.town_hall)} vs {EmojisTownHall.get(defe.defender.town_hall)}\u3000{EmojisClash.STAR} `{defe.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{defe.destruction:>3}%`"
-                    for defe in war_defenses]
-                    )
-                embed.add_field(
-                    name=f"R{self.show_account_stats.league_clan.league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
-                    value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
-                        + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
-                        + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
-                        + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
-                        + "\u200b",
-                    inline=False
-                    )
+                if war_member:
+                    war_attacks = sorted(war_member.attacks,key=lambda x:(x.order))
+                    war_defenses = sorted(war_member.defenses,key=lambda x:(x.order))
+                    attack_str = "\n".join(
+                        [f"{EmojisClash.ATTACK}\u3000{EmojisTownHall.get(att.attacker.town_hall)} vs {EmojisTownHall.get(att.defender.town_hall)}\u3000{EmojisClash.STAR} `{att.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{att.destruction:>3}%`"
+                        for att in war_attacks]
+                        )
+                    defense_str = "\n".join(
+                        [f"{EmojisClash.DEFENSE}\u3000{EmojisTownHall.get(defe.attacker.town_hall)} vs {EmojisTownHall.get(defe.defender.town_hall)}\u3000{EmojisClash.STAR} `{defe.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{defe.destruction:>3}%`"
+                        for defe in war_defenses]
+                        )
+                    embed.add_field(
+                        name=f"R{self.show_account_stats.league_clan.league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
+                        value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
+                            + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
+                            + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
+                            + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
+                            + "\u200b",
+                        inline=False
+                        )
         return [embed]

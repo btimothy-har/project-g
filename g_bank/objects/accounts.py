@@ -2,17 +2,18 @@ import asyncio
 import pendulum
 import xlsxwriter
 
+from functools import cached_property
 from redbot.core.utils import AsyncIter
 from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_client import ClashOfClansClient, aClan
 
 from .transaction import db_BankTransaction
 from mongoengine import *
 
 bot_client = BotClashClient()
 
-class BankAccount():
-    def __init__(self,account_id):
+class BankAccount():    
+    def __init__(self,account_id:str):
         self.id = account_id
     
     @property
@@ -23,14 +24,18 @@ class BankAccount():
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
     
-    @property
-    def balance(self):
-        if self._balance == 0:
-            self._balance = db_BankTransaction.objects(account=self.id).sum('amount')
-        return self._balance
+    @cached_property
+    def balance(self) -> int:
+        return 0
+    
+    async def get_balance(self):
+        def _query_balance():
+            transactions = db_BankTransaction.objects(account=self.id)
+            return transactions.sum('amount')
+        self.balance = await bot_client.run_in_thread(_query_balance)
     
     async def deposit(self,amount:int,user_id:int=None,comment:str=None):
-        async with self.lock:
+        def _save_to_db():
             transaction = db_BankTransaction(
                 account=self.id,
                 amount=amount,
@@ -39,10 +44,17 @@ class BankAccount():
                 comment=comment
                 )
             transaction.save()
-            self._balance = 0
+        
+        if self._master_lock.locked():
+            async with self._master_lock:
+                await asyncio.sleep(0.1)
+        
+        async with self._lock:
+            await bot_client.run_in_thread(_save_to_db)            
+            self.balance += amount
 
     async def withdraw(self,amount:int,user_id:int=None,comment:str=None):
-        async with self.lock:
+        def _save_to_db():
             transaction = db_BankTransaction(
                 account=self.id,
                 amount=amount * -1,
@@ -51,25 +63,40 @@ class BankAccount():
                 comment=comment
                 )
             transaction.save()
-            self._balance = 0
+        
+        if self._master_lock.locked():
+            async with self._master_lock:
+                await asyncio.sleep(0.1)
+
+        async with self._lock:
+            await bot_client.run_in_thread(_save_to_db)
+            self.balance -= amount
     
     async def admin_adjust(self,amount:int,user_id:int=None,comment:str=None):
-        transaction = db_BankTransaction(
-            account=self.id,
-            amount=amount,
-            timestamp=pendulum.now().int_timestamp,
-            user=user_id if user_id else 99,
-            comment=comment
-            )
-        transaction.save()
-        self._balance = 0
+        def _save_to_db():
+            transaction = db_BankTransaction(
+                account=self.id,
+                amount=amount,
+                timestamp=pendulum.now().int_timestamp,
+                user=user_id if user_id else 99,
+                comment=comment
+                )
+            transaction.save()
+        
+        async with self._lock:
+            await bot_client.run_in_thread(_save_to_db)
+            self.balance += amount
     
     async def export(self):
-        cut_off = pendulum.now().subtract(months=3).int_timestamp
-        transactions = db_BankTransaction.objects(
-            (Q(account=self.id) & Q(timestamp__gte=cut_off))
-            )
+        def _query_transactions():
+            transactions = db_BankTransaction.objects(
+                (Q(account=self.id) & Q(timestamp__gte=cut_off))
+                )
+            return transactions
         
+        cut_off = pendulum.now().subtract(months=3).int_timestamp
+        transactions = await bot_client.run_in_thread(_query_transactions)
+
         if len(transactions) == 0:
             return None
         
@@ -128,24 +155,42 @@ class ClanAccount(BankAccount):
     def __init__(self,clan_tag):
         super().__init__(clan_tag)
         if self._is_new:
-            self.lock = asyncio.Lock()
-            self._balance = 0
-            self._is_new = False
+            self._master_lock = asyncio.Lock()
+            self._lock = asyncio.Lock()
     
+    @classmethod
+    async def get(cls,clan:aClan):
+        if not clan.is_alliance_clan:
+            raise ValueError("Invalid Clan. Clan must be an Alliance clan.")
+        
+        c = cls(clan.tag)
+        if c._is_new:
+            await c.get_balance()
+        c._is_new = False
+        return c
+   
 class MasterAccount(BankAccount):
     _cache = {}
-    def __new__(cls,id):
+    def __new__(cls,id:str):
         if id not in cls._cache:
             instance = super().__new__(cls)
             instance._is_new = True
             cls._cache[id] = instance
         return cls._cache[id]
     
-    def __init__(self,id):
-        if id not in ['current','sweep','reserve','arix']:
+    def __init__(self,id:str):
+        if id not in ['current','sweep','reserve']:
             raise ValueError("Invalid Master Account ID.")
         super().__init__(id)
+
         if self._is_new:
-            self.lock = asyncio.Lock()
-            self._balance = 0
-            self._is_new = False
+            self._master_lock = asyncio.Lock()
+            self._lock = asyncio.Lock()
+    
+    @classmethod
+    async def get(cls,id:str):
+        c = cls(id)
+        if c._is_new:
+            await c.get_balance()
+        c._is_new = False
+        return c

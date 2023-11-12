@@ -27,43 +27,54 @@ class aClanWar():
 
     @classmethod
     async def load_all(cls) -> List['aClanWar']:
-        query = db_ClanWar.objects()
+        def _db_query():
+            return db_ClanWar.objects()
+        
         ret = []
+        query = await bot_client.run_in_thread(_db_query)
         async for war in AsyncIter(query):
             ret.append(cls(war_id=war.war_id))
         return sorted(ret, key=lambda w:(w.preparation_start_time),reverse=True)
 
     @classmethod
-    def for_player(cls,player_tag:str,season:aClashSeason):
-        if season:
-            query = db_ClanWar.objects(
-                Q(members__tag=player_tag) &
-                Q(type=ClanWarType.RANDOM) &
-                Q(preparation_start_time__gte=season.season_start.int_timestamp) &
-                Q(preparation_start_time__lte=season.season_end.int_timestamp)
-                ).only('war_id')
-        else:
-            query = db_ClanWar.objects(
-                Q(members__tag=player_tag) & Q(type=ClanWarType.RANDOM)
-                ).only('war_id')        
-        ret_wars = [cls(war_id=war.war_id) for war in query]
+    async def for_player(cls,player_tag:str,season:aClashSeason):
+        def _db_query():
+            if season:
+                query = db_ClanWar.objects(
+                    Q(members__tag=player_tag) &
+                    Q(type=ClanWarType.RANDOM) &
+                    Q(preparation_start_time__gte=season.season_start.int_timestamp) &
+                    Q(preparation_start_time__lte=season.season_end.int_timestamp)
+                    ).only('war_id')
+            else:
+                query = db_ClanWar.objects(
+                    Q(members__tag=player_tag) & Q(type=ClanWarType.RANDOM)
+                    ).only('war_id')
+            return [war.war_id for war in query]
+        
+        q = await bot_client.run_in_thread(_db_query)
+        ret_wars = [cls(war_id=wid) for wid in q]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
     @classmethod
-    def for_clan(cls,clan_tag:str,season:aClashSeason):
-        if season:
-            query = db_ClanWar.objects(
-                Q(clans__tag=clan_tag) &
-                Q(type=ClanWarType.RANDOM) &
-                Q(preparation_start_time__gte=season.season_start.int_timestamp) &
-                Q(preparation_start_time__lte=season.season_end.int_timestamp)
-                ).only('war_id')
-        else:
-            query = db_ClanWar.objects(
-                Q(clans__tag=clan_tag) & Q(type=ClanWarType.RANDOM)
-                ).only('raid_id')        
-        ret_war = [cls(war_id=war.war_id) for war in query]
-        return sorted(ret_war, key=lambda w:(w.preparation_start_time),reverse=True)
+    async def for_clan(cls,clan_tag:str,season:aClashSeason):
+        def _db_query():
+            if season:
+                query = db_ClanWar.objects(
+                    Q(clans__tag=clan_tag) &
+                    Q(type=ClanWarType.RANDOM) &
+                    Q(preparation_start_time__gte=season.season_start.int_timestamp) &
+                    Q(preparation_start_time__lte=season.season_end.int_timestamp)
+                    ).only('war_id')
+            else:
+                query = db_ClanWar.objects(
+                    Q(clans__tag=clan_tag) & Q(type=ClanWarType.RANDOM)
+                    ).only('war_id')
+            return [war.war_id for war in query]
+        
+        q = await bot_client.run_in_thread(_db_query)
+        ret_wars = [cls(war_id=wid) for wid in q]
+        return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
     def __new__(cls,war_id:str):
         if war_id not in cls._cache:
@@ -159,31 +170,37 @@ class aClanWar():
             clan_war.is_alliance_war = False
         
         if clan_war.do_i_save:
-            clan_war.save_to_database()
+            await clan_war.save_to_database()
         return clan_war
 
-    def save_to_database(self):
-        self._last_save = pendulum.now()
-        db_war = db_ClanWar(
-            war_id=self.war_id,
-            type=self.type,
-            state=self.state,
-            war_tag=self.war_tag,
-            league_group=self._league_group,
-            preparation_start_time=self.preparation_start_time.int_timestamp,
-            start_time=self.start_time.int_timestamp,
-            end_time=self.end_time.int_timestamp,
-            team_size=self.team_size,
-            attacks_per_member=self.attacks_per_member,
-            clans=[self.clan_1.to_json(),self.clan_2.to_json()],
-            members=[m.to_json() for m in self._members],
-            attacks=[a.to_json() for a in self._attacks],
-            is_alliance_war=self.is_alliance_war,
-            last_save=self._last_save.int_timestamp
-            )
-        db_war.save()
+    async def save_to_database(self):
+        def _db_save():
+            db_war = db_ClanWar(
+                war_id=self.war_id,
+                type=self.type,
+                state=self.state,
+                war_tag=self.war_tag,
+                league_group=self._league_group,
+                preparation_start_time=self.preparation_start_time.int_timestamp,
+                start_time=self.start_time.int_timestamp,
+                end_time=self.end_time.int_timestamp,
+                team_size=self.team_size,
+                attacks_per_member=self.attacks_per_member,
+                clans=[self.clan_1.to_json(),self.clan_2.to_json()],
+                members=[m.to_json() for m in self._members],
+                attacks=[a.to_json() for a in self._attacks],
+                is_alliance_war=self.is_alliance_war,
+                last_save=timestamp.int_timestamp
+                )
+            db_war.save()
+            return db_war
+        
+        timestamp = pendulum.now()
+        db_war = await bot_client.run_in_thread(_db_save)
+        self._last_save = timestamp
+        self._found_in_db = True
         return db_war
-    
+
     @property
     def do_i_save(self) -> bool:
         now = pendulum.now()
@@ -282,15 +299,13 @@ class aWarClan(BasicClan):
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
 
-        BasicClan.__init__(self)
-
         self.exp_earned = 0
 
         if json_data:
             self.tag = json_data['tag']
-            self.name = json_data['name']
-            self.badge = json_data.get('badge',None)
-            self.level = json_data.get('level',None)
+            self._name = json_data['name']
+            self._badge = json_data.get('badge',None)
+            self._level = json_data.get('level',None)
             self.stars = json_data['stars']
             self.destruction = json_data['destruction']
             self.average_attack_duration = json_data['average_attack_duration']
@@ -303,16 +318,30 @@ class aWarClan(BasicClan):
 
         if game_data:
             self.tag = game_data.tag
-            self.name = game_data.name
-            self.badge = game_data.badge.url
-            self.level = game_data.level
+            self._name = game_data.name
+            self._badge = game_data.badge.url
+            self._level = game_data.level
             self.stars = game_data.stars
             self.destruction = game_data.destruction
             self.average_attack_duration = game_data.average_attack_duration
             self.attacks_used = game_data.attacks_used
+        
+        BasicClan.__init__(self,self.tag)
 
         self.max_stars = self.war.team_size * self.war.attacks_per_member
         self._result = None
+    
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def badge(self) -> int:
+        return self._badge
+    
+    @property
+    def level(self) -> int:
+        return self._level
 
     def to_json(self) -> dict:
         return {
@@ -354,7 +383,7 @@ class aWarClan(BasicClan):
             return EmojisUI.HANDSHAKE
         elif self.war.type == ClanWarType.RANDOM:
             if self.is_alliance_clan:
-                return self._emoji
+                return BasicClan(self.tag).emoji
             else:
                 return EmojisClash.CLANWAR    
     @property
@@ -414,26 +443,38 @@ class aWarPlayer(BasicPlayer):
     def __init__(self,war,**kwargs):
         self.war = war
 
-        BasicPlayer.__init__(self)
-
         json_data = kwargs.get('json',None)
         game_data = kwargs.get('data',None)
         clan_tag = kwargs.get('clan_tag',None)
 
         if json_data:
             self.tag = json_data['tag']
-            self.name = json_data['name']
-            self.town_hall = json_data['town_hall']
+            self._name = json_data['name']
+            self._town_hall = json_data['town_hall']
             self.map_position = json_data['map_position']
 
             self.clan_tag = json_data.get('clan_tag',clan_tag)
 
         if game_data:
             self.tag = game_data.tag
-            self.name = game_data.name
-            self.town_hall = game_data.town_hall
+            self._name = game_data.name
+            self._town_hall = game_data.town_hall
             self.map_position = game_data.map_position
             self.clan_tag = game_data.clan.tag
+        
+        BasicPlayer.__init__(self,self.tag)
+    
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def town_hall(self) -> int:
+        return self._town_hall
+    
+    @property
+    def town_hall_level(self) -> int:
+        return self._town_hall
     
     def to_json(self):
         return {

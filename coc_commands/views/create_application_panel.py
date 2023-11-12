@@ -7,6 +7,7 @@ from redbot.core import commands
 
 from coc_main.api_client import CacheNotReady
 from coc_main.discord.guild import aGuild
+from coc_main.discord.application_panel import GuildApplicationPanel
 from coc_main.utils.components import DiscordButton, DiscordModal, DefaultView
 
 class CreateApplicationMenu(DefaultView):
@@ -101,30 +102,33 @@ class CreateApplicationMenu(DefaultView):
         q3 = modal.children[3].value.split('\n')
         q4 = modal.children[4].value.split('\n')
 
+        text_q1 = q1[0][:45]
+        placeholder_q1 = q1[1] if len(q1) > 1 else None
+        text_q2 = q2[0][:45]
+        placeholder_q2 = q2[1] if len(q2) > 1 else None
+        text_q3 = q3[0][:45]
+        placeholder_q3 = q3[1] if len(q3) > 1 else None
+        text_q4 = q4[0][:45]
+        placeholder_q4 = q4[1] if len(q4) > 1 else None
+
+
         guild = aGuild(interaction.guild.id)
-        new_panel = await guild.create_apply_panel(self.target_channel)
-
-        new_panel.tickettool_prefix = prefix
-        new_panel._tickettool_channel = self.listener_channel.id
-        new_panel.can_user_select_clans = self.choose_clans
-
-        new_panel.text_q1 = q1[0][:45]
-        if len(q1) > 1:
-            new_panel.placeholder_q1 = q1[1]
-
-        new_panel.text_q2 = q2[0][:45]
-        if len(q2) > 1:
-            new_panel.placeholder_q2 = q2[1]
-
-        new_panel.text_q3 = q3[0][:45]
-        if len(q3) > 1:
-            new_panel.placeholder_q3 = q3[1]
-
-        new_panel.text_q4 = q4[0][:45]
-        if len(q4) > 1:
-            new_panel.placeholder_q4 = q4[1]
-
-        new_panel.save()
+        await GuildApplicationPanel.create(
+            guild_id=interaction.guild.id,
+            channel_id=self.target_channel.id,
+            select_clans=self.choose_clans,
+            ticket_prefix=prefix,
+            listener_channel=self.listener_channel.id,
+            text_q1=text_q1,
+            placeholder_q1=placeholder_q1,
+            text_q2=text_q2,
+            placeholder_q2=placeholder_q2,
+            text_q3=text_q3,
+            placeholder_q3=placeholder_q3,
+            text_q4=text_q4,
+            placeholder_q4=placeholder_q4
+            )
+        
         while True:
             try:
                 await guild.update_apply_panels()

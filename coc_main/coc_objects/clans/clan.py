@@ -20,16 +20,30 @@ bot_client = client()
 
 class aClan(coc.Clan,BasicClan):
     def __init__(self,**kwargs):
-        
-        BasicClan.__init__(self)
-        coc.Clan.__init__(self,**kwargs)
 
+        self._name = None
+        self._description = None
+        self._badge = None
+        self._level = None
+        self._capital_hall = None
+        self._war_league_name = None
+        
+        coc.Clan.__init__(self,**kwargs)
+        BasicClan.__init__(self,tag=self.tag)
+
+        self.timestamp = pendulum.now()
+    
         try:
-            self.capital_hall = [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
+            self._capital_hall = [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
         except IndexError:
-            self.capital_hall = 0            
-        self.badge = getattr(self.badge,'url',"")
-        self.war_league_name = getattr(self.war_league,'name',"")
+            self._capital_hall = 0            
+        self._badge = getattr(self.badge,'url',"")
+        self._war_league_name = getattr(self.war_league,'name',"")
+
+        self._total_donations = sum([m.donations for m in self.members])
+        self._total_received = sum([m.received for m in self.members])
+
+        bot_client.clan_cache.set(self.tag,self)
 
     ##################################################
     ### DATA FORMATTERS
@@ -44,17 +58,48 @@ class aClan(coc.Clan,BasicClan):
         return hash(self.tag)
     
     @property
+    def name(self) -> str:
+        return self._name
+    @name.setter
+    def name(self,value:str):
+        self._name = value
+    
+    @property
     def description(self) -> str:
-        if self.custom_description:
-            return self.custom_description
+        if len(BasicClan(self.tag).description) > 0:
+            return BasicClan(self.tag).description
         return self._description
     @description.setter
-    def description(self,value):
+    def description(self,value:str):
         self._description = value
 
     @property
-    def c_description(self) -> str:
-        return self.description
+    def badge(self) -> str:
+        return self._badge
+    @badge.setter
+    def badge(self,value:str):
+        self._badge = value
+    
+    @property
+    def level(self) -> int:
+        return self._level
+    @level.setter
+    def level(self,value:int):
+        self._level = value
+    
+    @property
+    def capital_hall(self) -> int:
+        return self._capital_hall
+    @capital_hall.setter
+    def capital_hall(self,value:int):
+        self._capital_hall = value
+    
+    @property
+    def war_league_name(self) -> str:
+        return self._war_league_name
+    @war_league_name.setter
+    def war_league_name(self,value:str):
+        self._war_league_name = value
     
     @property
     def long_description(self) -> str:
@@ -74,6 +119,18 @@ class aClan(coc.Clan,BasicClan):
         war_league_str = f"{EmojisLeagues.get(self.war_league.name)} {self.war_league.name}" if self.war_league else ""
         description = f"{EmojisClash.CLAN} Level {self.level}\u3000{EmojisCapitalHall.get(self.capital_hall)} CH {self.capital_hall}\u3000{war_league_str}"
         return description
+    
+    async def _sync_cache(self):
+        if BasicClan(self.tag).name != self.name:
+            await self.set_name(self.name)
+        if BasicClan(self.tag).badge != self.badge:
+            await self.set_badge(self.badge)
+        if BasicClan(self.tag).level != self.level:
+            await self.set_level(self.level)
+        if BasicClan(self.tag).capital_hall != self.capital_hall:
+            await self.set_capital_hall(self.capital_hall)
+        if BasicClan(self.tag).war_league_name != self.war_league_name:
+            await self.set_war_league(self.war_league_name)
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
         return WarLeagueClan(self.tag,season)
@@ -97,8 +154,3 @@ class aClan(coc.Clan,BasicClan):
     #         mem = aMember(m)
     #         if self.tag not in [c.tag for c in mem.home_clans]:
     #             self.elders.remove(m)
-
-    async def change_description(self,new_desc:str):
-        if not self.is_alliance_clan:
-            return
-        self.custom_description = new_desc

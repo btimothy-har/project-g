@@ -3,6 +3,7 @@ from typing import *
 from redbot.core.utils import AsyncIter
 
 from coc_main.coc_objects.players.player import aPlayerSeason
+from coc_main.coc_objects.clans.clan import aClan
 from coc_main.coc_objects.events.clan_war import aClanWar, aWarAttack
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
@@ -35,11 +36,11 @@ class ClanWarLeaderboardPlayer():
     async def calculate(cls,
         player_season:aPlayerSeason,
         leaderboard_th:int,
-        eligible_clans:Optional[List[str]]=None):
+        eligible_clans:Optional[List[aClan]]=None):
 
         def predicate_war(clan_war:aClanWar):
             if eligible_clans:
-                return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan_1.tag in eligible_clans or clan_war.clan_2.tag in eligible_clans)
+                return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan_1.tag in e_clans or clan_war.clan_2.tag in e_clans)
             else:
                 return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False)
         
@@ -47,10 +48,14 @@ class ClanWarLeaderboardPlayer():
             return attack.attacker.town_hall <= attack.defender.town_hall
             
         lb_player = cls(player_season,leaderboard_th)
+        if eligible_clans:
+            e_clans = [c.tag for c in eligible_clans]
+        else:
+            e_clans = []
 
         war_stats = aClanWarSummary.for_player(
             player_tag=player_season.tag,
-            war_log=aClanWar.for_player(player_season.tag,player_season.season))
+            war_log=await aClanWar.for_player(player_season.tag,player_season.season))
 
         participated_wars = AsyncIter(war_stats.war_log)
         async for war in participated_wars.filter(predicate_war):

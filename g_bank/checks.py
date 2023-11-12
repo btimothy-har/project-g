@@ -14,15 +14,16 @@ def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
         bot = ctx.client
         guild = bot.get_guild(1132581106571550831) #assassins guild server
         user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
+
+    bank_admins = bot.get_cog("Bank").bank_admins
     
-    if user.id in bot.owner_ids:
-        return True    
-    if user.id in [664425813608759302,721330428111486996,632934232800362506]:
+    if user.id in bot.owner_ids or user.id in bank_admins:
         return True
-    if guild:    
-        fin_role = guild.get_role(1136578130312695889) #fin ministry
-        if fin_role in user.roles:
-            return True    
+    return False
+
+def is_payday_server(ctx:Union[discord.Interaction,commands.Context]):
+    if ctx.guild.id in [1132581106571550831,680798075685699691]:
+        return True
     return False
 
 def is_bank_server(ctx:Union[discord.Interaction,commands.Context]):

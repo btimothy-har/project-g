@@ -9,9 +9,15 @@ from redbot.core.utils import chat_formatting as chat
 
 from coc_main.api_client import CommandUnauthorized
 
-from coc_main.coc_objects.clans.clan import aClan, feed_description
+from coc_main.coc_objects.clans.clan import aClan
+from coc_main.discord.feeds.clan_feed import ClanDataFeed, feed_description
+from coc_main.discord.feeds.member_movement import ClanMemberFeed
+from coc_main.discord.feeds.donations import ClanDonationFeed
+from coc_main.discord.feeds.raid_results import RaidResultsFeed
+from coc_main.discord.feeds.capital_contribution import CapitalContributionFeed
+from coc_main.discord.feeds.reminders import EventReminders
 
-from coc_main.utils.components import clash_embed, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView
+from coc_main.utils.components import clash_embed, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView, DiscordModal
 
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
@@ -25,6 +31,10 @@ class ClanSettingsMenu(DefaultView):
         self.main_menu_options = ['Discord Feed','War Reminders','Raid Reminders']
         if self.clan.is_alliance_clan:
             self.main_menu_options.append('Recruiting')
+        
+        self.clan_feeds = []
+        self.war_reminders = []
+        self.raid_reminders = []
             
         super().__init__(context)
     
@@ -149,7 +159,8 @@ class ClanSettingsMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"Clan Settings: {self.clan.title}",
-            message=f"{self.clan.long_description}"
+            message=(f"\nClan Leader: <@{self.clan.leader}>\n" if self.clan.leader else "")
+                + f"{self.clan.long_description}"
                 + f"\n\n**To change Clan Settings, select an option from the dropdown below.**"
                 + f"\n\u200b",
             thumbnail=self.clan.badge
@@ -219,7 +230,7 @@ class ClanSettingsMenu(DefaultView):
             if response_msg.content.lower() == "cancel":
                 pass
             else:
-                await self.clan.change_description(response_msg.content)
+                await self.clan.set_description(response_msg.content)
             await response_msg.delete()
         finally:
             self.waiting_for = False
@@ -250,7 +261,7 @@ class ClanSettingsMenu(DefaultView):
             if response_msg.content.lower() == "cancel":
                 pass
             else:
-                self.clan.recruitment_info = response_msg.content
+                await self.clan.set_recruitment_info(response_msg.content)
             await response_msg.delete()
         finally:
             self.waiting_for = False
@@ -262,8 +273,8 @@ class ClanSettingsMenu(DefaultView):
         menu.disabled = True
 
         th_values = [int(th) for th in menu.values]
-        th_values.sort()        
-        self.clan.recruitment_level = th_values
+        th_values.sort()
+        await self.clan.set_recruitment_level(th_values)
 
         await self._recruiting_menu(interaction)
     
@@ -331,6 +342,8 @@ class ClanSettingsMenu(DefaultView):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
+        self.clan_feeds = [i for i in await ClanDataFeed.feeds_for_clan(self.clan) if i.guild_id == self.guild.id]
+
         self.load_discordfeed_menu_items()
         embed = await self.discordfeed_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -376,24 +389,26 @@ class ClanSettingsMenu(DefaultView):
     async def _callback_save_feed(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
-        feed_type = {
-            'Member Join/Leave': 1,
-            'Donation Log': 2,
-            'Raid Weekend Results': 3,
-            'Capital Contribution': 4
-            }
-        await self.clan.create_feed(
-            type=feed_type[self.feed_type],
-            channel=self.feed_channel
-            )
+        if self.feed_type == 'Member Join/Leave':
+            await ClanMemberFeed.create_feed(self.clan,self.feed_channel)
+        
+        if self.feed_type == 'Donation Log':
+            await ClanDonationFeed.create_feed(self.clan,self.feed_channel)
+        
+        if self.feed_type == 'Raid Weekend Results':
+            await RaidResultsFeed.create_feed(self.clan,self.feed_channel)
+        
+        if self.feed_type == 'Capital Contribution':
+            await CapitalContributionFeed.create_feed(self.clan,self.feed_channel)
+
         self.feed_type = None
         self.feed_channel = None
-
         await self._discord_feed_menu(interaction)
         
     async def _callback_delete_feed_start(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
+        self.clan_feeds = [i for i in await ClanDataFeed.feeds_for_clan(self.clan) if i.guild_id == self.guild.id]
         self.load_deletefeed_menu_items()
         embed = await self.discordfeed_embed()
         await interaction.edit_original_response(embeds=[embed],view=self)
@@ -402,8 +417,9 @@ class ClanSettingsMenu(DefaultView):
         await interaction.response.defer()
 
         for item in menu.values:
-            await self.clan.delete_feed(item)
-        
+            await ClanDataFeed.delete_feed(item)
+
+        self.clan_feeds = [i for i in await ClanDataFeed.feeds_for_clan(self.clan) if i.guild_id == self.guild.id]
         self.load_deletefeed_menu_items()
         embed = await self.discordfeed_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -426,9 +442,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete Feed",
             row=0
             )        
-        if len(self.clan.discord_feeds) >= 20:
+        if len(self.clan_feeds) >= 20:
             add_feed_button.disabled = True        
-        if len(self.clan.discord_feeds) == 0:
+        if len(self.clan_feeds) == 0:
             delete_feed_button.disabled = True
 
         self.add_item(self.home_button())
@@ -496,22 +512,22 @@ class ClanSettingsMenu(DefaultView):
         clan_member_feed_options = [discord.SelectOption(
             label=f"Join/Leave Log: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
             value=str(feed.pk))
-            for feed in self.clan.member_feed if feed.guild_id == self.guild.id
+            for feed in self.clan_feeds if feed.type == 1
             ]
         clan_donation_feed_options = [discord.SelectOption(
             label=f"Donation Log: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
             value=str(feed.pk))
-            for feed in self.clan.donation_feed if feed.guild_id == self.guild.id
+            for feed in self.clan_feeds if feed.type == 2
             ]
         clan_capital_raid_feed_options = [discord.SelectOption(
             label=f"Raid Results: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
             value=str(feed.pk))
-            for feed in self.clan.capital_raid_results_feed if feed.guild_id == self.guild.id
+            for feed in self.clan_feeds if feed.type == 3
             ]
         capital_contribution_options = [discord.SelectOption(
             label=f"Capital Gold Contribution: {getattr(self.bot.get_channel(feed.channel_id),'name','Unknown Channel')}",
             value=str(feed.pk))
-            for feed in self.clan.capital_contribution_feed if feed.guild_id == self.guild.id
+            for feed in self.clan_feeds if feed.type == 4
             ]
         options = clan_member_feed_options + clan_donation_feed_options + clan_capital_raid_feed_options + capital_contribution_options
         
@@ -530,17 +546,16 @@ class ClanSettingsMenu(DefaultView):
     ### DISCORD FEED EMBEDS
     ##################################################
     async def discordfeed_embed(self):
-        all_feeds = [f for f in self.clan.discord_feeds if f.guild_id == self.guild.id]
         embed = await clash_embed(
             context=self.ctx,
             title=f"Discord Feed: {self.clan.title}",
             message=f"**Only Feeds for the current Server are displayed below.**"
-                + f"\nAvailable Slots: **{20 - len(all_feeds)}** available (max: 20)"
+                + f"\nAvailable Slots: **{20 - len(self.clan_feeds)}** available (max: 20)"
                 + "\n\u200b",
             thumbnail=self.clan.badge
             )
         
-        async for feed in AsyncIter(all_feeds):
+        async for feed in AsyncIter(self.clan_feeds):
             channel = self.bot.get_channel(feed.channel_id)
             embed.add_field(
                 name=f"{getattr(channel,'name','Unknown Channel')}",
@@ -573,7 +588,9 @@ class ClanSettingsMenu(DefaultView):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
+        self.war_reminders = [r for r in await EventReminders.war_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_war_reminder_menu_items()
+
         embed = await self.war_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)
 
@@ -593,6 +610,7 @@ class ClanSettingsMenu(DefaultView):
         self.wrem_interval = []
         self.wrem_channel = None
 
+        self.war_reminders = [r for r in await EventReminders.war_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_add_war_reminder_menu_items()
         embed = await self.war_reminder_embed()
         embed2 = await self.add_war_reminder_embed()
@@ -604,7 +622,6 @@ class ClanSettingsMenu(DefaultView):
         self.wrem_type = menu.values
         
         self.load_add_war_reminder_menu_items()
-        
         embed = await self.war_reminder_embed()
         embed2 = await self.add_war_reminder_embed()
         await interaction.edit_original_response(embeds=[embed,embed2],view=self)
@@ -614,24 +631,45 @@ class ClanSettingsMenu(DefaultView):
         self.wrem_channel = menu.values[0]
         
         self.load_add_war_reminder_menu_items()
-
         embed = await self.war_reminder_embed()
         embed2 = await self.add_war_reminder_embed()
         await interaction.edit_original_response(embeds=[embed,embed2],view=self)
     
-    async def _callback_select_war_reminder_interval(self,interaction:discord.Interaction,menu:DiscordChannelSelect):
+    async def _callback_war_reminder_interval_modal(self,interaction:discord.Interaction,button:DiscordButton):
+        interval_modal = DiscordModal(
+            function=self._callback_war_reminder_set_interval,
+            title=f"War Reminder Interval",
+            )
+        interval_modal.add_field(
+            label="Reminder Interval (in hours, max: 24)",
+            placeholder="Separate reminders with a blank space. Max of 24 hours.",
+            required=True
+            )
+        await interaction.response.send_modal(interval_modal)
+
+    async def _callback_war_reminder_set_interval(self,interaction:discord.Interaction,modal:DiscordModal):
         await interaction.response.defer()
-        self.wrem_interval = menu.values
+
+        new_intervals = []
+        for i in modal.children[0].value.split():
+            try:
+                interval = int(i)
+            except:
+                continue
+            if interval > 0 and interval <= 24:
+                new_intervals.append(interval)
+
+        self.wrem_interval = sorted(set(list(new_intervals)),reverse=True)
         
         self.load_add_war_reminder_menu_items()
-
         embed = await self.war_reminder_embed()
         embed2 = await self.add_war_reminder_embed()
         await interaction.edit_original_response(embeds=[embed,embed2],view=self)
     
     async def _callback_save_war_reminder(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        await self.clan.create_clan_war_reminder(
+        await EventReminders.create_war_reminder(
+            clan=self.clan,
             channel=self.wrem_channel,
             war_types=self.wrem_type,
             interval=self.wrem_interval
@@ -645,6 +683,7 @@ class ClanSettingsMenu(DefaultView):
     async def _callback_delete_war_reminder_start(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()        
 
+        self.war_reminders = [r for r in await EventReminders.war_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_delete_warreminder_menu_items()
         embed = await self.war_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -653,8 +692,9 @@ class ClanSettingsMenu(DefaultView):
         await interaction.response.defer()
 
         for item in menu.values:
-            await self.clan.delete_reminder(item)
+            await EventReminders.delete_reminder(item)
         
+        self.war_reminders = [r for r in await EventReminders.war_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_delete_warreminder_menu_items()
         embed = await self.war_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)    
@@ -676,9 +716,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete War Reminder",
             row=0
             )
-        if len(self.clan.clan_war_reminders) >= 20:
+        if len(self.war_reminders) >= 3:
             add_reminder_button.disabled = True
-        if len(self.clan.clan_war_reminders) == 0:
+        if len(self.war_reminders) == 0:
             delete_reminder_button.disabled = True
         self.add_item(self.home_button())
         self.add_item(add_reminder_button)
@@ -697,6 +737,11 @@ class ClanSettingsMenu(DefaultView):
             function=self._callback_save_war_reminder,
             emoji=EmojisUI.YES,
             label="Save Reminder",
+            row=0
+            )
+        change_interval_button = DiscordButton(
+            function=self._callback_war_reminder_interval_modal,
+            label="Set/Change Reminder Interval",
             row=0
             )
         if not self.wrem_type:
@@ -735,27 +780,11 @@ class ClanSettingsMenu(DefaultView):
             max_values=1,
             row=2
             )
-        interval_hours = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
-        interval_options = [discord.SelectOption(
-            label=f"{text}",
-            value=text,
-            default=str(text) in self.wrem_interval
-            )
-            for i,text in enumerate(interval_hours)
-            ]
-        select_reminder_interval = DiscordSelectMenu(
-            function=self._callback_select_war_reminder_interval,
-            options=interval_options,
-            placeholder="Select Reminder Intervals (in hours).",
-            min_values=1,
-            max_values=len(interval_hours),
-            row=3
-            )
         self.add_item(back_button)
         self.add_item(save_reminder_button)
+        self.add_item(change_interval_button)
         self.add_item(select_war_type)
-        self.add_item(select_reminder_channel)
-        self.add_item(select_reminder_interval)
+        self.add_item(select_reminder_channel)        
     
     def load_delete_warreminder_menu_items(self):
         self.clear_items()        
@@ -772,7 +801,7 @@ class ClanSettingsMenu(DefaultView):
             value=str(reminder.pk),
             description=f"Type: {chat.humanize_list(reminder.sub_type)}"
             )
-            for reminder in self.clan.clan_war_reminders if reminder.guild_id == self.guild.id
+            for reminder in self.war_reminders
             ]
         
         if len(clan_war_reminder_options) > 0:            
@@ -794,11 +823,11 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             title=f"War Reminders: {self.clan.title}",
             message=f"**Only Reminders for the current Server are displayed below.**"
-                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.clan_war_reminders if r.guild_id == self.guild.id])}** available (max 20)"
+                + f"\nAvailable Slots: **{3 - len(self.war_reminders)}** available (max 3)"
                 + "\n\u200b",
             thumbnail=self.clan.badge
             )
-        async for reminder in AsyncIter(self.clan.clan_war_reminders):
+        async for reminder in AsyncIter(self.war_reminders):
             if reminder.guild_id != self.guild.id:
                 continue
             channel = self.bot.get_channel(reminder.channel_id)
@@ -817,12 +846,14 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             message=f"**You are adding a new Clan War Reminder.**"
                 + f"\nReminders are sent for players who have available attacks to be used in the War."
-                + f" Reminders can only be configured for the last 20 hours of Battle Day."
+                + f" Reminders can only be configured for a maximum of 24 hours."
                 + f"\n\nSelect the War Type(s), a Channel, and the Reminder Intervals, then press **Save Reminder**."
                 + f"\n\nSelected Type(s): {chat.humanize_list(self.wrem_type)}"
                 + f"\nSelected Channel: {getattr(self.wrem_channel,'mention','Not Set')}"
-                + f"\nSelected Interval: {chat.humanize_list(sorted([int(i) for i in self.wrem_interval],reverse=True))} hour(s)"
+                + f"\nSelected Interval(s):"
                 )
+        for i in self.wrem_interval:
+            embed.description += f"\n- {i} hour(s)"
         return embed
 
     ####################################################################################################
@@ -838,6 +869,7 @@ class ClanSettingsMenu(DefaultView):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
+        self.raid_reminders = [r for r in await EventReminders.raid_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_raid_reminder_menu_items()
         embed = await self.raid_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -856,6 +888,7 @@ class ClanSettingsMenu(DefaultView):
         self.rrem_interval = []
         self.rrem_channel = None
 
+        self.raid_reminders = [r for r in await EventReminders.raid_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_add_raid_reminder_menu_items()
         embed = await self.raid_reminder_embed()
         embed2 = await self.add_raid_reminder_embed()
@@ -870,19 +903,42 @@ class ClanSettingsMenu(DefaultView):
         embed = await self.raid_reminder_embed()
         embed2 = await self.add_raid_reminder_embed()
         await interaction.edit_original_response(embeds=[embed,embed2],view=self)
+
+    async def _callback_raid_reminder_interval_modal(self,interaction:discord.Interaction,button:DiscordButton):
+        interval_modal = DiscordModal(
+            function=self._callback_raid_reminder_set_interval,
+            title=f"Raid Reminder Interval",
+            )
+        interval_modal.add_field(
+            label="Reminder Interval (in hours, max: 70)",
+            placeholder="Separate reminders with a blank space. Max of 70 hours.",
+            required=True
+            )
+        await interaction.response.send_modal(interval_modal)
     
-    async def _callback_select_raid_reminder_interval(self,interaction:discord.Interaction,menu:DiscordChannelSelect):
+    async def _callback_raid_reminder_set_interval(self,interaction:discord.Interaction,modal:DiscordModal):
         await interaction.response.defer()
-        self.rrem_interval = menu.values
+
+        new_intervals = []
+        for i in modal.children[0].value.split():
+            try:
+                interval = int(i)
+            except:
+                continue
+            if interval > 0 and interval <= 70:
+                new_intervals.append(interval)
+
+        self.rrem_interval = sorted(set(list(new_intervals)),reverse=True)
         
         self.load_add_raid_reminder_menu_items()        
         embed = await self.raid_reminder_embed()
         embed2 = await self.add_raid_reminder_embed()
-        await interaction.edit_original_response(embeds=[embed,embed2],view=self)   
+        await interaction.edit_original_response(embeds=[embed,embed2],view=self)
     
     async def _callback_save_raid_reminder(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        await self.clan.create_capital_raid_reminder(
+        await EventReminders.create_raid_reminder(
+            clan=self.clan,
             channel=self.rrem_channel,
             interval=self.rrem_interval
             )        
@@ -894,6 +950,7 @@ class ClanSettingsMenu(DefaultView):
     async def _callback_delete_raid_reminder_start(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()        
 
+        self.raid_reminders = [r for r in await EventReminders.raid_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_delete_raidreminder_menu_items()
         embed = await self.raid_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -902,8 +959,9 @@ class ClanSettingsMenu(DefaultView):
         await interaction.response.defer()
 
         for item in menu.values:
-            await self.clan.delete_reminder(item)
+            await EventReminders.delete_reminder(item)
         
+        self.raid_reminders = [r for r in await EventReminders.raid_reminders_for_clan(self.clan) if r.guild_id == self.guild.id]
         self.load_delete_raidreminder_menu_items()
         embed = await self.raid_reminder_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -925,9 +983,9 @@ class ClanSettingsMenu(DefaultView):
             label="Delete Raid Reminder",
             row=0
             )
-        if len(self.clan.capital_raid_reminders) >= 20:
+        if len(self.raid_reminders) >= 3:
             add_reminder_button.disabled = True
-        if len(self.clan.capital_raid_reminders) == 0:
+        if len(self.raid_reminders) == 0:
             delete_reminder_button.disabled = True
         self.add_item(self.home_button())
         
@@ -949,6 +1007,12 @@ class ClanSettingsMenu(DefaultView):
             label="Save Reminder",
             row=0
             )
+        change_interval_button = DiscordButton(
+            function=self._callback_raid_reminder_interval_modal,
+            label="Set/Change Reminder Interval",
+            row=0
+            )
+        
         if not self.rrem_channel:
             save_reminder_button.disabled = True
         if not self.rrem_interval:
@@ -962,26 +1026,10 @@ class ClanSettingsMenu(DefaultView):
             max_values=1,
             row=2
             )
-        interval_hours = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]
-        interval_options = [discord.SelectOption(
-            label=text,
-            value=text,
-            default=str(text) in self.rrem_interval
-            )
-            for i,text in enumerate(interval_hours)
-            ]
-        select_reminder_interval = DiscordSelectMenu(
-            function=self._callback_select_raid_reminder_interval,
-            options=interval_options,
-            placeholder="Select Reminder Intervals (in hours).",
-            min_values=1,
-            max_values=len(interval_hours),
-            row=3
-            )
         self.add_item(back_button)
         self.add_item(save_reminder_button)
-        self.add_item(select_reminder_channel)
-        self.add_item(select_reminder_interval)
+        self.add_item(change_interval_button)
+        self.add_item(select_reminder_channel)        
     
     def load_delete_raidreminder_menu_items(self):
         self.clear_items()        
@@ -997,7 +1045,7 @@ class ClanSettingsMenu(DefaultView):
             label=f"Raid Reminder: {getattr(self.bot.get_channel(reminder.channel_id),'name','Unknown Channel')}",
             value=str(reminder.pk),
             )
-            for reminder in self.clan.capital_raid_reminders if reminder.guild_id == self.guild.id
+            for reminder in self.raid_reminders
             ]
         if len(clan_raid_reminder_options) > 0:            
             select_reminder_delete = DiscordSelectMenu(
@@ -1018,11 +1066,11 @@ class ClanSettingsMenu(DefaultView):
             context=self.ctx,
             title=f"Raid Reminders: {self.clan.title}",
             message=f"**Only Reminders for the current Server are displayed below.**"
-                + f"\nAvailable Slots: **{20 - len([r for r in self.clan.capital_raid_reminders if r.guild_id == self.guild.id])}** available (max 20)"
+                + f"\nAvailable Slots: **{3 - len(self.raid_reminders)}** available (max 3)"
                 + "\n\u200b",
             thumbnail=self.clan.badge
             )
-        async for reminder in AsyncIter(self.clan.capital_raid_reminders):
+        async for reminder in AsyncIter(self.raid_reminders):
             if reminder.guild_id != self.guild.id:
                 continue
             channel = self.bot.get_channel(reminder.channel_id)
@@ -1036,13 +1084,23 @@ class ClanSettingsMenu(DefaultView):
         return embed
 
     async def add_raid_reminder_embed(self):
+        def convert_hours_to_days(hours:int):
+            if hours < 24:
+                return f"{hours} hour(s)"
+            elif hours == 24:
+                return f"1 day"
+            else:
+                return f"{hours//24} day(s) and {hours%24} hour(s)"
+            
         embed = await clash_embed(
             context=self.ctx,
             message=f"**You are adding a new Capital Raid Weekend Reminder.**"
                 + f"\nReminders are sent for players who have started their Raid Weekends, but not used all their attacks."
-                + f" Reminders can only be configured for the last 24 hours of the Raid Weekend."
+                + f" Reminders can only be configured for up to 70 hours."
                 + f"\n\nSelect the Channel and the Reminder Intervals, then press **Save Reminder**."
                 + f"\n\nSelected Channel: {getattr(self.rrem_channel,'mention','Not Set')}"
-                + f"\nSelected Interval: {chat.humanize_list(sorted([int(i) for i in self.rrem_interval],reverse=True))} hour(s)"
+                + f"\nSelected Interval(s): "
                 )
+        for i in self.rrem_interval:
+            embed.description += f"\n- {convert_hours_to_days(i)}"
         return embed

@@ -21,19 +21,29 @@ from .mongo_discord import db_ClockConfig
 bot_client = client()
 
 class aGuildClocks():
-    def __init__(self,guild_id):        
-        self.id = guild_id    
+    @classmethod
+    async def get_for_guild(cls,guild_id:int):
+        def query_db():
+            try:
+                return db_ClockConfig.objects.get(s_id=guild_id)
+            except DoesNotExist:
+                return None
+        
+        db_config = await bot_client.run_in_thread(query_db)
+        return cls(guild_id,db_config)
+        
+    def __init__(self,guild_id:int,db_config:Optional[db_ClockConfig]=None):        
+        self.id = guild_id
+        self.use_channels = getattr(db_config,'use_channels',False)
+        self.use_events = getattr(db_config,'use_events',False)
+        self._season_channel = getattr(db_config,'season_channel',0)
+        self._raids_channel = getattr(db_config,'raids_channel',0)
+        self._clangames_channel = getattr(db_config,'clangames_channel',0)
+        self._warleague_channel = getattr(db_config,'warleague_channel',0)
 
     @property
     def guild(self):
         return bot_client.bot.get_guild(self.id)
-    
-    @property
-    def config(self) -> Optional[db_ClockConfig]:
-        try:
-            return db_ClockConfig.objects.get(s_id=self.id)
-        except DoesNotExist:
-            return None
     
     async def create_clock_channel(self):
         default_permissions = {
@@ -89,35 +99,49 @@ class aGuildClocks():
 
     ##################################################
     ### CONFIGURATION
-    ##################################################    
-    @property
-    def use_channels(self) -> bool:
-        return getattr(self.config,'use_channels',False)
-    @use_channels.setter
-    def use_channels(self,use_channels:bool):
-        db_ClockConfig.objects(s_id=self.id).update_one(use_channels=use_channels,upsert=True)
+    ##################################################
+    async def toggle_channels(self):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__use_channels=self.use_channels,
+                upsert=True
+                )
+        if self.use_channels:
+            self.use_channels = False
+        else:
+            self.use_channels = True        
+        await bot_client.run_in_thread(_update_in_db)
     
-    @property
-    def use_events(self) -> bool:
-        return getattr(self.config,'use_events',False)
-    @use_events.setter
-    def use_events(self,use_events:bool):
-        db_ClockConfig.objects(s_id=self.id).update_one(use_events=use_events,upsert=True)
+    async def toggle_events(self):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__use_events=self.use_events,
+                upsert=True
+                )
+        if self.use_events:
+            self.use_events = False
+        else:
+            self.use_events = True        
+        await bot_client.run_in_thread(_update_in_db)
     
     ##################################################
     ### SEASON CLOCKS
     ##################################################
     @property
     def season_channel(self) -> Optional[discord.VoiceChannel]:    
-        channel = self.guild.get_channel(getattr(self.config,'season_channel',0))
+        channel = self.guild.get_channel(self._season_channel)
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
-    @season_channel.setter
-    def season_channel(self,channel_id:int):
-        channel = self.guild.get_channel(channel_id)
-        if isinstance(channel,discord.VoiceChannel):
-            db_ClockConfig.objects(s_id=self.id).update_one(season_channel=channel.id,upsert=True)
+    
+    async def new_season_channel(self,channel_id:int):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__season_channel=channel_id,
+                upsert=True
+                )
+        self._season_channel = channel_id
+        await bot_client.run_in_thread(_update_in_db)
 
     async def update_season_channel(self):
         now = pendulum.now('UTC')
@@ -125,7 +149,7 @@ class aGuildClocks():
         if not self.season_channel:
             new_channel = await self.create_clock_channel()
             await new_channel.edit(position=0)
-            self.season_channel = new_channel.id
+            await self.new_season_channel(new_channel.id)
     
         season_ch_name = f"📅 {bot_client.current_season.short_description} "
         time_to_end = bot_client.current_season.time_to_end(now)
@@ -146,15 +170,19 @@ class aGuildClocks():
     ##################################################
     @property
     def raids_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(getattr(self.config,'raids_channel',0))
+        channel = self.guild.get_channel(self._raids_channel)
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
-    @raids_channel.setter
-    def raids_channel(self,channel_id:int):
-        channel = self.guild.get_channel(channel_id)
-        if isinstance(channel,discord.VoiceChannel):
-            db_ClockConfig.objects(s_id=self.id).update_one(raids_channel=channel.id,upsert=True)
+    
+    async def new_raids_channel(self,channel_id:int):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__raids_channel=channel_id,
+                upsert=True
+                )
+        self._raids_channel = channel_id
+        await bot_client.run_in_thread(_update_in_db)
     
     async def update_raidweekend_channel(self):
         now = pendulum.now('UTC')
@@ -163,7 +191,7 @@ class aGuildClocks():
         if not self.raids_channel:
             new_channel = await self.create_clock_channel()
             await new_channel.edit(position=1)
-            self.raids_channel = new_channel.id
+            await self.new_raids_channel(new_channel.id)
 
         raid_ch_name = None
         if now < raid_start < raid_end:
@@ -215,15 +243,19 @@ class aGuildClocks():
     ##################################################
     @property
     def clangames_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(getattr(self.config,'clangames_channel',0))
+        channel = self.guild.get_channel(self._clangames_channel)
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None
-    @clangames_channel.setter
-    def clangames_channel(self,channel_id:int):
-        channel = self.guild.get_channel(channel_id)
-        if isinstance(channel,discord.VoiceChannel):
-            db_ClockConfig.objects(s_id=self.id).update_one(clangames_channel=channel.id,upsert=True)
+
+    async def new_clangames_channel(self,channel_id:int):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__clangames_channel=channel_id,
+                upsert=True
+                )
+        self._clangames_channel = channel_id
+        await bot_client.run_in_thread(_update_in_db)
     
     async def update_clangames_channel(self):
         now = pendulum.now('UTC')
@@ -237,7 +269,7 @@ class aGuildClocks():
         if not self.clangames_channel:
             new_channel = await self.create_clock_channel()
             await new_channel.edit(position=2)
-            self.clangames_channel = new_channel.id
+            await self.new_clangames_channel(new_channel.id)
 
         cg_ch_name = None
         if now < clangames_season.clangames_start < clangames_season.clangames_end:
@@ -293,15 +325,19 @@ class aGuildClocks():
     ##################################################    
     @property
     def warleague_channel(self) -> Optional[discord.VoiceChannel]:
-        channel = self.guild.get_channel(getattr(self.config,'warleague_channel',0))
+        channel = self.guild.get_channel(self._warleague_channel)
         if isinstance(channel,discord.VoiceChannel):
             return channel
         return None    
-    @warleague_channel.setter
-    def warleague_channel(self,channel_id:int):
-        channel = self.guild.get_channel(channel_id)
-        if isinstance(channel,discord.VoiceChannel):
-            db_ClockConfig.objects(s_id=self.id).update_one(warleague_channel=channel.id,upsert=True)
+    
+    async def new_league_channel(self,channel_id:int):
+        def _update_in_db():
+            db_ClockConfig.objects(s_id=self.id).update_one(
+                set__warleague_channel=channel_id,
+                upsert=True
+                )
+        self._warleague_channel = channel_id
+        await bot_client.run_in_thread(_update_in_db)
     
     async def update_warleagues_channel(self):
         now = pendulum.now('UTC')
@@ -315,7 +351,7 @@ class aGuildClocks():
         if not self.warleague_channel:
             new_channel = await self.create_clock_channel()
             await new_channel.edit(position=3)
-            self.warleague_channel = new_channel.id
+            await self.new_league_channel(new_channel.id)
 
         cwl_ch_name = None
         if now < warleague_season.cwl_start < warleague_season.cwl_end:

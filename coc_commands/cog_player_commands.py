@@ -15,6 +15,7 @@ from coc_main.discord.member import aMember
 from coc_main.utils.components import handle_command_error, clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
+from coc_main.exceptions import CacheNotReady
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -52,7 +53,7 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
         coc = bot_client.bot.get_cog("ClashOfClansClient")
 
         member = aMember(member.id,member.guild.id)
-        view_accounts = await asyncio.gather(*(coc.fetch_player(p) for p in member.accounts_tags))
+        view_accounts = await asyncio.gather(*(coc.fetch_player(p) for p in member.account_tags))
 
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()
@@ -187,6 +188,25 @@ class Players(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    @commands.Cog.listener("on_member_update")
+    async def member_role_sync(self,before:discord.Member,after:discord.Member):
+        before_roles = sorted([r.id for r in before.roles])
+        after_roles = sorted([r.id for r in after.roles])
+
+        if before_roles != after_roles:
+            member = aMember(after.id,after.guild.id)
+            last_sync = await member.get_last_role_sync()
+            if not last_sync or pendulum.now().int_timestamp - getattr(last_sync,'int_timestamp',0) >= 60:
+                while True:
+                    try:
+                        await member.sync_clan_roles()
+                    except CacheNotReady:
+                        await asyncio.sleep(10)
+                        continue
+                    break
+            
+            await aMember.save_user_roles(after.id,after.guild.id)
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):

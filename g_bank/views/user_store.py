@@ -1,6 +1,7 @@
 import discord
 from typing import *
 from redbot.core import commands, bank
+from functools import cached_property
 
 from ..objects.item import ShopItem
 from ..objects.inventory import UserInventory
@@ -15,11 +16,7 @@ class UserStore(DefaultView):
         self.current_item = None
         super().__init__(context=context,timeout=300)
     
-    @property
-    def store_items(self):
-        return [i for i in ShopItem.get_by_guild(self.guild.id) if i.show_in_store]
-    
-    @property
+    @cached_property
     def store_categories(self):
         cat = sorted(list(set([i.category for i in self.store_items])))
         if 'Uncategorized' in cat:
@@ -103,6 +100,9 @@ class UserStore(DefaultView):
     ### START / STOP CALL
     ##################################################
     async def start(self):
+        guild_items = await ShopItem.get_by_guild(self.guild.id)
+        self.store_items = [i for i in guild_items if i.show_in_store]
+
         self.is_active = True
         await self._main_menu(self.ctx)
     
@@ -229,30 +229,38 @@ class UserStore(DefaultView):
             await interaction.response.defer()
         
         if menu:
-            self.current_item = ShopItem.get_by_id(menu.values[0])
+            self.current_item = await ShopItem.get_by_id(menu.values[0])
 
         item_embed = await self.get_item_embed()
 
         user = self.guild.get_member(interaction.user.id)
-        can_spend = await bank.can_spend(user,self.current_item.price)
 
         purchase_button = self.purchase_button
-        can_buy = await self.current_item.can_i_buy(self.guild.get_member(interaction.user.id))
-        if not can_buy or not can_spend:
+        inventory = await UserInventory.get_by_user_id(interaction.user.id)
+
+        if self.current_item.type in ['cash'] and inventory.has_item(self.current_item):
             purchase_button.disabled = True
-            if not can_spend:
-                purchase_button.label = f"You cannot afford this item."
-
-            elif self.current_item.required_role and self.current_item.required_role.id not in [r.id for r in user.roles]:
-                purchase_button.label = f"You are missing a Required Role for this Item."
-
-            elif isinstance(self.current_item.stock,int) and self.current_item.stock < 1:
-                purchase_button.label = "This item is out of stock."
-
-            else:
-                purchase_button.label = "You cannot purchase this item."
-
+            purchase_button.label = f"You can only have 1 of this item."
             purchase_button.style = discord.ButtonStyle.grey
+
+        if not purchase_button.disabled:
+            can_buy = self.current_item.can_i_buy(self.guild.get_member(interaction.user.id))
+            can_spend = await bank.can_spend(user,self.current_item.price)
+
+            if not can_buy or not can_spend:
+                purchase_button.disabled = True
+                if not can_spend:
+                    purchase_button.label = f"You cannot afford this item."
+
+                elif self.current_item.required_role and self.current_item.required_role.id not in [r.id for r in user.roles]:
+                    purchase_button.label = f"You are missing a Required Role for this Item."
+
+                elif isinstance(self.current_item.stock,int) and self.current_item.stock < 1:
+                    purchase_button.label = "This item is out of stock."
+
+                else:
+                    purchase_button.label = "You cannot purchase this item."
+                purchase_button.style = discord.ButtonStyle.grey
         
         self.clear_items()
         self.add_item(purchase_button)
@@ -266,7 +274,7 @@ class UserStore(DefaultView):
         await interaction.response.defer()
         currency = await bank.get_currency_name()
 
-        if not await self.current_item.can_i_buy(self.guild.get_member(interaction.user.id)):
+        if not self.current_item.can_i_buy(self.guild.get_member(interaction.user.id)):
             embed = await clash_embed(
                 context=self.ctx,
                 message=f"You cannot purchase **{self.current_item.name}**.",
@@ -274,7 +282,7 @@ class UserStore(DefaultView):
                 )
             return await interaction.followup.send(embed=embed,ephemeral=True)
         
-        user_inv = UserInventory(self.guild.get_member(interaction.user.id))
+        user_inv = await UserInventory.get_by_user_id(interaction.user.id)
         buy_item = await user_inv.purchase_item(self.current_item)
 
         purchase_msg = f"Congratulations! You spent {self.current_item.price} {currency} to purchase 1x **{self.current_item.name}**."
