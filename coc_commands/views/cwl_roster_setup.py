@@ -173,6 +173,7 @@ class CWLRosterMenu(DefaultView):
         await interaction.response.defer()
         
         embeds = await self.clan_embed()
+        self.clear_items()
         chk = await self.add_player_menu()
         if not chk:
             await interaction.followup.send("Oops! There doesn't seem to be anyone eligible for CWL.",ephemeral=True)

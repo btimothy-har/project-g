@@ -125,7 +125,7 @@ class RaidResultsFeed():
             draw.text((500, 970), f"{self.clan.name}\n{self.raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
 
         else:
-            badge_data = self.clan_badge
+            badge_data = self.clan.badge
             with urllib.request.urlopen(badge_data) as image_data:
                 badge = Image.open(image_data)
 
