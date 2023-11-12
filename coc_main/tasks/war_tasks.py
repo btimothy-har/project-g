@@ -213,7 +213,7 @@ class ClanWarLoop(TaskLoop):
                     self._lock
                     )
             
-            if getattr(current_war,'is_cwl',False):
+            if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
                 await self._update_league_group(clan)
                 #update previous round
                 previous_round = await bot_client.coc.get_current_war(self.tag,cwl_round=coc.WarRound.previous_war)

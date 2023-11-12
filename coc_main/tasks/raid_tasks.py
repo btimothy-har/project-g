@@ -120,8 +120,9 @@ class ClanRaidLoop(TaskLoop):
             while self.loop_active:
                 await asyncio.sleep(10)
                 if self.api_maintenance:
-                    continue                
-                await self._run_single_loop()
+                    continue
+                if pendulum.now().day_of_week in [5,6,7,1]:
+                    await self._run_single_loop()
         
         except asyncio.CancelledError:
             return await self.stop()
