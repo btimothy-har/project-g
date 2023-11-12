@@ -118,10 +118,10 @@ class ClanExcelExport():
             else:
                 stats = m.get_season_stats(self.season)
 
-            war_log = aClanWar.for_player(m.tag,season=self.season)
+            war_log = await aClanWar.for_player(m.tag,season=self.season)
             war_stats = aClanWarSummary.for_player(m.tag,war_log)
 
-            raid_log = aRaidWeekend.for_player(m.tag,season=self.season)
+            raid_log = await aRaidWeekend.for_player(m.tag,season=self.season)
             raid_stats = aSummaryRaidStats.for_player(m.tag,raid_log)
 
             m_data = []
@@ -172,7 +172,7 @@ class ClanExcelExport():
     async def war_report(self):
         bold = self.workbook.add_format({'bold': True})
         
-        clan_wars = aClanWar.for_clan(clan_tag=self.clan.tag,season=self.season)
+        clan_wars = await aClanWar.for_clan(clan_tag=self.clan.tag,season=self.season)
         async for war in AsyncIter(clan_wars):
             war_clan = war.get_clan(self.clan.tag)
             war_opponent = war.get_opponent(self.clan.tag)
@@ -252,7 +252,7 @@ class ClanExcelExport():
     async def raids_report(self):
         bold = self.workbook.add_format({'bold': True})
         
-        raids = aRaidWeekend.for_clan(clan_tag=self.clan.tag,season=self.season)
+        raids = await aRaidWeekend.for_clan(clan_tag=self.clan.tag,season=self.season)
         async for raid in AsyncIter(raids):
             raid_worksheet = self.workbook.add_worksheet(f'Raid {raid.start_time.format("DD MMM YYYY")}')
 

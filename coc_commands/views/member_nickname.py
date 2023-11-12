@@ -79,23 +79,44 @@ class MemberNicknameMenu(DefaultView):
     ### STEP 1: SELECT ACCOUNT (IF MEMBER ACCOUNTS > 1)
     ##################################################
     async def _select_accounts(self):
-        player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.member.member_accounts))
 
-        dropdown_options = [discord.SelectOption(
-            label=f"{account.name} | {account.tag}",
-            value=account.tag,
-            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan.tag else ""),
-            emoji=account.town_hall.emoji)
-            for account in player_accounts[:25]
-            ]
-        dropdown_menu = DiscordSelectMenu(
-            function=self._callback_account_select,
-            options=dropdown_options,
-            placeholder="Select an active member account.",
-            min_values=1,
-            max_values=1
-            )
-        self.add_item(dropdown_menu)
+        if self.guild.id == 688449973553201335: #ARIX
+            player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.member.member_accounts))
+
+            dropdown_options = [discord.SelectOption(
+                label=f"{account.name} | {account.tag}",
+                value=account.tag,
+                description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
+                emoji=account.town_hall.emoji)
+                for account in player_accounts[:25]
+                ]
+            dropdown_menu = DiscordSelectMenu(
+                function=self._callback_account_select,
+                options=dropdown_options,
+                placeholder="Select an active member account.",
+                min_values=1,
+                max_values=1
+                )
+            self.add_item(dropdown_menu)
+
+        else:
+            player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.member.accounts))
+
+            dropdown_options = [discord.SelectOption(
+                label=f"{account.name} | {account.tag}",
+                value=account.tag,
+                description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
+                emoji=account.town_hall.emoji)
+                for account in player_accounts[:25]
+                ]
+            dropdown_menu = DiscordSelectMenu(
+                function=self._callback_account_select,
+                options=dropdown_options,
+                placeholder="Select one of your linked accounts.",
+                min_values=1,
+                max_values=1
+                )
+            self.add_item(dropdown_menu)
 
         if self.for_self:
             embed = await clash_embed(
@@ -128,7 +149,7 @@ class MemberNicknameMenu(DefaultView):
             message=f"{EmojisUI.LOADING} Please wait..."
             )
         await interaction.edit_original_response(embed=embed,view=None)
-        self.member.default_account = menu.values[0]
+        await self.member.set_default_account(menu.values[0])
         await self._change_nickname()
 
     ##################################################

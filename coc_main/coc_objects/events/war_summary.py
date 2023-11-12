@@ -4,6 +4,7 @@ from typing import *
 
 from collections import defaultdict
 from redbot.core.utils import AsyncIter
+from functools import cached_property
 
 from .clan_war import aClanWar
 
@@ -41,7 +42,7 @@ class aClanWarSummary():
         instance.clan_tag = clan_tag
         return instance
     
-    @property
+    @cached_property
     def attack_count(self) -> int:
         try:
             if self.player_tag:
@@ -56,7 +57,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def offense_stars(self) -> int:
         try:
             if self.player_tag:
@@ -71,7 +72,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def offense_destruction(self) -> int:
         try:
             if self.player_tag:
@@ -86,7 +87,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def defense_count(self) -> int:
         try:
             if self.player_tag:
@@ -102,7 +103,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def defense_stars(self) -> int:
         try:
             if self.player_tag:
@@ -117,7 +118,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def defense_destruction(self) -> int:
         try:
             if self.player_tag:
@@ -132,7 +133,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def triples(self) -> int:
         try:
             if self.player_tag:
@@ -148,7 +149,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def unused_attacks(self) -> int:
         try:
             if self.player_tag:
@@ -164,7 +165,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def average_new_stars(self) -> float:
         try:
             if self.player_tag:
@@ -177,7 +178,7 @@ class aClanWarSummary():
         except:
             return 0
     
-    @property
+    @cached_property
     def average_attack_duration(self) -> float:
         try:
             if self.player_tag:

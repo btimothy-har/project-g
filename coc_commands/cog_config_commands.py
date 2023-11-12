@@ -9,10 +9,7 @@ from redbot.core.utils import AsyncIter
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
 from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_main.discord.guild import aGuild
-from coc_main.discord.clan_link import ClanGuildLink, db_ClanGuildLink
-from coc_main.discord.clan_panel import GuildClanPanel, db_GuildClanPanel
-from coc_main.discord.application_panel import GuildApplicationPanel, db_GuildApplyPanel
+from coc_main.discord.guild import aGuild, ClanGuildLink, GuildClanPanel, aGuildClocks, GuildApplicationPanel
 
 from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin, has_manage_server
@@ -25,7 +22,7 @@ bot_client = BotClashClient()
 
 async def autocomplete_guild_clan_panels(interaction:discord.Interaction,current:str):
     try:
-        panels = [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=interaction.guild.id)]
+        panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
         if current:
             sel_panels = [p for p in panels if current.lower() in str(p).lower()]
         else:
@@ -42,7 +39,7 @@ async def autocomplete_guild_clan_panels(interaction:discord.Interaction,current
 
 async def autocomplete_guild_apply_panels(interaction:discord.Interaction,current:str):
     try:
-        panels = [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=interaction.guild.id)]
+        panels = await GuildApplicationPanel.get_for_guild(interaction.guild.id)
         if current:
             sel_panels = [p for p in panels if current.lower() in str(p).lower()]
         else:
@@ -59,7 +56,7 @@ async def autocomplete_guild_apply_panels(interaction:discord.Interaction,curren
 
 async def autocomplete_guild_recruiting_reminders(interaction:discord.Interaction,current:str):
     try:
-        panels = RecruitingReminder.get_by_guild(interaction.guild.id)
+        panels = await RecruitingReminder.get_for_guild(interaction.guild.id)
 
         if current:
             sel_panels = [p for p in panels if current.lower() in str(p).lower()]
@@ -156,7 +153,7 @@ class ClashServerConfig(commands.Cog):
     ##################################################
     ### PARENT COMMAND GROUPS
     ##################################################
-    @commands.group(name="serversetup")
+    @commands.group(name="serversetup",aliases=["serverset"])
     @commands.guild_only()
     async def command_group_guildset(self,ctx):
         """
@@ -186,7 +183,7 @@ class ClashServerConfig(commands.Cog):
         To link/unlink clans, use [p]`clanset link` or [p]`clanset unlink`.
         """
 
-        clan_links = [ClanGuildLink(db) for db in db_ClanGuildLink.objects(guild_id=ctx.guild.id)]
+        clan_links = await ClanGuildLink.get_for_guild(ctx.guild.id)
         
         embed = await clash_embed(
             context=ctx,
@@ -196,7 +193,7 @@ class ClashServerConfig(commands.Cog):
             clan = await self.client.fetch_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
-                value=f"CoLeader Role: {getattr(link.coleader_role,'mention','None')}"
+                value=f"Co-Leader Role: {getattr(link.coleader_role,'mention','None')}"
                     + f"\nElder Role: {getattr(link.elder_role,'mention','None')}"
                     + f"\nMember Role: {getattr(link.member_role,'mention','None')}",
                 inline=False
@@ -210,7 +207,7 @@ class ClashServerConfig(commands.Cog):
     async def sub_appcommand_list_clans(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
-        clan_links = [ClanGuildLink(db) for db in db_ClanGuildLink.objects(guild_id=interaction.guild.id)]
+        clan_links = await ClanGuildLink.get_for_guild(interaction.guild.id)
         
         embed = await clash_embed(
             context=interaction,
@@ -220,7 +217,7 @@ class ClashServerConfig(commands.Cog):
             clan = await self.client.fetch_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
-                value=f"CoLeader Role: {getattr(link.coleader_role,'mention','None')}"
+                value=f"Co-Leader Role: {getattr(link.coleader_role,'mention','None')}"
                     + f"\nElder Role: {getattr(link.elder_role,'mention','None')}"
                     + f"\nMember Role: {getattr(link.member_role,'mention','None')}",
                 inline=False
@@ -264,7 +261,7 @@ class ClashServerConfig(commands.Cog):
             context=ctx,
             title="**Clan Panels**"
             )
-        clan_panels = [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=ctx.guild.id)]
+        clan_panels = await GuildClanPanel.get_for_guild(ctx.guild.id)
         for panel in clan_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
@@ -286,7 +283,7 @@ class ClashServerConfig(commands.Cog):
             context=interaction,
             title="**Clan Panels**"
             )
-        clan_panels = [GuildClanPanel(db) for db in db_GuildClanPanel.objects(server_id=interaction.guild.id)]
+        clan_panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
         for panel in clan_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
@@ -306,7 +303,6 @@ class ClashServerConfig(commands.Cog):
         """
         Create a Clan Panel.
         """
-        guild = aGuild(ctx.guild.id)
         channel = ctx.guild.get_channel(channel_id)
 
         if not isinstance(channel,discord.TextChannel):
@@ -317,7 +313,7 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        panel = GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)
+        panel = await GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)
         if panel:
             embed = await clash_embed(
                 context=ctx,
@@ -326,13 +322,16 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        await guild.create_clan_panel(channel)
+        await GuildClanPanel.create(guild_id=channel.guild.id,channel_id=channel.id)
         embed = await clash_embed(
             context=ctx,
             message=f"Clan Panel created.",
             success=True
             )
         await ctx.reply(embed=embed)
+
+        guild = aGuild(ctx.guild.id)
+        await guild.update_clan_panels()
     
     @app_subcommand_group_panel.command(name="create",
         description="Create a Clan Panel.")
@@ -343,10 +342,8 @@ class ClashServerConfig(commands.Cog):
     async def sub_appcommand_guildpanel_create(self,interaction:discord.Interaction,channel:discord.TextChannel):
 
         await interaction.response.defer()
-
-        guild = aGuild(interaction.guild.id)
         
-        panel = GuildClanPanel.get_panel(guild_id=interaction.guild.id,channel_id=channel.id)
+        panel = await GuildClanPanel.get_panel(guild_id=interaction.guild.id,channel_id=channel.id)
         if panel:
             embed = await clash_embed(
                 context=interaction,
@@ -355,13 +352,15 @@ class ClashServerConfig(commands.Cog):
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
         
-        await guild.create_clan_panel(channel)
+        await GuildClanPanel.create(guild_id=channel.guild.id,channel_id=channel.id)
         embed = await clash_embed(
             context=interaction,
             message=f"Clan Panel created.",
             success=True
             )
         await interaction.edit_original_response(embed=embed,view=None)
+        guild = aGuild(interaction.guild.id)
+        await guild.update_clan_panels()
     
     ##################################################
     ### SERVERSETUP / PANEL / DELETE
@@ -373,7 +372,6 @@ class ClashServerConfig(commands.Cog):
         """
         Deletes a Clan Panel.
         """
-        guild = aGuild(ctx.guild.id)
         channel = ctx.guild.get_channel(channel_id)
 
         if not isinstance(channel,discord.TextChannel):
@@ -384,7 +382,7 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        panel = GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)
+        panel = await GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel.id)
         if not panel:
             embed = await clash_embed(
                 context=ctx,
@@ -393,13 +391,15 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
                 
-        await guild.delete_clan_panel(channel)
+        await panel.delete()
         embed = await clash_embed(
             context=ctx,
             message=f"Clan Panel deleted.",
             success=True
             )
         await ctx.reply(embed=embed)
+        guild = aGuild(ctx.guild.id)
+        await guild.update_clan_panels()
 
     @app_subcommand_group_panel.command(name="delete",
         description="Delete a Clan Panel.")
@@ -412,16 +412,19 @@ class ClashServerConfig(commands.Cog):
 
         await interaction.response.defer()
         
-        guild = aGuild(interaction.guild.id)
         channel = interaction.guild.get_channel(int(panel))
 
-        await guild.delete_clan_panel(channel)
+        get_panel = await GuildClanPanel.get_panel(guild_id=channel.guild.id,channel_id=channel.id)
+
+        await get_panel.delete()
         embed = await clash_embed(
             context=interaction,
             message=f"Clan Panel deleted.",
             success=True
             )
         await interaction.edit_original_response(embed=embed,view=None)
+        guild = aGuild(interaction.guild.id)
+        await guild.update_clan_panels()
 
     ##################################################
     ### SERVER SETUP / APPLICATION
@@ -457,7 +460,8 @@ class ClashServerConfig(commands.Cog):
             context=ctx,
             title="**Application Panels**"
             )
-        application_panels = [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=ctx.guild.id)]
+        
+        application_panels = await GuildApplicationPanel.get_for_guild(ctx.guild.id)
         for panel in application_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
@@ -494,7 +498,8 @@ class ClashServerConfig(commands.Cog):
             context=interaction,
             title="**Application Panels**"
             )
-        application_panels = [GuildApplicationPanel(db) for db in db_GuildApplyPanel.objects(server_id=interaction.guild.id)]
+        
+        application_panels = await GuildApplicationPanel.get_for_guild(interaction.guild.id)
         for panel in application_panels:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
@@ -567,7 +572,6 @@ class ClashServerConfig(commands.Cog):
         """
         Delete an Application Panel.
         """
-        guild = aGuild(ctx.guild.id)
         channel = ctx.guild.get_channel(channel_id)
 
         if not isinstance(channel,discord.TextChannel):
@@ -578,7 +582,7 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        panel = GuildApplicationPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)        
+        panel = await GuildApplicationPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)
         if not panel:
             embed = await clash_embed(
                 context=ctx,
@@ -587,7 +591,8 @@ class ClashServerConfig(commands.Cog):
                 )
             return await ctx.reply(embed=embed)
         
-        await guild.delete_apply_panel(channel)
+        await panel.delete()
+        
         embed = await clash_embed(
             context=ctx,
             message=f"Application Panel deleted.",
@@ -606,10 +611,11 @@ class ClashServerConfig(commands.Cog):
         
         await interaction.response.defer()
 
-        guild = aGuild(interaction.guild.id)
         channel = interaction.guild.get_channel(int(panel))
 
-        await guild.delete_apply_panel(channel)
+        get_panel = await GuildApplicationPanel.get_panel(guild_id=channel.guild.id,channel_id=channel.id)
+        await get_panel.delete()
+
         embed = await clash_embed(
             context=interaction,
             message=f"Application Panel deleted.",
@@ -645,13 +651,13 @@ class ClashServerConfig(commands.Cog):
     async def subcommand_clashset_clocks_events(self,ctx):
         """Enable/Disable the use of Discord Scheduled Events."""
 
-        guild = aGuild(ctx.guild.id)
-        if not guild.clock_config.use_events:
-            guild.clock_config.use_events = True
-            await ctx.reply(f"Discord Scheduled Events have been __enabled__ for **{guild.name}**.")        
-        else:
-            guild.clock_config.use_events = False
-            await ctx.reply(f"Discord Scheduled Events have been __disabled__ for **{guild.name}**.")
+        clock_config = await aGuildClocks.get_for_guild(ctx.guild.id)
+        await clock_config.toggle_events()
+        await ctx.reply(
+            f"Discord Scheduled Events have been "
+            + (f"__enabled__" if clock_config.use_events else f"__disabled__")
+            + f" for **{clock_config.guild.name}**."
+            )
     
     @app_subcommand_group_clocks.command(name="toggle-events",
         description="Enable/Disable the use of Discord Scheduled Events.")
@@ -661,13 +667,13 @@ class ClashServerConfig(commands.Cog):
         
         await interaction.response.defer()
 
-        guild = aGuild(interaction.guild.id)        
-        if not guild.clock_config.use_events:
-            guild.clock_config.use_events = True
-            await interaction.edit_original_response(content=f"Discord Scheduled Events have been __enabled__ for **{guild.name}**.",view=None)
-        else:
-            guild.clock_config.use_events = False
-            await interaction.edit_original_response(content=f"Discord Scheduled Events have been __disabled__ for **{guild.name}**.",view=None)
+        clock_config = await aGuildClocks.get_for_guild(interaction.guild.id)
+        await clock_config.toggle_events()
+        await interaction.followup.send(
+            f"Discord Scheduled Events have been "
+            + (f"__enabled__" if clock_config.use_events else f"__disabled__")
+            + f" for **{clock_config.guild.name}**."
+            )
     
     ##################################################
     ### SERVER SETUP / CLOCKS / CHANNELS
@@ -678,13 +684,13 @@ class ClashServerConfig(commands.Cog):
     async def subcommand_clashset_clocks_channels(self,ctx):
         """Enable/Disable the use of Channel Clocks."""
 
-        guild = aGuild(ctx.guild.id)
-        if not guild.clock_config.use_channels:
-            guild.clock_config.use_channels = True
-            await ctx.reply(f"Channel Clocks have been __enabled__ for **{guild.name}**.")        
-        else:
-            guild.clock_config.use_channels = False
-            await ctx.reply(f"Channel Clocks have been __disabled__ for **{guild.name}**.")
+        clock_config = await aGuildClocks.get_for_guild(ctx.guild.id)
+        await clock_config.toggle_channels()
+        await ctx.reply(
+            f"Channel Clocks have been "
+            + (f"__enabled__" if clock_config.use_channels else f"__disabled__")
+            + f" for **{clock_config.guild.name}**."
+            )
     
     @app_subcommand_group_clocks.command(name="toggle-channels",
         description="Enable/Disable the use of Channel Clocks.")
@@ -694,13 +700,13 @@ class ClashServerConfig(commands.Cog):
         
         await interaction.response.defer()
 
-        guild = aGuild(interaction.guild.id)        
-        if not guild.clock_config.use_channels:
-            guild.clock_config.use_channels = True
-            await interaction.edit_original_response(content=f"Channel Clocks have been __enabled__ for **{guild.name}**.",view=None)
-        else:
-            guild.clock_config.use_channels = False
-            await interaction.edit_original_response(content=f"Channel Clocks have been __disabled__ for **{guild.name}**.",view=None)
+        clock_config = await aGuildClocks.get_for_guild(interaction.guild.id)
+        await clock_config.toggle_channels()
+        await interaction.followup.send(
+            f"Channel Clocks have been "
+            + (f"__enabled__" if clock_config.use_channels else f"__disabled__")
+            + f" for **{clock_config.guild.name}**."
+            )
     
     ##################################################
     ### RECRUITING REMINDER COMMAND GROUPS
@@ -733,7 +739,7 @@ class ClashServerConfig(commands.Cog):
         List all Recruiting Reminders in this Server.
         """
         
-        all_reminders = RecruitingReminder.get_by_guild(ctx.guild.id)
+        all_reminders = await RecruitingReminder.get_for_guild(ctx.guild.id)
 
         embed = await clash_embed(
             context=ctx,
@@ -759,7 +765,7 @@ class ClashServerConfig(commands.Cog):
 
         await interaction.response.defer()
         
-        all_reminders = RecruitingReminder.get_by_guild(interaction.guild.id)
+        all_reminders = await RecruitingReminder.get_for_guild(interaction.guild.id)
 
         embed = await clash_embed(
             context=interaction,
@@ -816,9 +822,8 @@ class ClashServerConfig(commands.Cog):
         To get the ID of a Leaderboard, use the command [p]`recruitreminder list`.
         """
         
-        try:
-            reminder = RecruitingReminder(reminder_id)
-        except:
+        reminder = await RecruitingReminder.get_by_id(reminder_id)
+        if not reminder:
             embed = await clash_embed(
                 context=ctx,
                 message=f"Reminder with ID `{reminder_id}` not found.",
@@ -844,9 +849,8 @@ class ClashServerConfig(commands.Cog):
 
         await interaction.response.defer()
 
-        try:
-            reminder = RecruitingReminder(reminder)
-        except:
+        get_reminder = await RecruitingReminder.get_by_id(reminder)
+        if not get_reminder:
             embed = await clash_embed(
                 context=interaction,
                 message=f"Reminder with ID `{reminder}` not found.",
@@ -854,7 +858,7 @@ class ClashServerConfig(commands.Cog):
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
         
-        await reminder.delete()
+        await get_reminder.delete()
         embed = await clash_embed(
             context=interaction,
             message=f"Recruiting Reminder deleted.",

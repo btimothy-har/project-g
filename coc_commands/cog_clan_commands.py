@@ -24,14 +24,12 @@ from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisClash
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from coc_main.discord.clan_link import db_ClanGuildLink, ClanGuildLink
+from coc_main.discord.clan_link import ClanGuildLink
 from coc_main.coc_objects.players.mongo_player import db_PlayerStats
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu
 from .excel.clan_export import ClanExcelExport
-
-from coc_main.discord.feeds.raid_results import RaidResultsFeed
 
 bot_client = BotClashClient()
 
@@ -43,22 +41,8 @@ async def autocomplete_clan_settings(interaction:discord.Interaction,current:str
             return await autocomplete_clans(interaction,current)
         
         else:
-            clan_tags = [db.tag for db in db_AllianceClan.objects(Q(coleaders__contains=interaction.user.id) | Q(leader=interaction.user.id))]
-            
-            if current:
-                clans = list(db_Clan.objects(
-                    (Q(tag__in=clan_tags)) &
-                    (Q(tag__icontains=current) | Q(name__icontains=current) | Q(abbreviation=current.upper()))
-                    ))
-            else:
-                clans = list(db_Clan.objects(tag__in=clan_tags))
-
-            return [
-                app_commands.Choice(
-                    name=f"{c.name} | {c.tag}",
-                    value=c.tag)
-                for c in random.sample(clans,min(len(clans),3))
-                ]
+            return await autocomplete_clans_coleader(interaction,current)
+        
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_clan_settings")
 
@@ -155,7 +139,7 @@ class Clans(commands.Cog):
                     title=f"{clan.title}",
                     message=f"{clan.long_description}"
                         + (f"\n\n> **Recruiting:** {clan.recruitment_level_emojis}" if clan.is_alliance_clan else "")
-                        + f"\n\n{clan.c_description}",
+                        + f"\n\n{clan.description}",
                     thumbnail=clan.badge,
                     show_author=False,
                     )
@@ -225,68 +209,70 @@ class Clans(commands.Cog):
     ##################################################
     ### CLAN FAMILY
     ##################################################
-    @commands.command(name="family-clans")
+    async def helper_family_clans(self,context:Union[commands.Context,discord.Interaction]):
+        clans = await self.client.get_registered_clans()
+        embed = await clash_embed(
+            context=context,
+            title=f"**{bot_client.bot.user.name} Registered Clans**",
+            message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" for clan in clans]),
+            )
+        return embed
+
+    @commands.command(name="familyclans")
     @commands.guild_only()
     async def command_family_clans(self,ctx:commands.Context):
         """
         Displays all Clans registered to the bot.
         """
-
-        clans = await self.client.get_registered_clans()
-        embed = await clash_embed(
-            context=ctx,
-            title=f"**{ctx.bot.user.name} Registered Clans**",
-            message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" for clan in clans]),
-            )        
+        embed = await self.helper_family_clans(ctx)
         await ctx.reply(embed=embed)
         
     @app_commands.command(
         name="family-clans",
         description="Displays all Clans registered to the bot.")
     @app_commands.guild_only()
-    async def app_command_find_clan(self,interaction:discord.Interaction):
+    async def app_command_family_clans(self,interaction:discord.Interaction):
 
         await interaction.response.defer()
-        clans = await self.client.get_registered_clans()
-        embed = await clash_embed(
-            context=interaction,
-            title=f"**{interaction.client.user.name} Registered Clans**",
-            message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" for clan in clans]),
-            )        
-        await interaction.edit_original_response(embed=embed)
+        embed = await self.helper_family_clans(interaction)
+        await interaction.followup.send(embed=embed)
 
     ##################################################
     ### FIND-CLAN (ALIAS: CLAN INFO)
     ##################################################
+    async def helper_find_clan(self,context:Union[commands.Context,discord.Interaction],clan_tag:str) -> Tuple[discord.Embed,Optional[ClanLinkMenu]]:
+        
+        clan = await self.client.fetch_clan(tag=clan_tag)
+        if not clan:
+            embed = await clash_embed(
+            context=context,
+            message=f"I couldn't find a Clan with the tag `{clan_tag}`.",
+            )
+            return embed,None
+
+        view = ClanLinkMenu([clan])
+        embed = await clash_embed(
+            context=context,
+            title=f"{clan.title}",
+            message=f"{clan.long_description}"
+                + (f"\n\n> **Recruiting:** {clan.recruitment_level_emojis}" if clan.is_alliance_clan else "")
+                + f"\n\n{clan.description}",
+            thumbnail=clan.badge,
+            show_author=False,
+            )
+        return embed,view
+    
     @commands.command(name="findclan")
     @commands.guild_only()
-    async def command_find_clan_123(self,ctx:commands.Context,clan_tag:str):
+    async def command_find_clan(self,ctx:commands.Context,clan_tag:str):
         """
         Gets information about an in-game Clan.
 
         This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p]abbreviation` instead.
         """
 
-        clan = await self.client.fetch_clan(tag=clan_tag)
-
-        if not clan:
-            embed = await clash_embed(
-            context=ctx,
-            message=f"I couldn't find a Clan with the tag `{clan_tag}`.",
-            )
-            return await ctx.reply(embed=embed)
-
-        view = ClanLinkMenu([clan])
-        embed = await clash_embed(
-            context=ctx,
-            title=f"{clan.title}",
-            message=f"{clan.long_description}"
-                + (f"\n\n> **Recruiting:** {clan.recruitment_level_emojis}" if clan.is_alliance_clan else "")
-                + f"\n\n{clan.c_description}",
-            thumbnail=clan.badge,
-            show_author=False,
-            )
-        return await ctx.reply(embed=embed,view=view)
+        embed, view = await self.helper_find_clan(ctx,clan_tag)
+        await ctx.reply(embed=embed,view=view)
         
     @app_commands.command(
         name="find-clan",
@@ -297,18 +283,8 @@ class Clans(commands.Cog):
     async def app_command_find_clan(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-        get_clan = await self.client.fetch_clan(tag=clan)
-
-        view = ClanLinkMenu([get_clan])
-        embed = await clash_embed(
-            context=interaction,
-            title=f"{get_clan.title}",
-            message=f"{get_clan.long_description}"
-                + (f"\n\n**Recruiting:** {get_clan.recruitment_level_emojis}" if len(get_clan.recruitment_level) > 0 else "")
-                + f"\n\n>>> {get_clan.c_description}",
-            thumbnail=get_clan.badge,
-            )
-        await interaction.edit_original_response(embed=embed,view=view)
+        embed, view = await self.helper_find_clan(interaction,clan)
+        await interaction.followup.send(embed=embed,view=view)
     
     @command_group_clan.command(name="info")
     @commands.guild_only()
@@ -319,25 +295,8 @@ class Clans(commands.Cog):
         This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p]abbreviation` instead.
         """
 
-        clan = await self.client.fetch_clan(tag=clan_tag)
-        if not clan:
-            embed = await clash_embed( 
-                context=ctx,
-                message=f"I couldn't find a Clan with the tag `{clan_tag}`.",
-                )
-            return await ctx.reply(embed=embed)
-
-        view = ClanLinkMenu([clan])
-        embed = await clash_embed(
-            context=ctx,
-            title=f"{clan.title}",
-            message=f"{clan.long_description}"
-                + (f"\n\n> **Recruiting:** {clan.recruitment_level_emojis}" if clan.is_alliance_clan else "")
-                + f"\n\n{clan.c_description}",
-            thumbnail=clan.badge,
-            show_author=False,
-            )
-        return await ctx.reply(embed=embed,view=view)
+        embed, view = await self.helper_find_clan(ctx,clan_tag)
+        await ctx.reply(embed=embed,view=view)
         
     @app_command_group_clan.command(
         name="info",
@@ -347,22 +306,46 @@ class Clans(commands.Cog):
     async def app_command_clan_information(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-        get_clan = await self.client.fetch_clan(tag=clan)
-
-        view = ClanLinkMenu([get_clan])
-        embed = await clash_embed(
-            context=interaction,
-            title=f"{get_clan.title}",
-            message=f"{get_clan.long_description}"
-                + (f"\n\n**Recruiting:** {get_clan.recruitment_level_emojis}" if len(get_clan.recruitment_level) > 0 else "")
-                + f"\n\n>>> {get_clan.c_description}",
-            thumbnail=get_clan.badge,
-            )
-        await interaction.edit_original_response(embed=embed,view=view)
+        embed, view = await self.helper_find_clan(interaction,clan)
+        await interaction.followup.send(embed=embed,view=view)
     
     ##################################################
     ### CLANDATA / EXPORT
     ##################################################
+    async def _clan_export_helper(self,
+        context:Union[commands.Context,discord.Interaction],
+        clan_tag_or_abbreviation:str,
+        season:Optional[aClashSeason]=None):
+
+        try:
+            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=context,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return embed, None
+
+        if not clan.is_alliance_clan:
+            embed = await clash_embed(
+                context=context,
+                message=f"Only Alliance Clans can be exported.",
+                success=False,
+                )
+            return embed, None
+        
+        if not season:
+            season = self.bot_client.current_season
+        rp_file = await ClanExcelExport.generate_report(clan,season)
+        discord_file = discord.File(rp_file)
+
+        message = f"Here is your Data for **{clan}**.\n\nSeason: {season.description}."
+        return message,discord_file
+
     @command_group_clan.command(name="export")
     @commands.guild_only()
     @commands.check(is_coleader)
@@ -373,37 +356,21 @@ class Clans(commands.Cog):
         Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
         """
 
-        try:
-            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
+        embed = await clash_embed(
+            context=ctx,
+            message=f"{EmojisUI.LOADING} Exporting data... please wait.",
+            timestamp=pendulum.now(),
+            )
+        message = await ctx.reply(embed=embed)
 
-        if not clan.is_alliance_clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"Only Alliance Clans can be exported.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)        
+        embed, discord_file = await self._clan_export_helper(ctx,clan_tag_or_abbreviation)
+        attachments = [discord_file] if discord_file else []
 
-        wait_msg = await ctx.reply("Exporting Clan Data... please wait.")
-        
-        season = self.bot_client.current_season
-        rp_file = await ClanExcelExport.generate_report(clan,season)
-
-        await wait_msg.delete()
-        await ctx.reply(
-            content=f"Here is the Clan data for {clan} as you requested.",
-            file=discord.File(rp_file))
-        
+        await message.edit(
+            content=f'{ctx.author.mention} {embed}',
+            embed=None,
+            attachments=attachments
+            )
 
     @app_command_group_clan.command(name="export",
         description="Export seasonal Clan Data to an Excel file.")
@@ -417,26 +384,84 @@ class Clans(commands.Cog):
     async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
         
         await interaction.response.defer()
-        
-        get_clan = await self.client.fetch_clan(clan)
-        if not clan.is_alliance_clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Only Alliance Clans can be exported.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        season = aClashSeason(season)
-        rp_file = await ClanExcelExport.generate_report(get_clan,season)
 
-        await interaction.followup.send(
-            content=f"Here is the Clan data for {get_clan} as you requested.",
-            file=discord.File(rp_file))
+        embed, discord_file = await self._clan_export_helper(interaction,clan,season)
+        attachments = [discord_file] if discord_file else []
+
+        await interaction.edit_original_response(
+            content=f'{interaction.user.mention} {embed}',
+            embed=None,
+            attachments=attachments
+            )
     
     ##################################################
     ### CLANDATA / COMPO
     ##################################################
+    async def _clan_composition_helper(self,
+        context:Union[commands.Context,discord.Interaction],
+        clan_tag_or_abbreviation:str) -> discord.Embed:
+
+        try:
+            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=context,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return embed
+
+        embed = await clash_embed(
+            context=context,
+            title=f"{clan.title}",
+            message=f"**Clan Member Composition**",
+            thumbnail=clan.badge,
+            )
+                   
+        get_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members),return_exceptions=True)
+        ingame_members = [member for member in get_members if isinstance(member,aPlayer)]
+
+        if clan.is_alliance_clan and clan.alliance_member_count > 0:
+            get_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members),return_exceptions=True)
+            clan_members = [member for member in get_members if isinstance(member,aPlayer)]
+            townhall_levels = [member.town_hall.level for member in clan_members]
+            townhall_levels.sort(reverse=True)
+            average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
+            townhall_counts = Counter(townhall_levels)
+            
+            embed.add_field(
+                name="**Registered Members**",
+                value=f"Total: {len(clan_members)} {EmojisUI.MEMBERS}\n"
+                    + f"Average: {EmojisTownHall.get(int(average_townhall))} {average_townhall}\n\n"
+                    + "\n".join([
+                        f"{EmojisTownHall.get(th)} `TH{th:02}`: {(count/len(clan_members))*100:.1f}% ({count})"
+                        for th, count in townhall_counts.items()
+                        ])
+                    + "\n\u200b",
+                inline=False,
+                )
+            
+        townhall_levels = [member.town_hall.level for member in ingame_members]
+        townhall_levels.sort(reverse=True)
+        average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
+        townhall_counts = Counter(townhall_levels)
+
+        embed.add_field(
+            name="**In-Game Members**",
+            value=f"Total: {len(ingame_members)} {EmojisUI.MEMBERS}\n"
+                + f"Average: {EmojisTownHall.get(int(average_townhall))} {average_townhall}\n\n"
+                + "\n".join([
+                    f"{EmojisTownHall.get(th)} `TH{th:02}`: {(count/len(ingame_members))*100:.1f}% ({count})"
+                    for th, count in townhall_counts.items()
+                    ])
+                + "\n\u200b",
+            inline=False,
+            )
+        return embed
+
     @command_group_clan.command(name="compo")
     @commands.guild_only()
     async def command_clan_composition(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
@@ -445,22 +470,9 @@ class Clans(commands.Cog):
 
         For registered Alliance clans, returns registered and in-game compositions.
         """
-     
-        try:
-            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-        
-        embed = await self.clan_composition_embed(ctx,clan)            
-        return await ctx.reply(embed=embed)
+
+        embed = await self._clan_composition_helper(ctx,clan_tag_or_abbreviation)
+        await ctx.reply(embed=embed)
 
     @app_command_group_clan.command(
         name="compo",
@@ -470,30 +482,15 @@ class Clans(commands.Cog):
     async def app_command_clan_composition(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-
-        get_clan = await self.client.fetch_clan(clan)
-        if not get_clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        embed = await self.clan_composition_embed(interaction,get_clan)
-        return await interaction.edit_original_response(embed=embed)
+        embed = await self._clan_composition_helper(interaction,clan)
+        await interaction.followup.send(embed=embed)
 
     ##################################################
     ### CLANDATA / STRENGTH
     ##################################################
-    @command_group_clan.command(name="strength")
-    @commands.guild_only()
-    async def subcommand_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        View a Clan's overall Offensive Strength.
-
-        For registered Alliance clans, returns only registered members.
-        """
+    async def _clan_strength_helper(self,
+        context:Union[commands.Context,discord.Interaction],
+        clan_tag_or_abbreviation:str) -> discord.Embed:
 
         try:
             clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
@@ -502,14 +499,70 @@ class Clans(commands.Cog):
         
         if not clan:
             embed = await clash_embed(
-                context=ctx,
+                context=context,
                 message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
                 success=False,
                 )
-            return await ctx.reply(embed=embed)
+            return embed
+        
+        if clan.is_alliance_clan and clan.alliance_member_count > 0:
+            showing_registered = True
+            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
+        else:
+            showing_registered = False
+            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
+        
+        townhall_levels = list(set([member.town_hall.level for member in clan_members]))
+        townhall_levels.sort(reverse=True)
+        average_th = round(sum([member.town_hall.level for member in clan_members])/len([member.town_hall.level for member in clan_members]),2)
 
-        embed = await self.clan_strength_embed(ctx,clan)
-        return await ctx.reply(embed=embed)
+        embed = await clash_embed(
+            context=context,
+            title=f"{clan.title}",
+            message=f"**Clan Offensive Strength**\n"
+                + f"**Average TH: {EmojisTownHall.get(round(average_th))} {average_th}**\n\n"
+                + (f"*Showing registered members only.*\n" if showing_registered else "*Showing in-game members only.*\n")
+                + (f"The {EmojisUI.LOGOUT} emoji denotes a registered member who is currently not in the clan.\n" if clan.is_alliance_clan and clan.alliance_member_count > 0 else "")
+                + f"\n`{'BK':^2}{'':^2}{'AQ':^2}{'':^2}{'GW':^2}{'':^2}{'RC':^2}{'':^2}{'Troops':>7}{'':^2}{'Spells':>7}{'':^2}`",
+            thumbnail=clan.badge,
+            )
+
+        async for th in AsyncIter(townhall_levels):
+            th_members = [member for member in clan_members if member.town_hall.level == th]
+            th_members.sort(key=lambda member:(member.hero_strength,member.troop_strength,member.spell_strength),reverse=True)
+            chunked_members = list(chunks(th_members,10))
+
+            for i, members_chunk in enumerate(chunked_members):
+                embed.add_field(
+                    name=f"{EmojisTownHall.get(th)} **TH{th}**"
+                        + (f" - ({i+1}/{len(chunked_members)})" if len(chunked_members) > 1 else ""),
+                    value="\n".join([
+                        f"`"
+                        + f"{getattr(member.barbarian_king,'level',''):^2}{'':^2}"
+                        + f"{getattr(member.archer_queen,'level',''):^2}{'':^2}"
+                        + f"{getattr(member.grand_warden,'level',''):^2}{'':^2}"
+                        + f"{getattr(member.royal_champion,'level',''):^2}{'':^2}"
+                        + f"{str(round((member.troop_strength / member.max_troop_strength)*100))+'%':>7}{'':^2}"
+                        + (f"{str(round((member.spell_strength / member.max_spell_strength)*100))+'%':>7}" if member.max_spell_strength > 0 else f"{'':>7}")
+                        + f"{'':^2}`\u3000{re.sub('[_*/]','',member.clean_name)}"
+                        + (f" {EmojisUI.LOGOUT}" if clan.is_alliance_clan and member.tag not in clan.members_dict else "")
+                        for member in members_chunk
+                        ]),
+                    inline=False,
+                    )
+        return embed
+
+    @command_group_clan.command(name="strength")
+    @commands.guild_only()
+    async def subcommand_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View a Clan's overall Offensive Strength.
+
+        For registered Alliance clans, returns only registered members.
+        """
+        
+        embed = await self._clan_strength_helper(ctx,clan_tag_or_abbreviation)
+        await ctx.reply(embed=embed)
     
     @app_command_group_clan.command(
         name="strength",
@@ -519,22 +572,70 @@ class Clans(commands.Cog):
     async def app_command_clan_strength(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-
-        get_clan = await self.client.fetch_clan(clan)
-        if not get_clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)            
-
-        embed = await self.clan_strength_embed(interaction,get_clan)
-        return await interaction.edit_original_response(embed=embed)
+        embed = await self._clan_strength_helper(interaction,clan)
+        await interaction.followup.send(embed=embed)
 
     ##################################################
     ### CLANDATA / DONATIONS
     ##################################################
+    async def _clan_donations_helper(self,
+        context:Union[commands.Context,discord.Interaction],
+        clan_tag_or_abbreviation:str) -> discord.Embed:
+
+        try:
+            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
+        
+        if not clan:
+            embed = await clash_embed(
+                context=context,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return embed
+        
+        if clan.is_alliance_clan and clan.alliance_member_count > 0:
+            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
+            clan_members.sort(key=lambda member: member.current_season.donations_sent.season_total,reverse=True)
+
+            stats_text = "\n".join([
+                f"`{str(member.current_season.donations_sent):>6}{'':^2}"
+                + f"{str(member.current_season.donations_rcvd):>6}{'':^2}`"
+                + f"\u3000{EmojisTownHall.get(member.town_hall.level)} {re.sub('[_*/]','',member.clean_name)}"
+                for member in clan_members])
+
+            embed = await clash_embed(
+                context=context,
+                title=f"{clan.title}: Donations",
+                message=f"**Showing stats for: {bot_client.current_season.description}**\n\n"
+                    + f"{EmojisClash.DONATIONSOUT} Total Sent: {sum(member.current_season.donations_sent.season_total for member in clan_members):,}\u3000|\u3000"
+                    + f"{EmojisClash.DONATIONSRCVD} Total Received: {sum(member.current_season.donations_rcvd.season_total for member in clan_members):,}\n\n"
+                    + f"`{'SENT':>6}{'':^2}{'RCVD':>6}{'':^2}`\n"
+                    + stats_text,
+                thumbnail=clan.badge,
+                )    
+        else:
+            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
+            clan_members.sort(key=lambda member: member.donations,reverse=True)
+
+            stats_text = "\n".join([
+                f"`{member.donations:>6}{'':^2}"
+                + f"{member.received:>6}{'':^2}`"
+                + f"\u3000{EmojisTownHall.get(member.town_hall.level)} {re.sub('[_*/]','',member.name)}"
+                for member in clan_members])
+
+            embed = await clash_embed(
+                context=context,
+                title=f"{clan.title}: Donations",
+                message=f"{EmojisClash.DONATIONSOUT} Total Sent: {sum(member.donations for member in clan_members):,}\u3000|\u3000"
+                    + f"{EmojisClash.DONATIONSRCVD} Total Received: {sum(member.received for member in clan_members):,}\n\n"
+                    + f"`{'SENT':>6}{'':^2}{'RCVD':>6}{'':^2}`\n"
+                    + stats_text,
+                thumbnail=clan.badge,
+                )
+        return embed
+        
     @command_group_clan.command(name="donations")
     @commands.guild_only()
     async def subcommand_clan_donations(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
@@ -544,20 +645,7 @@ class Clans(commands.Cog):
         For registered Alliance Clans, this will retrieve stats for registered members. For all other clans, this will return what is available via in-game.
         """
         
-        try:
-            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
-        
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-        
-        embed = await self.clan_donations_embed(ctx,clan)
+        embed = await self._clan_donations_helper(ctx,clan_tag_or_abbreviation)
         await ctx.reply(embed=embed)
     
     @app_command_group_clan.command(name="donations",
@@ -567,18 +655,8 @@ class Clans(commands.Cog):
     async def app_command_clanstats_donations(self,interaction:discord.Interaction,clan:str):
    
         await interaction.response.defer()
-
-        get_clan = await self.client.fetch_clan(clan)
-        if not get_clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-        
-        embed = await self.clan_donations_embed(interaction,get_clan)
-        await interaction.edit_original_response(embed=embed)
+        embed = await self._clan_donations_helper(interaction,clan)
+        await interaction.followup.send(embed=embed)
     
     ##################################################
     ### CLAN / MEMBERS
@@ -634,6 +712,56 @@ class Clans(commands.Cog):
     ##################################################
     ### CLAN GAMES
     ##################################################
+    async def _clan_games_helper(self,
+        context:Union[commands.Context,discord.Interaction],
+        clan_tag_or_abbreviation:str,
+        season:Optional[aClashSeason]=None) -> discord.Embed:
+
+        def _db_query():
+            query = db_PlayerStats.objects(
+                season=season.id,
+                clangames__clan=clan.tag,
+                clangames__score__gt=0
+                ).only('tag')
+            return [p.tag for p in query]
+
+        try:
+            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
+        except InvalidAbbreviation:
+            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
+
+        if not clan:
+            embed = await clash_embed(
+                context=context,
+                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
+                success=False,
+                )
+            return embed
+        
+        if not season:
+            season = aClashSeason.last_completed_clangames()
+        
+        query = await bot_client.run_in_thread(_db_query)        
+        players = await asyncio.gather(*(self.client.fetch_player(p) for p in query))
+
+        clangames_players = [p.get_season_stats(season) for p in players if isinstance(p,aPlayer)]
+
+        embed = await clash_embed(
+            context=context,
+            title=f"{clan.title}: Clan Games",
+            message=f"**Showing stats for: {season.description}**\n\n"
+                + f"{EmojisUI.MEMBERS} Total Participants: {len(clangames_players)}\n"
+                + f"{EmojisClash.CLANGAMES} Total Score: {sum([p.clangames.score for p in clangames_players]):,}\n\n"
+                + f"*{EmojisUI.LOGOUT} denotes a member who is not registered to this Clan.*\n"
+                + f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
+                + f"\n".join([
+                    f"`{i+1:<3}{p.clangames.score:>6,}{'':>2}{p.clangames.time_to_completion:>13}`\u3000{EmojisUI.LOGOUT if p.home_clan_tag != clan.tag else EmojisUI.SPACER}{EmojisTownHall.get(p.town_hall)} {re.sub('[_*/]','',p.clean_name)}"
+                    for i, p in enumerate(clangames_players)
+                    ]),
+            thumbnail=clan.badge,
+            )
+        return embed
+
     @commands.command(name="clangames",aliases=["cg"])
     @commands.guild_only()
     async def command_clan_games(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
@@ -642,21 +770,8 @@ class Clans(commands.Cog):
 
         Defaults to the last completed Clan Games. If viewing non-Alliance clans, data may not be completed.
         """
-  
-        try:
-            clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
-        except InvalidAbbreviation:
-            clan = await self.client.fetch_clan(clan_tag_or_abbreviation)
 
-        if not clan:
-            embed = await clash_embed(
-                context=ctx,
-                message=f"I couldn't find a Clan with the input `{clan_tag_or_abbreviation}`.",
-                success=False,
-                )
-            return await ctx.reply(embed=embed)
-
-        embed = await self.clan_games_data(ctx,clan,aClashSeason.last_completed_clangames())
+        embed = await self._clan_games_helper(ctx,clan_tag_or_abbreviation)
         await ctx.reply(embed=embed)
 
     @app_commands.command(name="clan-games",
@@ -665,24 +780,15 @@ class Clans(commands.Cog):
         clan=autocomplete_clans,
         season=autocomplete_seasons)
     @app_commands.describe(
-        clan="Select a Clan. If viewing non-Alliance clans, data may not be completed.",
+        clan="Select a Clan. If viewing non-Alliance clans, data may not be complete.",
         season="Select a Season to view for.")
     async def app_command_clan_games(self,interaction:discord.Interaction,clan:str,season:str):
 
         await interaction.response.defer()
+        get_season = aClashSeason(season)
+        embed = await self._clan_games_helper(interaction,clan,get_season)
+        await interaction.followup.send(embed=embed)
 
-        clan = await self.client.fetch_clan(clan)
-        if not clan:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"I couldn't find a Clan with the input `{clan}`.",
-                success=False,
-                )
-            return await interaction.edit_original_response(embed=embed)
-
-        embed = await self.clan_games_data(interaction,clan,aClashSeason.last_completed_clangames())
-        await interaction.edit_original_response(embed=embed)
-    
     ##################################################
     ### CLANSET / REGISTER
     ##################################################
@@ -694,10 +800,7 @@ class Clans(commands.Cog):
         abbreviation:str):
 
         clan = await self.client.fetch_clan(clan_tag)
-        clan.abbreviation = abbreviation
-        clan.emoji = emoji
-        clan.unicode_emoji = unicode_emoji
-
+        await clan.register(abbreviation=abbreviation,emoji=emoji,unicode_emoji=unicode_emoji)
         embed = await clash_embed(
             context=context,
             title=f"Registered: {clan.title}",
@@ -782,7 +885,7 @@ class Clans(commands.Cog):
         confirm_view = MenuConfirmation(ctx)
         
         message = await ctx.reply(
-            message=f"{ctx.author.mention}, please confirm the below action.",
+            content=f"{ctx.author.mention}, please confirm the below action.",
             embed=embed,
             view=confirm_view
             )        
@@ -793,17 +896,19 @@ class Clans(commands.Cog):
                 context=ctx,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)
-            return await message.edit(embed=[embed,timeout_embed],view=None)
+            return await message.edit(content=None,embed=[embed,timeout_embed],view=None)
     
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=ctx,
                 message=f"Task cancelled.",
                 success=False)
-            return await message.edit(embed=[embed,cancel_embed],view=None)
+            return await message.edit(content=None,embed=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
-            await ClanGuildLink.create(
+            await clan._sync_cache()
+
+            link = await ClanGuildLink.create(
                 clan_tag=clan.tag,
                 guild=ctx.guild,
                 member_role=member_role,
@@ -812,14 +917,14 @@ class Clans(commands.Cog):
                 )            
             complete_embed = await clash_embed(
                 context=ctx,
-                title=f"Link Clan: **{clan.title}**",
-                message=f"**Co-Leader Role:** {coleader_role.mention}"
-                    + f"\n**Elder Role:** {elder_role.mention}"
-                    + f"\n**Member Role:** {member_role.mention}",
-                url=clan.share_link,
+                title=f"Clan Linked: **{link.clan.title}**",
+                message=f"**Co-Leader Role:** {link.coleader_role.mention}"
+                    + f"\n**Elder Role:** {link.elder_role.mention}"
+                    + f"\n**Member Role:** {link.member_role.mention}",
+                url=link.clan.share_link,
                 success=True,
-                thumbnail=clan.badge)
-            return await message.edit(embed=complete_embed,view=None)
+                thumbnail=link.clan.badge)
+            return await message.edit(content=None,embed=complete_embed,view=None)
 
     @app_command_group_clanset.command(
         name="link",
@@ -858,17 +963,19 @@ class Clans(commands.Cog):
                 context=interaction,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)
-            return await interaction.edit_original_response(embeds=[embed,timeout_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,timeout_embed],view=None)
     
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=interaction,
                 message=f"Task cancelled.",
                 success=False)
-            return await interaction.edit_original_response(embeds=[embed,cancel_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
-            await ClanGuildLink.create(
+            await select_clan._sync_cache()
+
+            link = await ClanGuildLink.create(
                 clan_tag=select_clan.tag,
                 guild=interaction.guild,
                 member_role=member_role,
@@ -877,14 +984,14 @@ class Clans(commands.Cog):
                 )            
             complete_embed = await clash_embed(
                 context=interaction,
-                title=f"Link Clan: **{select_clan.title}**",
-                message=f"**Co-Leader Role:** {coleader_role.mention}"
-                    + f"\n**Elder Role:** {elder_role.mention}"
-                    + f"\n**Member Role:** {member_role.mention}",
-                url=select_clan.share_link,
+                title=f"Link Clan: **{link.clan.title}**",
+                message=f"**Co-Leader Role:** {link.coleader_role.mention}"
+                    + f"\n**Elder Role:** {link.elder_role.mention}"
+                    + f"\n**Member Role:** {link.member_role.mention}",
+                url=link.clan.share_link,
                 success=True,
-                thumbnail=select_clan.badge)
-            return await interaction.edit_original_response(embed=complete_embed,view=None)
+                thumbnail=link.clan.badge)
+            return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
     ##################################################
     ### CLANSET / UNLINK
@@ -892,12 +999,12 @@ class Clans(commands.Cog):
     @command_group_clanset.command(name="unlink")
     @commands.guild_only()
     @commands.admin()
-    async def subcommand_link_clan(self,ctx:commands.Context,clan_tag:str):
+    async def subcommand_unlink_clan(self,ctx:commands.Context,clan_tag:str):
         """
         [Admin-only] Unlinks a Clan from this Discord Server.
         """
         clan = await self.client.fetch_clan(clan_tag)
-        link = ClanGuildLink.get_link(clan_tag,ctx.guild.id)
+        link = await ClanGuildLink.get_link(clan.tag,ctx.guild.id)
         
         embed = await clash_embed(
             context=ctx,
@@ -909,7 +1016,7 @@ class Clans(commands.Cog):
         confirm_view = MenuConfirmation(ctx)
         
         message = await ctx.reply(
-            message=f"{ctx.author.mention}, please confirm the below action.",
+            content=f"{ctx.author.mention}, please confirm the below action.",
             embed=embed,
             view=confirm_view
             )        
@@ -920,14 +1027,14 @@ class Clans(commands.Cog):
                 context=ctx,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)
-            return await message.edit(embed=[embed,timeout_embed],view=None)
+            return await message.edit(content=None,embed=[embed,timeout_embed],view=None)
     
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=ctx,
                 message=f"Task cancelled.",
                 success=False)
-            return await message.edit(embed=[embed,cancel_embed],view=None)
+            return await message.edit(content=None,embed=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
             await ClanGuildLink.delete(clan.tag,ctx.guild)
@@ -936,7 +1043,7 @@ class Clans(commands.Cog):
                 message=f"**{clan.title}** has been unlinked from {ctx.guild.name}.",
                 success=True,
                 thumbnail=clan.badge)
-            return await message.edit(embed=complete_embed,view=None)
+            return await message.edit(content=None,embed=complete_embed,view=None)
 
     @app_command_group_clanset.command(
         name="unlink",
@@ -944,12 +1051,12 @@ class Clans(commands.Cog):
     @app_commands.check(is_admin)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_subcommand_link_clan(self,interaction:discord.Interaction,clan:str):
+    async def app_subcommand_unlink_clan(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
         
         select_clan = await self.client.fetch_clan(clan)
-        link = ClanGuildLink.get_link(select_clan.tag,interaction.guild.id)
+        link = await ClanGuildLink.get_link(select_clan.tag,interaction.guild.id)
 
         if not link:
             embed = await clash_embed(
@@ -969,7 +1076,7 @@ class Clans(commands.Cog):
         confirm_view = MenuConfirmation(interaction)
 
         await interaction.followup.send(
-            message=f"{interaction.user.mention}, please confirm the below action.",
+            content=f"{interaction.user.mention}, please confirm the below action.",
             embed=embed,
             view=confirm_view,
             wait=True
@@ -981,14 +1088,14 @@ class Clans(commands.Cog):
                 context=interaction,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)
-            return await interaction.edit_original_response(embeds=[embed,timeout_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,timeout_embed],view=None)
     
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=interaction,
                 message=f"Task cancelled.",
                 success=False)
-            return await interaction.edit_original_response(embeds=[embed,cancel_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
             await ClanGuildLink.delete(select_clan.tag,interaction.guild)
@@ -997,7 +1104,7 @@ class Clans(commands.Cog):
                 message=f"**{select_clan.title}** has been unlinked from {interaction.guild.name}.",
                 success=True,
                 thumbnail=select_clan.badge)
-            return await interaction.edit_original_response(embed=complete_embed,view=None)
+            return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
     ##################################################
     ### CLANSET / SETLEADER
@@ -1038,7 +1145,7 @@ class Clans(commands.Cog):
             message=f"**Current Leader:** <@{clan.leader}>"
                 + f"\n**New Leader:** {new_leader.mention}"
                 + f"\n\n{clan.long_description}"
-                + f"\n\n>>> {clan.c_description}",
+                + f"\n\n>>> {clan.description}",
             thumbnail=clan.badge)
         confirm_view = MenuConfirmation(ctx)
 
@@ -1054,14 +1161,14 @@ class Clans(commands.Cog):
                 context=ctx,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)
-            return await message.edit(embeds=[embed,timeout_embed],view=None)
+            return await message.edit(content=None,embeds=[embed,timeout_embed],view=None)
 
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=ctx,
                 message=f"Task cancelled.",
                 success=False)
-            return await message.edit(embeds=[embed,cancel_embed],view=None)
+            return await message.edit(content=None,embeds=[embed,cancel_embed],view=None)
         
         if confirm_view.confirmation:
             await clan.new_leader(new_leader.id)
@@ -1070,11 +1177,15 @@ class Clans(commands.Cog):
                 title=f"Change Leader: **{clan.title}**",
                 message=f"Leader: <@{clan.leader}>"
                     + f"\n\n{clan.long_description}"
-                    + f"\n\n>>> {clan.c_description}",
+                    + f"\n\n>>> {clan.description}",
                 url=clan.share_link,
                 success=True,
                 thumbnail=clan.badge)
-            return await message.edit(embed=complete_embed,view=None)
+            return await message.edit(
+                content=None,
+                embed=complete_embed,
+                view=None
+                )
 
     @app_command_group_clanset.command(
         name="leader",
@@ -1082,7 +1193,7 @@ class Clans(commands.Cog):
     @app_commands.check(is_admin_or_leader)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_subcommand_link_clan(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
+    async def app_subcommand_change_leader(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
 
         await interaction.response.defer()
 
@@ -1119,14 +1230,14 @@ class Clans(commands.Cog):
                 context=interaction,
                 message=f"Confirmation timed out. Please try again.",
                 success=False)            
-            return await interaction.edit_original_response(embeds=[embed,timeout_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,timeout_embed],view=None)
 
         if not confirm_view.confirmation:
             cancel_embed = await clash_embed(
                 context=interaction,
                 message=f"Task cancelled.",
                 success=False)
-            return await interaction.edit_original_response(embeds=[embed,cancel_embed],view=None)
+            return await interaction.edit_original_response(content=None,embeds=[embed,cancel_embed],view=None)
         
         if confirm_view.confirmation:
             await select_clan.new_leader(new_leader.id)
@@ -1173,165 +1284,3 @@ class Clans(commands.Cog):
         get_clan = await self.client.fetch_clan(clan)
         menu = ClanSettingsMenu(interaction,get_clan)
         await menu.start()
-    
-    async def clan_composition_embed(self,context:Union[commands.Context,discord.Interaction],clan:aClan):
-        embed = await clash_embed(
-            context=context,
-            title=f"{clan.title}",
-            message=f"**Clan Member Composition**",
-            thumbnail=clan.badge,
-            )            
-        get_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members),return_exceptions=True)
-        ingame_members = [member for member in get_members if isinstance(member,aPlayer)]
-
-        if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            get_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members),return_exceptions=True)
-            clan_members = [member for member in get_members if isinstance(member,aPlayer)]
-            townhall_levels = [member.town_hall.level for member in clan_members]
-            townhall_levels.sort(reverse=True)
-            average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
-            townhall_counts = Counter(townhall_levels)
-            
-            embed.add_field(
-                name="**Registered Members**",
-                value=f"Total: {len(clan_members)} {EmojisUI.MEMBERS}\n"
-                    + f"Average: {EmojisTownHall.get(int(average_townhall))} {average_townhall}\n\n"
-                    + "\n".join([
-                        f"{EmojisTownHall.get(th)} `TH{th:02}`: {(count/len(clan_members))*100:.1f}% ({count})"
-                        for th, count in townhall_counts.items()
-                        ])
-                    + "\n\u200b",
-                inline=False,
-                )
-        townhall_levels = [member.town_hall.level for member in ingame_members]
-        townhall_levels.sort(reverse=True)
-        average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
-        townhall_counts = Counter(townhall_levels)
-
-        embed.add_field(
-            name="**In-Game Members**",
-            value=f"Total: {len(ingame_members)} {EmojisUI.MEMBERS}\n"
-                + f"Average: {EmojisTownHall.get(int(average_townhall))} {average_townhall}\n\n"
-                + "\n".join([
-                    f"{EmojisTownHall.get(th)} `TH{th:02}`: {(count/len(ingame_members))*100:.1f}% ({count})"
-                    for th, count in townhall_counts.items()
-                    ])
-                + "\n\u200b",
-            inline=False,
-            )
-        return embed
-
-    async def clan_strength_embed(self,context:Union[commands.Context,discord.Interaction],clan:aClan):
-        if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            showing_registered = True
-            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
-        else:
-            showing_registered = False
-            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
-        
-        townhall_levels = list(set([member.town_hall.level for member in clan_members]))
-        townhall_levels.sort(reverse=True)
-        average_th = round(sum([member.town_hall.level for member in clan_members])/len([member.town_hall.level for member in clan_members]),2)
-
-        embed = await clash_embed(
-            context=context,
-            title=f"{clan.title}",
-            message=f"**Clan Offensive Strength**\n"
-                + f"**Average TH: {EmojisTownHall.get(round(average_th))} {average_th}**\n\n"
-                + (f"*Showing registered members only.*\n" if showing_registered else "*Showing in-game members only.*\n")
-                + (f"The {EmojisUI.LOGOUT} emoji denotes a registered member who is currently not in the clan.\n" if clan.is_alliance_clan and clan.alliance_member_count > 0 else "")
-                + f"\n`{'BK':^2}{'':^2}{'AQ':^2}{'':^2}{'GW':^2}{'':^2}{'RC':^2}{'':^2}{'Troops':>7}{'':^2}{'Spells':>7}{'':^2}`",
-            thumbnail=clan.badge,
-            )
-
-        async for th in AsyncIter(townhall_levels):
-            th_members = [member for member in clan_members if member.town_hall.level == th]
-            th_members.sort(key=lambda member:(member.hero_strength,member.troop_strength,member.spell_strength),reverse=True)
-            chunked_members = list(chunks(th_members,10))
-
-            for i, members_chunk in enumerate(chunked_members):
-                embed.add_field(
-                    name=f"{EmojisTownHall.get(th)} **TH{th}**"
-                        + (f" - ({i+1}/{len(chunked_members)})" if len(chunked_members) > 1 else ""),
-                    value="\n".join([
-                        f"`"
-                        + (f"{getattr(member.get_hero('Barbarian King'),'level',''):^2}{'':^2}" if member.town_hall.level >= 7 else f"{'':^4}")
-                        + (f"{getattr(member.get_hero('Archer Queen'),'level',''):^2}{'':^2}" if member.town_hall.level >= 9 else f"{'':^4}")
-                        + (f"{getattr(member.get_hero('Grand Warden'),'level',''):^2}{'':^2}" if member.town_hall.level >= 11 else f"{'':^4}")
-                        + (f"{getattr(member.get_hero('Royal Champion'),'level',''):^2}{'':^2}" if member.town_hall.level >= 13 else f"{'':^4}")
-                        + f"{str(round((member.troop_strength / member.max_troop_strength)*100))+'%':>7}{'':^2}"
-                        + (f"{str(round((member.spell_strength / member.max_spell_strength)*100))+'%':>7}" if member.max_spell_strength > 0 else f"{'':>7}")
-                        + f"{'':^2}`\u3000{re.sub('[_*/]','',member.clean_name)}"
-                        + (f" {EmojisUI.LOGOUT}" if clan.is_alliance_clan and member.tag not in clan.members_dict else "")
-                        for member in members_chunk
-                        ]),
-                    inline=False,
-                    )
-        return embed
-
-    async def clan_donations_embed(self,context:Union[commands.Context,discord.Interaction],clan:aClan):
-        if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
-            clan_members.sort(key=lambda member: member.current_season.donations_sent.alliance_only,reverse=True)
-
-            stats_text = "\n".join([
-                f"`{member.current_season.donations_sent.alliance_only:>6}{'':^2}"
-                + f"{member.current_season.donations_rcvd.alliance_only:>6}{'':^2}`"
-                + f"\u3000{EmojisTownHall.get(member.town_hall.level)} {re.sub('[_*/]','',member.name)}"
-                for member in clan_members])
-
-            embed = await clash_embed(
-                context=context,
-                title=f"{clan.title}: Donations",
-                message=f"**Showing stats for: {self.bot_client.current_season.description}**\n\n"
-                    + f"{EmojisClash.DONATIONSOUT} Total Sent: {sum(member.current_season.donations_sent.season_only_clan for member in clan_members):,}\u3000|\u3000"
-                    + f"{EmojisClash.DONATIONSRCVD} Total Received: {sum(member.current_season.donations_rcvd.season_only_clan for member in clan_members):,}\n\n"
-                    + f"`{'SENT':>6}{'':^2}{'RCVD':>6}{'':^2}`\n"
-                    + stats_text,
-                thumbnail=clan.badge,
-                )    
-        else:
-            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
-            clan_members.sort(key=lambda member: member.donations,reverse=True)
-
-            stats_text = "\n".join([
-                f"`{member.donations:>6}{'':^2}"
-                + f"{member.received:>6}{'':^2}`"
-                + f"\u3000{EmojisTownHall.get(member.town_hall.level)} {re.sub('[_*/]','',member.name)}"
-                for member in clan_members])
-
-            embed = await clash_embed(
-                context=context,
-                title=f"{clan.title}: Donations",
-                message=f"{EmojisClash.DONATIONSOUT} Total Sent: {sum(member.donations for member in clan_members):,}\u3000|\u3000"
-                    + f"{EmojisClash.DONATIONSRCVD} Total Received: {sum(member.received for member in clan_members):,}\n\n"
-                    + f"`{'SENT':>6}{'':^2}{'RCVD':>6}{'':^2}`\n"
-                    + stats_text,
-                thumbnail=clan.badge,
-                )
-        return embed
-
-    async def clan_games_data(self,context:Union[commands.Context,discord.Interaction],clan:aClan,season:aClashSeason):
-        query = db_PlayerStats.objects(
-            season=season.id,
-            clangames__clan=clan.tag,
-            clangames__score__gt=0
-            ).only('tag')
-        
-        players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in query))
-
-        embed = await clash_embed(
-            context=context,
-            title=f"{clan.title}: Clan Games",
-            message=f"**Showing stats for: {season.description}**\n\n"
-                + f"{EmojisUI.MEMBERS} Total Participants: {len(players)}\n"
-                + f"{EmojisClash.CLANGAMES} Total Score: {sum([p.clangames.score for p in players]):,}\n\n"
-                + f"*{EmojisUI.LOGOUT} denotes a member who is not registered to this Clan.*\n"
-                + f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
-                + f"\n".join([
-                    f"`{i+1:<3}{p.clangames.score:>6,}{'':>2}{p.clangames.time_to_completion:>13}`\u3000{EmojisUI.LOGOUT if p.home_clan_tag != clan.tag else EmojisUI.SPACER}{EmojisTownHall.get(p.town_hall)} {re.sub('[_*/]','',p.name)}"
-                    for i, p in enumerate(players)
-                    ]),
-            thumbnail=clan.badge,
-            )
-        return embed

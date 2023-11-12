@@ -6,7 +6,10 @@ import urllib
 import asyncio
 
 from redbot.core import commands, app_commands
+from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
+from redbot.core.utils import AsyncIter
+from discord.ext import tasks
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
@@ -39,10 +42,13 @@ class ECLIPSE(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 3
+    __release__ = 4
 
-    def __init__(self,bot):        
+    def __init__(self,bot:Red):        
         self.bot = bot
+        self._dump_channel = 1079665410770739201
+        self._dump_lock = asyncio.Lock()
+        self.dump_messages = []
 
         resource_path = f"{cog_data_path(self)}"
         self.bot.base_image_path = f"{resource_path}/base_images"
@@ -56,9 +62,18 @@ class ECLIPSE(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return self.bot.get_cog("ClashOfClansClient")
+    
+    @property
+    def dump_channel(self) -> discord.TextChannel:
+        return self.bot.get_channel(self._dump_channel)
 
     async def cog_load(self):
         asyncio.create_task(self.start_eclipse_cog())
+        self.delete_dump_messages.start()
+    
+    async def cog_unload(self):
+        self.delete_dump_messages.cancel()
+        await self.clear_dump_messages()
     
     async def start_eclipse_cog(self):
         while True:
@@ -66,6 +81,20 @@ class ECLIPSE(commands.Cog):
                 break
             await asyncio.sleep(1)
         await eWarBase.load_all()
+    
+    async def clear_dump_messages(self):
+        async with self._dump_lock:
+            messages = self.dump_messages.copy()
+            m_iter = AsyncIter(messages)
+
+            async for mid in m_iter:
+                try:
+                    message = await self.dump_channel.fetch_message(mid)
+                except:
+                    continue
+                else:
+                    await message.delete()
+                    self.dump_messages.remove(mid)        
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -92,6 +121,12 @@ class ECLIPSE(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
+    
+    @tasks.loop(minutes=10)
+    async def delete_dump_messages(self):
+        if self._dump_lock.locked():
+            return
+        await self.clear_dump_messages()        
     
     ############################################################
     ############################################################

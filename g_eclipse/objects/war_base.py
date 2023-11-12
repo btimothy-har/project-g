@@ -1,6 +1,7 @@
 import discord
 import pendulum
 import urllib
+import asyncio
 
 from typing import *
 from mongoengine import *
@@ -27,12 +28,15 @@ class dbWarBase(Document):
     claims = ListField(IntField(),default=[])
 
 class eWarBase():
+    _locks = {}
     _cache = {}
 
     @classmethod
     async def load_all(cls):
+        def _db_query():
+            return dbWarBase.objects()
         bases = []
-        query = dbWarBase.objects()
+        query = await bot_client.run_in_thread(_db_query)
         async for base in AsyncIter(query):
             bases.append(await cls.from_base_id(base.base_id))
         return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
@@ -138,35 +142,51 @@ class eWarBase():
         await image_attachment.save(image_filepath)
         base.base_image = image_filename
 
-        base.save_base()
+        await base.save_base()
         return base
 
-    def save_base(self):
-        db_base = dbWarBase(
-            base_id = self.id,
-            townhall = self.town_hall,
-            source = self.source,
-            builder = self.builder,
-            added_on = self.added_on,
-            base_type = self.base_type,
-            defensive_cc = self.defensive_cc_id,
-            base_image = self.base_image,
-            builder_notes = self.notes,
-            claims = self.claims
-            )
-        db_base.save()
-
-    def add_claim(self,user_id:int):
-        dbWarBase.objects(base_id=self.id).update_one(push__claims=user_id)
-        if user_id not in self.claims:
-            self.claims.append(user_id)
-
-    def remove_claim(self,user_id:int):
-        dbWarBase.objects(base_id=self.id).update_one(pull__claims=user_id)
+    @property
+    def lock(self):
         try:
-            self.claims.remove(user_id)
-        except ValueError:
-            pass
+            lock = eWarBase._locks[self.id]
+        except KeyError:
+            eWarBase._locks[self.id] = lock = asyncio.Lock()
+        return lock
+
+    async def save_base(self):
+        def _save_to_db():
+            db_base = dbWarBase(
+                base_id = self.id,
+                townhall = self.town_hall,
+                source = self.source,
+                builder = self.builder,
+                added_on = self.added_on,
+                base_type = self.base_type,
+                defensive_cc = self.defensive_cc_id,
+                base_image = self.base_image,
+                builder_notes = self.notes,
+                claims = self.claims
+                )
+            db_base.save()
+        await bot_client.run_in_thread(_save_to_db)
+
+    async def add_claim(self,user_id:int):
+        def _update_db():
+            dbWarBase.objects(base_id=self.id).update_one(push__claims=user_id)
+        
+        async with self.lock:
+            if user_id not in self.claims:
+                self.claims.append(user_id)
+                await bot_client.run_in_thread(_update_db)
+
+    async def remove_claim(self,user_id:int):
+        def _update_db():
+            dbWarBase.objects(base_id=self.id).update_one(pull__claims=user_id)
+        
+        async with self.lock:
+            if user_id in self.claims:
+                self.claims.remove(user_id)
+                await bot_client.run_in_thread(_update_db)
 
     async def base_embed(self):
         image_file_path = bot_client.bot.base_image_path + '/' + self.base_image

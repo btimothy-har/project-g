@@ -60,7 +60,7 @@ class ClanWarLeagues(commands.Cog):
     
     @property
     def active_war_league_season(self) -> aClashSeason:
-        if pendulum.now() > self.bot_client.current_season.cwl_end.add(days=7):
+        if pendulum.now() > self.bot_client.current_season.cwl_end.add(days=0):
             return self.bot_client.current_season.next_season()
         return self.bot_client.current_season
     
@@ -148,7 +148,7 @@ class ClanWarLeagues(commands.Cog):
         """
         
         season = self.active_war_league_season
-        cwlmenu = CWLPlayerMenu(ctx,season,aMember(ctx.author.id,ctx.guild.id))
+        cwlmenu = CWLPlayerMenu(ctx,season,aMember(ctx.author.id))
 
         if pendulum.now() < season.cwl_start:
             await cwlmenu.start_signup()
@@ -164,7 +164,7 @@ class ClanWarLeagues(commands.Cog):
         await interaction.response.defer()
 
         season = self.active_war_league_season
-        cwlmenu = CWLPlayerMenu(interaction,season,aMember(interaction.user.id,interaction.guild.id))
+        cwlmenu = CWLPlayerMenu(interaction,season,aMember(interaction.user.id))
 
         if pendulum.now() < season.cwl_start.subtract(days=1): 
             await cwlmenu.start_signup()
@@ -347,9 +347,7 @@ class ClanWarLeagues(commands.Cog):
         channel:discord.TextChannel,
         role:discord.Role):
 
-        clan.league_clan_channel = channel
-        clan.league_clan_role = role
-        clan.is_active_league_clan = True
+        await clan.add_to_war_league(channel,role)
 
         embed = await clash_embed(
             context=context,
@@ -389,7 +387,6 @@ class ClanWarLeagues(commands.Cog):
     async def sub_appcommand_cwl_clan_add(self,interaction:discord.Interaction,clan:str,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):
         
         await interaction.response.defer()
-
         get_clan = await self.client.fetch_clan(clan)
         embed = await self.add_war_league_clan_helper(interaction,get_clan,channel,role)
         await interaction.edit_original_response(embed=embed)
@@ -408,7 +405,7 @@ class ClanWarLeagues(commands.Cog):
         """
         
         clan = await self.client.fetch_clan(clan_tag)
-        clan.is_active_league_clan = False
+        await clan.remove_from_war_league()
 
         embed = await clash_embed(
             context=ctx,
@@ -577,7 +574,7 @@ class ClanWarLeagues(commands.Cog):
             return await ctx.reply(embed=embed,view=None)
         
         menu = CWLRosterMenu(ctx,season,cwl_clan)
-        await menu.setup_roster()
+        await menu.start()
     
     @app_subcommand_group_cwl_roster.command(name="setup",
         description="Setup a CWL Roster for a Clan. Defaults to the next open CWL Season.")
@@ -603,7 +600,7 @@ class ClanWarLeagues(commands.Cog):
             return await interaction.edit_original_response(embed=embed,view=None)
 
         menu = CWLRosterMenu(interaction,season,cwl_clan)
-        await menu.setup_roster()
+        await menu.start()
     
     ##################################################
     ### CWL / ROSTER / ADD
@@ -639,20 +636,20 @@ class ClanWarLeagues(commands.Cog):
         cwl_player = player.war_league_season(season)
         original_roster = cwl_player.roster_clan
 
-        cwl_player.admin_add(cwl_clan.tag)
+        await cwl_player.admin_add(cwl_clan.tag)
 
         if original_roster:
             original_roster_length = len(original_roster.participants)
             if original_roster_length < 15 and original_roster.roster_open == False:
                 reopen = True
-                original_roster.roster_open = True
+                await original_roster.open_roster()
 
         embed = await clash_embed(
             context=context,
             message=f"**{player.title}** has been added to CWL."
                 + f"\n\n> Clan: {cwl_player.roster_clan.title}"
                 + f"\n> Discord: <@{cwl_player.discord_user}>"
-                + (f"\n\n{original_roster.name}'s Roster has been re-opened. ({original_roster_length} players remain)" if reopen else ""),
+                + (f"\n\n{original_roster.clean_name}'s Roster has been re-opened. ({original_roster_length} players remain)" if reopen else ""),
             success=True
             )
         return embed
@@ -710,14 +707,14 @@ class ClanWarLeagues(commands.Cog):
                 )
             return embed
 
-        cwl_player.admin_remove()
         original_roster = cwl_player.roster_clan
+        await cwl_player.admin_remove()        
 
         if original_roster:
             original_roster_length = len(original_roster.participants)
             if original_roster_length < 15 and original_roster.roster_open == False:
                 reopen = True
-                original_roster.roster_open = True
+                await original_roster.open_roster()
 
         embed = await clash_embed(
             context=context,

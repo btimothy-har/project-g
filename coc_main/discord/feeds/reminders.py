@@ -1,6 +1,8 @@
 import discord
 import pendulum
 
+from typing import *
+
 from ...api_client import BotClashClient as client
 from ...cog_coc_client import ClashOfClansClient
 
@@ -8,6 +10,8 @@ from ...coc_objects.players.player import aPlayer
 from ...coc_objects.clans.clan import aClan
 from ...coc_objects.events.clan_war import aClanWar
 from ...coc_objects.events.raid_weekend import aRaidWeekend
+
+from ...discord.mongo_discord import db_ClanEventReminder
 
 from ...utils.components import get_bot_webhook, s_convert_seconds_to_str
 
@@ -22,6 +26,74 @@ class MemberReminder():
         self.accounts.append(account)
 
 class EventReminders():
+    @staticmethod
+    async def war_reminders_for_clan(clan:aClan) -> List[db_ClanEventReminder]:
+        def _get_from_db():
+            return db_ClanEventReminder.objects(tag=clan.tag,type=1)
+        reminders = await bot_client.run_in_thread(_get_from_db)
+        return reminders
+    
+    @staticmethod
+    async def create_war_reminder(
+        clan:aClan,
+        channel:Union[discord.TextChannel,discord.Thread],
+        war_types:list[str],
+        interval:list[int]) -> db_ClanEventReminder:
+
+        def _get_from_db():
+            new_reminder = db_ClanEventReminder(
+                tag=clan.tag,
+                type=1,
+                sub_type=wt,
+                guild_id=channel.guild.id,
+                channel_id=channel.id,
+                reminder_interval=intv
+                )
+            new_reminder.save()
+            return new_reminder
+
+        valid_types = ['random','cwl','friendly']
+        wt = [w for w in war_types if w in valid_types]
+        intv = sorted([int(i) for i in interval],reverse=True)
+
+        reminder = await bot_client.run_in_thread(_get_from_db)
+        return reminder
+
+    @staticmethod
+    async def raid_reminders_for_clan(clan:aClan) -> List[db_ClanEventReminder]:
+        def _get_from_db():
+            return db_ClanEventReminder.objects(tag=clan.tag,type=2)
+        reminders = await bot_client.run_in_thread(_get_from_db)
+        return reminders
+
+    @staticmethod
+    async def create_raid_reminder(
+        clan:aClan,
+        channel:Union[discord.TextChannel,discord.Thread],
+        interval:list[int]) -> db_ClanEventReminder:
+
+        def _get_from_db():
+            new_reminder = db_ClanEventReminder(
+                tag=clan.tag,
+                type=2,
+                guild_id=channel.guild.id,
+                channel_id=channel.id,
+                reminder_interval=intv
+                )
+            new_reminder.save()
+            return new_reminder
+
+        intv = sorted([int(i) for i in interval],reverse=True)
+        reminder = await bot_client.run_in_thread(_get_from_db)
+        return reminder
+
+    @staticmethod
+    async def delete_reminder(reminder_id:str):
+        def _delete_from_db():
+            db_ClanEventReminder.objects(id=reminder_id).delete()
+        await bot_client.run_in_thread(_delete_from_db)
+        return
+    
     def __init__(self,channel_id:int):
         self.channel = bot_client.bot.get_channel(channel_id)
         self.guild = getattr(self.channel,'guild',None)

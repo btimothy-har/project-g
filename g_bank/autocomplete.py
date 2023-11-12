@@ -1,5 +1,6 @@
 import discord
 import random
+import asyncio
 
 from mongoengine import *
 
@@ -10,33 +11,34 @@ from .objects.item import ShopItem
 from .checks import is_bank_admin
 
 from coc_main.api_client import BotClashClient
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.discord.member import aMember
 
 from coc_main.coc_objects.clans.mongo_clan import db_Clan, db_AllianceClan
 
 bot_client = BotClashClient()
+global_accounts = ["current","sweep","reserve"]
 
 async def autocomplete_eligible_accounts(interaction:discord.Interaction,current:str):
+    cog = bot_client.bot.get_cog("ClashOfClansClient")
     try:
         sel_accounts = []
         if is_bank_admin(interaction):
-            master_accounts = ['current','sweep','reserve']
             if current:
-                sel_accounts.extend([a for a in master_accounts if current.lower() in a])
+                sel_accounts.extend([a for a in global_accounts if current.lower() in a])
             else:
-                sel_accounts.extend(master_accounts)
+                sel_accounts.extend(global_accounts)
 
         if is_bank_admin(interaction):
-            eligible_clan_tags = [db.tag for db in db_AllianceClan.objects()]
+            clans = await cog.get_alliance_clans()
         else:
-            eligible_clan_tags = [db.tag for db in db_AllianceClan.objects(Q(coleaders__contains=interaction.user.id) | Q(leader=interaction.user.id))]
+            user = aMember(interaction.user.id)
+            clans = await asyncio.gather(*(cog.fetch_clan(c.tag) for c in user.coleader_clans))
 
         if current:
-            eligible_clans = db_Clan.objects(
-                (Q(tag__in=eligible_clan_tags)) &
-                (Q(tag__icontains=current) | Q(name__icontains=current) | Q(abbreviation=current.upper()))
-                )
+            eligible_clans = [c for c in clans if current.lower() in c.name.lower() or current.lower() in c.tag.lower() or current.lower() in c.abbreviation.lower()]
         else:
-            eligible_clans = db_Clan.objects(Q(tag__in=eligible_clan_tags))
+            eligible_clans = clans
 
         selection = []
         selection.extend([app_commands.Choice(
@@ -56,7 +58,7 @@ async def autocomplete_eligible_accounts(interaction:discord.Interaction,current
 
 async def autocomplete_store_items(interaction:discord.Interaction,current:str):
     try:
-        guild_items = ShopItem.get_by_guild(interaction.guild.id)
+        guild_items = await ShopItem.get_by_guild(interaction.guild.id)
 
         if not current:
             selection = guild_items
@@ -66,9 +68,9 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower()]
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
-                name=f"{item}",
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
@@ -77,7 +79,8 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
 
 async def autocomplete_store_items_restock(interaction:discord.Interaction,current:str):
     try:
-        guild_items = [i for i in ShopItem.get_by_guild(interaction.guild.id) if i._stock >= 0]
+        items = await ShopItem.get_by_guild(interaction.guild.id)
+        guild_items = [i for i in items if i._stock >= 0]
 
         if not current:
             selection = guild_items
@@ -87,9 +90,9 @@ async def autocomplete_store_items_restock(interaction:discord.Interaction,curre
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower()]
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
-                name=f"{item}",
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price} | Stock: {item.stock}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
@@ -97,12 +100,12 @@ async def autocomplete_store_items_restock(interaction:discord.Interaction,curre
         bot_client.coc_main_log.exception("Error in autocomplete_store_items_restock")
 
 async def autocomplete_distribute_items(interaction:discord.Interaction,current:str):
-
     try:
+        items = await ShopItem.get_by_guild(interaction.guild.id)
         if interaction.user.id in interaction.client.owner_ids:
-            guild_items = [i for i in ShopItem.get_by_guild(interaction.guild.id) if i.type in ['basic','cash']]
+            guild_items = [i for i in items if i.type in ['basic','cash']]
         else:
-            guild_items = [i for i in ShopItem.get_by_guild(interaction.guild.id) if i.type == 'basic']
+            guild_items = [i for i in items if i.type == 'basic']
 
         if not current:
             selection = guild_items
@@ -112,9 +115,9 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower()]
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
-                name=f"{item}",
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
@@ -123,7 +126,7 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
 
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
-        inv = UserInventory(interaction.user)
+        inv = await UserInventory.get_by_user_id(interaction.user.id)
         guild_items = [i for i in inv.inventory if i.guild_id == interaction.guild.id]
 
         if not current:
@@ -134,7 +137,7 @@ async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower()]
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
                 name=f"{item.name} (Qty: {item.quantity})",
                 value=item.id)

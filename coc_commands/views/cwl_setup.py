@@ -99,13 +99,13 @@ class CWLSeasonSetup(DefaultView):
     async def _open_signups(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
         
-        self.season.cwl_signup_status = True
+        await self.season.open_cwl_signups()
         embed = await self.get_embed()
         await interaction.edit_original_response(embed=embed,view=self)
     
     async def _close_signups(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()        
-        self.season.cwl_signup_status = False
+        await self.season.close_cwl_signups()
         embed = await self.get_embed()
         await interaction.edit_original_response(embed=embed,view=self)
     
@@ -114,13 +114,14 @@ class CWLSeasonSetup(DefaultView):
 
         currently_participating = await WarLeagueClan.participating_by_season(self.season)
 
-        for clan in currently_participating:
+        async for clan in AsyncIter(currently_participating):
             if clan.tag not in select.values:
-                clan.is_participating = False
+                await clan.disable_for_war_league()
         
-        for clan_tag in select.values:
+        async for clan_tag in AsyncIter(select.values):
             clan = await self.client.fetch_clan(clan_tag)
-            clan.war_league_season(self.season).is_participating = True
+            league_clan = clan.war_league_season(self.season)
+            await league_clan.enable_for_war_league()
             
         embed = await self.get_embed()
         await self.build_clan_selector()
@@ -161,7 +162,7 @@ class CWLSeasonSetup(DefaultView):
         participating_clans = await WarLeagueClan.participating_by_season(self.season)
         async for cwl_clan in AsyncIter(participating_clans):
             embed.add_field(
-                name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.clan_str}",
+                name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.name} ({cwl_clan.tag})",
                 value=f"# in Roster: {len(cwl_clan.participants)} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
                     + (f"\nIn War: Round {len(cwl_clan.league_group.rounds)-1} / {cwl_clan.league_group.number_of_rounds}\nPreparation: Round {len(cwl_clan.league_group.rounds)} / {cwl_clan.league_group.number_of_rounds}" if cwl_clan.league_group else "\nCWL Not Started" if self.season.cwl_signup_lock else "")
                     + (f"\nMaster Roster: {len(cwl_clan.master_roster)}" if cwl_clan.league_group else "")

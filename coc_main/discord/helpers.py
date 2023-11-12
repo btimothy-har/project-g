@@ -43,7 +43,7 @@ async def guild_clan_panel_embed(clan:aClan,guild:Optional[discord.Guild]=None) 
             + f"{EmojisClash.CAPITALTROPHY} {clan.capital_points}\u3000"
             + (f"{EmojisLeagues.get(clan.capital_league.name)} {clan.capital_league}" if clan.capital_league else f"{EmojisLeagues.UNRANKED} Unranked") #+ "\n"
             + (f"\n\n**Join this Clan at: [{guild.name}]({str(invite)})**" if guild and invite else "")
-            + f"\n\n{clan.c_description}"
+            + f"\n\n{clan.description}"
             + f"\n\n**Recruiting**"
             + f"\nTownhalls: {clan.recruitment_level_emojis}"
             + (f"\n\n{clan.recruitment_info}" if len(clan.recruitment_info) > 0 else ""),

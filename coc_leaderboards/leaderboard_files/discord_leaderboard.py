@@ -11,11 +11,11 @@ from numerize import numerize
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_client import ClashOfClansClient, aClan
 
 from coc_main.coc_objects.players.player import aPlayer, db_PlayerStats
 from coc_main.coc_objects.clans.clan import db_AllianceClan
-from coc_main.discord.guild import aGuild
+from coc_main.discord.guild import aGuild, ClanGuildLink
 
 from coc_main.utils.components import clash_embed, DiscordButton
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
@@ -115,16 +115,32 @@ class DiscordLeaderboard():
         return [bot_client.current_season] + bot_client.tracked_seasons[:3]
     
     @classmethod
-    def get_all_leaderboards(cls) -> List['DiscordLeaderboard']:
-        return [cls(lb) for lb in db_Leaderboard.objects()]
+    async def get_all_leaderboards(cls) -> List['DiscordLeaderboard']:
+        def _db_query():
+            return [lb for lb in db_Leaderboard.objects()]
+        leaderboards = await bot_client.run_in_thread(_db_query)
+        return [cls(lb) for lb in leaderboards]
     
     @classmethod
-    def get_by_id(cls,leaderboard_id:str):
-        return cls(db_Leaderboard.objects.get(pk=leaderboard_id))
+    async def get_by_id(cls,leaderboard_id:str) -> 'DiscordLeaderboard':
+        def _db_query():
+            try:
+                return db_Leaderboard.objects.get(pk=leaderboard_id)
+            except DoesNotExist:
+                return None
+        
+        leaderboard = await bot_client.run_in_thread(_db_query)
+        if leaderboard:
+            return cls(leaderboard)
+        return None
 
     @classmethod
-    def get_guild_leaderboards(cls,guild_id:int):
-        return [cls(lb) for lb in db_Leaderboard.objects(guild_id=guild_id)]
+    async def get_guild_leaderboards(cls,guild_id:int) -> List['DiscordLeaderboard']:
+        def _db_query():
+            return [lb for lb in db_Leaderboard.objects(guild_id=guild_id)]
+        
+        leaderboards = await bot_client.run_in_thread(_db_query)
+        return [cls(lb) for lb in leaderboards]
 
     def __init__(self,database_entry:db_Leaderboard):
         self.id = str(database_entry.pk)
@@ -141,24 +157,7 @@ class DiscordLeaderboard():
         self._leaderboard_data = {}
     
     def __str__(self):
-        return f"{self.lb_type} Leaderboard (Channel: {self.channel.name})"
-    
-    def save(self):
-        db_entry = db_Leaderboard(
-            pk=self.id,
-            type = self.type,
-            is_global = self.is_global,
-            guild_id = self.guild_id,
-            channel_id = self.channel_id,
-            message_id = self.message_id
-            )
-        db_entry.save()
-    
-    def delete(self):
-        try:
-            self.db_entry.delete()
-        except:
-            pass
+        return f"{self.lb_type} Leaderboard (Channel: {self.channel.name})"    
     
     def is_season_current(self,season):
         if self.type == 5:            
@@ -168,32 +167,10 @@ class DiscordLeaderboard():
             if season.is_current:
                 return True
         return False
-    
-    @property
-    def db_entry(self):
-        try:
-            return db_Leaderboard.objects.get(pk=self.id)
-        except DoesNotExist:
-            return db_Leaderboard(
-                type = self.type,
-                is_global = self.is_global,
-                guild_id = self.guild_id,
-                channel_id = self.channel_id
-                )
 
     @property
     def guild(self):
         return bot_client.bot.get_guild(self.guild_id)
-    
-    @property
-    def lb_clans(self):
-        if self.is_global:
-            return [db.tag for db in db_AllianceClan.objects()]
-        elif self.guild:
-            guild = aGuild(self.guild.id)
-            return [link.tag for link in guild.clan_links]
-        else:
-            return []
 
     @property
     def channel(self):
@@ -205,33 +182,79 @@ class DiscordLeaderboard():
     def lb_type(self):
         return leaderboard_types.get(self.type,"Unknown Leaderboard")
     
+    @property
+    def client(self) -> ClashOfClansClient:
+        return bot_client.bot.get_cog("ClashOfClansClient")
+    
     @classmethod
-    async def create(cls,
-        leaderboard_type:int,
-        is_global:bool,
-        guild:discord.Guild,
-        channel:discord.TextChannel):
+    async def create(cls,leaderboard_type:int,is_global:bool,guild:discord.Guild,channel:discord.TextChannel):
 
-        existing_db = db_Leaderboard.objects(
-            type=leaderboard_type,
-            is_global=is_global,
-            guild_id=guild.id
-            )
+        def _query_existing():
+            return db_Leaderboard.objects(
+                type=leaderboard_type,
+                is_global=is_global,
+                guild_id=guild.id
+                )
+        
+        def _create_in_db():
+            db_entry = db_Leaderboard(
+                type = leaderboard_type,
+                is_global = is_global,
+                guild_id = guild.id,
+                channel_id = channel.id
+                )
+            db_entry.save()
+            return db_entry
+        
+        existing_db = await bot_client.run_in_thread(_query_existing)
         if len(existing_db) > 0:
             raise LeaderboardExists(f"{leaderboard_types.get(leaderboard_type,'Unknown Leaderboard')} already exists for {guild.name}.")
 
-        db_entry = db_Leaderboard(
-            type = leaderboard_type,
-            is_global = is_global,
-            guild_id = guild.id,
-            channel_id = channel.id
-            )
-        db_entry.save()
+        db_entry = await bot_client.run_in_thread(_create_in_db)
         lb = cls(db_entry)
         await lb.send_blank_lb()
         return lb
+    
+    async def delete(self):
+        def _delete_in_db():
+            db_Leaderboard.objects(pk=self.id).delete()
+        
+        message = await self.fetch_message()
+        if message:
+            await message.delete()  
+        await bot_client.run_in_thread(_delete_in_db)
+    
+    async def get_leaderboard_clans(self) -> List[aClan]:
+        if self.is_global:
+            return await self.client.get_alliance_clans()
+        elif self.guild:
+            guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
+            clans = await asyncio.gather(*(self.client.fetch_clan(tag=link.tag) for link in guild_links))
+            return clans
+        else:
+            return []
 
     async def update_leaderboard(self):
+        def _db_get_archive(season):
+            try:
+                return db_Leaderboard_Archive.objects.get(
+                    type = self.type,
+                    is_global = self.is_global,
+                    guild_id = self.guild_id,
+                    season = season.id
+                    )
+            except DoesNotExist:
+                return None
+            except MultipleObjectsReturned:
+                bot_client.coc_main_log.warning(f"Multiple {self.lb_type} Leaderboards found for {season.description} in {self.guild.name}.")
+                db_Leaderboard_Archive.objects(
+                    type = self.type,
+                    is_global = self.is_global,
+                    guild_id = self.guild_id,
+                    season = season.id
+                    ).delete()
+                return None
+
         seasons = DiscordLeaderboard.get_leaderboard_seasons()
 
         try:
@@ -240,41 +263,17 @@ class DiscordLeaderboard():
                 archive = False
 
                 if not self.is_season_current(season):
-                    try:
-                        archived_lb = db_Leaderboard_Archive.objects.get(
-                            type = self.type,
-                            is_global = self.is_global,
-                            guild_id = self.guild_id,
-                            season = season.id
-                            )
-                    except DoesNotExist:
+                    archived_lb = await bot_client.run_in_thread(_db_get_archive,season)
+                    if not archived_lb:
                         calculate = True
                         archive = True
 
                 elif self.type == 5 and self.is_season_current(season) and pendulum.now() >= season.clangames_end:
-                    try:
-                        archived_lb = db_Leaderboard_Archive.objects.get(
-                            type = self.type,
-                            is_global = self.is_global,
-                            guild_id = self.guild_id,
-                            season = season.id
-                            )
-                        
-                    except DoesNotExist:
+                    archived_lb = await bot_client.run_in_thread(_db_get_archive,season)
+                    if not archived_lb:
                         calculate = True
                         archive = True
-
-                    except MultipleObjectsReturned:
-                        bot_client.coc_main_log.warning(f"Multiple {self.lb_type} Leaderboards found for {season.description} in {self.guild.name}.")
-                        calculate = True
-                        archive = True
-
-                        db_Leaderboard_Archive.objects(
-                            type = self.type,
-                            is_global = self.is_global,
-                            guild_id = self.guild_id,
-                            season = season.id
-                            ).delete()                    
+               
                 else:
                     calculate = True
 
@@ -321,6 +320,16 @@ class DiscordLeaderboard():
         await self.send_to_discord()
 
     async def consolidate_data(self,season,embed,send_to_archive=False):
+        def _save_archive():
+            lb = db_Leaderboard_Archive(
+                type = self.type,
+                is_global = self.is_global,
+                guild_id = self.guild_id,
+                season = season.id,
+                embed = embed.to_dict()
+                )
+            lb.save()
+
         if self.is_season_current(season):
             self._primary_embed = embed
         
@@ -329,18 +338,16 @@ class DiscordLeaderboard():
             self._leaderboard_data[season.id] = embed
         
         if send_to_archive:
-            db_Leaderboard_Archive(
-                type = self.type,
-                is_global = self.is_global,
-                guild_id = self.guild_id,
-                season = season.id,
-                embed = embed.to_dict()
-                ).save()
+            await bot_client.run_in_thread(_save_archive)
             bot_client.coc_main_log.info(f"Archived {self.lb_type} Leaderboard for {season.description} in {getattr(self.guild,'name','')} {self.guild_id}.")
     
     async def send_to_discord(self):
+        def _update_message_id():
+            db_Leaderboard.objects(pk=self.id).update_one(
+                set__message_id=self.message_id
+                )
         if not self.channel:
-            self.delete()
+            await self.delete()
         
         try:
             lb_view = LeaderboardView(self)
@@ -352,7 +359,7 @@ class DiscordLeaderboard():
                 message = await message.edit(embed=self._primary_embed,view=lb_view)
                 
             self.message_id = message.id
-            self.save()
+            await bot_client.run_in_thread(_update_message_id)
         except:
             bot_client.coc_main_log.exception(f"Error sending {self.lb_type} Leaderboard to Discord.")
 
@@ -384,15 +391,19 @@ class ClanWarLeaderboard(Leaderboard):
 
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
-        leaderboard = cls(parent,season)
-
-        query_players = db_PlayerStats.objects(
-            is_member=True,
-            season=season.id
-            ).only('tag')
+        def _db_query():
+            query_players = db_PlayerStats.objects(
+                is_member=True,
+                season=season.id
+                ).only('tag')
+            return [p.tag for p in query_players]
         
-        lb_players = []
-        lb_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag,enforce_lock=True) for p in query_players))
+        leaderboard = cls(parent,season)        
+        
+        query_players = await bot_client.run_in_thread(_db_query)
+
+        lb_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
         async for p in AsyncIter(lb_players):
             stats = p.get_season_stats(season)
@@ -401,7 +412,7 @@ class ClanWarLeaderboard(Leaderboard):
                 if parent.is_global:
                     lb_player = await ClanWarLeaderboardPlayer.calculate(stats,lb_th)
                 else:
-                    lb_player = await ClanWarLeaderboardPlayer.calculate(stats,lb_th,parent.lb_clans)
+                    lb_player = await ClanWarLeaderboardPlayer.calculate(stats,lb_th,lb_clans)
                 if lb_player.wars_participated > 0:
                     leaderboard.leaderboard_players[lb_th].append(lb_player)
         
@@ -459,29 +470,37 @@ class ResourceLootLeaderboard(Leaderboard):
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
 
+        def _db_query():
+            query_players = db_PlayerStats.objects(
+                is_member=True,
+                season=season.id,
+                loot_darkelixir__season_total__gt=0
+                ).only('tag')
+            return [p.tag for p in query_players]
+
         def predicate_leaderboard(player:aPlayer):
             stats = player.get_season_stats(season)            
             if parent.is_global:
                 return stats.attacks.season_total > 0
             else:
-                return stats.attacks.season_total > 0 and stats.home_clan_tag in parent.lb_clans
+                return stats.attacks.season_total > 0 and stats.home_clan_tag in [c.tag for c in lb_clans]
 
         leaderboard = cls(parent,season)
 
-        query_players = db_PlayerStats.objects(
-            is_member=True,
-            season=season.id,
-            loot_darkelixir__season_total__gt=0
-            ).only('tag')
+        query_players = await bot_client.run_in_thread(_db_query)
         
-        all_players = []
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag,enforce_lock=True) for p in query_players))
+        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        lb_clans = await leaderboard.parent.get_leaderboard_clans()
+
+        bot_client.coc_main_log.info(f"{len(all_players)} players found for {leaderboard.season.description}.")
         
         iter_players = AsyncIter(all_players)
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
-            async for lb_th in AsyncIter(eligible_townhalls):                
+            bot_client.coc_main_log.info(f"{stats.tag} {stats.town_hall}.")
+
+            async for lb_th in AsyncIter(eligible_townhalls):
                 if stats.town_hall == lb_th:
                     lb_player = await ResourceLootLeaderboardPlayer.calculate(stats,lb_th)
                     leaderboard.leaderboard_players[lb_th].append(lb_player)
@@ -540,23 +559,27 @@ class DonationsLeaderboard(Leaderboard):
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
 
+        def _db_query():
+            query_players = db_PlayerStats.objects(
+                is_member=True,
+                season=season.id,
+                donations_sent__season_total__gt=0
+                ).only('tag')
+            return [p.tag for p in query_players]
+
         def predicate_leaderboard(player:aPlayer):
             stats = player.get_season_stats(season)            
             if parent.is_global:
                 return stats.donations_sent.season_total > 0
             else:
-                return stats.donations_sent.season_total > 0 and stats.home_clan_tag in parent.lb_clans
+                return stats.donations_sent.season_total > 0 and stats.home_clan_tag in [c.tag for c in lb_clans]
 
         leaderboard = cls(parent,season)
 
-        query_players = db_PlayerStats.objects(
-            is_member=True,
-            season=season.id,
-            donations_sent__season_total__gt=0
-            ).only('tag')
+        query_players = await bot_client.run_in_thread(_db_query)
         
-        all_players = []
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag,enforce_lock=True) for p in query_players))
+        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        lb_clans = await leaderboard.parent.get_leaderboard_clans()
         
         iter_players = AsyncIter(all_players)
         async for p in iter_players.filter(predicate_leaderboard):
@@ -620,20 +643,24 @@ class ClanGamesLeaderboard(Leaderboard):
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
 
+        def _db_query():
+            query_players = db_PlayerStats.objects(
+                is_member=True,
+                season=season.id,
+                clangames__score__gt=0
+                ).only('tag')
+            return [p.tag for p in query_players]
+
         def predicate_leaderboard(player:aPlayer):
             stats = player.get_season_stats(season)
-            return stats.clangames.score > 0 and stats.clangames.clan_tag in parent.lb_clans and stats.home_clan_tag == stats.clangames.clan_tag
+            return stats.clangames.score > 0 and stats.clangames.clan_tag in [c.tag for c in lb_clans] and stats.home_clan_tag == stats.clangames.clan_tag
 
         leaderboard = cls(parent,season)
 
-        query_players = db_PlayerStats.objects(
-            is_member=True,
-            season=season.id,
-            clangames__score__gt=0
-            ).only('tag')
+        query_players = await bot_client.run_in_thread(_db_query)
         
-        all_players = []
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p.tag,enforce_lock=True) for p in query_players))
+        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
         iter_players = AsyncIter(all_players)
         async for p in iter_players.filter(predicate_leaderboard):
@@ -644,10 +671,9 @@ class ClanGamesLeaderboard(Leaderboard):
                 leaderboard.leaderboard_players['global'].append(lb_player)
             
             else:
-                clans = await asyncio.gather(*(leaderboard.client.fetch_clan(tag=c) for c in parent.lb_clans))
-                clans.sort(key=lambda x:(x.level,x.capital_hall),reverse=True)
+                lb_clans.sort(key=lambda x:(x.level,x.capital_hall),reverse=True)
 
-                async for c in AsyncIter(clans):
+                async for c in AsyncIter(lb_clans):
                     if stats.clangames.clan_tag == c.tag:
                         lb_player = await ClanGamesLeaderboardPlayer.calculate(stats)
                         leaderboard.leaderboard_players[c.tag].append(lb_player)
@@ -679,9 +705,8 @@ class ClanGamesLeaderboard(Leaderboard):
             embed.description += leaderboard_text
         
         else:
-            async for lb_tag in AsyncIter(self.parent.lb_clans):
-                clan = await self.client.fetch_clan(lb_tag)
-
+            lb_clans = await self.parent.get_leaderboard_clans()
+            async for clan in AsyncIter(lb_clans):
                 wl_players = self.leaderboard_players.get(clan.tag,[])
                 wl_players.sort(key=lambda x: (x.score,(x.completion_seconds * -1)),reverse=True)
 

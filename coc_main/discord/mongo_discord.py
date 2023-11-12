@@ -2,7 +2,7 @@ from mongoengine import *
 
 ##################################################
 #####
-##### GUILD LINKS
+##### CLAN/DISCORD LINKS
 #####
 ##################################################
 class db_ClanGuildLink(Document):
@@ -14,6 +14,33 @@ class db_ClanGuildLink(Document):
     elder_role = IntField(default=0)
     coleader_role = IntField(default=0)
 
+class db_ClanDataFeed(Document):
+    #1 - member feed
+    #2 - donation feed
+    #3 - raid weekend results
+    #4 - capital contribution
+    tag = StringField(required=True)
+    type = IntField(required=True)
+    guild_id = IntField(required=True)
+    channel_id = IntField(required=True)
+
+class db_ClanEventReminder(Document):
+    #type 1 - war
+    #type 2 - raid
+    #subtype (only for war) - random, friendly, cwl
+    tag = StringField(required=True)
+    type = IntField(required=True)
+    sub_type = ListField(StringField(),default=[])
+    guild_id = IntField(required=True)
+    channel_id = IntField(required=True)
+    reminder_interval = ListField(IntField(),default=[])
+    interval_tracker = ListField(IntField(),default=[])
+
+##################################################
+#####
+##### DISCORD PANELS
+#####
+##################################################
 class db_GuildClanPanel(Document):
     #ID using format {'guild':int,'channel':123}
     panel_id = DictField(primary_key=True,required=True)    
@@ -62,6 +89,11 @@ class db_ClanApplication(Document):
     ticket_channel = IntField(default=0)
     bot_prefix = StringField(default="")
 
+##################################################
+#####
+##### DISCORD CLOCKS
+#####
+##################################################
 class db_ClockConfig(Document):
     s_id = IntField(primary_key=True,required=True)
     use_channels = BooleanField(default=False)

@@ -2,6 +2,7 @@ import pendulum
 
 from typing import *
 
+from functools import cached_property
 from .raid_weekend import aRaidWeekend
 
 class aSummaryRaidStats():
@@ -19,7 +20,7 @@ class aSummaryRaidStats():
         stats.player_tag = player_tag
         return stats
     
-    @property
+    @cached_property
     def raid_attacks(self) -> int:
         try:
             if self.player_tag:
@@ -30,7 +31,7 @@ class aSummaryRaidStats():
         except:
             return 0
     
-    @property
+    @cached_property
     def resources_looted(self) -> int:
         try:
             if self.player_tag:
@@ -41,7 +42,7 @@ class aSummaryRaidStats():
         except:
             return 0
     
-    @property
+    @cached_property
     def medals_earned(self) -> int:
         try:
             if self.player_tag:
@@ -52,7 +53,7 @@ class aSummaryRaidStats():
         except:
             return 0
     
-    @property
+    @cached_property
     def unused_attacks(self) -> int:
         try:
             if self.player_tag:

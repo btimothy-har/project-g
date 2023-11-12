@@ -2,57 +2,80 @@ import discord
 import pendulum
 import asyncio
 
-from redbot.core.utils import AsyncIter
+from typing import *
 
+from .clan_feed import ClanDataFeed
 from ...api_client import BotClashClient as client
-from ...cog_coc_client import ClashOfClansClient
-
-from ...coc_objects.clans.clan import aClan, db_ClanDataFeed
-
+from ...coc_objects.players.player import aPlayer
+from ...coc_objects.clans.clan import BasicClan, aClan
+from ...discord.mongo_discord import db_ClanDataFeed
 from ...utils.constants.coc_emojis import EmojisClash, EmojisLeagues
 from ...utils.components import clash_embed, get_bot_webhook
 
 bot_client = client()
 
-class MemberDonationDelta():
-    def __init__(self,member,cached_member=None):
-        self.member = member
-        self.cached_member = cached_member
-        self.donated_chg = 0
-        self.received_chg = 0
-
-        if self.cached_member:
-            if self.member.donations > self.cached_member.donations:
-                self.donated_chg = self.member.donations - self.cached_member.donations
-            if self.member.received > self.cached_member.received:
-                self.received_chg = self.member.received - self.cached_member.received
+type = 1
 
 class ClanMemberFeed():
-    def __init__(self,clan:aClan,player_tag:str):
+
+    @staticmethod
+    async def feeds_for_clan(clan:BasicClan) -> List[db_ClanDataFeed]:
+        def _get_from_db():
+            return db_ClanDataFeed.objects(tag=clan.tag,type=type)
+        
+        feeds = await bot_client.run_in_thread(_get_from_db)
+        return feeds
+    
+    @staticmethod
+    async def create_feed(clan:BasicClan,channel:Union[discord.TextChannel,discord.Thread]) -> db_ClanDataFeed:
+        def _create_in_db():
+            feed = db_ClanDataFeed(
+                tag=clan.tag,
+                type=type,
+                guild_id=channel.guild.id,
+                channel_id=channel.id
+                )
+            feed.save()
+            return feed
+        
+        feed = await bot_client.run_in_thread(_create_in_db)
+        return feed
+    
+    @staticmethod
+    async def delete_feed(feed_id:str):
+        await ClanDataFeed.delete_feed(feed_id)
+    
+    def __init__(self,clan:aClan,player:aPlayer):
         self.clan = clan
-        self.player_tag = player_tag
-        self.player = None
-    
-    @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
-    async def fetch_player(self):
-        self.player = await self.coc_client.fetch_player(self.player_tag,no_cache=True)
+        self.player = player
 
     @classmethod
-    async def member_join(cls,clan:aClan,player_tag:str):
+    async def member_join(cls,clan:aClan,player:aPlayer):
         try:
-            if len(clan.member_feed) == 0:
-                return
-            
-            feed = cls(clan,player_tag)
-            await feed.fetch_player()
-            embed = await feed.join_embed()
+            clan_feeds = await cls.feeds_for_clan(clan)
 
-            await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
+            if len(clan_feeds) > 0:
+                feed = cls(clan,player)
+                embed = await feed.join_embed()
+
+                await asyncio.gather(*(feed.send_to_discord(embed, f) for f in clan_feeds))
+
         except Exception:
             bot_client.coc_main_log.exception(f"Error building Member Join Feed.")
+    
+    @classmethod
+    async def member_leave(cls,clan:aClan,player:aPlayer):
+        try:
+            clan_feeds = await cls.feeds_for_clan(clan)
+
+            if len(clan_feeds) > 0:
+                feed = cls(clan,player) 
+                embed = await feed.leave_embed()
+
+                await asyncio.gather(*(feed.send_to_discord(embed, f) for f in clan_feeds))
+
+        except Exception:
+            bot_client.coc_main_log.exception(f"Error building Member Leave Feed.")
     
     async def join_embed(self):
         embed = await clash_embed(
@@ -72,20 +95,6 @@ class ClanMemberFeed():
             icon_url="https://i.imgur.com/TZF5r54.png"
             )
         return embed
-    
-    @classmethod
-    async def member_leave(cls,clan:aClan,player_tag:str):
-        try:
-            if len(clan.member_feed) == 0:
-                return
-        
-            feed = cls(clan,player_tag)
-            await feed.fetch_player()
-            embed = await feed.leave_embed()
-
-            await asyncio.gather(*(feed.send_to_discord(embed, feed_data) for feed_data in clan.member_feed))
-        except Exception:
-            bot_client.coc_main_log.exception(f"Error building Member Leave Feed.")
     
     async def leave_embed(self):
         embed = await clash_embed(

@@ -1,4 +1,4 @@
-import logging
+import coc
 import asyncio
 import math
 import pendulum
@@ -8,6 +8,7 @@ from typing import *
 
 from collections import deque
 from ..api_client import BotClashClient as client
+from ..exceptions import InvalidTag, ClashAPIError
 from ..cog_coc_client import ClashOfClansClient
 
 bot_client = client()
@@ -20,7 +21,12 @@ bot_client = client()
 ############################################################
 ############################################################
 class TaskLoop():
-
+    
+    @staticmethod
+    async def report_fatal_error(message,error):
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        await cog.report_error(message,error)
+    
     @classmethod
     def loops(cls) -> List['TaskLoop']:
         return list(cls._loops.values())
@@ -28,20 +34,17 @@ class TaskLoop():
     @classmethod
     def keys(cls) -> List[str]:
         return list(cls._loops.keys())
-    
+
     def __init__(self):
-        self.task = None
         self._active = False
 
-        self.run_time = deque(maxlen=100)
-        self.api_time = deque(maxlen=100)
-        self.work_time = deque(maxlen=100)
-        
-        self.api_error = False
-        self.error_reports = 0
+        self.task = None
+        self.tags = []
 
-        self.deferred = False
+        self.run_time = deque(maxlen=100)
+
         self.defer_count = 0
+        self.deferred = True
     
     def __del__(self):
         if self.task:
@@ -51,24 +54,16 @@ class TaskLoop():
         pass
 
     @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        return asyncio.get_event_loop()
+
+    @property
     def coc_client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog('ClashOfClansClient')
-
-    ##################################################
-    ### MAIN LOOP HELPERS
-    ##################################################
+ 
     @property
-    def main_log(self) -> logging.Logger:
-        return bot_client.coc_main_log
-    
-    @property
-    def data_log(self) -> logging.Logger:
-        return bot_client.coc_data_log
-    
-    @property
-    def task_semaphore(self) -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
+    def api_maintenance(self) -> bool:
+        return self.coc_client.api_maintenance
     
     @property
     def task_lock(self) -> asyncio.Lock:
@@ -76,23 +71,9 @@ class TaskLoop():
         return cog.task_lock
     
     @property
-    def api_maintenance(self) -> asyncio.Lock:
+    def task_semaphore(self) -> asyncio.Semaphore:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.api_maintenance
-    
-    @property
-    def api_semaphore(self) -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.api_semaphore
-
-    @property
-    def last_error_report(self) -> Optional[pendulum.DateTime]:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.last_coc_task_error
-    @last_error_report.setter
-    def last_error_report(self,value:pendulum.DateTime):
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        cog.last_coc_task_error = value
+        return cog.task_semaphore
 
     ##################################################
     ### LOOP METHODS
@@ -101,6 +82,8 @@ class TaskLoop():
         self._active = True
         if not self.task or self.task.done():
             self.task = asyncio.create_task(self._loop_task())
+            return self.task
+        return None
     
     async def stop(self):
         self._active = False
@@ -113,11 +96,12 @@ class TaskLoop():
             except:
                 pass
     
-    async def report_fatal_error(self,message,error):
-        if not self.last_error_report or pendulum.now().int_timestamp - self.last_error_report.int_timestamp > 60:
-            self.last_error_report = pendulum.now()
-            await bot_client.bot.send_to_owners(f"{message}```{error}```")
-    
+    def unlock(self,lock:asyncio.Lock):
+        try:
+            lock.release()
+        except:
+            pass
+
     ##################################################
     ### LOOP METRICS
     ##################################################
@@ -128,25 +112,18 @@ class TaskLoop():
         return False
     
     @property
-    def sleep_time(self) -> int:
-        return 60
-    
-    @property
-    def to_defer(self) -> bool:
-        if self.api_maintenance:
-            return True
-        
-        if self.defer_count < 4:
+    def to_defer(self) -> bool:        
+        if self.defer_count < 6:
             rand = random.randint(1,11000) #0.01%
             if rand % 10 == 0:
                 return False
             return True
-        if self.defer_count < 8:
+        if self.defer_count < 12:
             rand = random.randint(1,2200) #0.05%
             if rand % 10 == 0:
                 return False
             return True
-        if self.defer_count < 11:
+        if self.defer_count < 18:
             rand = random.randint(1,1100) #1%
             if rand % 10 == 0:
                 return False
@@ -169,43 +146,5 @@ class TaskLoop():
     def runtime_avg(cls) -> int:
         try:
             return sum([sum(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0]) / sum([len(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
-        except ZeroDivisionError:
-            return 0
-        
-    @classmethod
-    def worktime_min(cls) -> int:
-        try:
-            return min([min(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except:
-            return 0    
-    @classmethod
-    def worktime_max(cls) -> int:
-        try:
-            return max([max(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except:
-            return 0            
-    @classmethod
-    def worktime_avg(cls) -> int:
-        try:
-            return sum([sum(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0]) / sum([len(i.work_time) for i in cls._loops.values() if i.loop_active and len(i.work_time) > 0])
-        except ZeroDivisionError:
-            return 0
-    
-    @classmethod
-    def apitime_min(cls) -> int:
-        try:
-            return min([min(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
-        except:
-            return 0    
-    @classmethod
-    def apitime_max(cls) -> int:
-        try:
-            return max([max(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
-        except:
-            return 0            
-    @classmethod
-    def apitime_avg(cls) -> int:
-        try:
-            return sum([sum(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0]) / sum([len(i.api_time) for i in cls._loops.values() if i.loop_active and len(i.api_time) > 0])
         except ZeroDivisionError:
             return 0

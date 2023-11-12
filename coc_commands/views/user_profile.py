@@ -8,7 +8,7 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, ClashAPIError, InvalidTag
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_client import ClashOfClansClient, BasicPlayer
 
 from coc_main.discord.member import aMember
 
@@ -82,6 +82,7 @@ class UserProfileMenu(DefaultView):
         await add_link_view._start_add_link()
 
         await add_link_view.wait()
+        await self.member.refresh_clash_link(force=True)
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
         await interaction.edit_original_response(embeds=embed,view=self)
     
@@ -91,6 +92,7 @@ class UserProfileMenu(DefaultView):
         await delete_link_view._start_delete_link()
 
         await delete_link_view.wait()
+        await self.member.refresh_clash_link(force=True)
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
         await interaction.edit_original_response(embeds=embed,view=self)
     
@@ -105,10 +107,12 @@ class UserProfileMenu(DefaultView):
 
         m_accounts.sort(key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
 
+        global_member = aMember(member.user_id)
+
         embed = await clash_embed(
             context=ctx,
             title=member.display_name,
-            message=(f"{' '.join([c.emoji for c in member.home_clans])}\n\n" if len(member.home_clans) > 0 else "")
+            message=(f"{' '.join([c.emoji for c in global_member.home_clans])}\n\n" if len(global_member.home_clans) > 0 else "")
                 + "\u200b",
             embed_color=next((r.color for r in sorted(member.discord_member.roles,key=lambda x:(x.position),reverse=True) if r.color.value), None),
             thumbnail=member.display_avatar
@@ -245,10 +249,10 @@ class AddLinkMenu(DefaultView):
             return self.stop_menu()
 
         if verify:
-            self.add_link_account.discord_user = interaction.user.id
+            await BasicPlayer.set_discord_link(self.add_link_account.tag,interaction.user.id)
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account **{coc.utils.correct_tag(tag)}** is now linked to your Discord account!",
+                message=f"The account **{self.add_link_account.tag}** is now linked to your Discord account!",
                 success=True
                 )
             await interaction.edit_original_response(embed=embed,view=None)
@@ -283,8 +287,9 @@ class DeleteLinkMenu(DefaultView):
     ##################################################
     async def on_timeout(self):
         self.is_active = False
-        self.remove_link_dropdown.placeholder = "Sorry, you timed out! Please try again."
-        self.remove_link_dropdown.disabled = True
+        if getattr(self,'remove_link_dropdown',None):
+            self.remove_link_dropdown.placeholder = "Sorry, you timed out! Please try again."
+            self.remove_link_dropdown.disabled = True
         await self.message.edit(view=self)
         self.stop_menu()
 
@@ -302,20 +307,21 @@ class DeleteLinkMenu(DefaultView):
             description=account.member_description_no_emoji,
             emoji=EmojisTownHall.get(account.town_hall_level))
             for account in m_accounts if not account.is_member
-            ]        
-        remove_link_dropdown = DiscordSelectMenu(
-            function=self._callback_remove_account,
-            options=select_options,
-            placeholder="Select an account to remove.",
-            min_values=1,
-            max_values=len(select_options)
-            )        
-        self.add_item(remove_link_dropdown)
+            ]
+        if len(select_options) > 0:
+            remove_link_dropdown = DiscordSelectMenu(
+                function=self._callback_remove_account,
+                options=select_options,
+                placeholder="Select an account to remove.",
+                min_values=1,
+                max_values=len(select_options)
+                )        
+            self.add_item(remove_link_dropdown)
 
         self.is_active = True
         embed = await clash_embed(
             context=self.ctx,
-            message=f"Please select an account to unlink from your profile. Accounts that cannot be removed are not shown in the dropdown."
+            message=f"Please select an account to unlink from your profile. Accounts that cannot be removed are not shown in the dropdown. If you have no eligible accounts, the dropdown is not shown."
                 + "\n\u200b",
             )
         embed.add_field(
@@ -332,7 +338,7 @@ class DeleteLinkMenu(DefaultView):
         remove_accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in menu.values))
 
         for account in remove_accounts:
-            account.discord_user = 0
+            await BasicPlayer.set_discord_link(account.tag,0)
         
         embed = await clash_embed(
             context=self.ctx,

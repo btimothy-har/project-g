@@ -14,15 +14,26 @@ bot_client = client()
 class GuildClanPanel():
 
     @classmethod
-    def get_panel(cls,guild_id:int,channel_id:int):
-        try:
-            panel = db_GuildClanPanel.objects.get(
-                server_id=guild_id,
-                channel_id=channel_id
-                )
-        except DoesNotExist:
-            return None
-        return cls(panel)
+    async def get_for_guild(cls,guild_id:int) -> List['GuildClanPanel']:
+        def _query_db():
+            return [db for db in db_GuildClanPanel.objects(server_id=guild_id)]
+        db = await bot_client.run_in_thread(_query_db)
+        return [cls(panel) for panel in db]
+
+    @classmethod
+    async def get_panel(cls,guild_id:int,channel_id:int) -> Optional['GuildClanPanel']:
+        def _query_db():
+            try:
+                return db_GuildClanPanel.objects.get(
+                    server_id=guild_id,
+                    channel_id=channel_id
+                    )
+            except DoesNotExist:
+                return None
+        db = await bot_client.run_in_thread(_query_db)
+        if db:
+            return cls(db)
+        return None
     
     @classmethod
     def get_from_id(cls,panel_id:dict):
@@ -45,40 +56,29 @@ class GuildClanPanel():
     
     @classmethod
     async def create(cls,guild_id:int,channel_id:int):
-        panel_id = {'guild':guild_id,'channel':channel_id}
-        try:
-            panel = db_GuildClanPanel.objects.get(
+        def _create_in_db():
+            panel_id = {'guild':guild_id,'channel':channel_id}
+            db_GuildClanPanel.objects(panel_id=panel_id).update_one(
                 server_id=guild_id,
-                channel_id=channel_id
+                channel_id=channel_id,
+                upsert=True
                 )
-        except DoesNotExist:
-            panel = db_GuildClanPanel(
-                panel_id = panel_id,
-                server_id = guild_id,
-                channel_id = channel_id
-                )
-            panel.save()        
+            return db_GuildClanPanel.objects.get(panel_id=panel_id)
+        panel = await bot_client.run_in_thread(_create_in_db)
         return cls(panel)
     
     async def delete(self):
-        db_GuildClanPanel.objects(panel_id=self.id).delete()
-        async for m_id in self.long_message_ids:
+        def _delete_from_db():
+            db_GuildClanPanel.objects(panel_id=self.id).delete()
+        
+        await bot_client.run_in_thread(_delete_from_db)
+        async for m_id in AsyncIter(self.long_message_ids):
             try:
                 message = await self.channel.fetch_message(m_id)
             except discord.NotFound:
                 pass
             else:
                 await message.delete()
-    
-    def save(self):
-        db_panel = db_GuildClanPanel(
-            panel_id = self.id,
-            server_id = self.guild_id,
-            channel_id = self.channel_id,
-            message_id = self.message_id,
-            long_message_ids = self.long_message_ids
-            )
-        db_panel.save()
     
     @property
     def guild(self):
@@ -96,7 +96,13 @@ class GuildClanPanel():
                 pass
         return None
     
-    async def send_to_discord(self,embeds:list[discord.Embed]):        
+    async def send_to_discord(self,embeds:list[discord.Embed]):
+        def _update_in_db():
+            db_GuildClanPanel.objects(panel_id=self.id).update(
+                set__message_id=message_ids_master[0],
+                set__long_message_ids=message_ids_master
+                )
+            
         try:
             if not self.channel:
                 self.delete()
@@ -141,10 +147,7 @@ class GuildClanPanel():
                 else:
                     await message.delete()
             
-            db_GuildClanPanel.objects(panel_id=self.id).update(
-                set__message_id=message_ids_master[0],
-                set__long_message_ids=message_ids_master
-                )
+            await bot_client.run_in_thread(_update_in_db)
 
         except Exception as exc:
             bot_client.coc_main_log.exception(

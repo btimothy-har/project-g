@@ -39,8 +39,8 @@ class db_WarLeagueGroup(Document):
 class db_WarLeagueClan(Document):
     #ID using format {'season':'1-2023','tag':'#12345678'}
     cwl_id = DictField(primary_key=True,required=True)
-    season = StringField(default="")
-    tag = StringField(default="")
+    season = StringField(default="",required=True)
+    tag = StringField(default="",required=True)
     name = StringField(default="")
     is_participating = BooleanField(default=False)
     roster_open = BooleanField(default=True)    
@@ -52,8 +52,8 @@ class db_WarLeagueClan(Document):
 class db_WarLeaguePlayer(Document):
     #ID using format {'season':'1-2023','tag':'#12345678'}
     cwl_id = DictField(primary_key=True,required=True)
-    season = StringField(default="")
-    tag = StringField(default="")
+    season = StringField(default="",required=True)
+    tag = StringField(default="",required=True)
     name = StringField(default="")
     registered = BooleanField(default=False)
     discord_user = IntField(default=0)

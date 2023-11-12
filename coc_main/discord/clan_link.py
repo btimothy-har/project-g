@@ -13,15 +13,31 @@ bot_client = client()
 class ClanGuildLink():
 
     @classmethod
-    def get_link(cls,clan_tag:str,guild_id:int):
-        try:
-            return cls(db_ClanGuildLink.objects.get(tag=clan_tag,guild_id=guild_id))
-        except DoesNotExist:
-            return None
+    async def get_link(cls,clan_tag:str,guild_id:int) -> Optional['ClanGuildLink']:
+        def _get_from_db():
+            try:
+                return db_ClanGuildLink.objects.get(tag=clan_tag,guild_id=guild_id)
+            except DoesNotExist:
+                return None
+        
+        link = await bot_client.run_in_thread(_get_from_db)
+        if link:
+            return cls(link)
+        return None
     
     @classmethod
-    def get_clan_links(cls,clan_tag:str):
-        return [cls(link) for link in db_ClanGuildLink.objects(tag=clan_tag)]
+    async def get_links_for_clan(cls,clan_tag:str):
+        def _get_from_db():
+            return db_ClanGuildLink.objects(tag=clan_tag)
+        links = await bot_client.run_in_thread(_get_from_db)
+        return [cls(link) for link in links]
+
+    @classmethod
+    async def get_for_guild(cls,guild_id:int):
+        def _query_db():
+            return [db for db in db_ClanGuildLink.objects(guild_id=guild_id)]
+        db = await bot_client.run_in_thread(_query_db)
+        return [cls(link) for link in db]
     
     def __init__(self,database_entry:db_ClanGuildLink):
         self.id = database_entry.link_id
@@ -52,8 +68,10 @@ class ClanGuildLink():
         return cls(guild_link)
     
     @classmethod
-    def delete(cls,clan_tag:str,guild:discord.Guild):   
-        db_ClanGuildLink.objects(tag=clan_tag,guild_id=guild.id).delete()
+    async def delete(cls,clan_tag:str,guild:discord.Guild):   
+        def _db_delete():
+            db_ClanGuildLink.objects(tag=clan_tag,guild_id=guild.id).delete()        
+        await bot_client.run_in_thread(_db_delete)
     
     @property
     def clan(self) -> BasicClan:

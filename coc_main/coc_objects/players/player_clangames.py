@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import pendulum
 
@@ -12,15 +13,15 @@ class aPlayerClanGames():
     def __init__(self,
         tag:str,
         season:aClashSeason,
-        api_value:int,
         dict_value:dict):
         
         self.tag = tag
-        self.season = season    
+        self.season = season
+        self._lock = asyncio.Lock()
 
         self.clan_tag = dict_value.get('clan',None)
         self.score = dict_value.get('score',0)
-        self.last_updated = dict_value.get('last_updated',api_value)
+        self.last_updated = dict_value.get('last_updated')
 
         if isinstance(dict_value.get('starting_time'),datetime.datetime):
             if dict_value['starting_time'].timestamp() > 0:
@@ -44,7 +45,12 @@ class aPlayerClanGames():
             else:
                 self.ending_time = None
     
-    def __json__(self):
+    @property
+    def _db_id(self) -> Dict[str,str]:
+        return {'season': self.season.id,'tag': self.tag}
+        
+    @property
+    def json(self):
         return {
             'clan': self.clan_tag,
             'score': self.score,
@@ -52,27 +58,29 @@ class aPlayerClanGames():
             'starting_time': getattr(self.starting_time,'int_timestamp',None),
             'ending_time': getattr(self.ending_time,'int_timestamp',None)
             }
-    @property
-    def json(self):
-        return self.__json__()    
+    
     @property
     def games_start(self):
         return self.season.clangames_start
+    
     @property
     def games_end(self):
         return self.season.clangames_end
+    
     @property
     def completion(self):
         if self.ending_time:
             return self.games_start.diff(self.ending_time)
         else:
             return None
+        
     @property
     def completion_seconds(self) -> int:
         if self.ending_time:
             return self.completion.in_seconds()
         else:
             return 0
+        
     @property
     def time_to_completion(self):
         if self.ending_time:
@@ -90,33 +98,35 @@ class aPlayerClanGames():
         else:
             return ""
 
-    async def calculate_clangames(self,player):
-        increment = 0
-
-        if self.games_start <= player.timestamp <= self.games_end.add(days=1):
-            new_score = getattr(player.get_achievement('Games Champion'),'value',self.last_updated)
-            increment = new_score - self.last_updated
-
-            if increment > 0:                
-                if self.score == 0:
-                    self.clan_tag = player.clan.tag
-                    self.starting_time = player.timestamp                    
-                    bot_client.coc_data_log.debug(
-                        f"Player {self.tag} {self.season.id}: Started Clan Games at {player.timestamp}."
-                        )
-
-                self.score += increment
-                self.last_updated = new_score
+    async def update(self,    
+        increment:int,
+        latest_value:int,
+        timestamp:pendulum.DateTime,
+        clan,
+        db_update:Callable,
+        ):
+        
+        async with self._lock:
+            if self.score == 0:
+                self.clan_tag = clan.tag
+                self.starting_time = timestamp
                 bot_client.coc_data_log.debug(
-                    f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
+                    f"Player {self.tag} {self.season.id}: Started Clan Games at {timestamp}."
                     )
 
-                if self.score >= self.season.clangames_max:
-                    self.ending_time = player.timestamp
-                    self.score = self.season.clangames_max
-                    bot_client.coc_data_log.debug(
-                        f"Player {self.tag} {self.season.id}: Finished Clan Games at {player.timestamp}."
-                        )
-        else:
-            self.last_updated = getattr(player.get_achievement('Games Champion'),'value',0)        
-        return increment
+            self.score += increment
+            self.last_updated = latest_value
+            bot_client.coc_data_log.debug(
+                f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
+                )
+
+            if self.score >= self.season.clangames_max:
+                self.ending_time = timestamp
+                self.score = self.season.clangames_max
+                bot_client.coc_data_log.debug(
+                    f"Player {self.tag} {self.season.id}: Finished Clan Games at {timestamp}."
+                    )
+            
+            await bot_client.run_in_thread(db_update,db_id=self._db_id,stat_json=self.json)
+        
+        return self

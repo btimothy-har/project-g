@@ -1,7 +1,9 @@
+import coc
 import asyncio
 import os
 import discord
 import pendulum
+import xlsxwriter
 
 from typing import *
 
@@ -10,33 +12,37 @@ from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
 
-from .objects.accounts import MasterAccount, ClanAccount
+from .objects.accounts import BankAccount, MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
-from .objects.item import ShopItem
-from .views.store_manager import StoreManager
+from .objects.item import ShopItem, db_ShopItem
+from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
-from .checks import is_bank_admin, is_bank_server, is_coleader_or_bank_admin
-from .autocomplete import autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items
+from .checks import is_bank_admin, is_payday_server, is_bank_server, is_coleader_or_bank_admin
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items
 
 from mee6rank.mee6rank import Mee6Rank
 
 from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbreviation
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan, db_Player
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWeekend
 
+from coc_main.coc_objects.players.player import aPlayer, aHero, db_Player
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidMember
 
 from coc_main.discord.member import aMember
 
+from coc_main.tasks.player_tasks import PlayerLoop
+from coc_main.tasks.war_tasks import ClanWarLoop
+from coc_main.tasks.raid_tasks import ClanRaidLoop
+
 from coc_main.utils.components import clash_embed, MenuPaginator
-from coc_main.utils.constants.coc_constants import WarResult
+from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
 
 bot_client = BotClashClient()
-
 non_member_multiplier = 0.2
 
 ############################################################
@@ -53,7 +59,7 @@ class Bank(commands.Cog):
 
     __author__ = bot_client.author
     __version__ = bot_client.version
-    __release__ = 4
+    __release__ = 5
 
     def __init__(self,bot:Red):
         self.bot = bot
@@ -62,20 +68,48 @@ class Bank(commands.Cog):
         if not os.path.exists(self.bot.coc_bank_path):
             os.makedirs(self.bot.coc_bank_path)
 
-        self.current_account = MasterAccount('current')
-        self.sweep_account = MasterAccount('sweep')
-        self.reserve_account = MasterAccount('reserve')
-        self.eligible_boost_servers = [1132581106571550831,688449973553201335,680798075685699691]
+        self.bank_admins = []
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
             "use_rewards":False,
+            "admins":[],
             }
         self.config.register_global(**default_global)
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
+    
+    async def cog_load(self):
+        self.current_account = await MasterAccount.get('current')
+        self.sweep_account = await MasterAccount.get('sweep')
+        self.reserve_account = await MasterAccount.get('reserve')
+
+        self.bank_admins = await self.config.admins()
+
+        try:
+            self.use_rewards = await self.config.use_rewards()
+        except:
+            self.use_rewards = False            
+  
+        PlayerLoop.add_player_event(self.member_th_progress_reward)
+        PlayerLoop.add_player_event(self.member_hero_upgrade_reward)
+        PlayerLoop.add_achievement_event(self.capital_contribution_rewards)
+        
+        ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
+        ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
+    
+    async def cog_unload(self):
+        PlayerLoop.remove_player_event(self.member_th_progress_reward)
+        PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
+        PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
+
+        ClanWarLoop.remove_war_end_event(self.clan_war_ended_rewards)
+        ClanRaidLoop.remove_raid_end_event(self.raid_weekend_ended_rewards)
+
+        ClanAccount._cache = {}
+        MasterAccount._cache = {}
 
     @property
     def client(self) -> ClashOfClansClient:
@@ -106,22 +140,6 @@ class Bank(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
-    
-    async def cog_load(self):
-        try:
-            self.use_rewards = await self.config.use_rewards()
-        except:
-            self.use_rewards = False
-    
-    ############################################################
-    #####
-    ##### ACCOUNT HELPERS
-    #####
-    ############################################################
-    def get_clan_account(self,clan:aClan):
-        if not clan.is_alliance_clan:
-            raise ValueError("Clan must be an Alliance Clan.")
-        return ClanAccount(clan.tag)
 
     ############################################################
     #####
@@ -129,7 +147,11 @@ class Bank(commands.Cog):
     #####
     ############################################################
     async def month_end_sweep(self):
-        async with self.current_account.lock:
+        def _member_db_query():
+            query = db_Player.objects(is_member=True).only('tag')
+            return [db.tag for db in query]
+            
+        async with self.current_account._master_lock:
             current_balance = self.current_account.balance
             if current_balance > 0:
                 await self.sweep_account.deposit(
@@ -151,37 +173,39 @@ class Bank(commands.Cog):
         alliance_clans = await self.client.get_alliance_clans()
             
         sweep_balance = self.sweep_account.balance
-        available_for_distribution = sweep_balance * 0.7
-        async for clan in AsyncIter(alliance_clans):
-            if not clan.bank_account:
-                continue
+        distribution_per_clan = (sweep_balance * 0.7) / len(alliance_clans)
 
-            clan_balance = clan.balance
+        async for clan in AsyncIter(alliance_clans):            
+            clan_account = await ClanAccount.get(clan)
+            clan_balance = clan_account.balance
+
             if clan_balance > 0:
+                await clan_account.withdraw(
+                    amount=round(clan_balance * 0.1),
+                    user_id=self.bot.user.id,
+                    comment=f"EOS to Reserve Account."
+                    )                
                 await self.reserve_account.deposit(
                     amount=round(clan_balance * 0.1),
                     user_id=self.bot.user.id,
                     comment=f"EOS from {clan.tag} {clan.name}."
                     )
-                await clan.bank_account.withdraw(
-                    amount=round(clan_balance * 0.1),
-                    user_id=self.bot.user.id,
-                    comment=f"EOS to Reserve Account."
-                    )                
-            if available_for_distribution > 0:
-                await clan.bank_account.deposit(
-                    amount=round((available_for_distribution) / len(alliance_clans)),
+                
+            if distribution_per_clan > 0:
+                distribution = round(distribution_per_clan * (clan.alliance_member_count / 50))
+
+                await clan_account.deposit(
+                    amount=distribution,
                     user_id=self.bot.user.id,
                     comment=f"EOS from Sweep Account."
                     )
                 await self.sweep_account.withdraw(
-                    amount=round((available_for_distribution) / len(alliance_clans)),
+                    amount=distribution,
                     user_id=self.bot.user.id,
                     comment=f"EOS to {clan.tag} {clan.name}."
                     )
-                
-        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
-           
+    
+        member_tags = await bot_client.run_in_thread(_member_db_query)           
         await self.current_account.deposit(
             amount=round(len(member_tags) * 25000),
             user_id=self.bot.user.id,
@@ -189,14 +213,10 @@ class Bank(commands.Cog):
             )
     
     async def apply_bank_taxes(self):
-        await bank.bank_prune(self.bot)
-        all_accounts = await bank.get_leaderboard()
-
-        async for id,account in AsyncIter(all_accounts):
-            user = self.bot.get_user(id)
+        async def _user_tax(user_id:int):
+            user = self.bot.get_user(user_id)
             if user.bot:
-                await bank.set_balance(user,0)
-                continue
+                return await bank.set_balance(user,0)                
 
             current_balance = await bank.get_balance(user)
             additional_tax = 0
@@ -221,22 +241,35 @@ class Bank(commands.Cog):
                     amount=total_tax,
                     user_id=self.bot.user.id,
                     comment=f"Taxes for {user.id}."
-                    )
+                    )                
+
+        await bank.bank_prune(self.bot)
+        all_accounts = await bank.get_leaderboard()
+
+        await asyncio.gather(*(_user_tax(id) for id,account in all_accounts))            
     
-    async def member_th_progress_reward(self,player:aPlayer,cached_value:int):
+    ############################################################
+    #####
+    ##### PLAYER PROGRESS REWARDS
+    #####
+    ############################################################ 
+    async def member_th_progress_reward(self,old_player:aPlayer,new_player:aPlayer):
         if not self.use_rewards:
             return
-        if not player.is_member:
+        if not new_player.is_member:
             return
-        member = self.bot.get_user(player.discord_user)
+        member = self.bot.get_user(new_player.discord_user)
         if not member:
             return
         
-        if player.hero_rushed_pct > 0:
+        if old_player.town_hall.level == new_player.town_hall.level:
+            return
+        
+        if new_player.hero_rushed_pct > 0:
             reward = 0
-        elif player.town_hall.level <= 9:
+        elif new_player.town_hall.level <= 9:
             reward = 10000
-        elif player.town_hall.level <= 13:
+        elif new_player.town_hall.level <= 13:
             reward = 15000
         else:
             reward = 20000
@@ -245,45 +278,158 @@ class Bank(commands.Cog):
         await self.current_account.withdraw(
             amount = reward,
             user_id = self.bot.user.id,
-            comment = f"Townhall Bonus for {player.name} ({player.tag}): TH{cached_value} to TH{player.town_hall.level}."
+            comment = f"Townhall Bonus for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
             )
     
-    async def member_hero_upgrade_reward(self,player:aPlayer,levels:int):
+    async def member_hero_upgrade_reward(self,old_player:aPlayer,new_player:aPlayer):
+        async def _hero_reward(hero:aHero):
+            old_hero = old_player.get_hero(hero.name)
+            upgrades = range(old_hero.level+1,hero.level+1)
+            async for u in AsyncIter(upgrades):
+                if u > hero.min_level:
+                    await bank.deposit_credits(member,rew)
+                    await self.current_account.withdraw(
+                        amount = rew,
+                        user_id = self.bot.user.id,
+                        comment = f"Hero Bonus for {new_player.name} ({new_player.tag}): {hero.name} upgraded to {hero.level}."
+                        )
+                    
         if not self.use_rewards:
             return
-        if not player.is_member:
+        if not new_player.is_member:
             return
-        member = self.bot.get_user(player.discord_user)
+        member = self.bot.get_user(new_player.discord_user)
         if not member:
             return
         
-        reward = 1000 * levels
-        await bank.deposit_credits(member,reward)
-        await self.current_account.withdraw(
-            amount = reward,
-            user_id = self.bot.user.id,
-            comment = f"Hero Bonus for {player.name} ({player.tag}): {levels} upgraded."
-            )
+        if new_player.hero_strength == old_player.hero_strength:
+            return
+        
+        rew = 1000
+        await asyncio.gather(*(_hero_reward(hero) for hero in new_player.heroes))
     
-    async def member_legend_rewards(self):
+    async def capital_contribution_rewards(self,old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
+        if achievement.name == "Most Valuable Clanmate":
+            if not self.use_rewards:
+                return
+            member = self.bot.get_user(new_player.discord_user)
+            if not member:
+                return
+            
+            old_ach = old_player.get_achievement(achievement.name)
+            new_ach = new_player.get_achievement(achievement.name)            
+            increment = new_ach.value - old_ach.value
+            
+            membership_multiplier = 1 if new_player.is_member else non_member_multiplier
+            total_reward = round((10 * (increment // 1000)) * membership_multiplier)
+
+            await bank.deposit_credits(member,total_reward)
+            await self.current_account.withdraw(
+                amount = total_reward,
+                user_id = self.bot.user.id,
+                comment = f"Capital Gold Bonus for {new_player.name} ({new_player.tag}): {increment}"
+                )
+    
+    ############################################################
+    #####
+    ##### WAR REWARDS
+    #####
+    ############################################################
+    async def clan_war_ended_rewards(self,clan:aClan,war:aClanWar):
+
+        async def war_bank_rewards(player:aWarPlayer):        
+            member = self.bot.get_user(player.discord_user)
+            if not member:
+                return
+            
+            if player.unused_attacks > 0:
+                balance = await bank.get_balance(member)
+                penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
+                await bank.withdraw_credits(member,penalty)
+                await self.current_account.deposit(
+                    amount = penalty,
+                    user_id = self.bot.user.id,
+                    comment = f"Clan War Penalty for {player.name} ({player.tag})."
+                    )
+
+            membership_multiplier = 1 if player.is_member else non_member_multiplier
+            participation = 50
+            performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
+            result = 100 if player.clan.result == WarResult.WON else 0
+
+            total_reward = round((participation + performance + result) * membership_multiplier)
+            await bank.deposit_credits(member,total_reward)
+            await self.current_account.withdraw(
+                amount = total_reward,
+                user_id = self.bot.user.id,
+                comment = f"Clan War Reward for {player.name} ({player.tag})."
+                )
+        
         if not self.use_rewards:
             return
         
-        reward_per_trophy = 20
-        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
-        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))
+        if clan.is_alliance_clan and war.type == ClanWarType.RANDOM:
+            war_clan = war.get_clan(clan.tag)
+            if not war_clan:
+                return
+            
+            await asyncio.gather(*(war_bank_rewards(player) for player in war_clan.members))
+    
+    async def raid_weekend_ended_rewards(self,clan:aClan,raid:aRaidWeekend):
+        async def raid_bank_rewards(player:aRaidMember):        
+            member = self.bot.get_user(player.discord_user)
+            if not member:
+                return
+            
+            if player.attack_count < 6:
+                unused_attacks = 6 - player.attack_count
+                balance = await bank.get_balance(member)
+                penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
+                await bank.withdraw_credits(member,penalty)
+                await self.current_account.deposit(
+                    amount = penalty,
+                    user_id = self.bot.user.id,
+                    comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
+                    )
+            
+            membership_multiplier = 1 if player.is_member else non_member_multiplier
+
+            total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * membership_multiplier)
+            await bank.deposit_credits(member,total_reward)
+            await self.current_account.withdraw(
+                amount = total_reward,
+                user_id = self.bot.user.id,
+                comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
+                )
+
+        if not self.use_rewards:
+            return
         
-        async for player in AsyncIter(alliance_members):
+        if clan.is_alliance_clan:
+            await asyncio.gather(*(raid_bank_rewards(player) for player in raid.members))    
+    
+    ############################################################
+    #####
+    ##### EOS REWARDS
+    #####
+    ############################################################
+    async def member_legend_rewards(self):
+        def _db_query():
+            query = db_Player.objects(is_member=True).only('tag')
+            return [db.tag for db in query]
+        
+        async def _distribute_rewards(player:aPlayer):
             if not player.is_member:
-                continue
+                return
             if not player.legend_statistics:
-                continue
+                return
             if not player.legend_statistics.previous_season:
-                continue
+                return
 
             member = self.bot.get_user(player.discord_user)
             if not member:
-                continue
+                return
+            
             reward = (player.legend_statistics.previous_season.trophies - 5000) * reward_per_trophy
             if reward > 0:
                 await bank.deposit_credits(member,reward)
@@ -292,83 +438,48 @@ class Bank(commands.Cog):
                     user_id=self.bot.user.id,
                     comment=f"Legend Rewards for {player.name} {player.tag}."
                     )
-    
-    async def war_bank_rewards(self,player:aWarPlayer):
+        
         if not self.use_rewards:
             return
         
-        member = self.bot.get_user(player.discord_user)
-        if not member:
-            return
+        reward_per_trophy = 20
+        member_tags = await bot_client.run_in_thread(_db_query)
+        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))
         
-        if player.unused_attacks > 0:
-            balance = await bank.get_balance(member)
-            penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
-            await bank.withdraw_credits(member,penalty)
-            await self.current_account.deposit(
-                amount = penalty,
-                user_id = self.bot.user.id,
-                comment = f"Clan War Penalty for {player.name} ({player.tag})."
-                )
-
-        membership_multiplier = 1 if player.is_member else non_member_multiplier
-        participation = 50
-        performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
-        result = 100 if player.clan.result == WarResult.WON else 0
-
-        total_reward = round((participation + performance + result) * membership_multiplier)
-        await bank.deposit_credits(member,total_reward)
-        await self.current_account.withdraw(
-            amount = total_reward,
-            user_id = self.bot.user.id,
-            comment = f"Clan War Reward for {player.name} ({player.tag})."
-            )
+        await asyncio.gather(*(_distribute_rewards(player) for player in alliance_members))
     
-    async def raid_bank_rewards(self,player:aRaidMember):
+    async def member_clan_games_rewards(self):
+        def _db_query():
+            query = db_Player.objects(is_member=True).only('tag')
+            return [db.tag for db in query]
+
+        async def _distribute_rewards(player:aPlayer):
+            if not player.is_member:
+                return          
+            member = self.bot.get_user(player.discord_user)
+            if not member:
+                return
+
+            player_season = player.get_season_stats(bot_client.current_season)
+
+            if player_season.clangames.clan_tag == player_season.home_clan_tag:
+                reward = round(4000 * (player_season.clangames.score / 4000))
+
+                if reward > 0:
+                    await bank.deposit_credits(member,reward)
+                    await self.current_account.withdraw(
+                        amount=reward,
+                        user_id=self.bot.user.id,
+                        comment=f"Clan Games Rewards for {player.name} {player.tag}. Score: {player_season.clangames.score}."
+                        )
+        
         if not self.use_rewards:
             return
         
-        member = self.bot.get_user(player.discord_user)
-        if not member:
-            return
-        
-        if player.attack_count < 6:
-            unused_attacks = 6 - player.attack_count
-            balance = await bank.get_balance(member)
-            penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
-            await bank.withdraw_credits(member,penalty)
-            await self.current_account.deposit(
-                amount = penalty,
-                user_id = self.bot.user.id,
-                comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
-                )
-        
-        membership_multiplier = 1 if player.is_member else non_member_multiplier
+        member_tags = await bot_client.run_in_thread(_db_query)
+        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))        
+        await asyncio.gather(*(_distribute_rewards(player) for player in alliance_members))            
 
-        total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * membership_multiplier)
-        await bank.deposit_credits(member,total_reward)
-        await self.current_account.withdraw(
-            amount = total_reward,
-            user_id = self.bot.user.id,
-            comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
-            )
-    
-    async def capital_contribution_rewards(self,player:aPlayer,value_increment:int):
-        if not self.use_rewards:
-            return
-        member = self.bot.get_user(player.discord_user)
-        if not member:
-            return
-        membership_multiplier = 1 if player.is_member else non_member_multiplier
-        total_reward = round((10 * (value_increment // 1000)) * membership_multiplier)
-
-        await bank.deposit_credits(member,total_reward)
-        await self.current_account.withdraw(
-            amount = total_reward,
-            user_id = self.bot.user.id,
-            comment = f"Capital Gold Bonus for {player.name} ({player.tag}): {value_increment}"
-            )
-    
     ############################################################
     ############################################################
     #####
@@ -431,15 +542,15 @@ class Bank(commands.Cog):
                 clan = None
         
         if clan:
+            account = await ClanAccount.get(clan)
             embed = await clash_embed(
                 context=context,
-                message=f"**{clan.title}** has **{clan.balance:,} {currency}**.",
+                message=f"**{clan.title}** has **{account.balance:,} {currency}**.",
                 timestamp=pendulum.now()
                 )
             return embed       
 
         member = aMember(user.id,context.guild.id)
-
         embed = await clash_embed(
             context=context,
             message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
@@ -473,8 +584,7 @@ class Bank(commands.Cog):
     @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
     @app_commands.describe(
         select_clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
-    async def app_command_bank_balance(self,interaction:discord.Interaction,select_clan:Optional[str]=None):
-        
+    async def app_command_bank_balance(self,interaction:discord.Interaction,select_clan:Optional[str]=None):        
         await interaction.response.defer()
 
         if select_clan:
@@ -490,25 +600,25 @@ class Bank(commands.Cog):
     ##################################################
     async def helper_payday(self,context:Union[discord.Interaction,commands.Context]):
         currency = await bank.get_currency_name()
-        user = context.guild.get_member(context.user.id) if isinstance(context,discord.Interaction) else context.author
-        member = aMember(user.id,context.guild.id)
+        user_id = context.user.id if isinstance(context,discord.Interaction) else context.author.id
+        member = aMember(user_id,1132581106571550831)
 
-        is_booster = True if member.discord_member.premium_since else False
+        is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
-        last_payday = member.last_payday
-        if last_payday:
-            if last_payday.add(days=1) > pendulum.now():
+        if member.last_payday:
+            if member.last_payday.add(days=1) > pendulum.now():
                 embed = await clash_embed(
                     context=context,
-                    message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
+                    message=f"You can claim your next payday <t:{member.last_payday.add(days=1).int_timestamp}:R>.",
                     success=False,
                     timestamp=pendulum.now()
                     )        
                 return embed        
+            
         try:
             mee6user = await Mee6Rank._get_player(
                 bot_client.bot.get_cog("Mee6Rank"),
-                user,
+                member.discord_member,
                 get_avatar=False
                 )
         except:
@@ -519,25 +629,30 @@ class Bank(commands.Cog):
         boost_bonus = 1000 if is_booster else 0
 
         total_payout = basic_payout + xp_bonus + boost_bonus
-        await bank.deposit_credits(user,total_payout)
-
-        member.last_payday = pendulum.now().int_timestamp
+        await bank.deposit_credits(member.discord_member,total_payout)
+        await member.set_last_payday(pendulum.now())
 
         embed = await clash_embed(
             context=context,
-            message=f"Here's some money, {user.mention}! You received:"
+            message=f"Here's some money, {member.mention}! You received:"
                 + f"\n\nBase Payout: {basic_payout} {currency}"
                 + f"\nXP Bonus: {xp_bonus:,} {currency}"
                 + f"\nNitro Bonus: {boost_bonus:,} {currency}"
-                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(user):,} {currency}.",
+                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
             success=True,
             timestamp=pendulum.now()
             )        
         return embed
+
+    @commands.command(name="debugitem")
+    async def command_debug(self,ctx:commands.Context):
+        items = await ShopItem.get_by_guild(ctx.guild.id)
+        for item in items:
+            await ctx.reply(f"{item.name} ({item.id}) {item.guild_id}")
     
     @commands.command(name="payday")
     @commands.guild_only()
-    @commands.check(is_bank_server)
+    @commands.check(is_payday_server)
     async def command_payday(self,ctx:commands.Context):
         """
         Payday!
@@ -550,7 +665,7 @@ class Bank(commands.Cog):
     @app_commands.command(name="payday",
         description="Receive a set amount of money every 24 hours.")
     @app_commands.guild_only()
-    @app_commands.check(is_bank_server)
+    @app_commands.check(is_payday_server)
     async def app_command_payday(self,interaction:discord.Interaction):
 
         await interaction.response.defer()        
@@ -567,14 +682,74 @@ class Bank(commands.Cog):
         """
         Enable or Disable Currency Rewards.
         """
+
         self.use_rewards = not self.use_rewards
         await self.config.use_rewards.set(self.use_rewards)
         await ctx.reply(f"Currency Rewards have been {'Enabled' if self.use_rewards else 'Disabled'}.")
+    
+    ##################################################
+    ### BANK / SETADMIN
+    ##################################################
+    @command_group_bank.command(name="setadmin")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_setadmin(self,ctx:commands.Context,member:discord.Member):
+        """
+        [Owner only] Add a Bank Admin.
+        """
+        
+        if member.id in self.bank_admins:
+            return await ctx.reply(f"{member.display_name} is already a Bank Admin.")
+        
+        self.bank_admins.append(member.id)
+        await self.config.admins.set(self.bank_admins)
+        await ctx.reply(f"{member.display_name} is now a Bank Admin.")
+    
+    ##################################################
+    ### BANK / DELADMIN
+    ##################################################
+    @command_group_bank.command(name="deladmin")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_deladmin(self,ctx:commands.Context,member:discord.Member):
+        """
+        [Owner only] Deletes a Bank Admin.
+        """
+        
+        if member.id not in self.bank_admins:
+            return await ctx.reply(f"{member.display_name} is not a Bank Admin.")            
+        
+        self.bank_admins.remove(member.id)
+        await self.config.admins.set(self.bank_admins)
+        await ctx.reply(f"{member.display_name} is no longer a Bank Admin.")
+    
+    ##################################################
+    ### BANK / SHOWADMIN
+    ##################################################
+    @command_group_bank.command(name="showadmins")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_showadmin(self,ctx:commands.Context,member:discord.Member):
+        """
+        [Owner only] Lists the current Bank Admins.
+        """
+
+        embed = await clash_embed(
+            context=ctx,
+            title=f"{self.bot.user.name} Bank Admins",
+            message="\n".join([ctx.guild.get_member(id).display_name for id in self.bank_admins]),
+            timestamp=pendulum.now()
+            )
+        await ctx.reply(embed=embed)
 
     ##################################################
     ### BANK / GLOBALBAL
     ##################################################
     async def helper_global_account_balances(self,context:Union[discord.Interaction,commands.Context]):
+        def _db_query():
+            query = db_Player.objects(is_member=True).only('tag')
+            return [db.tag for db in query]
+        
         currency = await bank.get_currency_name()
         leaderboard = await bank.get_leaderboard()
         if len(leaderboard) == 0:
@@ -582,7 +757,7 @@ class Bank(commands.Cog):
         else:
             total_balance = sum([account['balance'] for id,account in leaderboard])
 
-        member_tags = [db.tag for db in db_Player.objects(is_member=True).only('tag')]
+        member_tags = await bot_client.run_in_thread(_db_query)
 
         embed = await clash_embed(
             context=context,
@@ -591,7 +766,7 @@ class Bank(commands.Cog):
                 + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
                 + f"\n`{'Reserve':<10}` {self.reserve_account.balance:,} {currency}"
                 + f"\n`{'Total':<10}` {total_balance:,} {currency}"
-                + f"\n\nNew Monthly Balance (est.): {len(member_tags) * 25000:,}",
+                + f"\n\nNew Monthly Balance (est.): {len(member_tags) * 25000:,} {currency}",
             timestamp=pendulum.now()
             )
         return embed
@@ -619,18 +794,13 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / LEADERBOARD
     ##################################################
-    @command_group_bank.command(name="leaderboard",aliases=['lb'])
-    @commands.guild_only()
-    async def command_bank_leaderboard(self,ctx:commands.Context):
-        """
-        Displays the Economy Leaderboard for this Server.
-        """        
+    async def _helper_leaderboard(self,ctx:Union[commands.Context,discord.Interaction]):
+        
         pages = []
         leaderboard = await bank.get_leaderboard(guild=ctx.guild)
-        now = pendulum.now()
 
         if len(leaderboard) == 0:
-            return await ctx.reply("Oops! There doesn't seem to be any accounts in the Bank.")
+            return None
         
         count = 0
         embed = None
@@ -641,55 +811,47 @@ class Bank(commands.Cog):
                     context=ctx,
                     title=f"Bank Leaderboard: {ctx.guild.name}",
                     message=f"`{'':>3}{'':<3}{'WEALTH':>7}{'':<2}`",
-                    timestamp=now
+                    timestamp=pendulum.now()
                     )
-            member = ctx.guild.get_member(id)            
+            member = ctx.guild.get_member(id)
             embed.description += f"\n`{count:>3}{'':<3}{account['balance']:>7,}{'':<2}`\u3000{member.display_name}"
             if (count >= 10 and count % 10 == 0) or count == len(leaderboard):
                 pages.append(embed)
                 embed = None
         
-        if len(pages) > 1:
-            paginate = MenuPaginator(ctx,pages)
+        return pages
+
+    @command_group_bank.command(name="leaderboard",aliases=['lb'])
+    @commands.guild_only()
+    async def command_bank_leaderboard(self,ctx:commands.Context):
+        """
+        Displays the Economy Leaderboard for this Server.
+        """        
+
+        leaderboard = await self._helper_leaderboard(ctx)
+        if not leaderboard:
+            return await ctx.reply("Oops! There doesn't seem to be any accounts in the Bank.")
+        
+        if len(leaderboard) > 1:
+            paginate = MenuPaginator(ctx,leaderboard)
             await paginate.start()
         else:
-            await ctx.reply(embed=pages[0])
+            await ctx.reply(embed=leaderboard[0])
     
     @app_command_group_bank.command(name="leaderboard",
         description="Displays the Economy Leaderboard for this Server.")
     async def app_command_bank_leaderboard(self,interaction:discord.Interaction):
 
         await interaction.response.defer()
-
-        pages = []
-        leaderboard = await bank.get_leaderboard(guild=interaction.guild)
-        now = pendulum.now()
-
-        if len(leaderboard) == 0:
+        leaderboard = await self._helper_leaderboard(interaction)
+        if not leaderboard:
             return await interaction.followup.send("Oops! There doesn't seem to be any accounts in the Bank.")
         
-        count = 0
-        embed = None
-        async for id,account in AsyncIter(leaderboard):
-            count += 1
-            if not embed:
-                embed = await clash_embed(
-                    context=interaction,
-                    title=f"Bank Leaderboard: {interaction.guild.name}",
-                    message=f"`{'':>3}{'':<3}{'WEALTH':>7}{'':<2}`",
-                    timestamp=now
-                    )
-            member = interaction.guild.get_member(id)            
-            embed.description += f"\n`{count:>3}{'':<3}{account['balance']:>7,}{'':<2}`\u3000{member.display_name}"
-            if (count >= 10 and count % 10 == 0) or count == len(leaderboard):
-                pages.append(embed)
-                embed = None
-        
-        if len(pages) > 1:
-            paginate = MenuPaginator(interaction,pages)
+        if len(leaderboard) > 1:
+            paginate = MenuPaginator(interaction,leaderboard)
             await paginate.start()
         else:
-            await interaction.followup.send(embed=pages[0])
+            await interaction.followup.send(embed=leaderboard[0])
     
     ##################################################
     ### BANK / TRANSACTIONS
@@ -704,10 +866,10 @@ class Bank(commands.Cog):
         Only Guild and Clan Accounts have tracked transactions. Only transactions in the last 3 months are reported.
         """
 
-        if account_type_or_clan_abbreviation in ['current','sweep','reserve']:
+        if account_type_or_clan_abbreviation in global_accounts:
             if not is_bank_admin(ctx):
                 return await ctx.reply("You don't have permission to do this.")
-            account = MasterAccount(account_type_or_clan_abbreviation)
+            account = await MasterAccount.get(account_type_or_clan_abbreviation)
         
         else:
             clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
@@ -715,7 +877,7 @@ class Bank(commands.Cog):
 
             if not check_permissions:
                 return await ctx.reply("You don't have permission to do this.")
-            account = ClanAccount(clan.tag)
+            account = await ClanAccount.get(clan)
         
         embed = await clash_embed(
             context=ctx,
@@ -725,15 +887,17 @@ class Bank(commands.Cog):
         
         rpfile = await account.export() 
         if not rpfile:
-            return await msg.edit("There were no transactions to report.")
+            embed = await clash_embed(
+                context=ctx,
+                message=f"There were no transactions to report."
+                )
+            return await msg.edit(embed=embed)
            
-        rept_embed = await clash_embed(
-            context=ctx,
-            title=f"Bank Transaction Report",
-            message=f"Your report is available for download below.",
-            success=True)
-        await msg.edit(embed=rept_embed)
-        await ctx.send(file=discord.File(rpfile))
+        await msg.edit(
+            content=f"{ctx.author.mention} Your report is available for download below.",
+            embed=None,
+            attachments=[discord.File(rpfile)]
+            )
 
     @app_command_group_bank.command(name="transactions",
         description="Export Bank Transactions to Excel.")
@@ -741,14 +905,14 @@ class Bank(commands.Cog):
     @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
     @app_commands.describe(
         select_account="Select an Account to view.")
-    async def app_command_bank_transactions(self,interaction:discord.Interaction,select_account:str):
+    async def app_command_transaction_report(self,interaction:discord.Interaction,select_account:str):
 
         await interaction.response.defer()
 
-        if select_account in ['current','sweep','reserve']:
+        if select_account in global_accounts:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You don't have permission to do this.")
-            account = MasterAccount(select_account)
+            account = await MasterAccount.get(select_account)
         
         else:
             try:
@@ -759,7 +923,7 @@ class Bank(commands.Cog):
 
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.")
-            account = ClanAccount(clan.tag)
+            account = await ClanAccount.get(clan)
         
         embed = await clash_embed(
             context=interaction,
@@ -769,15 +933,17 @@ class Bank(commands.Cog):
         
         rpfile = await account.export() 
         if not rpfile:
-            return await msg.edit("There were no transactions to report.")
-           
-        rept_embed = await clash_embed(
-            context=interaction,
-            title=f"Bank Transaction Report",
-            message=f"Your report is available for download below.",
-            success=True)
-        await msg.edit(embed=rept_embed)
-        await interaction.followup.send(file=discord.File(rpfile))
+            embed = await clash_embed(
+                context=interaction,
+                message=f"There were no transactions to report."
+                )
+            return await msg.edit(embed=embed)
+        
+        await msg.edit(
+            content=f"{interaction.user.mention} Your report is available for download below.",
+            embed=None,
+            attachments=[discord.File(rpfile)]
+            )
     
     ##################################################
     ### BALANCE
@@ -789,35 +955,22 @@ class Bank(commands.Cog):
         """
         Deposit Amount to a Global or Clan Bank Account.
         """
-        
-        if account_type_or_clan_abbreviation in ['current']:
-            await self.current_account.deposit(
+        if account_type_or_clan_abbreviation in global_accounts:
+            account = await MasterAccount.get(account_type_or_clan_abbreviation)
+            await account.deposit(
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Deposit."
                 )
         
-        elif account_type_or_clan_abbreviation in ['sweep']:
-            await self.sweep_account.deposit(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Manual Deposit."
-                )
-        
-        elif account_type_or_clan_abbreviation in ['reserve']:
-            await self.reserve_account.deposit(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Manual Deposit."
-                )
-            
         else:
             try:
                 clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
             except InvalidAbbreviation as exc:
                 return await ctx.reply(exc.message)
             else:
-                await clan.bank_account.deposit(
+                account = await ClanAccount.get(clan)
+                await account.deposit(
                     amount=amount,
                     user_id=ctx.author.id,
                     comment=f"Manual Deposit."
@@ -835,42 +988,30 @@ class Bank(commands.Cog):
         
         await interaction.response.defer(ephemeral=True)
 
-        if select_account in ['current']:
-            await self.current_account.deposit(
+        currency = await bank.get_currency_name()
+
+        if select_account in global_accounts:
+            account = await MasterAccount.get(select_account)
+            await account.deposit(
                 amount=amount,
                 user_id=interaction.user.id,
                 comment=f"Manual Deposit."
                 )
-            return await interaction.followup.send(f"Deposited {amount:,} to Current Account.",ephemeral=True)
+            return await interaction.followup.send(f"Deposited {amount:,} {currency} to {select_account.capitalize()} account.",ephemeral=True)
         
-        elif select_account in ['sweep']:
-            await self.sweep_account.deposit(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Deposit."
-                )
-            return await interaction.followup.send(f"Deposited {amount:,} to Sweep Account.",ephemeral=True)
-        
-        elif select_account in ['reserve']:
-            await self.reserve_account.deposit(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Deposit."
-                )
-            return await interaction.followup.send(f"Deposited {amount:,} to Reserve Account.",ephemeral=True)
-            
         else:
             try:
                 clan = await self.client.fetch_clan(select_account)
             except InvalidAbbreviation as exc:
                 return await interaction.followup.send(exc.message,ephemeral=True)
             else:
-                await clan.bank_account.deposit(
+                account = await ClanAccount.get(clan)
+                await account.deposit(
                     amount=amount,
                     user_id=interaction.user.id,
                     comment=f"Manual Deposit."
                     )
-                return await interaction.followup.send(f"Deposited {amount:,} to {clan.title}.",ephemeral=True)
+                return await interaction.followup.send(f"Deposited {amount:,} {currency} to {clan.title}.",ephemeral=True)
                 
     ##################################################
     ### WITHDRAW
@@ -882,39 +1023,24 @@ class Bank(commands.Cog):
         """
         Withdraw Amount from a Global or Clan Bank Account.
         """
-        
-        if account_type_or_clan_abbreviation in ['current']:
-            await self.current_account.withdraw(
+
+        if account_type_or_clan_abbreviation in global_accounts:
+            account = await MasterAccount.get(account_type_or_clan_abbreviation)
+            await account.withdraw(
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Withdrawal."
                 )
         
-        elif account_type_or_clan_abbreviation in ['sweep']:
-            await self.sweep_account.withdraw(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Manual Withdrawal."
-                )
-        
-        elif account_type_or_clan_abbreviation in ['reserve']:
-            await self.reserve_account.withdraw(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Manual Withdrawal."
-                )
-            
         else:
-            try:
-                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
-            except InvalidAbbreviation as exc:
-                return await ctx.reply(exc.message)
-            else:
-                await clan.bank_account.withdraw(
-                    amount=amount,
-                    user_id=ctx.author.id,
-                    comment=f"Manual Withdrawal."
-                    )            
+            clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
+       
+            account = await ClanAccount.get(clan)
+            await account.withdraw(
+                amount=amount,
+                user_id=ctx.author.id,
+                comment=f"Manual Withdrawal."
+                )        
         await ctx.tick()
     
     @app_command_group_bank.command(name="withdraw",
@@ -928,42 +1054,27 @@ class Bank(commands.Cog):
         
         await interaction.response.defer(ephemeral=True)
 
-        if select_account in ['current']:
-            await self.current_account.withdraw(
+        currency = await bank.get_currency_name()
+
+        if select_account in global_accounts:
+            account = await MasterAccount.get(select_account)
+            await account.withdraw(
                 amount=amount,
                 user_id=interaction.user.id,
                 comment=f"Manual Withdrawal."
                 )
-            return await interaction.followup.send(f"Withdrew {amount:,} from Current Account.",ephemeral=True)
+            return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {select_account.capitalize()} account.",ephemeral=True)
         
-        elif select_account in ['sweep']:
-            await self.sweep_account.withdraw(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Withdrawal."
-                )
-            return await interaction.followup.send(f"Withdrew {amount:,} from Sweep Account.",ephemeral=True)
-        
-        elif select_account in ['reserve']:
-            await self.reserve_account.withdraw(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Withdrawal."
-                )
-            return await interaction.followup.send(f"Withdrew {amount:,} from Reserve Account.",ephemeral=True)
-            
         else:
-            try:
-                clan = await self.client.fetch_clan(select_account)
-            except InvalidAbbreviation as exc:
-                return await interaction.followup.send(exc.message,ephemeral=True)
-            else:
-                await clan.bank_account.withdraw(
-                    amount=amount,
-                    user_id=interaction.user.id,
-                    comment=f"Manual Withdrawal."
-                    )
-                return await interaction.followup.send(f"Withdrew {amount:,} from {clan.title}.",ephemeral=True)
+            clan = await self.client.fetch_clan(select_account)
+           
+            account = await ClanAccount.get(clan)
+            await account.withdraw(
+                amount=amount,
+                user_id=interaction.user.id,
+                comment=f"Manual Withdrawal."
+                )
+            return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {clan.title}.",ephemeral=True)
     
     ##################################################
     ### REWARD
@@ -977,16 +1088,13 @@ class Bank(commands.Cog):
 
         Funds are withdrawn from Global or Clan Accounts.
         """
-        if account_type_or_clan_abbreviation in ['current','sweep','reserve']:
+
+        if account_type_or_clan_abbreviation in global_accounts:
             if not is_bank_admin(ctx):
                 return await ctx.reply("You don't have permission to do this.")
             
-            account = MasterAccount(account_type_or_clan_abbreviation)
-            await account.withdraw(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Reward transfer to {user.name} {user.id}."
-                )                 
+            account = await MasterAccount.get(account_type_or_clan_abbreviation)
+
         else:
             try:
                 clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
@@ -997,12 +1105,13 @@ class Bank(commands.Cog):
             if not check_permissions:
                 return await ctx.reply("You don't have permission to do this.")
             
-            account = ClanAccount(clan.tag)
-            await account.withdraw(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Reward transfer to {user.name} {user.id}."
-                )        
+            account = await ClanAccount.get(clan)
+
+        await account.withdraw(
+            amount=amount,
+            user_id=ctx.author.id,
+            comment=f"Reward transfer to {user.name} {user.id}."
+            )
         await bank.deposit_credits(user,amount)
         await ctx.tick()
     
@@ -1022,49 +1131,50 @@ class Bank(commands.Cog):
         amount:int,
         user:Optional[discord.Member]=None,
         role:Optional[discord.Role]=None):
+
+        async def _helper_reward_user(account:BankAccount,user:discord.Member):
+            try:
+                await account.withdraw(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Reward transfer to {user.name} {user.id}."
+                    )
+                await bank.deposit_credits(user,amount)
+                return user
+            except:
+                return None
         
         await interaction.response.defer()
+        currency = await bank.get_currency_name()
 
         if not user and not role:
             return await interaction.followup.send(f"You need to provide at least a User or a Role.")
 
-        if select_account in ['current','sweep','reserve']:
+        if select_account in global_accounts:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
-            account = MasterAccount(select_account)
+            account = await MasterAccount.get(select_account)
             
         else:
             clan = await self.client.fetch_clan(select_account)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
-            account = ClanAccount(clan.tag)
-        
+            account = await ClanAccount.get(clan)
+
         count = 0
         if role:            
-            iter_members = AsyncIter(role.members)
-            async for member in iter_members:
-                await account.withdraw(
-                    amount=amount,
-                    user_id=interaction.user.id,
-                    comment=f"Reward transfer to {member.name} {member.id}."
-                    )
-                await bank.deposit_credits(member,amount)
-                count += 1
+            distribution = await asyncio.gather(*(_helper_reward_user(account,member) for member in role.members))
+            count += len([member for member in distribution if isinstance(member,discord.Member)])
         
         if user:
-            await account.withdraw(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Reward transfer to {user.name} {user.id}."
-                )
-            await bank.deposit_credits(user,amount)
+            await _helper_reward_user(account,user)
             count += 1
         
         if count == 1 and user:
-            return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,}.",ephemeral=True)
+            return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,} {currency}.",ephemeral=True)
         else:
-            return await interaction.followup.send(f"Distributed {amount:,} to {count} members.",ephemeral=True)
+            return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY
@@ -1084,7 +1194,7 @@ class Bank(commands.Cog):
         else:
             target = ctx.author
 
-        inventory = UserInventory(target)
+        inventory = await UserInventory.get_by_user_id(target.id)
         embed = await inventory.get_embed(ctx)
         await ctx.reply(embed=embed)
     
@@ -1105,7 +1215,7 @@ class Bank(commands.Cog):
         else:
             target = interaction.guild.get_member(interaction.user.id)
 
-        inventory = UserInventory(target)
+        inventory = await UserInventory.get_by_user_id(target.id)
         embed = await inventory.get_embed(interaction)
         await interaction.followup.send(embed=embed)
     
@@ -1146,7 +1256,7 @@ class Bank(commands.Cog):
         You can only gift items from the current server.
         """
 
-        await ctx.reply(f"For a better experience, use the Slash Command `/gift` to do this action.")
+        await ctx.reply(f"Use the Slash Command `/gift` to do this action.")
     
     @app_commands.command(
         name="gift",
@@ -1167,9 +1277,9 @@ class Bank(commands.Cog):
         if user.bot:
             return await interaction.followup.send("You can't gift bots!",ephemeral=True)
         
-        item = ShopItem.get_by_id(item)
+        item = await ShopItem.get_by_id(item)
 
-        inventory = UserInventory(interaction.user)
+        inventory = await UserInventory.get_by_user_id(interaction.user.id)
         gift = await inventory.gift_item(item,user)
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
@@ -1185,7 +1295,7 @@ class Bank(commands.Cog):
         Redeems an item from your inventory!
         """
 
-        inv = UserInventory(ctx.author)
+        inv = await UserInventory.get_by_user_id(ctx.author.id)
         inv_check = len([i for i in inv.inventory if i.guild_id == ctx.guild.id]) > 0
 
         if not inv_check:
@@ -1203,6 +1313,8 @@ class Bank(commands.Cog):
             await ctx.author.add_roles(role)
             return await ctx.reply(f"Please open a ticket in <#798930079111053372> to redeem your item!")
 
+        return await ctx.reply("This server doesn't have a redeemable item.")
+
     @app_commands.command(
         name="redeem",
         description="Redeems an item from your inventory!"
@@ -1214,7 +1326,7 @@ class Bank(commands.Cog):
 
         member = interaction.guild.get_member(interaction.user.id)
 
-        inv = UserInventory(member)
+        inv = await UserInventory.get_by_user_id(member.id)
         inv_check = len([i for i in inv.inventory if i.guild_id == interaction.guild.id]) > 0
 
         if not inv_check:
@@ -1231,38 +1343,13 @@ class Bank(commands.Cog):
             role = interaction.guild.get_role(1163327086262485094)
             await member.add_roles(role)
             return await interaction.followup.send(f"Please open a ticket in <#798930079111053372> to redeem your item!")
-    
-    ##################################################
-    ### STORE MANAGER
-    ##################################################    
-    @commands.command(name="shopmanager")
-    @commands.admin()
-    @commands.guild_only()
-    async def command_user_store_manager(self,ctx:commands.Context):
-        """
-        Manage the Store for this Guild.
-        """
-
-        store = StoreManager(ctx)
-        await store.start()
-    
-    @app_commands.command(
-        name="shop-manager",
-        description="Open the Shop Manager. Equivalent to [p]`shopmanager`."
-        )
-    @app_commands.guild_only()
-    @app_commands.check(is_admin)
-    async def app_command_store_manager(self,interaction:discord.Interaction):
         
-        await interaction.response.defer()
-
-        store = StoreManager(interaction)
-        await store.start()
+        return await interaction.followup.send("This server doesn't have a redeemable item.")
     
     ##################################################
     ### SHOP ITEM GROUP
     ##################################################    
-    @commands.group(name="shopitem")
+    @commands.group(name="shopmanage")
     @commands.admin()
     @commands.guild_only()
     async def command_group_shop_item(self,ctx:commands.Context):
@@ -1273,8 +1360,8 @@ class Bank(commands.Cog):
             pass
     
     app_command_group_shopitem = app_commands.Group(
-        name="shop-item",
-        description="Group for Shop Item commands. Equivalent to [p]shopitem.",
+        name="shop-manage",
+        description="Group for Shop Item commands. Equivalent to [p]shopmanage.",
         guild_only=True
         )
     
@@ -1291,7 +1378,7 @@ class Bank(commands.Cog):
         This bypasses all checks and will distribute the item directly to the user's inventory.
         """
 
-        await ctx.reply(f"For a better experience, use the Slash Command `/shop-item distribute` to do this action.")
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-manage distribute` to do this action.")
     
     @app_command_group_shopitem.command(
         name="distribute",
@@ -1312,12 +1399,12 @@ class Bank(commands.Cog):
         if user.bot:
             return await interaction.followup.send("You can't give items to bots!",ephemeral=True)
         
-        item = ShopItem.get_by_id(item)
+        get_item = await ShopItem.get_by_id(item)
 
-        inventory = UserInventory(user)
-        await inventory.add_item_to_inventory(item)
+        inventory = await UserInventory.get_by_user_id(user.id)
+        await inventory.add_item_to_inventory(get_item)
 
-        return await interaction.followup.send(f"1x **{item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)
+        return await interaction.followup.send(f"1x **{get_item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)
 
     ##################################################
     ### SHOP ITEM / REDEEM
@@ -1332,7 +1419,7 @@ class Bank(commands.Cog):
         Only usable if item exists in the user's inventory.
         """
 
-        await ctx.reply(f"For a better experience, use the Slash Command `/shop-item redeem` to do this action.")
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-manage redeem` to do this action.")
     
     @app_command_group_shopitem.command(
         name="redeem",
@@ -1353,14 +1440,203 @@ class Bank(commands.Cog):
         if user.bot:
             return await interaction.followup.send("You can't redeem items for bots!")
         
-        item = ShopItem.get_by_id(item)
-        inventory = UserInventory(user)
+        get_item = await ShopItem.get_by_id(item)
+        inventory = await UserInventory.get_by_user_id(user.id)
 
-        if not inventory.has_item(item):
+        if not inventory.has_item(get_item):
             return await interaction.followup.send(f"{user.mention} doesn't have that item.")
 
-        await inventory.remove_item_from_inventory(item)
-        await interaction.followup.send(f"1x **{item.name}** has been redeemed from {user.mention}'s inventory.")
+        await inventory.remove_item_from_inventory(get_item)
+        await interaction.followup.send(f"1x **{get_item.name}** has been redeemed from {user.mention}'s inventory.")
+
+    ##################################################
+    ### SHOP ITEM / OVERVIEW
+    ################################################## 
+    async def _shop_overview_embed(self,ctx:Union[commands.Context,discord.Interaction]):
+        guild_items = await ShopItem.get_by_guild(ctx.guild.id)
+        embed = await clash_embed(
+            context=ctx,
+            title=f"**Guild Store: {ctx.guild.name}**"
+            )
+        embed.add_field(
+            name=f"**Overview**",
+            value="```ini"
+                + f"\n{'[Total Items]':<15} {len(guild_items):>3}"
+                + f"\n{'[In Store]':<15} {len([i for i in guild_items if i.show_in_store]):>3}"
+                + f"\n{'[Stock Out]':<15} {len([i for i in guild_items if i.stock == 0]):>3}"
+                + "```",
+            inline=True)
+        embed.add_field(
+            name=f"**Items by Type (In Store / Total)**",
+            value="```ini"
+                + f"\n{'[Basic]':<10} {len([i for i in guild_items if i.type == 'basic' and i.show_in_store]):^4}/{len([i for i in guild_items if i.type == 'basic']):^4}"
+                + f"\n{'[Role]':<10} {len([i for i in guild_items if i.type == 'role' and i.show_in_store]):^4}/{len([i for i in guild_items if i.type == 'role']):^4}"
+                + f"\n{'[Random]':<10} {len([i for i in guild_items if i.type == 'random' and i.show_in_store]):^4}/{len([i for i in guild_items if i.type == 'random']):^4}"
+                + f"\n{'[Cash]':<10} {len([i for i in guild_items if i.type == 'cash' and i.show_in_store]):^4}/{len([i for i in guild_items if i.type == 'cash']):^4}"
+                + "```",
+            inline=True)
+        if len([i for i in guild_items if i.stock == 0]) > 0:
+            embed.add_field(
+                name=f"**Needing Restock**",
+                value=f"Use the `/shop-manage restock` command to restock items."
+                    + "\n- "
+                    + "\n- ".join([f"{str(i)}" for i in guild_items if i.stock == 0])
+                    + "\n\u200b",
+                inline=False)
+        return embed
+    
+    @command_group_shop_item.command(name="status")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_status(self,ctx:commands.Context):
+        """
+        Overview of the Guild Store.
+        """
+        embed = await self._shop_overview_embed(ctx)
+        await ctx.reply(embed=embed)
+    
+    @app_command_group_shopitem.command(
+        name="status",
+        description="Overview of the Guild Store."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    async def app_command_shop_overview(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+        embed = await self._shop_overview_embed(interaction)
+        await interaction.followup.send(embed=embed)
+
+    ##################################################
+    ### SHOP ITEM / EXPORT
+    ################################################## 
+    async def _shop_export(self,ctx:Union[commands.Context,discord.Interaction]):
+        guild_items = await ShopItem.get_by_guild(ctx.guild.id)
+
+        if len(guild_items) == 0:
+            return None
+
+        report_file = bot_client.bot.coc_bank_path + '/' + f"{ctx.guild.name}_ShopItems_{pendulum.now().format('YYYYMMDDHHmmss')}.xlsx"
+
+        workbook = xlsxwriter.Workbook(report_file)
+        worksheet = workbook.add_worksheet('Guild Items')
+
+        headers = ['ID','Type','Name','Category','Description','Price','Stock','Show in Store','Requires Role','Is Exclusive','Add-only?']
+
+        row = 0
+        col = 0
+        async for h in AsyncIter(headers):
+            worksheet.write(row,col,h)
+            col += 1
+
+        async for t in AsyncIter(guild_items):
+            col = 0
+            row += 1
+
+            m_data = []
+            m_data.append(t.id)
+            m_data.append(t.type.capitalize())
+            m_data.append(t.name)
+            m_data.append(t.category)
+            m_data.append(t.description)
+            m_data.append(t.price)
+            m_data.append(t.stock)
+            m_data.append(t.show_in_store)
+            m_data.append(getattr(t.required_role,'name',''))
+            m_data.append(t.exclusive_role)
+            m_data.append(False if t.bidirectional_role else True)
+
+            for d in m_data:
+                worksheet.write(row,col,d)
+                col += 1
+        
+        workbook.close()
+        return report_file
+    
+    @command_group_shop_item.command(name="export")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_export(self,ctx:commands.Context):
+        """
+        Export Shop Items for the Guild to Excel.
+        """
+        embed = await clash_embed(
+            context=ctx,
+            message=f"{EmojisUI.LOADING} Please wait..."
+            )
+        msg = await ctx.reply(embed=embed)
+        
+        rpfile = await self._shop_export(ctx)
+        if not rpfile:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"There were no items to report."
+                )
+            await msg.edit(embed=embed)
+            return
+
+        await msg.edit(
+            content=f"{ctx.author.mention} Your report is available for download below.",
+            embed=None,
+            attachments=[discord.File(rpfile)]
+            )
+    
+    @app_command_group_shopitem.command(
+        name="export",
+        description="Export Shop Items for the Guild to Excel."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    async def app_command_shop_item_export(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+        embed = await clash_embed(
+            context=interaction,
+            message=f"{EmojisUI.LOADING} Please wait..."
+            )
+        msg = await interaction.followup.send(embed=embed,wait=True)
+        
+        rpfile = await self._shop_export(interaction)
+        if not rpfile:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"There were no items to report."
+                )
+            await msg.edit(embed=embed)
+            return
+
+        await msg.edit(
+            content=f"{interaction.user.mention} Your report is available for download below.",
+            embed=None,
+            attachments=[discord.File(rpfile)]
+            )
+
+    ##################################################
+    ### SHOP ITEM / ADD
+    ################################################## 
+    @command_group_shop_item.command(name="add")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_add(self,ctx:commands.Context):
+        """
+        Adds a Shop Item.
+
+        Uses the system ID to identify Shop Items. You can get the system ID using `/shop-manage export`.
+        """
+        view = AddItem(ctx)
+        await view.start()
+    
+    @app_command_group_shopitem.command(
+        name="add",
+        description="Adds a Shop Item."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    async def app_command_add_item(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+        view = AddItem(interaction)
+        await view.start()
     
     ##################################################
     ### SHOP ITEM / DELETE
@@ -1372,9 +1648,9 @@ class Bank(commands.Cog):
         """
         Delete a Shop Item.
 
-        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        Uses the system ID to identify Shop Items. You can get the system ID using `/shop-manage export`.
         """
-        item = ShopItem.get_by_id(item_id)
+        item = await ShopItem.get_by_id(item_id)
         if not item:
             return await ctx.reply("I couldn't find that item.")
         await item.delete()
@@ -1393,11 +1669,85 @@ class Bank(commands.Cog):
     async def app_command_delete_item(self,interaction:discord.Interaction,item:str):
         
         await interaction.response.defer(ephemeral=True)
-        item = ShopItem.get_by_id(item)
+        get_item = await ShopItem.get_by_id(item)
         if not item:
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        await item.delete()
-        await interaction.followup.send("Item deleted.",ephemeral=True)
+        await get_item.delete()
+        await interaction.followup.send(f"{get_item.name} deleted.",ephemeral=True)
+    
+    ##################################################
+    ### SHOP ITEM / SHOW
+    ################################################## 
+    @command_group_shop_item.command(name="show")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_show(self,ctx:commands.Context,item_id:str):
+        """
+        Displays a Shop Item in the Store.
+
+        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        """
+        item = await ShopItem.get_by_id(item_id)
+        if not item:
+            return await ctx.reply("I couldn't find that item.")
+        await item.unhide()
+        await ctx.tick()
+    
+    @app_command_group_shopitem.command(
+        name="show",
+        description="Displays a Shop Item in the Store."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_store_items)
+    @app_commands.describe(
+        item="Select a Shop Item to display."
+        )        
+    async def app_command_show_item(self,interaction:discord.Interaction,item:str):
+        
+        await interaction.response.defer(ephemeral=True)
+        get_item = await ShopItem.get_by_id(item)
+        if not item:
+            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
+        await get_item.unhide()
+        await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
+
+    ##################################################
+    ### SHOP ITEM / HIDE
+    ################################################## 
+    @command_group_shop_item.command(name="hide")   
+    @commands.admin()
+    @commands.guild_only()
+    async def subcommand_shop_item_hide(self,ctx:commands.Context,item_id:str):
+        """
+        Hides a Shop Item in the Store.
+
+        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        """
+        item = await ShopItem.get_by_id(item_id)
+        if not item:
+            return await ctx.reply("I couldn't find that item.")
+        await item.hide()
+        await ctx.tick()
+    
+    @app_command_group_shopitem.command(
+        name="hides",
+        description="Hides a Shop Item in the Store."
+        )
+    @app_commands.guild_only()
+    @app_commands.check(is_admin)
+    @app_commands.autocomplete(item=autocomplete_store_items)
+    @app_commands.describe(
+        item="Select a Shop Item to hide."
+        )        
+    async def app_command_hide_item(self,interaction:discord.Interaction,item:str):
+        
+        await interaction.response.defer(ephemeral=True)
+        get_item = await ShopItem.get_by_id(item)
+        if not item:
+            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
+        await get_item.hide()
+        await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
     
     ##################################################
     ### SHOP ITEM / RESTOCK
@@ -1413,11 +1763,11 @@ class Bank(commands.Cog):
 
         Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
         """
-        item = ShopItem.get_by_id(item_id)
+        item = await ShopItem.get_by_id(item_id)
         if not item:
             return await ctx.reply("I couldn't find that item.")
         
-        item.stock += amount
+        await item.restock(amount)
         await ctx.reply(f"Restocked {item} by {amount}. New stock: {item.stock}.")
     
     @app_command_group_shopitem.command(
@@ -1434,8 +1784,8 @@ class Bank(commands.Cog):
     async def app_command_restock_item(self,interaction:discord.Interaction,item:str,amount:int):
         
         await interaction.response.defer(ephemeral=True)
-        item = ShopItem.get_by_id(item)
-        if not item:
+        get_item = await ShopItem.get_by_id(item)
+        if not get_item:
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        item.stock += amount
-        await interaction.followup.send(f"Restocked {item} by {amount}. New stock: {item.stock}.",ephemeral=True)
+        await get_item.restock(amount)
+        await interaction.followup.send(f"Restocked {get_item} by {amount}. New stock: {item.stock}.",ephemeral=True)

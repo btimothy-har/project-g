@@ -36,25 +36,3 @@ class db_WarLeagueClanSetup(Document):
 
     #deprecated
     webhook = IntField(default=0)
-
-class db_ClanDataFeed(Document):
-    #1 - member feed
-    #2 - donation feed
-    #3 - raid weekend results
-    #4 - capital contribution
-    tag = StringField(required=True)
-    type = IntField(required=True)
-    guild_id = IntField(required=True)
-    channel_id = IntField(required=True)
-
-class db_ClanEventReminder(Document):
-    #type 1 - war
-    #type 2 - raid
-    #subtype (only for war) - random, friendly, cwl
-    tag = StringField(required=True)
-    type = IntField(required=True)
-    sub_type = ListField(StringField(),default=[])
-    guild_id = IntField(required=True)
-    channel_id = IntField(required=True)
-    reminder_interval = ListField(IntField(),default=[])
-    interval_tracker = ListField(IntField(),default=[])
