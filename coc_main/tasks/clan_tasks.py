@@ -18,7 +18,6 @@ from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
 
 bot_client = client()
-
 default_sleep = 60
 
 ############################################################

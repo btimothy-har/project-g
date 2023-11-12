@@ -230,5 +230,5 @@ class ClanRaidLoop(TaskLoop):
                     
                     await bot_client.run_in_thread(_update_reminder,track)
         
-        except Exception as exc:
+        except Exception:
             bot_client.coc_main_log.exception(f"Error in Raid Reminder task.")
