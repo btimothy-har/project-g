@@ -519,13 +519,14 @@ class aMember():
 
         if self.guild_id == 688449973553201335:
             abb_clans = []
-            guild = aGuild(self.guild.id)
+            linked_clans = await ClanGuildLink.get_for_guild(self.guild_id)
             if len(self.leader_clans) > 0:
-                [abb_clans.append(c.abbreviation) for c in self.leader_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in guild.clan_links]]
+                [abb_clans.append(c.abbreviation) for c in self.leader_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in linked_clans]]
+                
             elif len(self.home_clans) > 0:
-                if self.default_account.home_clan and self.default_account.home_clan.tag in [gc.tag for gc in guild.clan_links]:
+                if self.default_account.home_clan and self.default_account.home_clan.tag in [gc.tag for gc in linked_clans]:
                     abb_clans.append(self.default_account.home_clan.abbreviation)
-                [abb_clans.append(c.abbreviation) for c in self.home_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in guild.clan_links]]
+                [abb_clans.append(c.abbreviation) for c in self.home_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in linked_clans]]
 
             if len(abb_clans) > 0:
                 new_nickname += f" | {' + '.join(abb_clans)}"
