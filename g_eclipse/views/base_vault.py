@@ -23,39 +23,54 @@ class BaseVaultMenu(DefaultView):
         self.all_bases = []
         self.base_selector = []
 
-        self.home_button = DiscordButton(
+        self.base_select_menu = None
+        super().__init__(context,timeout=900)
+    
+    @property
+    def home_button(self):
+        return DiscordButton(
             function=self._callback_home,
             label="Home",
             emoji=EmojisUI.HOME,
             row=0,
             style=discord.ButtonStyle.blurple
             )
-        self.vault_button = DiscordButton(
+    
+    @property
+    def vault_button(self):
+        return DiscordButton(
             function=self._callback_vault,
             label="Personal Vault",
             emoji=EmojisUI.LOCK,
             row=0
             )
-        self.base_save = DiscordButton(
+    
+    @property
+    def base_save(self):
+        return DiscordButton(
             function=self._callback_save_base,
             label="Bookmark Base",
             emoji=EmojisUI.DOWNLOAD,
             row=0
             )
-        self.base_unsave = DiscordButton(
+    
+    @property
+    def base_unsave(self):
+        return DiscordButton(
             function=self._callback_unsave_base,
             label="Delete Bookmark",
             emoji=EmojisUI.DELETE,
             row=0
-            ) 
-        self.exit_button = DiscordButton(
+            )
+    
+    @property
+    def exit_button(self):
+        return DiscordButton(
             function=self._callback_exit,
             emoji=EmojisUI.EXIT,
             style=discord.ButtonStyle.danger,
             row=0
             )
-        self.base_select_menu = None
-        super().__init__(context,timeout=900)
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -65,8 +80,7 @@ class BaseVaultMenu(DefaultView):
             embed = await eclipse_embed(context=self.ctx,message=f"Logged out of **E.C.L.I.P.S.E.**.")
             await self.ctx.followup.edit_message(self.message.id,embed=embed,view=None)
         except:
-            pass
-        
+            pass        
         self.stop_menu()
     
     @property
@@ -191,8 +205,6 @@ class BaseVaultMenu(DefaultView):
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
         self.vault_mode = True
-        self.home_button.disabled = False
-        self.vault_button.disabled = True
 
         self.base_index = 0
         self.all_bases = await eWarBase.by_user_claim(self.user.id)
@@ -234,7 +246,6 @@ class BaseVaultMenu(DefaultView):
             item.disabled = True        
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
-        self.home_button.disabled = False
         self.base_th = int(menu.values[0])
         self.base_index = 0
         self.all_bases = await eWarBase.by_townhall_level(self.base_th)
@@ -277,11 +288,13 @@ class BaseVaultMenu(DefaultView):
         
         embed1 = await self._browse_bases_embed()
         embed2 = await self._show_base_embed()
+        for item in self.children:
+            item.disabled = False
         await interaction.followup.edit_message(
             interaction.message.id,
             embeds=[embed1,embed2],
             view=self
-            )
+            )        
  
     async def _callback_save_base(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
@@ -303,7 +316,9 @@ class BaseVaultMenu(DefaultView):
         embed4 = await self._send_base_link_embed()
         embeds = [embed1,embed2,embed4] if embed4 else [embed1,embed2,embed3]
 
-        button.disabled = False
+        for item in self.children:
+            item.disabled = False
+
         await interaction.followup.edit_message(
             interaction.message.id,
             embeds=embeds,
@@ -347,7 +362,9 @@ class BaseVaultMenu(DefaultView):
         embed1 = await self._browse_bases_embed()
         embed2 = await self._show_base_embed()
         
-        button.disabled = False
+        for item in self.children:
+            item.disabled = False
+            
         await interaction.followup.edit_message(
             interaction.message.id,
             embeds=[embed1,embed2],
