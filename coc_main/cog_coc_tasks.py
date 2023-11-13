@@ -19,7 +19,7 @@ from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
 
 from .coc_objects.clans.clan import db_Clan, db_WarLeagueClanSetup, aClan
-from .coc_objects.players.player import db_Player, db_PlayerStats, aPlayer
+from .coc_objects.players.player import db_Player, db_PlayerStats, aPlayer, BasicPlayer
 from .coc_objects.events.mongo_events import db_ClanWar, db_RaidWeekend
 
 from .tasks.player_tasks import PlayerLoop
@@ -179,8 +179,8 @@ class ClashOfClansTasks(commands.Cog):
         linked_accounts = await bot_client.get_linked_players(member.id)
         async for tag in AsyncIter(linked_accounts):
             player = await self.client.fetch_player(tag)
-            if player.discord_user == 0:                    
-                player.discord_user = member.id
+            if player.discord_user == 0:
+                await BasicPlayer.set_discord_link(player.tag,member.id)
     
     @commands.Cog.listener("on_guild_channel_create")
     async def recruiting_ticket_listener(self,channel):
