@@ -94,7 +94,7 @@ class BankAccount():
                 )
             return [t for t in transactions]
         
-        cut_off = pendulum.now().subtract(months=1).int_timestamp
+        cut_off = pendulum.datetime(pendulum.now().year, pendulum.now().month, 1).int_timestamp
         transactions = await bot_client.run_in_thread(_query_transactions)
 
         if len(transactions) == 0:
@@ -102,13 +102,13 @@ class BankAccount():
         
         return transactions
 
-    async def export(self,transactions):        
+    async def export(self,transactions):
         report_file = bot_client.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
 
         workbook = xlsxwriter.Workbook(report_file)
         worksheet = workbook.add_worksheet('Bank Transactions')
 
-        rpt_transactions = sorted(transactions,key=lambda t:t.timestamp,reverse=True)
+        rpt_transactions = sorted(transactions[:10000],key=lambda t:t.timestamp,reverse=True)
         headers = ['Timestamp','User','Account','Debit','Credit','Comment']
 
         row = 0

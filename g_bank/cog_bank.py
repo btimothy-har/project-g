@@ -895,7 +895,7 @@ class Bank(commands.Cog):
         else:
             embed = await clash_embed(
                 context=ctx,
-                message=f"Found {len(transactions)} transactions."
+                message=f"{EmojisUI.LOADING} Found {len(transactions):,} transactions. Reporting only the most recent 10,000."
                 )
             await msg.edit(embed=embed)
         
@@ -948,7 +948,7 @@ class Bank(commands.Cog):
         else:
             embed = await clash_embed(
                 context=interaction,
-                message=f"Found {len(transactions)} transactions."
+                message=f"{EmojisUI.LOADING} Found {len(transactions):,} transactions. Reporting only the most recent 10,000."
                 )
             await msg.edit(embed=embed)
         
