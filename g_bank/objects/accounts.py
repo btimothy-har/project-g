@@ -94,7 +94,7 @@ class BankAccount():
                 )
             return transactions
         
-        cut_off = pendulum.now().subtract(months=3).int_timestamp
+        cut_off = pendulum.now().subtract(months=1).int_timestamp
         transactions = await bot_client.run_in_thread(_query_transactions)
 
         if len(transactions) == 0:
