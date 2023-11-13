@@ -491,14 +491,10 @@ class ResourceLootLeaderboard(Leaderboard):
         
         all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
-
-        bot_client.coc_main_log.info(f"{len(all_players)} players found for {leaderboard.season.description}.")
         
         iter_players = AsyncIter(all_players)
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
-
-            bot_client.coc_main_log.info(f"{stats.tag} {stats.town_hall}.")
 
             async for lb_th in AsyncIter(eligible_townhalls):
                 if stats.town_hall == lb_th:
