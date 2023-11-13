@@ -73,7 +73,6 @@ class ECLIPSE(commands.Cog):
     
     async def cog_unload(self):
         self.delete_dump_messages.cancel()
-        await self.clear_dump_messages()
     
     async def start_eclipse_cog(self):
         while True:
