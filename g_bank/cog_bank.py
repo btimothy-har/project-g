@@ -241,7 +241,7 @@ class Bank(commands.Cog):
                     amount=total_tax,
                     user_id=self.bot.user.id,
                     comment=f"Taxes for {user.id}."
-                    )                
+                    )
 
         await bank.bank_prune(self.bot)
         all_accounts = await bank.get_leaderboard()
@@ -274,19 +274,20 @@ class Bank(commands.Cog):
         else:
             reward = 20000
         
-        await bank.deposit_credits(member,reward)
-        await self.current_account.withdraw(
-            amount = reward,
-            user_id = self.bot.user.id,
-            comment = f"Townhall Bonus for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
-            )
+        if reward > 0:
+            await bank.deposit_credits(member,reward)
+            await self.current_account.withdraw(
+                amount = reward,
+                user_id = self.bot.user.id,
+                comment = f"Townhall Bonus for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
+                )
     
     async def member_hero_upgrade_reward(self,old_player:aPlayer,new_player:aPlayer):
         async def _hero_reward(hero:aHero):
             old_hero = old_player.get_hero(hero.name)
             upgrades = range(old_hero.level+1,hero.level+1)
             async for u in AsyncIter(upgrades):
-                if u > hero.min_level:
+                if u > hero.min_level and rew > 0:
                     await bank.deposit_credits(member,rew)
                     await self.current_account.withdraw(
                         amount = rew,
@@ -323,12 +324,13 @@ class Bank(commands.Cog):
             membership_multiplier = 1 if new_player.is_member else non_member_multiplier
             total_reward = round((10 * (increment // 1000)) * membership_multiplier)
 
-            await bank.deposit_credits(member,total_reward)
-            await self.current_account.withdraw(
-                amount = total_reward,
-                user_id = self.bot.user.id,
-                comment = f"Capital Gold Bonus for {new_player.name} ({new_player.tag}): {increment}"
-                )
+            if total_reward > 0:
+                await bank.deposit_credits(member,total_reward)
+                await self.current_account.withdraw(
+                    amount = total_reward,
+                    user_id = self.bot.user.id,
+                    comment = f"Capital Gold Bonus for {new_player.name} ({new_player.tag}): {increment}"
+                    )
     
     ############################################################
     #####
@@ -358,12 +360,13 @@ class Bank(commands.Cog):
             result = 100 if player.clan.result == WarResult.WON else 0
 
             total_reward = round((participation + performance + result) * membership_multiplier)
-            await bank.deposit_credits(member,total_reward)
-            await self.current_account.withdraw(
-                amount = total_reward,
-                user_id = self.bot.user.id,
-                comment = f"Clan War Reward for {player.name} ({player.tag})."
-                )
+            if total_reward > 0:
+                await bank.deposit_credits(member,total_reward)
+                await self.current_account.withdraw(
+                    amount = total_reward,
+                    user_id = self.bot.user.id,
+                    comment = f"Clan War Reward for {player.name} ({player.tag})."
+                    )
         
         if not self.use_rewards:
             return
@@ -395,12 +398,13 @@ class Bank(commands.Cog):
             membership_multiplier = 1 if player.is_member else non_member_multiplier
 
             total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * membership_multiplier)
-            await bank.deposit_credits(member,total_reward)
-            await self.current_account.withdraw(
-                amount = total_reward,
-                user_id = self.bot.user.id,
-                comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
-                )
+            if total_reward > 0:
+                await bank.deposit_credits(member,total_reward)
+                await self.current_account.withdraw(
+                    amount = total_reward,
+                    user_id = self.bot.user.id,
+                    comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
+                    )
 
         if not self.use_rewards:
             return

@@ -30,7 +30,9 @@ class BankAccount():
     
     async def get_balance(self):
         def _query_balance():
-            transactions = db_BankTransaction.objects(account=self.id)
+            transactions = db_BankTransaction.objects(
+                (Q(account=self.id) & Q(amount__ne=0))
+                )
             return transactions.sum('amount')
         self.balance = await bot_client.run_in_thread(_query_balance)
     
@@ -90,7 +92,7 @@ class BankAccount():
     async def query_transactions(self):
         def _query_transactions():
             transactions = db_BankTransaction.objects(
-                (Q(account=self.id) & Q(timestamp__gte=cut_off))
+                (Q(account=self.id) & Q(timestamp__gte=cut_off) & Q(amount__ne=0))
                 )
             return [t for t in transactions]
         
