@@ -87,12 +87,12 @@ class BankAccount():
             await bot_client.run_in_thread(_save_to_db)
             self.balance += amount
     
-    async def export(self):
+    async def query_transactions(self):
         def _query_transactions():
             transactions = db_BankTransaction.objects(
                 (Q(account=self.id) & Q(timestamp__gte=cut_off))
                 )
-            return transactions
+            return [t for t in transactions]
         
         cut_off = pendulum.now().subtract(months=1).int_timestamp
         transactions = await bot_client.run_in_thread(_query_transactions)
@@ -100,6 +100,9 @@ class BankAccount():
         if len(transactions) == 0:
             return None
         
+        return transactions
+
+    async def export(self,transactions):        
         report_file = bot_client.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
 
         workbook = xlsxwriter.Workbook(report_file)

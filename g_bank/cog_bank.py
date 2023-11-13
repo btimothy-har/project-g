@@ -884,15 +884,22 @@ class Bank(commands.Cog):
             message=f"{EmojisUI.LOADING} Please wait..."
             )
         msg = await ctx.reply(embed=embed)
-        
-        rpfile = await account.export() 
-        if not rpfile:
+
+        transactions = await account.query_transactions()
+        if len(transactions) == 0:
             embed = await clash_embed(
                 context=ctx,
                 message=f"There were no transactions to report."
                 )
             return await msg.edit(embed=embed)
-           
+        else:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"Found {len(transactions)} transactions."
+                )
+            await msg.edit(embed=embed)
+        
+        rpfile = await account.export(transactions)           
         await msg.edit(
             content=f"{ctx.author.mention} Your report is available for download below.",
             embed=None,
@@ -930,14 +937,22 @@ class Bank(commands.Cog):
             message=f"{EmojisUI.LOADING} Please wait..."
             )
         msg = await interaction.followup.send(embed=embed,wait=True)
-        
-        rpfile = await account.export() 
-        if not rpfile:
+
+        transactions = await account.query_transactions()
+        if len(transactions) == 0:
             embed = await clash_embed(
                 context=interaction,
                 message=f"There were no transactions to report."
                 )
             return await msg.edit(embed=embed)
+        else:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Found {len(transactions)} transactions."
+                )
+            await msg.edit(embed=embed)
+        
+        rpfile = await account.export(transactions)
         
         await msg.edit(
             content=f"{interaction.user.mention} Your report is available for download below.",
