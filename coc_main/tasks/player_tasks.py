@@ -85,15 +85,16 @@ class PlayerTasks():
             else:
                 increment = new_player.attack_wins - old_player.attack_wins
             
-            stat = await new_player.current_season.attacks.increment_stat(
-                increment=max(increment,0),
-                latest_value=new_player.attack_wins,
-                db_update=_update_in_db,
-                alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                )
-            bot_client.coc_data_log.debug(
-                f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
-                )
+            if increment > 0 or new_player.attack_wins != new_player.current_season.attacks.last_update:
+                stat = await new_player.current_season.attacks.increment_stat(
+                    increment=max(increment,0),
+                    latest_value=new_player.attack_wins,
+                    db_update=_update_in_db,
+                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    )
+                bot_client.coc_data_log.debug(
+                    f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
+                    )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Attack Wins task.")
 
@@ -112,15 +113,16 @@ class PlayerTasks():
             else:
                 increment = new_player.defense_wins - old_player.defense_wins
 
-            stat = await new_player.current_season.defenses.increment_stat(
-                increment=max(increment,0),
-                latest_value=new_player.defense_wins,
-                db_update=_update_in_db,
-                alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                )
-            bot_client.coc_data_log.debug(
-                f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
-                )
+            if increment > 0 or new_player.defense_wins != new_player.current_season.defenses.last_update:
+                stat = await new_player.current_season.defenses.increment_stat(
+                    increment=max(increment,0),
+                    latest_value=new_player.defense_wins,
+                    db_update=_update_in_db,
+                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    )
+                bot_client.coc_data_log.debug(
+                    f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
+                    )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Defense Wins task.")
 
@@ -139,15 +141,16 @@ class PlayerTasks():
             else:
                 increment = new_player.donations - old_player.donations
             
-            stat = await new_player.current_season.donations.increment_stat(
-                increment=max(increment,0),
-                latest_value=new_player.donations,
-                db_update=_update_in_db,
-                alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                )
-            bot_client.coc_data_log.debug(
-                f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
-                )
+            if increment > 0 or new_player.donations != new_player.current_season.donations.last_update:
+                stat = await new_player.current_season.donations.increment_stat(
+                    increment=max(increment,0),
+                    latest_value=new_player.donations,
+                    db_update=_update_in_db,
+                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    )
+                bot_client.coc_data_log.debug(
+                    f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
+                    )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Donations Sent task.")
 
@@ -166,15 +169,16 @@ class PlayerTasks():
             else:
                 increment = new_player.received - old_player.received
 
-            stat = await new_player.current_season.received.increment_stat(
-                increment=max(increment,0),
-                latest_value=new_player.received,
-                db_update=_update_in_db,
-                alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                )
-            bot_client.coc_data_log.debug(
-                f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
-                )
+            if increment > 0 or new_player.received != new_player.current_season.received.last_update:
+                stat = await new_player.current_season.received.increment_stat(
+                    increment=max(increment,0),
+                    latest_value=new_player.received,
+                    db_update=_update_in_db,
+                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    )
+                bot_client.coc_data_log.debug(
+                    f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
+                    )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Donations Rcvd task.")
     
@@ -211,17 +215,18 @@ class PlayerTasks():
                     increment = new_ach.value - new_player.current_season.loot_gold.last_update
                 else:
                     increment = new_ach.value - old_ach.value
-
-                stat = await new_player.current_season.loot_gold.increment_stat(
-                    increment=max(increment,0),
-                    latest_value=new_ach.value,
-                    db_update=_update_gold_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                    )
-            
-                bot_client.coc_data_log.debug(
-                    f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
-                    )
+                
+                if increment > 0 or new_ach.value != new_player.current_season.loot_gold.last_update:
+                    stat = await new_player.current_season.loot_gold.increment_stat(
+                        increment=max(increment,0),
+                        latest_value=new_ach.value,
+                        db_update=_update_gold_db,
+                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        )
+                
+                    bot_client.coc_data_log.debug(
+                        f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
+                        )
             
             #Loot Elixir
             if achievement.name == "Elixir Escapade":
@@ -233,16 +238,17 @@ class PlayerTasks():
                 else:
                     increment = new_ach.value - old_ach.value
 
-                stat = await new_player.current_season.loot_elixir.increment_stat(
-                    increment=max(increment,0),
-                    latest_value=new_ach.value,
-                    db_update=_update_elixir_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                    )
-                
-                bot_client.coc_data_log.debug(
-                    f"{new_player.tag} {new_player.name}: loot_elixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
-                    )
+                if increment > 0 or new_ach.value != new_player.current_season.loot_elixir.last_update:
+                    stat = await new_player.current_season.loot_elixir.increment_stat(
+                        increment=max(increment,0),
+                        latest_value=new_ach.value,
+                        db_update=_update_elixir_db,
+                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        )
+                    
+                    bot_client.coc_data_log.debug(
+                        f"{new_player.tag} {new_player.name}: loot_elixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
+                        )
             
             #Loot Dark Elixir
             if achievement.name == "Heroic Heist":
@@ -253,17 +259,18 @@ class PlayerTasks():
                     increment = new_ach.value - new_player.current_season.loot_darkelixir.last_update
                 else:
                     increment = new_ach.value - old_ach.value
-
-                stat = await new_player.current_season.loot_darkelixir.increment_stat(
-                    increment=max(increment,0),
-                    latest_value=new_ach.value,
-                    db_update=_update_darkelixir_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                    )
                 
-                bot_client.coc_data_log.debug(
-                    f"{new_player.tag} {new_player.name}: loot_darkelixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
-                    )
+                if increment > 0 or new_ach.value != new_player.current_season.loot_darkelixir.last_update:
+                    stat = await new_player.current_season.loot_darkelixir.increment_stat(
+                        increment=max(increment,0),
+                        latest_value=new_ach.value,
+                        db_update=_update_darkelixir_db,
+                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        )
+                    
+                    bot_client.coc_data_log.debug(
+                        f"{new_player.tag} {new_player.name}: loot_darkelixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
+                        )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Achievements task.")
 
@@ -286,20 +293,21 @@ class PlayerTasks():
                     increment = new_ach.value - new_player.current_season.capitalcontribution.last_update
                 else:
                     increment = new_ach.value - old_ach.value
-
-                stat = await new_player.current_season.capitalcontribution.increment_stat(
-                    increment=max(increment,0),
-                    latest_value=new_ach.value,
-                    db_update=_update_capitalcontribution_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                    )
                 
-                if increment > 0:
-                    await CapitalContributionFeed.send_feed_update(new_player,increment)
+                if increment > 0 or new_ach.value != new_player.current_season.capitalcontribution.last_update:
+                    stat = await new_player.current_season.capitalcontribution.increment_stat(
+                        increment=max(increment,0),
+                        latest_value=new_ach.value,
+                        db_update=_update_capitalcontribution_db,
+                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        )
                 
-                bot_client.coc_data_log.debug(
-                    f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
-                    )
+                    if increment > 0:
+                        await CapitalContributionFeed.send_feed_update(new_player,increment)
+                    
+                    bot_client.coc_data_log.debug(
+                        f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
+                        )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Capital Contributions task.")
 
