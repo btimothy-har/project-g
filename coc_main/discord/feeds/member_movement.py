@@ -120,7 +120,7 @@ class ClanMemberFeed():
             url=self.player.share_link,
             timestamp=pendulum.now())
         embed.set_footer(
-            text=f"Left {self.clan.name} [{self.clan.member_count}/50] " + (f"and joined {self.player.clan.name}" if self.player.clan.tag and self.player.clan.tag != self.clan.tag else ""),
+            text=f"Left {self.clan.name} [{self.clan.member_count}/50] " + (f"and joined {self.player.clan.name}" if self.player.clan and getattr(self.player.clan,'tag',None) != self.clan.tag else ""),
             icon_url="https://i.imgur.com/TZF5r54.png"
             )
         return embed
