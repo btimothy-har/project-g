@@ -12,7 +12,7 @@ from redbot.core.utils import AsyncIter
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client
 
-from ..coc_objects.players.player import aPlayer, db_Player
+from ..coc_objects.players.player import BasicPlayer, aPlayer, db_Player
 from ..coc_objects.clans.clan import aClan
 
 from .mongo_discord import db_GuildApplyPanel, db_ClanApplication
@@ -451,7 +451,7 @@ class ClanApplyMenuUser(DefaultView):
                 tags_chk.append(player.tag)
                 accounts.append(player)
                 if player.discord_user == 0:
-                    player.discord_user = self.member.id
+                    await BasicPlayer.set_discord_link(player.tag,self.member.id)
         
         if len(self.clans) == 0:
             eligible_townhalls = set([a.town_hall.level for a in accounts])

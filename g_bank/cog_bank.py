@@ -702,8 +702,8 @@ class Bank(commands.Cog):
             return await ctx.reply(f"{member.display_name} is already a Bank Admin.")
         
         self.bank_admins.append(member.id)
-        await self.config.admins.set(self.bank_admins)
         await ctx.reply(f"{member.display_name} is now a Bank Admin.")
+        await self.config.admins.set(self.bank_admins)        
     
     ##################################################
     ### BANK / DELADMIN
@@ -720,8 +720,8 @@ class Bank(commands.Cog):
             return await ctx.reply(f"{member.display_name} is not a Bank Admin.")            
         
         self.bank_admins.remove(member.id)
-        await self.config.admins.set(self.bank_admins)
         await ctx.reply(f"{member.display_name} is no longer a Bank Admin.")
+        await self.config.admins.set(self.bank_admins)        
     
     ##################################################
     ### BANK / SHOWADMIN
@@ -1131,6 +1131,8 @@ class Bank(commands.Cog):
         amount:int,
         user:Optional[discord.Member]=None,
         role:Optional[discord.Role]=None):
+        
+        await interaction.response.defer()
 
         async def _helper_reward_user(account:BankAccount,user:discord.Member):
             try:
@@ -1143,8 +1145,7 @@ class Bank(commands.Cog):
                 return user
             except:
                 return None
-        
-        await interaction.response.defer()
+            
         currency = await bank.get_currency_name()
 
         if not user and not role:
