@@ -84,17 +84,15 @@ class ECLIPSE(commands.Cog):
     
     async def clear_dump_messages(self):
         async with self._dump_lock:
-            messages = self.dump_messages.copy()
-            m_iter = AsyncIter(messages)
-
-            async for mid in m_iter:
+            async for message in self.dump_channel.history(limit=30):
                 try:
-                    message = await self.dump_channel.fetch_message(mid)
-                except:
+                    if message.author.id == self.bot.user.id:
+                        if message.id in self.dump_messages:
+                            self.dump_messages.remove(message.id)
+                        await message.delete()
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error deleting ECLIPSE Dump Message {message.id} in {self.dump_channel.id}.")
                     continue
-                else:
-                    await message.delete()
-                    self.dump_messages.remove(mid)        
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
