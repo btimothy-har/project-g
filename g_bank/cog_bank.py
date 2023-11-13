@@ -37,7 +37,7 @@ from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.tasks.raid_tasks import ClanRaidLoop
 
 from coc_main.utils.components import clash_embed, MenuPaginator
-from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
+from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
@@ -283,16 +283,17 @@ class Bank(commands.Cog):
                 )
     
     async def member_hero_upgrade_reward(self,old_player:aPlayer,new_player:aPlayer):
-        async def _hero_reward(hero:aHero):
-            old_hero = old_player.get_hero(hero.name)
-            upgrades = range(old_hero.level+1,hero.level+1)
+        async def _hero_reward(hero:str):
+            old_hero = old_player.get_hero(hero)
+            new_hero = new_player.get_hero(hero)
+            upgrades = range(old_hero.level+1,new_hero.level+1)
             async for u in AsyncIter(upgrades):
-                if u > hero.min_level and rew > 0:
+                if u > new_hero.min_level and rew > 0:
                     await bank.deposit_credits(member,rew)
                     await self.current_account.withdraw(
                         amount = rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus for {new_player.name} ({new_player.tag}): {hero.name} upgraded to {hero.level}."
+                        comment = f"Hero Bonus for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
                         )
                     
         if not self.use_rewards:
@@ -307,7 +308,8 @@ class Bank(commands.Cog):
             return
         
         rew = 1000
-        await asyncio.gather(*(_hero_reward(hero) for hero in new_player.heroes))
+        heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
+        await asyncio.gather(*(_hero_reward(hero) for hero in heroes))
     
     async def capital_contribution_rewards(self,old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         if achievement.name == "Most Valuable Clanmate":

@@ -149,6 +149,10 @@ class BaseVaultMenu(DefaultView):
             await interaction.response.defer(ephemeral=True)
             self.ctx = interaction
 
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+
         self._base_vault_main_menu()
         self.vault_mode = False
         self.home_button.disabled = True
@@ -181,6 +185,10 @@ class BaseVaultMenu(DefaultView):
     async def _callback_vault(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
         self.ctx = interaction
+
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
 
         self.vault_mode = True
         self.home_button.disabled = False
@@ -222,6 +230,10 @@ class BaseVaultMenu(DefaultView):
         await interaction.response.defer(ephemeral=True)
         self.ctx = interaction
 
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+
         self.home_button.disabled = False
         self.base_th = int(menu.values[0])
         self.base_index = 0
@@ -256,6 +268,10 @@ class BaseVaultMenu(DefaultView):
         await interaction.response.defer(ephemeral=True)
         self.ctx = interaction
 
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+
         self.base_index = int(menu.values[0])
         self._build_base_select_menu()
         
@@ -271,8 +287,10 @@ class BaseVaultMenu(DefaultView):
         await interaction.response.defer(ephemeral=True)
         self.ctx = interaction
 
-        button.disabled = True
-        await interaction.edit_original_response(view=self)
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+
         await self.all_bases[self.base_index].add_claim(self.user.id)
 
         embed1 = await self._browse_bases_embed()
@@ -296,8 +314,10 @@ class BaseVaultMenu(DefaultView):
         await interaction.response.defer(ephemeral=True)
         self.ctx = interaction
 
-        button.disabled = True
-        await interaction.edit_original_response(view=self)
+        for item in self.children:
+            item.disabled = True        
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+
         await self.all_bases[self.base_index].remove_claim(self.user.id)
 
         del self.all_bases[self.base_index]

@@ -87,10 +87,12 @@ class DefaultWarTasks():
             
             time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
             if clan.is_registered_clan and len(clan.abbreviation) > 0 and time_remaining > 3600:
-                await bot_client.update_bot_status(
-                    cooldown=360,
-                    text=f"{clan.abbreviation} {WarResult.ongoing(war.get_clan(clan.tag).result)} in war!"
-                    )
+                war_clan = war.get_clan(clan.tag)
+                if war_clan.attacks_used > 0:
+                    await bot_client.update_bot_status(
+                        cooldown=360,
+                        text=f"{clan.abbreviation} {WarResult.ongoing(war.get_clan(clan.tag).result)} in war!"
+                        )
         except Exception:
             bot_client.coc_main_log.exception(f"Error in Ongoing War task.")
     

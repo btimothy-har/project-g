@@ -11,12 +11,12 @@ from ..season.season import aClashSeason
 bot_client = client()
 
 class aPlayerStat():
-    def __init__(self,tag:str,season:aClashSeason,description:str,dict_value:dict):
-        
+    def __init__(self,tag:str,season:aClashSeason,description:str,dict_value:dict):        
         self.tag = tag
         self.season = season
         self.description = description
         self._lock = asyncio.Lock()
+        self._prior_seen = dict_value.get('priorSeen',False)
 
         if 'season' in dict_value:
             self.season_only_clan = dict_value['season']
@@ -47,7 +47,8 @@ class aPlayerStat():
         return {
             'season_only_clan': self.season_only_clan,
             'season_total': self.season_total,
-            'lastUpdate': self.last_update
+            'lastUpdate': self.last_update,
+            'priorSeen': self._prior_seen
             }
     
     @property
@@ -79,6 +80,8 @@ class aPlayerStat():
             self.season_total += increment
             if alliance:
                 self.season_only_clan += increment
+            
+            self._prior_seen = True
             await bot_client.run_in_thread(_create_in_db)
             await bot_client.run_in_thread(db_update,self._db_id,self.json)
         

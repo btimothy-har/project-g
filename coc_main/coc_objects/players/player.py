@@ -19,6 +19,7 @@ from .player_season import aPlayerSeason, db_PlayerStats
 from ..season.season import aClashSeason
 from ..clans.player_clan import aPlayerClan
 from ..events.clan_war_leagues import WarLeaguePlayer
+from ...exceptions import CacheNotReady
 
 from ...utils.constants.coc_constants import HeroAvailability, TroopAvailability, SpellAvailability, PetAvailability
 from ...utils.constants.coc_constants import EmojisHeroes, EmojisLeagues
@@ -46,7 +47,6 @@ class aPlayer(coc.Player,BasicPlayer):
         self.label_ids = [label.id for label in self.labels]
 
         self.town_hall = aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
-        self.clan_castle = sum([a.value for a in self.achievements if a.name=='Empire Builder'])
         self.clan_tag = getattr(self.clan,'tag',None)
 
         if self.clan:
@@ -60,47 +60,17 @@ class aPlayer(coc.Player,BasicPlayer):
             clan_ph = None
         self.clan = clan_ph
 
-        hero_ph = []
-        for hero_name in HeroAvailability.return_all_unlocked(self.town_hall.level):
-            hero = self.get_hero(hero_name)
-            if hero:
-                hero = aHero(hero,self.town_hall.level)
-            else:
-                hero = aHero._not_yet_unlocked(hero_name,self.town_hall.level)
-            hero_ph.append(hero)
-        self.heroes = hero_ph
+        self._heroes = super().heroes
+        self._heroes_cached = False
 
-        troops_ph = []
-        for troop_name in TroopAvailability.return_all_unlocked(self.town_hall.level):
-            troop = self.get_troop(name=troop_name,is_home_troop=True)
-            if troop:
-                troop = aTroop(troop,self.town_hall.level)
-            else:
-                if troop_name not in coc.SUPER_TROOP_ORDER:
-                    troop = aTroop._not_yet_unlocked(troop_name,self.town_hall.level)
-            if troop:
-                troops_ph.append(troop)
-        self.troops = troops_ph
+        self._troops = super().troops
+        self._troops_cached = False
 
-        spells_ph = []
-        for spell_name in SpellAvailability.return_all_unlocked(self.town_hall.level):
-            spell = self.get_spell(name=spell_name)
-            if spell:
-                spell = aSpell(spell,self.town_hall.level)
-            else:
-                spell = aSpell._not_yet_unlocked(spell_name,self.town_hall.level)
-            spells_ph.append(spell)
-        self.spells = spells_ph
+        self._spells = super().spells
+        self._spells_cached = False
 
-        pets_ph = []
-        for pet_name in PetAvailability.return_all_unlocked(self.town_hall.level):
-            pet = self.get_pet(name=pet_name)
-            if pet:
-                pet = aPet(pet,self.town_hall.level)
-            else:
-                pet = aPet._not_yet_unlocked(pet_name,self.town_hall.level)
-            pets_ph.append(pet)
-        self.pets = pets_ph
+        self._pets = super().pets
+        self._pets_cached = False
     
     def __str__(self):
         return f"{self.name} ({self.tag})"
@@ -131,6 +101,80 @@ class aPlayer(coc.Player,BasicPlayer):
     @town_hall_level.setter
     def town_hall_level(self,value:int):
         self._town_hall_level = value
+
+    @property
+    def heroes(self) -> List[aHero]:
+        if not self._heroes_cached:
+            hero_ph = []
+            for hero_name in HeroAvailability.return_all_unlocked(self.town_hall.level):
+                hero = self.get_hero(hero_name)
+                if hero:
+                    hero = aHero(hero,self.town_hall.level)
+                else:
+                    hero = aHero._not_yet_unlocked(hero_name,self.town_hall.level)
+                hero_ph.append(hero)
+            self._heroes = hero_ph
+            self._heroes_cached = True
+        return self._heroes
+    @heroes.setter
+    def heroes(self,value:List[Union[coc.Hero,aHero]]):
+        self._heroes = value
+    
+    @property
+    def troops(self) -> List[aTroop]:
+        if not self._troops_cached:
+            troops_ph = []
+            for troop_name in TroopAvailability.return_all_unlocked(self.town_hall.level):
+                troop = self.get_troop(name=troop_name,is_home_troop=True)
+                if troop:
+                    troop = aTroop(troop,self.town_hall.level)
+                else:
+                    if troop_name not in coc.SUPER_TROOP_ORDER:
+                        troop = aTroop._not_yet_unlocked(troop_name,self.town_hall.level)
+                if troop:
+                    troops_ph.append(troop)
+            self._troops = troops_ph
+            self._troops_cached = True
+        return self._troops
+    @troops.setter
+    def troops(self,value:List[Union[coc.Troop,aTroop]]):
+        self._troops = value
+
+    @property
+    def spells(self) -> List[aSpell]:
+        if not self._spells_cached:
+            spells_ph = []
+            for spell_name in SpellAvailability.return_all_unlocked(self.town_hall.level):
+                spell = self.get_spell(name=spell_name)
+                if spell:
+                    spell = aSpell(spell,self.town_hall.level)
+                else:
+                    spell = aSpell._not_yet_unlocked(spell_name,self.town_hall.level)
+                spells_ph.append(spell)
+            self._spells = spells_ph
+            self._spells_cached = True
+        return self._spells
+    @spells.setter
+    def spells(self,value:List[Union[coc.Spell,aSpell]]):
+        self._spells = value
+    
+    @property
+    def pets(self) -> List[aPet]:
+        if not self._pets_cached:
+            pets_ph = []
+            for pet_name in PetAvailability.return_all_unlocked(self.town_hall.level):
+                pet = self.get_pet(name=pet_name)
+                if pet:
+                    pet = aPet(pet,self.town_hall.level)
+                else:
+                    pet = aPet._not_yet_unlocked(pet_name,self.town_hall.level)
+                pets_ph.append(pet)
+            self._pets = pets_ph
+            self._pets_cached = True
+        return self._pets
+    @pets.setter
+    def pets(self,value:List[Union[coc.Pet,aPet]]):
+        self._pets = value
     
     @cached_property
     def league_icon(self):
@@ -344,19 +388,19 @@ class aPlayer(coc.Player,BasicPlayer):
         return WarLeaguePlayer(self.tag,season)
 
     def get_hero(self,hero_name:str):
-        return next((hero for hero in self.heroes if hero.name == hero_name),None)
+        return next((hero for hero in self._heroes if hero.name == hero_name),None)
     
     def get_troop(self,name:str,is_home_troop:bool=False):
         if is_home_troop:
-            return next((troop for troop in self.troops if troop.name == name),None)
+            return next((troop for troop in self._troops if troop.name == name),None)
         else:
-            return next((troop for troop in self.troops if troop.name == name and not troop.village == 'home'),None)
+            return next((troop for troop in self._troops if troop.name == name and not troop.village == 'home'),None)
     
     def get_spell(self,name:str):
-        return next((spell for spell in self.spells if spell.name == name),None)
+        return next((spell for spell in self._spells if spell.name == name),None)
     
     def get_pet(self,name:str):
-        return next((pet for pet in self.pets if pet.name == name),None)
+        return next((pet for pet in self._pets if pet.name == name),None)
     
     # @property
     # def notes(self):
