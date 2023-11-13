@@ -35,9 +35,6 @@ from .discord.member import aMember
 from .discord.application_panel import GuildApplicationPanel, listener_user_application
 from .discord.recruiting_reminder import RecruitingReminder
 
-from .discord.feeds.member_movement import ClanMemberFeed
-from .discord.feeds.donations import ClanDonationFeed
-
 from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
@@ -71,8 +68,6 @@ class ClashOfClansTasks(commands.Cog):
 
         # DATA QUEUE
         self.queue_lock = asyncio.Lock()
-        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.05))
-        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.05))
 
         # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
@@ -289,10 +284,7 @@ class ClashOfClansTasks(commands.Cog):
                 bot_client.clan_cache.remove_from_queue(clan_tag)
             
             clan_queue = bot_client.clan_cache.queue.copy()
-            bounded_gather(*(fetch_clan(c) for c in clan_queue),
-                semaphore=self.clan_queue_semaphore,
-                return_exceptions=True
-                )
+            await asyncio.gather(*(fetch_clan(c) for c in clan_queue),return_exceptions=True)
             
         async def load_player_queue():
             async def fetch_player(player_tag):
@@ -300,19 +292,16 @@ class ClashOfClansTasks(commands.Cog):
                 bot_client.player_cache.remove_from_queue(player_tag)
             
             player_queue = bot_client.player_cache.queue.copy()
-            bounded_gather(*(fetch_player(p) for p in player_queue),
-                semaphore=self.player_queue_semaphore,
-                return_exceptions=True
-                )
+            await asyncio.gather(*(fetch_player(p) for p in player_queue),return_exceptions=True)
             
         if self.queue_lock.locked():
             return        
         try:
             async with self.queue_lock:
-                await asyncio.gather(
-                    load_clan_queue(),
-                    load_player_queue(),
-                    return_exceptions=True)
+                t = []
+                t.append(asyncio.create_task(load_clan_queue()))
+                t.append(asyncio.create_task(load_player_queue()))
+                await asyncio.gather(*t,return_exceptions=True)
 
         except Exception as exc:
             await self.bot.send_to_owners(f"An error occured during Clash Data Queue. Check logs for details."

@@ -365,7 +365,6 @@ class PlayerLoop(TaskLoop):
     
     @property
     def delay_multiplier(self) -> float:
-        return 1
         if not self.cached_player:
             return 1
         if self.cached_player.is_member:
@@ -459,7 +458,7 @@ class PlayerLoop(TaskLoop):
             except ClashAPIError as exc:
                 return
             finally:
-                wait = int(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier)
+                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier,300))
                 self.loop.call_later(wait,self.unlock,self._lock)
 
             if self.cached_player:

@@ -26,7 +26,7 @@ class BasicPlayer():
         
         player_tags = await bot_client.run_in_thread(_get_from_db)
         players = [cls(tag=tag) for tag in player_tags]
-        await asyncio.gather(*(player._load_attributes() for player in players))        
+        await asyncio.gather(*(player._load_attributes() for player in players)) 
         return players
     
     @classmethod
@@ -158,8 +158,9 @@ class BasicPlayer():
                 upsert=True
                 )
             bot_client.coc_data_log.info(f"{player}: first_seen changed to {player.first_seen}.")
-            
+        
         player = cls(tag=coc.utils.correct_tag(tag))
+
         async with player._attributes._lock:
             player._attributes.first_seen = pendulum.now()
             player._attributes.is_new = False
@@ -313,9 +314,10 @@ class _PlayerAttributes():
             self.discord_user = db.discord_user
             self.is_member = db.is_member
             self.home_clan = aPlayerClan(tag=db.home_clan) if db.home_clan else None
-            self.first_seen = pendulum.from_timestamp(db.first_seen)
-            self.last_joined = pendulum.from_timestamp(db.last_joined)
-            self.last_removed = pendulum.from_timestamp(db.last_removed)
+            
+            self.first_seen = pendulum.from_timestamp(db.first_seen) if db.first_seen > 0 else None
+            self.last_joined = pendulum.from_timestamp(db.last_joined) if db.last_joined > 0 else None
+            self.last_removed = pendulum.from_timestamp(db.last_removed) if db.last_removed > 0 else None
     
     @property
     def _database(self) -> Optional[db_Player]:
@@ -359,21 +361,21 @@ class _PlayerAttributes():
     @cached_property
     def first_seen(self) -> Optional[pendulum.DateTime]:
         fs = getattr(self._database,'first_seen',0)
-        if fs:
+        if fs > 0:
             return pendulum.from_timestamp(fs)
         return None
     
     @cached_property
     def last_joined(self) -> Optional[pendulum.DateTime]:
         lj = getattr(self._database,'last_joined',0)
-        if lj:
+        if lj > 0:
             return pendulum.from_timestamp(lj)
         return None
 
     @cached_property
     def last_removed(self) -> Optional[pendulum.DateTime]:
         lr = getattr(self._database,'last_removed',0)
-        if lr:
+        if lr > 0:
             return pendulum.from_timestamp(lr)
         return None
     

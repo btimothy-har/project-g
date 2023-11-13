@@ -101,8 +101,6 @@ class aPlayer(coc.Player,BasicPlayer):
                 pet = aPet._not_yet_unlocked(pet_name,self.town_hall.level)
             pets_ph.append(pet)
         self.pets = pets_ph
-
-        bot_client.player_cache.set(self.tag,self)
     
     def __str__(self):
         return f"{self.name} ({self.tag})"

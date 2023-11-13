@@ -40,11 +40,6 @@ class aClan(coc.Clan,BasicClan):
         self._badge = getattr(self.badge,'url',"")
         self._war_league_name = getattr(self.war_league,'name',"")
 
-        self._total_donations = sum([m.donations for m in self.members])
-        self._total_received = sum([m.received for m in self.members])
-
-        bot_client.clan_cache.set(self.tag,self)
-
     ##################################################
     ### DATA FORMATTERS
     ##################################################

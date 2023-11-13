@@ -1,3 +1,4 @@
+import coc
 import discord
 import pendulum
 import asyncio
@@ -6,6 +7,7 @@ from typing import *
 
 from .clan_feed import ClanDataFeed
 from ...api_client import BotClashClient as client
+from ...cog_coc_client import ClashOfClansClient
 from ...coc_objects.players.player import aPlayer
 from ...coc_objects.clans.clan import BasicClan, aClan
 from ...discord.mongo_discord import db_ClanDataFeed
@@ -13,7 +15,6 @@ from ...utils.constants.coc_emojis import EmojisClash, EmojisLeagues
 from ...utils.components import clash_embed, get_bot_webhook
 
 bot_client = client()
-
 type = 1
 
 class ClanMemberFeed():
@@ -49,13 +50,20 @@ class ClanMemberFeed():
         self.clan = clan
         self.player = player
 
+    @staticmethod
+    def get_coc_client() -> ClashOfClansClient:
+        return bot_client.bot.get_cog('ClashOfClansClient')
+
     @classmethod
-    async def member_join(cls,clan:aClan,player:aPlayer):
+    async def member_join(cls,clan:aClan,player:coc.ClanMember):
         try:
             clan_feeds = await cls.feeds_for_clan(clan)
 
             if len(clan_feeds) > 0:
-                feed = cls(clan,player)
+                coc_client = cls.get_coc_client() 
+                p = await coc_client.fetch_player(player.tag,no_cache=True)
+
+                feed = cls(clan,p)
                 embed = await feed.join_embed()
 
                 await asyncio.gather(*(feed.send_to_discord(embed, f) for f in clan_feeds))
@@ -64,12 +72,15 @@ class ClanMemberFeed():
             bot_client.coc_main_log.exception(f"Error building Member Join Feed.")
     
     @classmethod
-    async def member_leave(cls,clan:aClan,player:aPlayer):
+    async def member_leave(cls,clan:aClan,player:coc.ClanMember):
         try:
             clan_feeds = await cls.feeds_for_clan(clan)
 
             if len(clan_feeds) > 0:
-                feed = cls(clan,player) 
+                coc_client = cls.get_coc_client() 
+                p = await coc_client.fetch_player(player.tag,no_cache=True)
+
+                feed = cls(clan,p) 
                 embed = await feed.leave_embed()
 
                 await asyncio.gather(*(feed.send_to_discord(embed, f) for f in clan_feeds))

@@ -64,9 +64,10 @@ class RaidResultsFeed():
     async def send_results(cls,clan:aClan,raid_weekend:aRaidWeekend):
         try:
             a = cls(clan,raid_weekend)
-
             image = await a.get_results_image()
-            await asyncio.gather(*(a.send_to_discord(feed,image) for feed in a.feeds))
+            feeds = await a.feeds_for_clan(clan)
+
+            await asyncio.gather(*(a.send_to_discord(feed,image) for feed in feeds))
         except Exception:
             bot_client.coc_main_log.exception(f"Error building Raid Results Feed for {clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}")
         

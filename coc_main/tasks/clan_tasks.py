@@ -86,7 +86,6 @@ class ClanLoop(TaskLoop):
 
     @property
     def delay_multiplier(self) -> float:
-        return 1
         if not self.cached_clan:
             return 1
         if self.feed_count > 0:
@@ -97,7 +96,7 @@ class ClanLoop(TaskLoop):
             return 1        
         if self.cached_clan.is_registered_clan:
             return 2
-        return 3
+        return 5
     
     ############################################################
     ### PRIMARY TASK LOOP
@@ -156,7 +155,7 @@ class ClanLoop(TaskLoop):
             except ClashAPIError as exc:
                 return
             finally:
-                wait = int(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier)
+                wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier,600))
                 self.loop.call_later(wait,self.unlock,self._lock)
 
             if self.cached_clan:
@@ -179,7 +178,7 @@ class ClanLoop(TaskLoop):
         members_left = [m for m in old_clan.members if m.tag not in [n.tag for n in new_clan.members]]
 
         old_member_iter = AsyncIter(members_left)
-        async for member in old_member_iter:
+        async for member in old_member_iter:            
             for event in ClanLoop._member_leave_events:
                 asyncio.create_task(event(member,new_clan))
 

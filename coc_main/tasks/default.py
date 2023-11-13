@@ -74,7 +74,7 @@ class TaskLoop():
     def task_semaphore(self) -> asyncio.Semaphore:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.task_semaphore
-
+    
     ##################################################
     ### LOOP METHODS
     ##################################################
