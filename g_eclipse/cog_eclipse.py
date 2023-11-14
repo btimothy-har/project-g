@@ -84,6 +84,8 @@ class ECLIPSE(commands.Cog):
     
     async def clear_dump_messages(self):
         async with self._dump_lock:
+            if not self.dump_channel:
+                return            
             async for message in self.dump_channel.history(limit=30):
                 try:
                     if message.author.id == self.bot.user.id:
