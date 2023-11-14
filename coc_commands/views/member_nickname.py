@@ -70,10 +70,16 @@ class MemberNicknameMenu(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=embed,view=self)
 
-        if len(self.member.member_accounts) > 1:
-            await self._select_accounts()
+        if self.guild.id == 688449973553201335: #ARIX
+            if len(self.member.member_accounts) > 1:
+                await self._select_accounts()
+            else:
+                await self._change_nickname()
         else:
-            await self._change_nickname()
+            if len(self.member.accounts) > 1:
+                await self._select_accounts()
+            else:
+                await self._change_nickname()
     
     ##################################################
     ### STEP 1: SELECT ACCOUNT (IF MEMBER ACCOUNTS > 1)

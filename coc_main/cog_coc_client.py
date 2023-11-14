@@ -31,13 +31,14 @@ class RequestCounter():
         self._archive_received = deque(maxlen=60)
         self._sent = 0
         self._received = 0
-        self._timestamp = pendulum.now()
-        self._lock = asyncio.Lock()
+        self._timestamp_sent = pendulum.now()
+        self._timestamp_received = pendulum.now()
 
     @property
     def current_average(self) -> (float, float):
-        diff = pendulum.now() - self._timestamp
+        diff = pendulum.now() - self._timestamp_sent
         sent_avg = self._sent / diff.total_seconds() if self._sent > 0 else 0
+        diff = pendulum.now() - self._timestamp_received
         rcvd_avg = self._received / diff.total_seconds() if self._received > 0 else 0
         return sent_avg, rcvd_avg
     
@@ -59,22 +60,30 @@ class RequestCounter():
         maxr = max(self._archive_sent)
         return avg, last, maxr
     
-    async def increment_sent(self):
-        async with self._lock:
-            self._sent += 1
-
-    async def increment_received(self):
-        async with self._lock:
-            self._received += 1
-    
-    async def reset(self):
-        async with self._lock:
-            diff = pendulum.now() - self._timestamp
-            self._archive_received.append(self._received / diff.total_seconds())
-            self._received = 0
-            self._archive_sent.append(self._sent / diff.total_seconds())
+    def increment_sent(self):
+        diff = pendulum.now().int_timestamp - self._timestamp_sent.int_timestamp
+        if diff > 60:
+            self._archive_sent.append(self._sent / diff)
             self._sent = 0
-            self._timestamp = pendulum.now()
+            self._timestamp_sent = pendulum.now()
+        self._sent += 1
+
+    def increment_received(self):
+        diff = pendulum.now().int_timestamp - self._timestamp_received.int_timestamp
+        if diff > 60:
+            self._archive_received.append(self._received / diff)
+            self._received = 0
+            self._timestamp_received = pendulum.now()
+        self._received += 1
+    
+    # async def reset(self):
+    #     async with self._lock:
+    #         diff = pendulum.now() - self._timestamp
+    #         self._archive_received.append(self._received / diff.total_seconds())
+    #         self._received = 0
+    #         self._archive_sent.append(self._sent / diff.total_seconds())
+    #         self._sent = 0
+    #         self._timestamp = pendulum.now()
 
 class ClientThrottler:
     def __init__(self,cog:BotClashClient,rate_limit:int,concurrent_requests:int=1):
@@ -84,29 +93,28 @@ class ClientThrottler:
         self.throttle_count = 0
         
         self._lock = asyncio.Lock()
-        self._semaphore = asyncio.Semaphore(concurrent_requests * 1)
+        self._semaphore = asyncio.Semaphore(rate_limit)
         self._throttle = False
     
     async def start_throttle(self) -> bool:
         all_times = []
-        index_range = int(bot_client.num_keys * 20)
+        index_range = int(bot_client.num_keys * 10)
         if len(self.cog.last_api_response) > 0:
-            all_times.extend(list(self.cog.last_api_response)[-index_range:])        
+            all_times = list(self.cog.last_api_response)[-index_range:]  
         
         avg_100 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_100 > 1:
+        if avg_100 > 1.5:
             return True
         return False
     
     async def release_throttle(self) -> bool:
         all_times = []
-        #index_range = int(max((bot_client.num_keys / 2),100) * 1.5)
-        index_range = int(bot_client.num_keys * 40)
+        index_range = int(bot_client.num_keys * 20)
         if len(self.cog.last_api_response) > 0:
-            all_times.extend(list(self.cog.last_api_response)[-index_range:])
+            all_times = list(self.cog.last_api_response)[-index_range:]
         
         avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_300 <= 0.6:
+        if avg_300 <= 1:
             return True
         return False
 
@@ -290,7 +298,7 @@ class ClashOfClansClient(commands.Cog):
     
     @tasks.loop(seconds=59)
     async def reset_counter(self):
-        await self.counter.reset()
+        return
     
     ############################################################
     #####
@@ -322,7 +330,7 @@ class ClashOfClansClient(commands.Cog):
             diff = st - ot
             self.player_throttle.append(diff.total_seconds())
 
-            await self.counter.increment_sent()
+            self.counter.increment_sent()
             player = await self.client.coc.get_player(n_tag,cls=aPlayer)
             return player
 
@@ -334,13 +342,14 @@ class ClashOfClansClient(commands.Cog):
             else:
                 raise ClashAPIError(exc) from exc
         finally:
-            if player:
-                bot_client.player_cache.set(player.tag,player)
+            self.counter.increment_received()
 
             diff = pendulum.now() - st
             self.player_api.append(diff.total_seconds())
-            self.last_api_response.append(diff.total_seconds())
-            await self.counter.increment_received()
+            self.last_api_response.append(diff.total_seconds())            
+
+            if player:
+                bot_client.player_cache.set(player.tag,player)
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         def _db_query(q_clan,q_season):
@@ -395,7 +404,7 @@ class ClashOfClansClient(commands.Cog):
             diff = st - ot
             self.clan_throttle.append(diff.total_seconds())
 
-            await self.counter.increment_sent()
+            self.counter.increment_sent()
             clan = await self.client.coc.get_clan(n_tag,cls=aClan)
 
             return clan
@@ -408,13 +417,14 @@ class ClashOfClansClient(commands.Cog):
             else:
                 raise ClashAPIError(exc) from exc
         finally:
-            if clan:
-                bot_client.clan_cache.set(clan.tag,clan)
-
+            self.counter.increment_received()
+            
             diff = pendulum.now() - st
             self.clan_api.append(diff.total_seconds())                
             self.last_api_response.append(diff.total_seconds())
-            await self.counter.increment_received()
+            if clan:
+                bot_client.clan_cache.set(clan.tag,clan)
+            
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
         def _db_query():
@@ -470,7 +480,7 @@ class ClashOfClansClient(commands.Cog):
         try:
             st = pendulum.now()
 
-            await self.counter.increment_sent()
+            self.counter.increment_sent()
             api_war = await self.client.coc.get_clan_war(clan.tag)
 
         except coc.PrivateWarLog:
@@ -482,10 +492,9 @@ class ClashOfClansClient(commands.Cog):
         finally:
             diff = pendulum.now() - st
             self.war_api.append(diff.total_seconds())
-            self.last_api_response.append(diff.total_seconds())
 
             if api_war:                
-                await self.counter.increment_received()
+                self.counter.increment_received()
 
                 if getattr(api_war,'state','notInWar') != 'notInWar':
                     clan_war = await aClanWar.create_from_api(api_war)
@@ -497,7 +506,7 @@ class ClashOfClansClient(commands.Cog):
         try:
             st = pendulum.now()
 
-            await self.counter.increment_sent()
+            self.counter.increment_sent()
             api_group = await self.client.coc.get_league_group(clan.tag)
 
         except coc.NotFound:
@@ -507,10 +516,9 @@ class ClashOfClansClient(commands.Cog):
         finally:
             diff = pendulum.now() - st
             self.war_api.append(diff.total_seconds())
-            self.last_api_response.append(diff.total_seconds())
 
             if api_group:
-                await self.counter.increment_received()
+                self.counter.increment_received()
 
                 if api_group.state in ['preparation','inWar','ended','warEnded']:
                     league_group = await WarLeagueGroup.from_api(clan,api_group)
@@ -528,7 +536,7 @@ class ClashOfClansClient(commands.Cog):
         try:
             st = pendulum.now()
 
-            await self.counter.increment_sent()
+            self.counter.increment_sent()
             raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
 
         except coc.PrivateWarLog:
@@ -540,10 +548,9 @@ class ClashOfClansClient(commands.Cog):
         finally:
             diff = pendulum.now() - st
             self.raid_api.append(diff.total_seconds())
-            self.last_api_response.append(diff.total_seconds())
 
             if raidloggen:
-                await self.counter.increment_received()
+                self.counter.increment_received()
 
                 if len(raidloggen) > 0:
                     api_raid = raidloggen[0]

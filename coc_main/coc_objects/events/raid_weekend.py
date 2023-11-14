@@ -150,6 +150,8 @@ class aRaidWeekend():
                 self.members = [aRaidMember(self,json=m) for m in raid_data['members']]
 
                 self._last_save = pendulum.from_timestamp(raid_data.get('last_save',0)) if raid_data.get('last_save',0) > 0 else None
+            
+            self._is_new = False
     
     @classmethod
     async def create_from_api(cls,clan:BasicClan,data:coc.RaidLogEntry) -> 'aRaidWeekend':

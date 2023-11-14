@@ -431,7 +431,7 @@ class ClanWarLeaderboard(Leaderboard):
                 + (f"\n- Only Wars with Clans linked to this Server are included." if not self.parent.is_global else "")
                 + f"\n- Townhall levels are captured from the specific War you participated in."
                 + f"\n- Leaderboard resets at the end of every month."
-                + f"\n\n{EmojisUI.SPACER}{EmojisUI.SPACER}`{'':<2}{'TRP':>3}{'':<4}{'ATT':>3}{'':<4}{'AVG':>3}{'':<4}{'HITRT':>5}{'':<2}`"
+                + f"\n\n{EmojisUI.SPACER}{EmojisUI.SPACER}`{'':<2}{'TRP':>3}{'':<4}{'ATT':>3}{'':<4}{'WARS':>4}{'':<4}{'AVG':>3}{'':<4}{'HITRT':>5}{'':<2}`"
                 )
         async for lb_th in AsyncIter(eligible_townhalls):
             wl_players = self.leaderboard_players.get(lb_th,[])
@@ -441,7 +441,7 @@ class ClanWarLeaderboard(Leaderboard):
                 embed.add_field(
                     name=f"**TH{lb_th}**",
                     value="\n".join([
-                        f"{EmojisTownHall.get(lb_th)}{p.stats.home_clan.emoji}`{'':<2}{p.total_triples:>3}{'':<4}{p.total_attacks:>3}{'':<4}{p.avg_stars:>3}{'':<4}{str(p.hit_rate)+'%':>5}{'':<2}`\u3000{re.sub('[_*/]','',p.clean_name)}"
+                        f"{EmojisTownHall.get(lb_th)}{p.stats.home_clan.emoji}`{'':<2}{p.total_triples:>3}{'':<4}{p.total_attacks:>3}{'':<4}{p.wars_participated:>4}{'':<4}{p.avg_stars:>3}{'':<4}{str(p.hit_rate)+'%':>5}{'':<2}`\u3000{re.sub('[_*/]','',p.clean_name)}"
                         for p in wl_players[:5]]),
                     inline=False
                     )

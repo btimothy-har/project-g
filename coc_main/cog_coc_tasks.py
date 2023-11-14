@@ -20,7 +20,8 @@ from .cog_coc_client import ClashOfClansClient
 
 from .coc_objects.clans.clan import db_Clan, db_WarLeagueClanSetup, aClan
 from .coc_objects.players.player import db_Player, db_PlayerStats, aPlayer, BasicPlayer
-from .coc_objects.events.mongo_events import db_ClanWar, db_RaidWeekend
+from .coc_objects.events.clan_war import db_ClanWar, aClanWar
+from .coc_objects.events.raid_weekend import db_RaidWeekend, aRaidWeekend
 
 from .tasks.player_tasks import PlayerLoop
 from .tasks.clan_tasks import ClanLoop
@@ -68,6 +69,9 @@ class ClashOfClansTasks(commands.Cog):
 
         # DATA QUEUE
         self.queue_lock = asyncio.Lock()
+        self.last_queue_run = None
+        self.clan_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.1))
+        self.player_queue_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.1))
 
         # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
@@ -278,24 +282,49 @@ class ClashOfClansTasks(commands.Cog):
 
     @tasks.loop(seconds=10)
     async def coc_data_queue(self):
+        if self.queue_lock.locked():
+            return
+        
+        limit = 25000
+        
         async def load_clan_queue():            
             async def fetch_clan(clan_tag):
-                await self.client.fetch_clan(clan_tag,enforce_lock=True)
-                bot_client.clan_cache.remove_from_queue(clan_tag)
+                try:
+                    clan = await self.client.fetch_clan(clan_tag,enforce_lock=True)
+                except:
+                    return None
+                else:
+                    return clan
+                finally:
+                    bot_client.clan_cache.remove_from_queue(clan_tag)
             
-            clan_queue = bot_client.clan_cache.queue.copy()
-            await asyncio.gather(*(fetch_clan(c) for c in clan_queue),return_exceptions=True)
+            queue = bot_client.clan_cache.queue.copy()
+            clan_queue = queue[:limit]
+            if len(clan_queue) > 0:
+                bot_client.coc_main_log.info(f"Clan Queue In: {len(clan_queue)}")
+                clans = await asyncio.gather(*(fetch_clan(c) for c in clan_queue),
+                    return_exceptions=True)
+                bot_client.coc_main_log.info(f"Clan Queue Out: {len(clans)}")
             
         async def load_player_queue():
             async def fetch_player(player_tag):
-                await self.client.fetch_player(player_tag,enforce_lock=True)
-                bot_client.player_cache.remove_from_queue(player_tag)
+                try:
+                    player = await self.client.fetch_player(player_tag,enforce_lock=True)
+                except:
+                    return None
+                else:
+                    return player
+                finally:
+                    bot_client.player_cache.remove_from_queue(player_tag)
             
-            player_queue = bot_client.player_cache.queue.copy()
-            await asyncio.gather(*(fetch_player(p) for p in player_queue),return_exceptions=True)
+            queue = bot_client.player_cache.queue.copy()
+            player_queue = queue[:limit]
+            if len(player_queue) > 0:
+                bot_client.coc_main_log.info(f"Player Queue In: {len(player_queue)}")
+                players = await asyncio.gather(*(fetch_player(c) for c in player_queue),
+                    return_exceptions=True)
+                bot_client.coc_main_log.info(f"Player Queue Out: {len(players)}")
             
-        if self.queue_lock.locked():
-            return        
         try:
             async with self.queue_lock:
                 t = []
@@ -309,6 +338,8 @@ class ClashOfClansTasks(commands.Cog):
             self.coc_main_log.exception(
                 f"Error in Clash Data Queue"
                 )
+        finally:
+            self.last_queue_run = pendulum.now()
     
     @tasks.loop(minutes=1.0)
     async def refresh_coc_loops(self):
@@ -368,13 +399,23 @@ class ClashOfClansTasks(commands.Cog):
                 asyncio.create_task(DiscordGuildLoop(guild.id).start())       
         
     async def status_embed(self):
+        def _query_player():
+            return [t.tag for t in db_Player.objects().only('tag')]        
+        def _query_clan():
+            return [t.tag for t in db_Clan.objects().only('tag')]        
+        def _query_wars():
+            return [t for t in db_ClanWar.objects()]
+        def _query_raids():
+            return [t for t in db_RaidWeekend.objects()]
+        
         embed = await clash_embed(self.bot,
             title="**Clash of Clans Data Status**",
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
                 + f"\n\nCurrent Season: {bot_client.current_season.description}"
                 + f"\nTracked Seasons: {humanize_list([i.short_description for i in bot_client.tracked_seasons])}"
-                + f"\n\nRefresh Task: " + ("Running" if self.refresh_lock.locked() else "Not Running") + " (Last: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None") + ")"
-                + f"\nSeason Task: " + ("Running" if self.season_lock.locked() else "Not Running") + " (Last: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None") + ")",
+                + f"\n\nLoop Refresh: " + ("Running" if self.refresh_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None") + ")"
+                + f"\nQueue Check: " + ("Running" if self.queue_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_queue_run.int_timestamp}:R>" if self.last_queue_run else "None") + ")"
+                + f"\nSeason Check: " + ("Running" if self.season_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None") + ")",
             timestamp=pendulum.now()
             )
         embed.add_field(
@@ -386,39 +427,47 @@ class ClashOfClansTasks(commands.Cog):
                 + "```",
             inline=False
             )
+        db_players = await bot_client.run_in_thread(_query_player)
         embed.add_field(
             name="**Player Loops**",
             value="```ini"
-                + f"\n{'[Mem/Queue]':<15} {len(bot_client.player_cache):,} (Queue: {len(bot_client.player_cache.queue):,})"
+                + f"\n{'[Mem/DB]':<15} {len(bot_client.player_cache):,} / {len(db_players):,}"
+                + f"\n{'[Queue]':<15} {len(bot_client.player_cache.queue):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in PlayerLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Deferred]':<15} {len([i for i in PlayerLoop.loops() if i.deferred]):,}"
                 + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg(),1)}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
+        db_clan = await bot_client.run_in_thread(_query_clan)
         embed.add_field(
             name="**Clans**",
             value="```ini"
-                + f"\n{'[Mem/Queue]':<15} {len(bot_client.clan_cache):,} (Queue: {len(bot_client.clan_cache.queue):,})"
+                + f"\n{'[Mem/DB]':<15} {len(bot_client.clan_cache):,} / {len(db_clan):,}"
+                + f"\n{'[Queue]':<15} {len(bot_client.clan_cache.queue):,}"
                 + f"\n{'[Loops]':<15} {len([i for i in ClanLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Deferred]':<15} {len([i for i in ClanLoop.loops() if i.deferred]):,}"
                 + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg(),1)}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
                 + "```",
             inline=False
             )
+        db_wars = await bot_client.run_in_thread(_query_wars)
         embed.add_field(
             name="**Clan Wars**",
             value="```ini"
-                + f"\n{'[Database]':<10} {len(db_ClanWar.objects()):,}"
+                + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
+                + f"\n{'[Database]':<10} {len(db_wars):,}"
                 + f"\n{'[Loops]':<10} {len([i for i in ClanWarLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Runtime]':<10} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
+        db_raids = await bot_client.run_in_thread(_query_raids)
         embed.add_field(
             name="**Capital Raids**",
             value="```ini"
-                + f"\n{'[Database]':<10} {len(db_RaidWeekend.objects()):,}"
+                + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
+                + f"\n{'[Database]':<10} {len(db_raids):,}"
                 + f"\n{'[Loops]':<10} {len([i for i in ClanRaidLoop.loops() if i.loop_active]):,}"
                 + f"\n{'[Runtime]':<10} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",

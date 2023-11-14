@@ -28,13 +28,12 @@ class aPlayerSeason():
             cls._cache[(tag,season.id)] = instance
         return cls._cache[(tag,season.id)]
     
-    def __init__(self,tag:str,season:aClashSeason):
-        self.tag = tag
-        self.season = season
-               
+    def __init__(self,tag:str,season:aClashSeason):   
         if self._is_new:
+            self.tag = tag
+            self.season = season
             self._lock = asyncio.Lock()
-            
+
         self._is_new = False
     
     def __str__(self):

@@ -5,6 +5,7 @@ from mongoengine import *
 
 from ..api_client import BotClashClient as client
 from ..coc_objects.clans.clan import aClan
+from redbot.core.utils import AsyncIter
 
 from .mongo_discord import db_GuildClanPanel
 from ..utils.components import ClanLinkMenu
@@ -34,14 +35,6 @@ class GuildClanPanel():
         if db:
             return cls(db)
         return None
-    
-    @classmethod
-    def get_from_id(cls,panel_id:dict):
-        try:
-            panel = db_GuildClanPanel.objects.get(panel_id=panel_id)
-        except DoesNotExist:
-            return None
-        return cls(panel)
     
     def __init__(self,database_entry:db_GuildClanPanel):        
         self.id = database_entry.panel_id

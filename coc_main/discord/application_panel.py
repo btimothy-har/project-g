@@ -54,14 +54,6 @@ class GuildApplicationPanel():
         if db:
             return cls(db)
         return None
-    
-    @classmethod
-    def get_from_id(cls,panel_id:dict):
-        try:
-            panel = db_GuildApplyPanel.objects.get(panel_id=panel_id)
-        except DoesNotExist:
-            return None
-        return cls(panel) 
 
     def __init__(self,database_entry:db_GuildApplyPanel):        
         self.id = database_entry.panel_id

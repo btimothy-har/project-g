@@ -183,9 +183,7 @@ class Leaderboards(commands.Cog):
         """
         List all Leaderboards setup in this server.
         """
-
-        await ctx.reply(db_Leaderboard.objects())
-    
+        
         embed = await self.helper_list_guild_leaderboards(ctx,ctx.guild)
         await ctx.reply(embed=embed)        
     

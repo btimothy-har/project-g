@@ -129,7 +129,7 @@ class ClanWarLoop(TaskLoop):
             super().__init__()
             self._is_new = False
             self._lock = asyncio.Lock()
-            self._remind_lock = asyncio.Lock()
+            self._remind_lock = {}
             self.cached_war = None
             self.cached_events = {}
     
@@ -296,10 +296,15 @@ class ClanWarLoop(TaskLoop):
             reminder.interval_tracker = new_tracking
             reminder.save()
 
-        if self._remind_lock.locked():
+        try:
+            lock = self._remind_lock[str(reminder.id)]
+        except KeyError:
+            self._remind_lock[str(reminder.id)] = lock = asyncio.Lock()
+
+        if lock.locked():
             return
         
-        async with self._remind_lock:
+        async with lock:
             try:
                 time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
 

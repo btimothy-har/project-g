@@ -129,6 +129,8 @@ class aClanWar():
                 self._attacks = [aWarAttack(self,json=attack) for attack in war_data['attacks']]
                 self.is_alliance_war = war_data['is_alliance_war']
                 self._last_save = pendulum.from_timestamp(war_data.get('last_save',0)) if war_data.get('last_save',0) > 0 else None
+        
+            self._is_new = False
 
     @classmethod
     async def create_from_api(cls,data:coc.ClanWar,league_group_id:str=None) -> 'aClanWar':

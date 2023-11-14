@@ -55,18 +55,21 @@ class DataCache():
         return list(self.cache.values())
     
     def set(self,key,value):
-        self.cache[key] = value
+        n_key = coc.utils.correct_tag(key)
+        self.cache[n_key] = value
 
     def get(self,key):
         return self.cache.get(key,None)
     
     def delete(self,key:str):
-        if key in self.cache:
-            del self.cache[key]
+        n_key = coc.utils.correct_tag(key)
+        if n_key in self.cache:
+            del self.cache[n_key]
 
     def add_to_queue(self,key:str):
-        if key not in self.queue and key not in self.cache:
-            self.queue.append(key)
+        n_key = coc.utils.correct_tag(key)
+        if n_key not in self.queue and n_key not in self.cache:
+            self.queue.append(n_key)
     
     async def add_many_to_queue(self,keys:List[str]):
         aiter = AsyncIter(keys)
@@ -74,8 +77,9 @@ class DataCache():
             self.add_to_queue(key)
 
     def remove_from_queue(self,key:str):
-        if key in self.queue:
-            self.queue.remove(key)
+        n_key = coc.utils.correct_tag(key)
+        if n_key in self.queue:
+            self.queue.remove(n_key)
 
 ############################################################
 ############################################################

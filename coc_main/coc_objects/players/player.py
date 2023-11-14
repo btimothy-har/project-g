@@ -401,26 +401,3 @@ class aPlayer(coc.Player,BasicPlayer):
     
     def get_pet(self,name:str):
         return next((pet for pet in self._pets if pet.name == name),None)
-    
-    # @property
-    # def notes(self):
-    #     try:
-    #         self._notes = dPlayer.objects.get(tag=self.tag).notes
-    #     except DoesNotExist:
-    #         self._notes = []
-    #     return self._notes
-    # @notes.setter
-    # def notes(self,new_note):
-    #     self._notes.append(new_note)
-    #     try:
-    #         player_data = dPlayer.objects.get(tag=self.tag)
-    #     except DoesNotExist:
-    #         player_data = dPlayer(tag=self.tag)
-    #     player_data.notes=list(set(self._notes))
-    #     player_data.save()
-
-    # def add_note(self,ctx,message):
-    #         new_note = await aNote.new_note(ctx,message)
-    #         new_note_id = new_note.save_note_to_db()
-    #         self.notes.append(new_note_id)
-    #         self.save_player_to_db()
