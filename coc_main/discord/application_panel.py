@@ -294,6 +294,7 @@ class ClanApplyMenuUser(DefaultView):
             function=self._callback_complete_application,
             title=f"Member Application",
             )
+        apply_modal.panel = panel
         question_tag = discord.ui.TextInput(
             label="Your Clash Player Tags, separated by spaces.",
             default=" ".join(default_tags),
@@ -416,7 +417,7 @@ class ClanApplyMenuUser(DefaultView):
                 answer_q2 = [getattr(q2,'label',''),getattr(q2,'value','')],
                 answer_q3 = [getattr(q3,'label',''),getattr(q3,'value','')],
                 answer_q4 = [getattr(q4,'label',''),getattr(q4,'value','')],
-                bot_prefix = getattr(panel,'ticket_prefix','')
+                bot_prefix = getattr(modal.panel,'ticket_prefix','')
                 )
             application = new_application.save()
             return str(application.pk)
@@ -466,13 +467,12 @@ class ClanApplyMenuUser(DefaultView):
         panel = await GuildApplicationPanel.get_panel(interaction.guild.id,interaction.channel.id)
         app_id = await bot_client.run_in_thread(_save_application)
 
-        if getattr(panel,'listener_channel',None):
-            channel = interaction.guild.get_channel(panel.listener_channel)
-            if channel:
-                await channel.send(f"{getattr(panel,'tickettool_prefix','')}ticket {app_id} {self.member.id}")
+        l_channel = modal.panel.listener_channel
+        if l_channel:
+            await l_channel.send(f"{getattr(modal.panel,'tickettool_prefix','')}ticket {app_id} {self.member.id}")
 
         if interaction.guild.id == 680798075685699691:
-            await panel.listener_channel.send(
+            await modal.panel.listener_channel.send(
                 f"Tags: {tags_chk}"
                 )
             
@@ -493,7 +493,7 @@ class ClanApplyMenuUser(DefaultView):
                     )
                 channel_found = True
                 break
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
         
         if not channel_found:
             await interaction.followup.send(

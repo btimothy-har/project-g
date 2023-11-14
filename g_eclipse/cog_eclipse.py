@@ -75,8 +75,8 @@ class ECLIPSE(commands.Cog):
                 await asyncio.sleep(1)
             await bot_client.bot.wait_until_red_ready()
             await eWarBase.load_all()
-            
-        asyncio.create_task(self.start_eclipse_cog())
+
+        asyncio.create_task(start_eclipse_cog())
         self.delete_dump_messages.start()
     
     async def cog_unload(self):
