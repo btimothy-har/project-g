@@ -129,6 +129,7 @@ class ClanWarLoop(TaskLoop):
             super().__init__()
             self._is_new = False
             self._lock = asyncio.Lock()
+            self._remind_lock = asyncio.Lock()
             self.cached_war = None
             self.cached_events = {}
     
@@ -295,33 +296,36 @@ class ClanWarLoop(TaskLoop):
             reminder.interval_tracker = new_tracking
             reminder.save()
 
-        try:
-            time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
+        if self._remind_lock.locked():
+            return
+        
+        async with self._remind_lock:
+            try:
+                time_remaining = current_war.end_time.int_timestamp - pendulum.now().int_timestamp
 
-            if len(reminder.interval_tracker) > 0:
-                next_reminder = max(reminder.interval_tracker)
+                if len(reminder.interval_tracker) > 0:
+                    next_reminder = max(reminder.interval_tracker)
 
-                #Reminder is overdue
-                if next_reminder > (time_remaining / 3600):
-                    channel = bot_client.bot.get_channel(reminder.channel_id)
-                    reminder_clan = current_war.get_clan(clan.tag)
-                    
-                    if channel and reminder_clan:        
-                        event_reminder = EventReminders(channel_id=reminder.channel_id)
-
-                        remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
+                    #Reminder is overdue
+                    if next_reminder > (time_remaining / 3600):
+                        channel = bot_client.bot.get_channel(reminder.channel_id)
+                        reminder_clan = current_war.get_clan(clan.tag)
                         
-                        await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))                        
-                        await event_reminder.send_war_reminders(clan,current_war)
+                        if channel and reminder_clan:        
+                            event_reminder = EventReminders(channel_id=reminder.channel_id)
 
-            if len(reminder.reminder_interval) > 0:
-                if len(reminder.interval_tracker) != len(reminder.reminder_interval):
+                            remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
+                            
+                            await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))                        
+                            await event_reminder.send_war_reminders(clan,current_war)
+
+                if len(reminder.reminder_interval) > 0:
                     track = []
                     for remind in reminder.reminder_interval:
                         if remind < (time_remaining / 3600):
                             track.append(remind)
                         
                     await bot_client.run_in_thread(_update_reminder,track)
-                        
-        except Exception:
-            bot_client.coc_main_log.exception(f"Error in War Reminder task.")
+                            
+            except Exception:
+                bot_client.coc_main_log.exception(f"Error in War Reminder task.")

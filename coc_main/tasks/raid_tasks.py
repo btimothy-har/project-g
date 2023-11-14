@@ -84,6 +84,7 @@ class ClanRaidLoop(TaskLoop):
             super().__init__()
             self._is_new = False
             self._lock = asyncio.Lock()
+            self._remind_lock = asyncio.Lock()
             self.cached_raid = None
     
     async def start(self):
@@ -204,32 +205,35 @@ class ClanRaidLoop(TaskLoop):
         def _update_reminder(new_tracking:List[int]=[]):
             reminder.interval_tracker = new_tracking
             reminder.save()
+        
+        if self._remind_lock.locked():
+            return
 
-        try:
-            time_remaining = current_raid.end_time.int_timestamp - pendulum.now().int_timestamp
+        async with self._remind_lock:
+            try:
+                time_remaining = current_raid.end_time.int_timestamp - pendulum.now().int_timestamp
 
-            if len(reminder.interval_tracker) > 0:
-                next_reminder = max(reminder.interval_tracker)
+                if len(reminder.interval_tracker) > 0:
+                    next_reminder = max(reminder.interval_tracker)
 
-                #Reminder is overdue
-                if next_reminder > (time_remaining / 3600):
-                    channel = bot_client.bot.get_channel(reminder.channel_id)
+                    #Reminder is overdue
+                    if next_reminder > (time_remaining / 3600):
+                        channel = bot_client.bot.get_channel(reminder.channel_id)
 
-                    if channel:
-                        event_reminder = EventReminders(channel_id=reminder.channel_id)
-                        remind_members = [m for m in current_raid.members if m.attack_count < 6]
+                        if channel:
+                            event_reminder = EventReminders(channel_id=reminder.channel_id)
+                            remind_members = [m for m in current_raid.members if m.attack_count < 6]
 
-                        await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))
-                        await event_reminder.send_raid_reminders(clan,current_raid)
-            
-            if len(reminder.reminder_interval) > 0:
-                if len(reminder.interval_tracker) != len(reminder.reminder_interval):
+                            await asyncio.gather(*(event_reminder.add_account(m.tag) for m in remind_members))
+                            await event_reminder.send_raid_reminders(clan,current_raid)
+                
+                if len(reminder.reminder_interval) > 0:
                     track = []
                     for remind in reminder.reminder_interval:
                         if remind < (time_remaining / 3600):
                             track.append(remind)
                     
                     await bot_client.run_in_thread(_update_reminder,track)
-        
-        except Exception:
-            bot_client.coc_main_log.exception(f"Error in Raid Reminder task.")
+            
+            except Exception:
+                bot_client.coc_main_log.exception(f"Error in Raid Reminder task.")
