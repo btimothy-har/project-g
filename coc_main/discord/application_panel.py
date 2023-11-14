@@ -464,7 +464,6 @@ class ClanApplyMenuUser(DefaultView):
                 if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
                     self.clans.append(clan)
         
-        panel = await GuildApplicationPanel.get_panel(interaction.guild.id,interaction.channel.id)
         app_id = await bot_client.run_in_thread(_save_application)
 
         l_channel = modal.panel.listener_channel
@@ -507,6 +506,11 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             return db_ClanApplication.objects.get(pk=application_id)
         except DoesNotExist:
             return None
+    
+    def _player_query():
+        q = db_Player.objects(discord_user=member.id).only('tag')
+        member_account_tags = [db.tag for db in q]
+        return member_account_tags
         
     def _update_ticket_channel(application_id,channel_id):
         db_ClanApplication.objects(pk=application_id).update_one(set__ticket_channel=channel_id)
@@ -523,11 +527,11 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             )
         return await channel.send(embed=embed)
     
-    account_tasks = await asyncio.gather(*(coc_client.fetch_player(tag=i) for i in application.tags),return_exceptions=True)
-    clan_tasks = await asyncio.gather(*(coc_client.fetch_clan(tag=i) for i in application.clans),return_exceptions=True)
+    application_accounts = await asyncio.gather(*(coc_client.fetch_player(tag=i) for i in application.tags),return_exceptions=True)
+    application_clans = await asyncio.gather(*(coc_client.fetch_clan(tag=i) for i in application.clans),return_exceptions=True)
     
     member = channel.guild.get_member(application.applicant_id)    
-    clans = [c for c in clan_tasks if isinstance(c,aClan)]
+    clans = [c for c in application_clans if isinstance(c,aClan)]
 
     application_embed = await clash_embed(
         context=bot_client.bot,
@@ -566,11 +570,13 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             value=f"{application.answer_q4[1]}\n\u200b",
             inline=False
             )
+        
+    aa = [a for a in application_accounts if isinstance(a,aPlayer)]
  
-    accounts = sorted([a for a in account_tasks if isinstance(a,aPlayer)],key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+    accounts = sorted(aa,key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
     accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
 
-    member_account_tags = [db.tag for db in db_Player.objects(discord_user=member.id).only('tag')]
+    member_account_tags = await bot_client.run_in_thread(_player_query)
     other_accounts = [tag for tag in member_account_tags if tag not in application.tags]
 
     if len(accounts) == 0:
