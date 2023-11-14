@@ -43,8 +43,6 @@ class BasicClan():
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _ClanAttributes(self.tag)
 
-        bot_client.clan_cache.add_to_queue(self.tag)
-
     def __str__(self):
         return f"Clan {self.name} ({self.tag})"
     
@@ -507,6 +505,8 @@ class _ClanAttributes():
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
             self._lock = asyncio.Lock()
+            bot_client.clan_cache.add_to_queue(self.tag)
+            
         self._is_new = False
 
     async def _load_attributes(self):

@@ -297,8 +297,12 @@ class _PlayerAttributes():
         return cls._cache[n_tag]
     
     def __init__(self,tag:str):
-        self.tag = coc.utils.correct_tag(tag)
-        self._lock = asyncio.Lock()
+        if self._is_new:
+            self.tag = coc.utils.correct_tag(tag)
+            self._lock = asyncio.Lock()
+            bot_client.player_cache.add_to_queue(self.tag)
+        
+        self._is_new = False
 
     async def _load_attributes(self):
         def _get_from_db() -> db_Player:
