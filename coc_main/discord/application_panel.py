@@ -399,6 +399,12 @@ class ClanApplyMenuUser(DefaultView):
         await interaction.followup.delete_message(interaction.message.id)
     
     async def _callback_complete_application(self,interaction:discord.Interaction,modal:DiscordModal):
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(
+            content=f"{self.member.mention} Please wait while I process your application...",
+            ephemeral=True
+            )
+        
         def _save_application():
             new_application = db_ClanApplication(
                 applicant_id = self.member.id,
@@ -419,13 +425,7 @@ class ClanApplyMenuUser(DefaultView):
             try:
                 return db_ClanApplication.objects.get(pk=app_id)
             except DoesNotExist:
-                return None
-        
-        await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(
-            content=f"{self.member.mention} Please wait while I process your application...",
-            ephemeral=True
-            )
+                return None        
 
         accounts = []
         q_tags = [q for q in modal.children if q.label == "Your Clash Player Tags, separated by spaces."][0]

@@ -82,17 +82,20 @@ class Bank(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
     
     async def cog_load(self):
-        self.current_account = await MasterAccount.get('current')
-        self.sweep_account = await MasterAccount.get('sweep')
-        self.reserve_account = await MasterAccount.get('reserve')
+        async def start_bank_cog():
+            self.current_account = await MasterAccount.get('current')
+            self.sweep_account = await MasterAccount.get('sweep')
+            self.reserve_account = await MasterAccount.get('reserve')
 
-        self.bank_admins = await self.config.admins()
+            self.bank_admins = await self.config.admins()
 
-        try:
-            self.use_rewards = await self.config.use_rewards()
-        except:
-            self.use_rewards = False            
-  
+            try:
+                self.use_rewards = await self.config.use_rewards()
+            except:
+                self.use_rewards = False            
+        
+        asyncio.create_task(start_bank_cog())
+    
         PlayerLoop.add_player_event(self.member_th_progress_reward)
         PlayerLoop.add_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.add_achievement_event(self.capital_contribution_rewards)
