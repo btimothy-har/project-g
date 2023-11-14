@@ -417,7 +417,7 @@ class ClanApplyMenuUser(DefaultView):
                 answer_q2 = [getattr(q2,'label',''),getattr(q2,'value','')],
                 answer_q3 = [getattr(q3,'label',''),getattr(q3,'value','')],
                 answer_q4 = [getattr(q4,'label',''),getattr(q4,'value','')],
-                bot_prefix = getattr(modal.panel,'ticket_prefix','')
+                bot_prefix = getattr(modal.panel,'tickettool_prefix','')
                 )
             application = new_application.save()
             return str(application.pk)
