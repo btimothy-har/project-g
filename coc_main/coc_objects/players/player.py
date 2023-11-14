@@ -341,14 +341,14 @@ class aPlayer(coc.Player,BasicPlayer):
         if self.is_member:
             return f"{self.home_clan.emoji} {self.alliance_rank} of {self.home_clan.name}"
         else:
-            return f"<:Clan:825654825509322752> " + f"{str(self.role)} of {self.clan.name}" if self.clan.tag else "No Clan"
+            return f"<:Clan:825654825509322752> " + f"{str(self.role)} of {self.clan.name}" if self.clan else "No Clan"
         
     @property
     def member_description_no_emoji(self):
         if self.is_member:
             return f"{self.alliance_rank} of {self.home_clan.name}"
         else:
-            return f"{str(self.role)} of {self.clan.name}" if self.clan.tag else "No Clan"       
+            return f"{str(self.role)} of {self.clan.name}" if self.clan else "No Clan"       
          
     ##################################################
     ### PLAYER SEASON STATS
