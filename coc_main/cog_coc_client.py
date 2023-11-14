@@ -96,7 +96,8 @@ class ClientThrottler:
         self._semaphore = asyncio.Semaphore(rate_limit)
         self._throttle = False
     
-    async def start_throttle(self) -> bool:
+    @property
+    def start_throttle(self) -> bool:
         all_times = []
         index_range = int(bot_client.num_keys * 10)
         if len(self.cog.last_api_response) > 0:
@@ -107,7 +108,8 @@ class ClientThrottler:
             return True
         return False
     
-    async def release_throttle(self) -> bool:
+    @property
+    def release_throttle(self) -> bool:
         all_times = []
         index_range = int(bot_client.num_keys * 20)
         if len(self.cog.last_api_response) > 0:
@@ -123,8 +125,7 @@ class ClientThrottler:
         await self._semaphore.acquire()
 
         # activate throttle if average response time is > 1.5 seconds
-        start_throttle = await self.start_throttle()
-        if start_throttle:
+        if self.start_throttle:
             self._throttle = True
         
         # while throttle is active, requests are serialized and throttled with a delay
@@ -140,8 +141,7 @@ class ClientThrottler:
             pass
 
     async def __aexit__(self, exc_type, exc_value, traceback):        
-        release = await self.release_throttle()
-        if release:
+        if self.release_throttle:
             self.sleep_time = 0
             self.throttle_count = 0
             self._throttle = False
