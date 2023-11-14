@@ -301,10 +301,8 @@ class ClashOfClansTasks(commands.Cog):
             queue = bot_client.clan_cache.queue.copy()
             clan_queue = queue[:limit]
             if len(clan_queue) > 0:
-                bot_client.coc_main_log.info(f"Clan Queue In: {len(clan_queue)}")
-                clans = await asyncio.gather(*(fetch_clan(c) for c in clan_queue),
+                await asyncio.gather(*(fetch_clan(c) for c in clan_queue),
                     return_exceptions=True)
-                bot_client.coc_main_log.info(f"Clan Queue Out: {len(clans)}")
             
         async def load_player_queue():
             async def fetch_player(player_tag):
@@ -320,10 +318,8 @@ class ClashOfClansTasks(commands.Cog):
             queue = bot_client.player_cache.queue.copy()
             player_queue = queue[:limit]
             if len(player_queue) > 0:
-                bot_client.coc_main_log.info(f"Player Queue In: {len(player_queue)}")
-                players = await asyncio.gather(*(fetch_player(c) for c in player_queue),
+                await asyncio.gather(*(fetch_player(c) for c in player_queue),
                     return_exceptions=True)
-                bot_client.coc_main_log.info(f"Player Queue Out: {len(players)}")
             
         try:
             async with self.queue_lock:
