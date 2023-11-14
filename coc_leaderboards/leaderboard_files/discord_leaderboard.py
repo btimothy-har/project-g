@@ -402,7 +402,8 @@ class ClanWarLeaderboard(Leaderboard):
         
         query_players = await bot_client.run_in_thread(_db_query)
 
-        lb_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
+        lb_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
         async for p in AsyncIter(lb_players):
@@ -489,7 +490,8 @@ class ResourceLootLeaderboard(Leaderboard):
 
         query_players = await bot_client.run_in_thread(_db_query)
         
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
+        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
         
         iter_players = AsyncIter(all_players)
@@ -573,8 +575,9 @@ class DonationsLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)
 
         query_players = await bot_client.run_in_thread(_db_query)
-        
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+
+        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
+        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
         
         iter_players = AsyncIter(all_players)
@@ -654,8 +657,9 @@ class ClanGamesLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)
 
         query_players = await bot_client.run_in_thread(_db_query)
-        
-        all_players = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players))
+
+        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
+        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
         iter_players = AsyncIter(all_players)
