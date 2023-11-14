@@ -385,7 +385,9 @@ class Clans(commands.Cog):
         
         await interaction.response.defer()
 
-        embed, discord_file = await self._clan_export_helper(interaction,clan,season)
+        get_season = aClashSeason(season)
+
+        embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
         attachments = [discord_file] if discord_file else []
 
         await interaction.edit_original_response(

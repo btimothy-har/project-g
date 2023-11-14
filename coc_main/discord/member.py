@@ -198,9 +198,9 @@ class aMember():
     
     @property
     def account_tags(self) -> List[str]:
-        if not self._account_tags:
+        if not self._last_refreshed:
             raise CacheNotReady()
-        return self._account_tags
+        return [] if not self._account_tags else self._account_tags
     
     @property
     def accounts(self) -> List[BasicPlayer]:
@@ -522,7 +522,7 @@ class aMember():
             linked_clans = await ClanGuildLink.get_for_guild(self.guild_id)
             if len(self.leader_clans) > 0:
                 [abb_clans.append(c.abbreviation) for c in self.leader_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in linked_clans]]
-                
+
             elif len(self.home_clans) > 0:
                 if self.default_account.home_clan and self.default_account.home_clan.tag in [gc.tag for gc in linked_clans]:
                     abb_clans.append(self.default_account.home_clan.abbreviation)
