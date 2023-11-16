@@ -265,7 +265,7 @@ class aPlayerSeason():
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__last_seen=list(set([t.int_timestamp for t in self.last_seen])),
+                    set__last_seen=[t.int_timestamp for t in self.last_seen],
                     upsert=True
                     )
             
