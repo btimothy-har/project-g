@@ -112,9 +112,10 @@ class CustomThrottler(coc.BasicThrottler):
             self._sent_time = pendulum.now()
         self._sent += 1
 
-        diff = pendulum.now().int_timestamp - self._sent_time.int_timestamp
-        chk = self._sent / diff if diff > 0 else 0
-        if chk > self.client.rate_limit:
+        diff = pendulum.now() - self._sent_time
+        if diff.total_seconds() == 0:
+            return True
+        if self._sent / diff.total_seconds() > self.client.rate_limit:
             return True
         return False
     
@@ -391,9 +392,6 @@ class BotClashClient():
                 raise LoginNotSet(f"Clash API Username is not set.")
             if clashapi_login.get("password") is None:
                 raise LoginNotSet(f"Clash API Password is not set.")
-            
-            throttler = coc.BatchThrottler if self.throttler == 2 else coc.BasicThrottler
-            str_throttler = "Batch" if self.throttler == 2 else "Basic"
 
             self.bot.coc_client = coc.EventsClient(
                 key_count=int(clashapi_login.get("keys",1)),
@@ -404,7 +402,7 @@ class BotClashClient():
                 cache_max_size=100000
                 )
             await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
-            self.coc_main_log.info(f"Logged into Clash API client with Username/Password. Using {str_throttler} throttler.")
+            self.coc_main_log.info(f"Logged into Clash API client with Username/Password.")
         
         self.num_keys = len(self.coc.http._keys)
         self.rate_limit = self.num_keys * rate_limit
@@ -421,9 +419,6 @@ class BotClashClient():
     async def api_login_keys(self):
         if len(self.client_keys) == 0:
             raise LoginNotSet(f"Clash API Keys are not set.")
-        
-        throttler = coc.BasicThrottler if self.throttler == 1 else coc.BatchThrottler
-        str_throttler = "Basic" if self.throttler == 1 else "Batch"
                 
         self.bot.coc_client = coc.EventsClient(
             load_game_data=coc.LoadGameData(always=True),
@@ -432,7 +427,7 @@ class BotClashClient():
             cache_max_size=100000
             )
         await self.bot.coc_client.login_with_tokens(*self.client_keys)
-        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys. Using {str_throttler} throttler.")
+        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys.")
 
     async def api_logout(self):
         await self.coc.close()

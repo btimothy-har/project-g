@@ -510,14 +510,7 @@ class PlayerLoop(TaskLoop):
                 async with self.api_semaphore, self.throttle:
                     new_player = None
                     try:
-                        if tag == '#LJC8V0GCJ':
-                            bot_client.coc_main_log.info(f"Player Loop fetching for {tag}.")
-
                         new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
-
-                        if tag == '#LJC8V0GCJ':
-                            bot_client.coc_main_log.info(f"Player Loop fetched for {tag}.")
-                    
                     except (coc.ClashOfClansException) as exc:
                         return self.unlock(lock)
                     
