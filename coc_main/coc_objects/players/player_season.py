@@ -92,10 +92,14 @@ class aPlayerSeason():
     @cached_property
     def time_in_home_clan(self) -> int:
         return getattr(self._database,'time_in_home_clan',0)
-        
+    
     @cached_property
+    def _last_seen(self) -> List[int]:
+        return sorted(getattr(self._database,'last_seen',[]))
+        
+    @property
     def last_seen(self) -> List[pendulum.DateTime]:
-        return [pendulum.from_timestamp(x) for x in list(set(getattr(self._database,'last_seen',[])))]
+        return [pendulum.from_timestamp(x) for x in list(set(self._last_seen))]
     
     @cached_property
     def attacks(self) -> aPlayerStat:
@@ -265,13 +269,13 @@ class aPlayerSeason():
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__last_seen=[t.int_timestamp for t in self.last_seen],
+                    set__last_seen=self._last_seen,
                     upsert=True
                     )
             
         async with self._lock:
-            if timestamp.int_timestamp not in [x.int_timestamp for x in self.last_seen]:
-                self.last_seen.append(timestamp)
+            if timestamp.int_timestamp not in self._last_seen:
+                self._last_seen.append(timestamp.int_timestamp)
                 await bot_client.run_in_thread(_update_in_db)
                 bot_client.coc_data_log.debug(f"{self}: Added last seen {timestamp}")
         
