@@ -108,44 +108,17 @@ class DefaultWarTasks():
 ############################################################
 ############################################################
 class ClanWarLoop(TaskLoop):
-    _loops = {}
+    _instance = None
+    _cached = {}
+    _locks = {}
+    _reminder_locks = {}
+
     _new_war_events = [DefaultWarTasks._war_found]
     _war_start_events = [DefaultWarTasks._war_start]
     _war_ended_events = [DefaultWarTasks._war_ended]
     _ongoing_war_events = [DefaultWarTasks._ongoing_war]
     _new_attack_events = []
 
-    def __new__(cls,clan_tag:str):
-        if clan_tag not in cls._loops:
-            instance = super().__new__(cls)
-            instance._is_new = True
-            cls._loops[clan_tag] = instance
-        return cls._loops[clan_tag]
-
-    def __init__(self,clan_tag:str):
-        self.tag = clan_tag
-        
-        if self._is_new:
-            super().__init__()
-            self._is_new = False
-            self._lock = asyncio.Lock()
-            self._remind_lock = {}
-            self.cached_war = None
-            self.cached_events = {}
-    
-    async def start(self):
-        i = await super().start()
-        if i:
-            bot_client.coc_main_log.debug(f"{self.tag}: War Loop started.")
-    
-    async def stop(self):
-        await super().stop()
-        self.unlock(self._lock)
-        try:
-            bot_client.coc_main_log.debug(f"{self.tag}: War Loop stopped.")
-        except:
-            pass
-    
     @classmethod
     def add_war_end_event(cls,event):
         if event.__name__ not in [e.__name__ for e in cls._war_ended_events]:
@@ -159,85 +132,142 @@ class ClanWarLoop(TaskLoop):
             cls._war_ended_events.remove(event)
             bot_client.coc_main_log.info(f"Removed {event.__name__} {event} from War Ended Events.")
 
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._is_new = True
+        return cls._instance
+
+    def __init__(self):        
+        if self._is_new:
+            super().__init__()
+            self._is_new = False
+            self._tags = []
+    
+    async def start(self):
+        bot_client.coc_main_log.info(f"War Loop started.")
+        self._active = True
+        await self._loop_task()
+    
+    def stop(self):
+        self._active = False
+        try:
+            bot_client.coc_main_log.debug(f"War Loop stopped.")
+        except:
+            pass
+    
+    def add_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)
+        if n_tag not in self._tags:
+            self._tags.append(n_tag)
+            bot_client.coc_main_log.info(f"Added {n_tag} to War Loop.")
+    
+    def remove_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)
+        if n_tag in self._tags:
+            self._tags.remove(n_tag)
+            bot_client.coc_main_log.info(f"Removed {n_tag} from War Loop.")
+
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
     async def _loop_task(self):
         try:
             while self.loop_active:
-                await asyncio.sleep(10)
                 if self.api_maintenance:
-                    continue                
-                await self._run_single_loop()
-            
-        except asyncio.CancelledError:
-            return await self.stop()
+                    await asyncio.sleep(30)
+                    continue
 
+                if len(self._tags) == 0:
+                    await asyncio.sleep(30)
+                    continue
+
+                sleep = (1 / len(self._tags))
+                for tag in self._tags:
+                    await asyncio.sleep(sleep)
+                    asyncio.create_task(self._run_single_loop(tag))
+
+                await asyncio.sleep(30)
+            
         except Exception as exc:
-            if not self.loop_active:
-                return await self.stop()
-            
-            bot_client.coc_main_log.exception(
-                f"{self.tag}: FATAL WAR LOOP ERROR. Attempting restart. {exc}"
-                )
-            await TaskLoop.report_fatal_error(
-                message="FATAL WAR LOOP ERROR",
-                error=exc,
-                )
-            await self.stop()
-            return await self.start()
-    
-    async def _run_single_loop(self):
-        if self._lock.locked():
-            return
-        await self._lock.acquire()
-
-        async with self.task_semaphore:
-            st = pendulum.now()
-            try:
-                clan = await self.coc_client.fetch_clan(tag=self.tag)
-            except InvalidTag:
-                raise asyncio.CancelledError
-            except ClashAPIError:
-                return self.unlock(self._lock)
-
-            if not clan.public_war_log:
-                return self.unlock(self._lock)
-            
-            current_war = None
-            try:
-                current_war = await bot_client.coc.get_current_war(self.tag)
-            except (coc.NotFound,coc.Maintenance,coc.GatewayError):
-                return
-            finally:
-                self.loop.call_later(
-                    getattr(current_war,'_response_retry',default_sleep),
-                    self.unlock,
-                    self._lock
+            if self.loop_active:
+                bot_client.coc_main_log.exception(
+                    f"FATAL WAR LOOP ERROR. Attempting restart. {exc}"
                     )
+                await TaskLoop.report_fatal_error(
+                    message="FATAL WAR LOOP ERROR",
+                    error=exc,
+                    )
+                await self.start()
+    
+    async def _run_single_loop(self,tag:str):
+        try:
+            lock = self._locks[tag]
+        except KeyError:
+            self._locks[tag] = lock = asyncio.Lock()
             
-            if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
-                await self._update_league_group(clan)
-                #update previous round
-                previous_round = await bot_client.coc.get_current_war(self.tag,cwl_round=coc.WarRound.previous_war)
-                if previous_round:
-                    cached_round = self.cached_events.get(previous_round.preparation_start_time.raw_time,None)
-                    if cached_round:
-                        await self._dispatch_events(clan,cached_round,previous_round,is_current=False)
-                    self.cached_events[previous_round.preparation_start_time.raw_time] = previous_round
-            
-            if self.cached_war and current_war:
-                old_war = self.cached_war
-                await self._dispatch_events(clan,old_war,current_war,is_current=True)
-            
-            self.cached_war = current_war
+        try:
+            async with self.task_semaphore:
+                if lock.locked():
+                    return
+                await lock.acquire()
 
-            if current_war.state != 'notInWar':
-                self.cached_events[current_war.preparation_start_time.raw_time] = current_war
+                cached_events = self._cached.get(tag,None)
+                if not cached_events:
+                    self._cached[tag] = cached_events = {}
 
+                cached_war = cached_events.get('current_war',None)
+                
+                st = pendulum.now()
+                try:
+                    clan = await self.coc_client.fetch_clan(tag=tag)
+                except (InvalidTag,ClashAPIError):
+                    return self.unlock(lock)
+                
+                if not getattr(clan,'public_war_log',False):
+                    return self.unlock(lock)
+                
+                current_war = None
+                try:
+                    current_war = await bot_client.coc.get_current_war(tag)
+                except (coc.NotFound,coc.Maintenance,coc.GatewayError):
+                    return self.unlock(lock)
+                finally:
+                    self._cached[tag]['current_war'] = current_war
+                    wait = getattr(current_war,'_response_retry',default_sleep)
+                    self.loop.call_later(wait,self.unlock,lock)
+                        
+                if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
+                    await self._update_league_group(clan)
+                    #update previous round
+                    previous_round = await bot_client.coc.get_current_war(tag,cwl_round=coc.WarRound.previous_war)
+                    if previous_round:
+                        cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
+                        if cached_round:
+                            await self._dispatch_events(clan,cached_round,previous_round,is_current=False)
+                        self._cached[tag][previous_round.preparation_start_time.raw_time] = previous_round
+                
+                if cached_war and current_war:
+                    await self._dispatch_events(clan,cached_war,current_war,is_current=True)
+        
+        except Exception as exc:
+            if self.loop_active:
+                bot_client.coc_main_log.exception(
+                    f"FATAL CLAN WAR LOOP ERROR: {tag}"
+                    )
+                await TaskLoop.report_fatal_error(
+                    message=f"FATAL CLAN WAR LOOP ERROR: {tag}",
+                    error=exc,
+                    )
+            return self.unlock(lock)
+
+        finally:
             et = pendulum.now()
-            runtime = et - st
-            self.run_time.append(runtime.total_seconds())
+            try:
+                runtime = et - st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
 
     async def _dispatch_events(self,clan:aClan,cached_war:coc.ClanWar,new_war:coc.ClanWar,is_current:bool=False):
         if new_war.state == 'notInWar':
@@ -297,9 +327,9 @@ class ClanWarLoop(TaskLoop):
             reminder.save()
 
         try:
-            lock = self._remind_lock[str(reminder.id)]
+            lock = self._reminder_locks[str(reminder.id)]
         except KeyError:
-            self._remind_lock[str(reminder.id)] = lock = asyncio.Lock()
+            self._reminder_locks[str(reminder.id)] = lock = asyncio.Lock()
 
         if lock.locked():
             return

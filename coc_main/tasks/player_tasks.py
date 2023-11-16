@@ -1,7 +1,9 @@
 import asyncio
 import coc
 import pendulum
+import copy
 
+from typing import *
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
@@ -15,7 +17,6 @@ from ..coc_objects.players.player import aPlayer, db_PlayerStats
 from ..utils.constants.coc_constants import activity_achievements
 
 bot_client = client()
-
 default_sleep = 60
 
 ############################################################
@@ -347,7 +348,10 @@ class PlayerTasks():
 ############################################################
 ############################################################
 class PlayerLoop(TaskLoop):
-    _loops = {}
+    _instance = None
+    _cached = {}
+    _locks = {}
+    
     _player_events = [
         PlayerTasks.player_time_in_home_clan,
         PlayerTasks.player_last_seen_main,
@@ -362,49 +366,6 @@ class PlayerLoop(TaskLoop):
         PlayerTasks.player_capital_contribution,
         PlayerTasks.player_clan_games,
         ]
-
-    def __new__(cls,player_tag:str):
-        if player_tag not in cls._loops:
-            instance = super().__new__(cls)
-            instance._is_new = True
-            cls._loops[player_tag] = instance
-        return cls._loops[player_tag]
-
-    def __init__(self,player_tag:str):
-        self.tag = player_tag
-        
-        if self._is_new:
-            super().__init__()
-            self._is_new = False
-            self._lock = asyncio.Lock()
-            self.cached_player = None
-
-    async def start(self):
-        i = await super().start()
-        if i:
-            bot_client.coc_main_log.debug(f"{self.tag}: Player Loop started.")
-    
-    async def stop(self):        
-        await super().stop()
-        self.unlock(self._lock)
-        try:
-            self.main_log.debug(f"{self.tag}: Player Loop stopped.")
-        except:
-            pass
-    
-    @property
-    def delay_multiplier(self) -> float:
-        if not self.cached_player:
-            return 1
-        if self.cached_player.is_member:
-            return 1
-        if getattr(self.cached_player.clan,'is_registered_clan',False):
-            return 1.5
-        if getattr(self.cached_player.clan,'is_active_league_clan',False):
-            return 1.5
-        if bot_client.bot.get_user(self.cached_player.discord_user):
-            return 2
-        return 3
     
     @classmethod
     def add_player_event(cls,event):
@@ -432,76 +393,165 @@ class PlayerLoop(TaskLoop):
             cls._achievement_events.remove(event)
             bot_client.coc_main_log.info(f"Removed {event.__name__} {event} from Player Achievement Events.")
 
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._is_new = True
+        return cls._instance
+
+    def __init__(self):        
+        if self._is_new:
+            super().__init__()
+            self._is_new = False
+
+    async def start(self):
+        bot_client.coc_main_log.info(f"Player Loop started.")
+        self._active = True
+        await self._loop_task()
+    
+    def stop(self):
+        self._active = False
+        try:
+            bot_client.coc_main_log.info(f"Player Loop stopped.")
+        except:
+            pass
+    
+    @property
+    def throttle(self):
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.player_throttle
+    
+    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
+        if not player:
+            return 1
+        if player.is_member:
+            return 1
+        if getattr(player.clan,'is_alliance_clan',False):
+            return 1.5
+        if getattr(player.clan,'is_active_league_clan',False):
+            return 1.5
+        if getattr(player.clan,'is_registered_clan',False):
+            return 2
+        if bot_client.bot.get_user(player.discord_user):
+            return 2
+        return 3
+    
+    def defer(self,player:Optional[aPlayer]=None) -> bool:
+        if self.task_lock.locked():
+            if not player:
+                return False
+            if player.is_member:
+                return False
+            if getattr(player.clan,'is_alliance_clan',False):
+                return False
+            if getattr(player.clan,'is_active_league_clan',False):
+                return False
+            if getattr(player.clan,'is_registered_clan',False):
+                return False
+            if bot_client.bot.get_user(player.discord_user):
+                return False
+            if pendulum.now().int_timestamp - player.timestamp.int_timestamp >= (10 * 60):
+                return False
+            return True
+        return False
+
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
     async def _loop_task(self):
         try:
             while self.loop_active:
-                await asyncio.sleep(10)
+
                 if self.api_maintenance:
+                    await asyncio.sleep(10)
                     continue
-                await self._run_single_loop()
-        
-        except asyncio.CancelledError:
-            return await self.stop()
+
+                if not bot_client.player_cache.keys:
+                    await asyncio.sleep(10)
+                    continue
+
+                all_player_tags = copy.copy(bot_client.player_cache.keys)
+                sleep = (10 / len(all_player_tags))
+
+                for tag in all_player_tags:
+                    await asyncio.sleep(sleep)
+                    asyncio.create_task(self._run_single_loop(tag))
+
+                await asyncio.sleep(10)
         
         except Exception as exc:
-            if not self.loop_active:
-                return await self.stop()
-            
-            bot_client.coc_main_log.exception(
-                f"{self.tag}: FATAL PLAYER LOOP ERROR. Attempting restart. {exc}"
-                )
-            await TaskLoop.report_fatal_error(
-                message="FATAL PLAYER LOOP ERROR",
-                error=exc,
-                )
-            await self.stop()
-            return await self.start()
+            if self.loop_active:
+                bot_client.coc_main_log.exception(
+                    f"FATAL PLAYER LOOP ERROR. Attempting restart. {exc}"
+                    )
+                await TaskLoop.report_fatal_error(
+                    message="FATAL PLAYER LOOP ERROR",
+                    error=exc,
+                    )
+                await self.start()
     
-    async def _run_single_loop(self):
-        if self._lock.locked():
-            return        
-        await self._lock.acquire()
-        
-        if self.task_lock.locked():
-            if self.to_defer:
-                self.defer_count += 1
-                self.deferred = True
-                return self.unlock(self._lock)
-            else:
-                async with self.task_lock:
-                    await asyncio.sleep(0)
-            
-        async with self.task_semaphore:
-            self.deferred = False
-            self.defer_count = 0
-            st = pendulum.now()
+    async def _run_single_loop(self,tag:str):
+        try:
+            lock = self._locks[tag]
+        except KeyError:
+            self._locks[tag] = lock = asyncio.Lock()
 
-            new_player = None
-            try:
-                new_player = await self.coc_client.fetch_player(self.tag,no_cache=True,enforce_lock=True)
-            except InvalidTag as exc:
-                raise asyncio.CancelledError from exc
-            except ClashAPIError as exc:
-                return
-            finally:
-                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier,300))
-                self.loop.call_later(wait,self.unlock,self._lock)
+        try:
+            async with self.task_semaphore:   
+                if lock.locked():
+                    return
+                await lock.acquire()
 
-            if self.cached_player:
-                old_player = self.cached_player
-                await self._dispatch_events(old_player,new_player)
-            
-            self.cached_player = new_player
+                cached_player = self._cached.get(tag,None)
+                if self.defer(cached_player):
+                    return self.unlock(lock)
 
+                st = pendulum.now()
+                async with self.api_semaphore, self.throttle:
+                    new_player = None
+                    try:
+                        if tag == '#LJC8V0GCJ':
+                            bot_client.coc_main_log.info(f"Player Loop fetching for {tag}.")
+
+                        new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
+
+                        if tag == '#LJC8V0GCJ':
+                            bot_client.coc_main_log.info(f"Player Loop fetched for {tag}.")
+                    
+                    except (coc.ClashOfClansException) as exc:
+                        return self.unlock(lock)
+                    
+                    finally:
+                        if new_player:
+                            self._cached[tag] = new_player
+                        wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
+                        #wait = getattr(new_player,'_response_retry',default_sleep)
+                        self.loop.call_later(wait,self.unlock,lock)
+                
+                await new_player._sync_cache()
+                if cached_player:
+                    await self._dispatch_events(cached_player,new_player)
+
+        except Exception as exc:
+            if self.loop_active:
+                bot_client.coc_main_log.exception(
+                    f"PLAYER LOOP ERROR: {tag}"
+                    )
+                await TaskLoop.report_fatal_error(
+                    message=f"PLAYER LOOP ERROR: {tag}",
+                    error=exc,
+                    )
+            return self.unlock(lock)
+                
+        finally:
             et = pendulum.now()
-            runtime = et-st
-            self.run_time.append(runtime.total_seconds())
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
-        asyncio.create_task(new_player._sync_cache())
         for event in PlayerLoop._player_events:
             asyncio.create_task(event(old_player,new_player))
 

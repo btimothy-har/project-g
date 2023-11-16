@@ -75,6 +75,11 @@ class TaskLoop():
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.task_semaphore
     
+    @property
+    def api_semaphore(self) -> asyncio.Semaphore:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.api_semaphore
+    
     ##################################################
     ### LOOP METHODS
     ##################################################
@@ -107,9 +112,12 @@ class TaskLoop():
     ##################################################
     @property
     def loop_active(self) -> bool:
-        if bot_client._is_initialized and self._active:
-            return True
-        return False
+        try:
+            if bot_client._is_initialized and self._active:
+                return True
+            return False
+        except:
+            return False
     
     @property
     def to_defer(self) -> bool:        
@@ -132,19 +140,22 @@ class TaskLoop():
     
     @classmethod
     def runtime_min(cls) -> int:
+        loop = cls()
         try:
-            return min([min(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
+            return min(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
         except:
             return 0    
     @classmethod
     def runtime_max(cls) -> int:
+        loop = cls()
         try:
-            return max([max(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
+            return max(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
         except:
-            return 0            
+            return 0                
     @classmethod
     def runtime_avg(cls) -> int:
+        loop = cls()
         try:
-            return sum([sum(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0]) / sum([len(i.run_time) for i in cls._loops.values() if i.loop_active and len(i.run_time) > 0])
-        except ZeroDivisionError:
+            return sum(loop.run_time)/len(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
+        except:
             return 0

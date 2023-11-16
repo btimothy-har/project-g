@@ -25,20 +25,14 @@ class aClan(coc.Clan,BasicClan):
         self._description = None
         self._badge = None
         self._level = None
-        self._capital_hall = None
-        self._war_league_name = None
         
         coc.Clan.__init__(self,**kwargs)
         BasicClan.__init__(self,tag=self.tag)
 
         self.timestamp = pendulum.now()
-    
-        try:
-            self._capital_hall = [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
-        except IndexError:
-            self._capital_hall = 0            
         self._badge = getattr(self.badge,'url',"")
-        self._war_league_name = getattr(self.war_league,'name',"")
+
+        bot_client.clan_cache.set(self.tag,self)        
 
     ##################################################
     ### DATA FORMATTERS
@@ -84,17 +78,14 @@ class aClan(coc.Clan,BasicClan):
     
     @property
     def capital_hall(self) -> int:
-        return self._capital_hall
-    @capital_hall.setter
-    def capital_hall(self,value:int):
-        self._capital_hall = value
+        try:
+            return [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
+        except IndexError:
+            return 0
     
     @property
     def war_league_name(self) -> str:
-        return self._war_league_name
-    @war_league_name.setter
-    def war_league_name(self,value:str):
-        self._war_league_name = value
+        return getattr(self.war_league,'name',"")
     
     @property
     def long_description(self) -> str:

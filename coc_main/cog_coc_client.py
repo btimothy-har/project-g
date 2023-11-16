@@ -25,128 +25,6 @@ from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI
 
 bot_client = BotClashClient()
 
-class RequestCounter():
-    def __init__(self):
-        self._archive_sent = deque(maxlen=60)
-        self._archive_received = deque(maxlen=60)
-        self._sent = 0
-        self._received = 0
-        self._timestamp_sent = pendulum.now()
-        self._timestamp_received = pendulum.now()
-
-    @property
-    def current_average(self) -> (float, float):
-        diff = pendulum.now() - self._timestamp_sent
-        sent_avg = self._sent / diff.total_seconds() if self._sent > 0 else 0
-        diff = pendulum.now() - self._timestamp_received
-        rcvd_avg = self._received / diff.total_seconds() if self._received > 0 else 0
-        return sent_avg, rcvd_avg
-    
-    @property
-    def rcvd_stats(self) -> (float, float, float):
-        if len(self._archive_received) == 0:
-            return 0,0,0
-        avg = sum(self._archive_received)/len(self._archive_received)
-        last = self._archive_received[-1]
-        maxr = max(self._archive_received)
-        return avg, last, maxr
-    
-    @property
-    def sent_stats(self) -> (float, float, float):
-        if len(self._archive_sent) == 0:
-            return 0,0,0
-        avg = sum(self._archive_sent)/len(self._archive_sent)
-        last = self._archive_sent[-1]
-        maxr = max(self._archive_sent)
-        return avg, last, maxr
-    
-    def increment_sent(self):
-        diff = pendulum.now().int_timestamp - self._timestamp_sent.int_timestamp
-        if diff > 60:
-            self._archive_sent.append(self._sent / diff)
-            self._sent = 0
-            self._timestamp_sent = pendulum.now()
-        self._sent += 1
-
-    def increment_received(self):
-        diff = pendulum.now().int_timestamp - self._timestamp_received.int_timestamp
-        if diff > 60:
-            self._archive_received.append(self._received / diff)
-            self._received = 0
-            self._timestamp_received = pendulum.now()
-        self._received += 1
-    
-    # async def reset(self):
-    #     async with self._lock:
-    #         diff = pendulum.now() - self._timestamp
-    #         self._archive_received.append(self._received / diff.total_seconds())
-    #         self._received = 0
-    #         self._archive_sent.append(self._sent / diff.total_seconds())
-    #         self._sent = 0
-    #         self._timestamp = pendulum.now()
-
-class ClientThrottler:
-    def __init__(self,cog:BotClashClient,rate_limit:int,concurrent_requests:int=1):
-        self.cog = cog
-        self.base_sleep = 1 / rate_limit
-        self.sleep_time = 0
-        self.throttle_count = 0
-        
-        self._lock = asyncio.Lock()
-        self._semaphore = asyncio.Semaphore(rate_limit)
-        self._throttle = False
-    
-    async def start_throttle(self) -> bool:
-        all_times = []
-        index_range = int(bot_client.num_keys * 10)
-        if len(self.cog.last_api_response) > 0:
-            all_times = list(self.cog.last_api_response)[-index_range:]  
-        
-        avg_100 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_100 > 1.5:
-            return True
-        return False
-    
-    async def release_throttle(self) -> bool:
-        all_times = []
-        index_range = int(bot_client.num_keys * 20)
-        if len(self.cog.last_api_response) > 0:
-            all_times = list(self.cog.last_api_response)[-index_range:]
-        
-        avg_300 = sum(all_times)/len(all_times) if len(all_times) > 0 else 0
-        if avg_300 <= 1:
-            return True
-        return False
-
-    async def __aenter__(self):
-        # semaphore restricts number of concurrent requests
-        await self._semaphore.acquire()
-
-        # activate throttle if average response time is > 1.5 seconds
-        start_throttle = await self.start_throttle()
-        if start_throttle:
-            self._throttle = True
-        
-        # while throttle is active, requests are serialized and throttled with a delay
-        if self._throttle:
-            # lock serializes requests
-            async with self._lock:
-                # delay increases by 10% each request
-                self.sleep_time += (self.base_sleep * 0.1)
-                self.throttle_count += 1
-                await asyncio.sleep(self.sleep_time)
-        else:
-            # if average response time is < 1.5 seconds, requests are not serialized and throttled
-            pass
-
-    async def __aexit__(self, exc_type, exc_value, traceback):        
-        release_throttle = await self.release_throttle()
-        if release_throttle:
-            self.sleep_time = 0
-            self.throttle_count = 0
-            self._throttle = False
-        self._semaphore.release()
-
 ############################################################
 ############################################################
 #####
@@ -167,24 +45,6 @@ class ClashOfClansClient(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
-        self.counter = RequestCounter()
-
-        self.api_lock = ClientThrottler(
-            cog=self,
-            rate_limit=bot_client.rate_limit,
-            concurrent_requests=int(bot_client.num_keys)
-            )        
-        self.last_api_response = deque(maxlen=500)
-
-        self.player_api = deque(maxlen=10000)
-        self.player_throttle = deque(maxlen=100)
-
-        self.clan_api = deque(maxlen=10000)
-        self.clan_throttle = deque(maxlen=100)
-        
-        self.war_api = deque(maxlen=1000)
-        self.raid_api = deque(maxlen=1000)
-
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
@@ -195,23 +55,21 @@ class ClashOfClansClient(commands.Cog):
     
     @property
     def api_maintenance(self) -> bool:
-        return bot_client.api_maintenance  
-
-    @property
-    def player_api_avg(self) -> float:
-        return sum(self.player_api)/len(self.player_api) if len(self.player_api) > 0 else 0
-
-    @property
-    def clan_api_avg(self) -> float:
-        return sum(self.clan_api)/len(self.clan_api) if len(self.clan_api) > 0 else 0
-
-    @property
-    def war_api_avg(self) -> float:
-        return sum(self.war_api)/len(self.war_api) if len(self.war_api) > 0 else 0
+        return bot_client.api_maintenance
     
     @property
-    def raid_api_avg(self) -> float:
-        return sum(self.raid_api)/len(self.raid_api) if len(self.raid_api) > 0 else 0
+    def player_api(self) -> deque:
+        return bot_client.player_api
+    @property
+    def player_api_avg(self) -> float:
+        return bot_client.player_api_avg
+    
+    @property
+    def clan_api(self) -> deque:
+        return bot_client.clan_api
+    @property
+    def clan_api_avg(self) -> float:
+        return bot_client.clan_api_avg
 
     ##################################################
     ### COG LOAD
@@ -250,11 +108,10 @@ class ClashOfClansClient(commands.Cog):
         self.client.coc_main_log.info(
             f"Found {len(clans):,} Clans in database."
             )
-
-        await asyncio.gather(
-            bot_client.player_cache.add_many_to_queue([p.tag for p in players]),
-            bot_client.clan_cache.add_many_to_queue([c.tag for c in clans])
-            )
+        
+        c_queue_task = asyncio.create_task(bot_client.clan_cache.add_many_to_queue([c.tag for c in clans]))
+        p_queue_task = asyncio.create_task(bot_client.player_cache.add_many_to_queue([p.tag for p in players]))
+        await asyncio.gather(c_queue_task,p_queue_task)
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
@@ -320,17 +177,7 @@ class ClashOfClansClient(commands.Cog):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
             
-        try:
-            ot = pendulum.now()
-            if enforce_lock:
-                async with self.api_lock:
-                    await asyncio.sleep(0)
-
-            st = pendulum.now()
-            diff = st - ot
-            self.player_throttle.append(diff.total_seconds())
-
-            self.counter.increment_sent()
+        try:          
             player = await self.client.coc.get_player(n_tag,cls=aPlayer)
             return player
 
@@ -340,16 +187,7 @@ class ClashOfClansClient(commands.Cog):
             if cached:
                 return cached
             else:
-                raise ClashAPIError(exc) from exc
-        finally:
-            self.counter.increment_received()
-
-            diff = pendulum.now() - st
-            self.player_api.append(diff.total_seconds())
-            self.last_api_response.append(diff.total_seconds())            
-
-            if player:
-                bot_client.player_cache.set(player.tag,player)
+                raise ClashAPIError(exc) from exc                
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         def _db_query(q_clan,q_season):
@@ -395,18 +233,7 @@ class ClashOfClansClient(commands.Cog):
                 return cached
 
         try:
-            ot = pendulum.now()
-            if enforce_lock:
-                async with self.api_lock:
-                    await asyncio.sleep(0)
-
-            st = pendulum.now()
-            diff = st - ot
-            self.clan_throttle.append(diff.total_seconds())
-
-            self.counter.increment_sent()
             clan = await self.client.coc.get_clan(n_tag,cls=aClan)
-
             return clan
 
         except coc.NotFound as exc:
@@ -415,16 +242,7 @@ class ClashOfClansClient(commands.Cog):
             if cached:
                 return cached
             else:
-                raise ClashAPIError(exc) from exc
-        finally:
-            self.counter.increment_received()
-            
-            diff = pendulum.now() - st
-            self.clan_api.append(diff.total_seconds())                
-            self.last_api_response.append(diff.total_seconds())
-            if clan:
-                bot_client.clan_cache.set(clan.tag,clan)
-            
+                raise ClashAPIError(exc) from exc               
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
         def _db_query():
@@ -478,9 +296,6 @@ class ClashOfClansClient(commands.Cog):
     async def get_clan_war(self,clan:aClan) -> aClanWar:
         api_war = None
         try:
-            st = pendulum.now()
-
-            self.counter.increment_sent()
             api_war = await self.client.coc.get_clan_war(clan.tag)
 
         except coc.PrivateWarLog:
@@ -490,12 +305,7 @@ class ClashOfClansClient(commands.Cog):
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc) from exc
         finally:
-            diff = pendulum.now() - st
-            self.war_api.append(diff.total_seconds())
-
             if api_war:                
-                self.counter.increment_received()
-
                 if getattr(api_war,'state','notInWar') != 'notInWar':
                     clan_war = await aClanWar.create_from_api(api_war)
                     return clan_war
@@ -504,9 +314,6 @@ class ClashOfClansClient(commands.Cog):
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
         api_group = None
         try:
-            st = pendulum.now()
-
-            self.counter.increment_sent()
             api_group = await self.client.coc.get_league_group(clan.tag)
 
         except coc.NotFound:
@@ -514,12 +321,7 @@ class ClashOfClansClient(commands.Cog):
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc)
         finally:
-            diff = pendulum.now() - st
-            self.war_api.append(diff.total_seconds())
-
             if api_group:
-                self.counter.increment_received()
-
                 if api_group.state in ['preparation','inWar','ended','warEnded']:
                     league_group = await WarLeagueGroup.from_api(clan,api_group)
                     return league_group
@@ -534,9 +336,6 @@ class ClashOfClansClient(commands.Cog):
         raidloggen = None
         api_raid = None
         try:
-            st = pendulum.now()
-
-            self.counter.increment_sent()
             raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
 
         except coc.PrivateWarLog:
@@ -546,12 +345,7 @@ class ClashOfClansClient(commands.Cog):
         except (coc.Maintenance,coc.GatewayError) as exc:
             raise ClashAPIError(exc) from exc
         finally:
-            diff = pendulum.now() - st
-            self.raid_api.append(diff.total_seconds())
-
             if raidloggen:
-                self.counter.increment_received()
-
                 if len(raidloggen) > 0:
                     api_raid = raidloggen[0]
                     if api_raid:
@@ -570,65 +364,40 @@ class ClashOfClansClient(commands.Cog):
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}",
             timestamp=pendulum.now()
             )
+        
+        waiters = len(bot_client.coc.http._HTTPClient__lock._waiters) if bot_client.coc.http._HTTPClient__lock._waiters else 0
 
         embed.add_field(
             name="**API Client**",
             value="```ini"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
-                + f"\n{'[API Throttle]':<15} {'On:' if self.api_lock._throttle else 'Off:'} {self.api_lock.sleep_time*1000:.2f}ms ({self.api_lock.throttle_count:,})"
+                + f"\n{'[API Requests]':<15} " + f"{(bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit) - bot_client.coc.http._HTTPClient__lock._value} / {bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit}" + f" (Waiters: {waiters:,})"
                 + "```",
             inline=False
             )
-        
-        avg_throttle = sum(self.player_throttle)/len(self.player_throttle) if len(self.player_throttle) > 0 else 0
-        max_throttle = max(self.player_throttle) if len(self.player_throttle) > 0 else 0
         embed.add_field(
             name="**Player API**",
             value="```ini"
-                + f"\n{'[Last]':<10} {(self.player_api[-1] if len(self.player_api) > 0 else 0):.3f}s"
-                + f"\n{'[Mean]':<10} {self.player_api_avg:.3f}s"
-                + f"\n{'[Min/Max]':<10} {(min(self.player_api) if len(self.player_api) > 0 else 0):.3f}s ~ {(max(self.player_api) if len(self.player_api) > 0 else 0):.3f}s"
-                + f"\n{'[Wait]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
+                + f"\n{'[Last]':<10} {(self.player_api[-1] if len(self.player_api) > 0 else 0)/1000:.3f}s"
+                + f"\n{'[Mean]':<10} {self.player_api_avg/1000:.3f}s"
+                + f"\n{'[Min/Max]':<10} {(min(self.player_api) if len(self.player_api) > 0 else 0)/1000:.3f}s ~ {(max(self.player_api) if len(self.player_api) > 0 else 0)/1000:.3f}s"
                 + "```",
             inline=False
             )
-        avg_throttle = sum(self.clan_throttle)/len(self.clan_throttle) if len(self.clan_throttle) > 0 else 0
-        max_throttle = max(self.clan_throttle) if len(self.clan_throttle) > 0 else 0
         embed.add_field(
             name="**Clan API**",
             value="```ini"
-                + f"\n{'[Last]':<10} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0):.3f}s"
-                + f"\n{'[Mean]':<10} {self.clan_api_avg:.3f}s"
-                + f"\n{'[Min/Max]':<10} {(min(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s ~ {(max(self.clan_api) if len(self.clan_api) > 0 else 0):.3f}s"
-                + f"\n{'[Wait]':<10} {avg_throttle:.2f}s (max: {max_throttle:.2f}s)"
+                + f"\n{'[Last]':<10} {(self.clan_api[-1] if len(self.clan_api) > 0 else 0)/1000:.3f}s"
+                + f"\n{'[Mean]':<10} {self.clan_api_avg/1000:.3f}s"
+                + f"\n{'[Min/Max]':<10} {(min(self.clan_api) if len(self.clan_api) > 0 else 0)/1000:.3f}s ~ {(max(self.clan_api) if len(self.clan_api) > 0 else 0)/1000:.3f}s"
                 + "```",
             inline=False
             )
-        embed.add_field(
-            name="**Clan War API**",
-            value="```ini"
-                + f"\n{'[Last]':<6} {(self.war_api[-1] if len(self.war_api) > 0 else 0):.3f}s"
-                + f"\n{'[Avg]':<6} {self.war_api_avg:.3f}s"
-                + f"\n{'[Min]':<6} {(min(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
-                + f"\n{'[Max]':<6} {(max(self.war_api) if len(self.war_api) > 0 else 0):.3f}s"
-                + "```",
-            inline=True
-            )
-        embed.add_field(
-            name="**Capital Raids API**",
-            value="```ini"
-                + f"\n{'[Last]':<6} {(self.raid_api[-1] if len(self.raid_api) > 0 else 0):.3f}s"
-                + f"\n{'[Avg]':<6} {self.raid_api_avg:.3f}s"
-                + f"\n{'[Min]':<6} {(min(self.raid_api) if len(self.raid_api) > 0 else 0):.3f}s"
-                + f"\n{'[Max]':<6} {(max(self.raid_api) if len(self.raid_api) > 0 else 0):.3f}s"
-                + "```",
-            inline=True
-            )
         
-        sent, rcvd = self.counter.current_average
-        avg_rcvd, last_rcvd, max_rcvd = self.counter.rcvd_stats
-        avg_sent, last_sent, max_sent = self.counter.sent_stats
+        sent, rcvd = bot_client.api_current_throughput
+        avg_rcvd, last_rcvd, max_rcvd = bot_client.rcvd_stats
+        avg_sent, last_sent, max_sent = bot_client.sent_stats
         
         embed.add_field(
             name="**Throughput (sent / rcvd, per second)**",

@@ -37,28 +37,12 @@ class aPlayer(coc.Player,BasicPlayer):
         self._name = None
         self._exp_level = None
         self._town_hall_level = None
+        self._clan = None
         
         coc.Player.__init__(self,**kwargs)
         BasicPlayer.__init__(self,self.tag)
 
-        self.timestamp = pendulum.now()
-
-        self.town_hall_level = self.town_hall
-        self.label_ids = [label.id for label in self.labels]
-
-        self.town_hall = aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
-        self.clan_tag = getattr(self.clan,'tag',None)
-
-        if self.clan:
-            clan_ph = aPlayerClan(
-                tag=getattr(self.clan,'tag',None),
-                name=self.clan.name,
-                badge=self.clan.badge,
-                level=self.clan.level
-                )
-        else:
-            clan_ph = None
-        self.clan = clan_ph
+        self.timestamp = pendulum.now()        
 
         self._heroes = super().heroes
         self._heroes_cached = False
@@ -71,6 +55,9 @@ class aPlayer(coc.Player,BasicPlayer):
 
         self._pets = super().pets
         self._pets_cached = False
+
+        bot_client.player_cache.set(self.tag,self)
+
     
     def __str__(self):
         return f"{self.name} ({self.tag})"
@@ -98,9 +85,35 @@ class aPlayer(coc.Player,BasicPlayer):
     @property
     def town_hall_level(self) -> int:
         return self._town_hall_level
-    @town_hall_level.setter
-    def town_hall_level(self,value:int):
+    
+    @property
+    def label_ids(self) -> List[str]:
+        return [label.id for label in self.labels]
+    
+    @property
+    def town_hall(self) -> aTownHall:
+        return aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
+    @town_hall.setter
+    def town_hall(self,value:int):
         self._town_hall_level = value
+
+    @property
+    def clan(self) -> Optional[aPlayerClan]:
+        if not self._clan:
+            return None
+        return aPlayerClan(
+            tag=getattr(self._clan,'tag',None),
+            name=self._clan.name,
+            badge=self._clan.badge,
+            level=self._clan.level
+            )    
+    @clan.setter
+    def clan(self,value:coc.Clan):
+        self._clan = value
+    
+    @property
+    def clan_tag(self) -> str:
+        return getattr(self.clan,'tag',None)
 
     @property
     def heroes(self) -> List[aHero]:

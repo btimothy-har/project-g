@@ -10,7 +10,10 @@ from coc.ext import discordlinks
 from typing import *
 from mongoengine import *
 
+from functools import cached_property
+from itertools import islice
 from art import text2art
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
@@ -28,6 +31,8 @@ coc_data_logger.setLevel(logging.INFO)
 
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
+
+rate_limit = 10
 
 ############################################################
 ############################################################
@@ -81,6 +86,55 @@ class DataCache():
         if n_key in self.queue:
             self.queue.remove(n_key)
 
+class CustomThrottler(coc.BasicThrottler):
+    def __init__(self,sleep_time):
+        self.sleep_time = sleep_time
+        self.degraded = False
+        self.degraded_sleep_time = sleep_time
+        self.degrade_count = 0
+
+        self._sent = 0
+        self._sent_time = pendulum.now()
+
+        self._rcvd = 0
+        self._rcvd_time = pendulum.now()
+        super().__init__(self.sleep_time)
+    
+    @property
+    def client(self) -> 'BotClashClient':
+        return BotClashClient()
+    
+    def increment_sent(self):
+        diff = pendulum.now().int_timestamp - self._sent_time.int_timestamp
+        if diff > 60:
+            self.client._api_sent.append(self._sent / diff)
+            self._sent = 0
+            self._sent_time = pendulum.now()
+        self._sent += 1
+
+        diff = pendulum.now().int_timestamp - self._sent_time.int_timestamp
+        chk = self._sent / diff if diff > 0 else 0
+        if chk > self.client.rate_limit:
+            return True
+        return False
+    
+    def increment_rcvd(self):
+        diff = pendulum.now().int_timestamp - self._rcvd_time.int_timestamp
+        if diff > 60:
+            self.client._api_rcvd.append(self._rcvd / diff)
+            self._rcvd = 0
+            self._rcvd_time = pendulum.now()
+        self._rcvd += 1
+    
+    async def __aenter__(self):
+        if self.increment_sent():
+            await super().__aenter__()        
+        return self
+    
+    async def __aexit__(self, exc_type, exc, tb):
+        self.increment_rcvd()
+        await super().__aexit__(exc_type, exc, tb)
+
 ############################################################
 ############################################################
 #####
@@ -107,6 +161,8 @@ class BotClashClient():
             self.api_maintenance = False
             self._current_season = None
             self._tracked_seasons = []
+            self._api_sent = deque(maxlen=60)
+            self._api_rcvd = deque(maxlen=60)
 
             self.thread_pool = ThreadPoolExecutor(max_workers=16)
 
@@ -203,6 +259,56 @@ class BotClashClient():
     def coc(self) -> coc.EventsClient:
         return self.bot.coc_client
     
+    @property
+    def throttle(self) -> CustomThrottler:
+        return self.coc.http._HTTPClient__throttle
+    
+    @property
+    def player_api(self) -> deque:
+        try:
+            return self.coc.http.stats['/players/{}']
+        except KeyError:
+            return deque()
+    @property
+    def player_api_avg(self) -> float:
+        return sum(self.player_api) / len(self.player_api) if len(self.player_api) > 0 else 0
+    
+    @property
+    def clan_api(self) -> deque:
+        try:
+            return self.coc.http.stats['/clans/{}']
+        except KeyError:
+            return deque()
+    @property
+    def clan_api_avg(self) -> float:
+        return sum(self.clan_api)/len(self.clan_api) if len(self.clan_api) > 0 else 0
+    
+    @property
+    def api_current_throughput(self) -> (float, float):
+        diff = pendulum.now() - self.throttle._sent_time
+        sent_avg = self.throttle._sent / diff.total_seconds() if self.throttle._sent > 0 else 0
+        diff = pendulum.now() - self.throttle._rcvd_time
+        rcvd_avg = self.throttle._rcvd / diff.total_seconds() if self.throttle._rcvd > 0 else 0
+        return sent_avg, rcvd_avg
+    
+    @property
+    def rcvd_stats(self) -> (float, float, float):
+        if len(self._api_rcvd) == 0:
+            return 0,0,0
+        avg = sum(self._api_rcvd)/len(self._api_rcvd)
+        last = self._api_rcvd[-1]
+        maxr = max(self._api_rcvd)
+        return avg, last, maxr
+    
+    @property
+    def sent_stats(self) -> (float, float, float):
+        if len(self._api_sent) == 0:
+            return 0,0,0
+        avg = sum(self._api_sent)/len(self._api_sent)
+        last = self._api_sent[-1]
+        maxr = max(self._api_sent)
+        return avg, last, maxr
+    
     ##################################################
     #####
     ##### CLASH SEASONS
@@ -293,15 +399,16 @@ class BotClashClient():
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='Created for Project G, from coc.py',
                 load_game_data=coc.LoadGameData(always=True),
-                throttle_limit=40,
-                throttler=throttler,
-                cache_max_size=None
+                throttler=CustomThrottler,
+                throttle_limit=rate_limit,
+                cache_max_size=100000
                 )
             await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
             self.coc_main_log.info(f"Logged into Clash API client with Username/Password. Using {str_throttler} throttler.")
         
         self.num_keys = len(self.coc.http._keys)
-        self.rate_limit = self.num_keys * 30        
+        self.rate_limit = self.num_keys * rate_limit
+        self.default_sleep = (1 / self.rate_limit) * 2
         self._api_logged_in = True
 
         self.bot.coc_client.add_events(
@@ -320,9 +427,9 @@ class BotClashClient():
                 
         self.bot.coc_client = coc.EventsClient(
             load_game_data=coc.LoadGameData(always=True),
-            throttle_limit=40,
-            throttler=throttler,
-            cache_max_size=None
+            throttler=CustomThrottler,
+            throttle_limit=rate_limit,
+            cache_max_size=100000
             )
         await self.bot.coc_client.login_with_tokens(*self.client_keys)
         self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys. Using {str_throttler} throttler.")

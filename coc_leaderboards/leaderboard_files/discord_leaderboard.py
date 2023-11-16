@@ -12,6 +12,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
 from coc_main.cog_coc_client import ClashOfClansClient, aClan
+from coc_main.cog_coc_tasks import ClashOfClansTasks
 
 from coc_main.coc_objects.players.player import aPlayer, db_PlayerStats
 from coc_main.coc_objects.clans.clan import db_AllianceClan
@@ -374,6 +375,10 @@ class Leaderboard():
     @property
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    @property
+    def tasks(self) -> ClashOfClansTasks:
+        return bot_client.bot.get_cog("ClashOfClansTasks")
 
 ##################################################
 #####
@@ -401,9 +406,18 @@ class ClanWarLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)        
         
         query_players = await bot_client.run_in_thread(_db_query)
+        lb_players = []
+        for tag in query_players:
+            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+                try:
+                    player = await leaderboard.client.fetch_player(tag=tag)
+                except:
+                    continue
+                else:
+                    if isinstance(player,aPlayer):
+                        lb_players.append(player)
+                await asyncio.sleep(0.1)
 
-        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
-        lb_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
         async for p in AsyncIter(lb_players):
@@ -489,12 +503,21 @@ class ResourceLootLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)
 
         query_players = await bot_client.run_in_thread(_db_query)
+        lb_players = []
+        for tag in query_players:
+            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+                try:
+                    player = await leaderboard.client.fetch_player(tag=tag)
+                except:
+                    continue
+                else:
+                    if isinstance(player,aPlayer):
+                        lb_players.append(player)
+                await asyncio.sleep(0.1)
         
-        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
-        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
         
-        iter_players = AsyncIter(all_players)
+        iter_players = AsyncIter(lb_players)
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
@@ -575,12 +598,21 @@ class DonationsLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)
 
         query_players = await bot_client.run_in_thread(_db_query)
+        lb_players = []
+        for tag in query_players:
+            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+                try:
+                    player = await leaderboard.client.fetch_player(tag=tag)
+                except:
+                    continue
+                else:
+                    if isinstance(player,aPlayer):
+                        lb_players.append(player)
+                await asyncio.sleep(0.1)
 
-        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
-        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
         
-        iter_players = AsyncIter(all_players)
+        iter_players = AsyncIter(lb_players)
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
@@ -657,12 +689,21 @@ class ClanGamesLeaderboard(Leaderboard):
         leaderboard = cls(parent,season)
 
         query_players = await bot_client.run_in_thread(_db_query)
+        lb_players = []
+        for tag in query_players:
+            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+                try:
+                    player = await leaderboard.client.fetch_player(tag=tag)
+                except:
+                    continue
+                else:
+                    if isinstance(player,aPlayer):
+                        lb_players.append(player)
+                await asyncio.sleep(0.1)
 
-        fetch = await asyncio.gather(*(leaderboard.client.fetch_player(tag=p,enforce_lock=True) for p in query_players),return_exceptions=True)
-        all_players = [p for p in fetch if isinstance(p,aPlayer)]
         lb_clans = await leaderboard.parent.get_leaderboard_clans()
 
-        iter_players = AsyncIter(all_players)
+        iter_players = AsyncIter(lb_players)
         async for p in iter_players.filter(predicate_leaderboard):
             stats = p.get_season_stats(season)
 
