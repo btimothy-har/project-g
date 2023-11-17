@@ -135,7 +135,7 @@ class ClashOfClansTasks(commands.Cog):
         
         asyncio.create_task(self.start_recruiting_loop())
 
-        #self._controller_loop = asyncio.create_task(self.coc_task_controller())
+        self._controller_loop = asyncio.create_task(self.coc_task_controller())
         self.clash_season_check.start()
         self.coc_data_queue.start()        
         self.refresh_coc_loops.start()
@@ -171,7 +171,7 @@ class ClashOfClansTasks(commands.Cog):
         self.coc_data_queue.cancel()
         self.clash_season_check.cancel()
         
-        #self._controller_loop.cancel()
+        self._controller_loop.cancel()
 
         bot_client.coc_main_log.info(f"Stopped Clash Data Loop.")
 
