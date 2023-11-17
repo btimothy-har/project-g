@@ -380,15 +380,6 @@ class ClashOfClansTasks(commands.Cog):
         
         try:
             async with self.refresh_lock:
-                # p_copy = bot_client.player_cache.keys.copy()
-                # players = AsyncIter(p_copy)
-                # async for tag in players.filter(predicate_player_not_in_loop):
-                #     asyncio.create_task(PlayerLoop(tag).start())
-
-                # c_copy = bot_client.clan_cache.keys.copy()
-                # clans = AsyncIter(c_copy)
-                # async for tag in clans.filter(predicate_clan_not_in_loop):
-                #     asyncio.create_task(ClanLoop(tag).start())
 
                 alliance_tags = await bot_client.run_in_thread(_get_alliance_tags)
                 alliance_clans = AsyncIter(alliance_tags)
@@ -435,50 +426,46 @@ class ClashOfClansTasks(commands.Cog):
                 + "```",
             inline=False
             )
-        diff = pendulum.now() - self.player_loop.last_loop
         embed.add_field(
             name="**Player Loops**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(bot_client.player_cache):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_cache.queue):,}"
                 + f"\n{'[Running]':<10} {self.player_loop._running:,}"
-                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Last]':<10} {self.player_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"
                 + "```",
             inline=False
             )
-        diff = pendulum.now() - self.clan_loop.last_loop
         embed.add_field(
             name="**Clans**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(bot_client.clan_cache):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_cache.queue):,}"
                 + f"\n{'[Running]':<10} {self.clan_loop._running:,}"
-                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Last]':<10} {self.clan_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.clan_loop._queue.qsize():,}"
                 + "```",
             inline=False
             )
-        diff = pendulum.now() - self.war_loop.last_loop
         embed.add_field(
             name="**Clan Wars**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
                 + f"\n{'[Clans]':<10} {len(self.war_loop._tags):,}"
                 + f"\n{'[Running]':<10} {self.war_loop._running:,}"
-                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Last]':<10} {self.war_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
                 + "```",
             inline=True
             )
-        diff = pendulum.now() - self.raid_loop.last_loop
         embed.add_field(
             name="**Capital Raids**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
                 + f"\n{'[Clans]':<10} {len(self.raid_loop._tags):,}"
                 + f"\n{'[Running]':<10} {self.raid_loop._running:,}"
-                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Last]':<10} {self.raid_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
                 + "```",
             inline=True
