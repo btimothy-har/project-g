@@ -55,9 +55,6 @@ class aPlayer(coc.Player,BasicPlayer):
 
         self._pets = super().pets
         self._pets_cached = False
-
-        bot_client.player_cache.set(self.tag,self)
-
     
     def __str__(self):
         return f"{self.name} ({self.tag})"

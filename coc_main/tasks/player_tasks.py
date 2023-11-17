@@ -484,7 +484,7 @@ class PlayerLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-                
+
                 await asyncio.sleep(10)
         
         except Exception as exc:
@@ -558,6 +558,8 @@ class PlayerLoop(TaskLoop):
                         
                     if new_player:
                         self._cached[tag] = new_player
+                        bot_client.player_cache.set(new_player.tag,new_player)
+                        
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)

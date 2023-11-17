@@ -317,7 +317,8 @@ class ClashOfClansTasks(commands.Cog):
             async def fetch_clan(clan_tag):
                 try:
                     async with self.api_semaphore:
-                        await bot_client.coc.get_clan(clan_tag,cls=aClan)
+                        clan = await bot_client.coc.get_clan(clan_tag,cls=aClan)
+                        bot_client.clan_cache.set(clan.tag,clan)
                         bot_client.clan_cache.remove_from_queue(clan_tag)
                 except coc.NotFound:
                     bot_client.clan_cache.remove_from_queue(clan_tag)
@@ -336,10 +337,11 @@ class ClashOfClansTasks(commands.Cog):
             async def fetch_player(player_tag):
                 try:
                     async with self.api_semaphore:
-                        await bot_client.coc.get_player(player_tag,cls=aPlayer)
+                        player = await bot_client.coc.get_player(player_tag,cls=aPlayer)
+                        bot_client.player_cache.set(player.tag,player)
                         bot_client.player_cache.remove_from_queue(player_tag)
                 except coc.NotFound:
-                    bot_client.player_cache.remove_from_queue(player_tag)                    
+                    bot_client.player_cache.remove_from_queue(player_tag)
                     return None
                 except:
                     return None
@@ -407,11 +409,16 @@ class ClashOfClansTasks(commands.Cog):
         embed = await clash_embed(self.bot,
             title="**Clash of Clans Data Status**",
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
-                + f"\n\nCurrent Season: {bot_client.current_season.description}"
-                + f"\nTracked Seasons: {humanize_list([i.short_description for i in bot_client.tracked_seasons])}"
-                + f"\n\nLoop Refresh: " + ("Running" if self.refresh_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None") + ")"
-                + f"\nQueue Check: " + ("Running" if self.queue_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_queue_run.int_timestamp}:R>" if self.last_queue_run else "None") + ")"
-                + f"\nSeason Check: " + ("Running" if self.season_lock.locked() else "Not Running") + " (last: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None") + ")",
+                + f"\n\n**Current Season: {bot_client.current_season.description}**"
+                + f"\n\n**__Loop Refresh__**\n"
+                + ("Running" if self.refresh_lock.locked() else "Not Running")
+                + "\nLast: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
+                + f"\n\n**__Queue Check__**\n"
+                + ("Running" if self.queue_lock.locked() else "Not Running")
+                + "\nLast: " + (f"<t:{self.last_queue_run.int_timestamp}:R>" if self.last_queue_run else "None")
+                + f"\n\n**__Season Check__**\n"
+                + ("Running" if self.season_lock.locked() else "Not Running")
+                + "\nLast: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None"),
             timestamp=pendulum.now()
             )
         

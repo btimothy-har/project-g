@@ -122,7 +122,7 @@ class CustomThrottler(coc.BasicThrottler):
             last_run = self.last_run
             if last_run:
                 difference = pendulum.now() - last_run
-                need_to_sleep = (self.sleep_time * 1.5) - difference.total_seconds()
+                need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
                 if need_to_sleep > 0:
                     self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
@@ -263,6 +263,7 @@ class BotClashClient():
     
     async def shutdown(self):
         self._connector_task.cancel()
+        await self._connector_task
         await self.api_logout()
 
         for handler in self.discordlinks_log.handlers:
@@ -400,7 +401,7 @@ class BotClashClient():
         try:
             while True:
                 try:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(3)
                     reload = False
                     if self.player_api_avg > 3000 or max(self.player_api[-100:]) > 10000:
                         reload = True                
@@ -421,7 +422,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=5):
+    async def api_login(self,rate_limit:int=10):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -443,9 +444,6 @@ class BotClashClient():
                 cache_max_size=100000
                 )
             self.coc_main_log.info(f"New Client Created: {self.bot.coc_client}")
-        
-        # use sample of 100 keys
-        keys = random.sample(self.client_keys,100)
             
         await self.bot.coc_client.login_with_tokens(*self.client_keys)
         self._last_login = pendulum.now()

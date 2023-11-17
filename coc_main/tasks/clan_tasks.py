@@ -213,6 +213,7 @@ class ClanLoop(TaskLoop):
 
                     if new_clan:
                         self._cached[tag] = new_clan
+                        bot_client.clan_cache.set(new_clan.tag,new_clan)
                     wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)

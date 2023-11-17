@@ -198,6 +198,7 @@ class ClashOfClansClient(commands.Cog):
                 await asyncio.sleep(1)
                 continue
                   
+        bot_client.player_cache.set(player.tag,player)
         return player
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
@@ -263,6 +264,7 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError()
                 await asyncio.sleep(1)
                 continue
+        bot_client.clan_cache.set(clan.tag,clan)
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
