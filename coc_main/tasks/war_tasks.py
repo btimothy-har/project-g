@@ -1,10 +1,10 @@
 import coc
 import asyncio
 import pendulum
+import aiohttp
 
 from typing import *
 
-from redbot.core.utils import AsyncIter
 
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
@@ -254,7 +254,7 @@ class ClanWarLoop(TaskLoop):
                 st = pendulum.now()
                 try:
                     clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                except (InvalidTag,ClashAPIError):
+                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
                     return self.unlock(lock)
                 
                 if not getattr(clan,'public_war_log',False):
@@ -263,7 +263,7 @@ class ClanWarLoop(TaskLoop):
                 current_war = None
                 try:
                     current_war = await bot_client.coc.get_current_war(tag)
-                except (coc.NotFound,coc.Maintenance,coc.GatewayError):
+                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
                     return self.unlock(lock)
                 finally:
                     self._cached[tag]['current_war'] = current_war
@@ -273,12 +273,16 @@ class ClanWarLoop(TaskLoop):
                 if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
                     await self._update_league_group(clan)
                     #update previous round
-                    previous_round = await bot_client.coc.get_current_war(tag,cwl_round=coc.WarRound.previous_war)
-                    if previous_round:
-                        cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
-                        if cached_round:
-                            await self._dispatch_events(clan,cached_round,previous_round,is_current=False)
-                        self._cached[tag][previous_round.preparation_start_time.raw_time] = previous_round
+                    try:
+                        previous_round = await bot_client.coc.get_current_war(tag,cwl_round=coc.WarRound.previous_war)
+                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
+                        pass
+                    else:
+                        if previous_round:
+                            cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
+                            if cached_round:
+                                await self._dispatch_events(clan,cached_round,previous_round,is_current=False)
+                            self._cached[tag][previous_round.preparation_start_time.raw_time] = previous_round
                 
                 if cached_war and current_war:
                     await self._dispatch_events(clan,cached_war,current_war,is_current=True)

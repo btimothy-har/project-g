@@ -21,7 +21,7 @@ from .coc_objects.events.raid_weekend import aRaidWeekend
 from .exceptions import InvalidTag, ClashAPIError, InvalidAbbreviation
 
 from .utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
-from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI
+from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI, s_convert_seconds_to_str
 
 bot_client = BotClashClient()
 
@@ -366,10 +366,14 @@ class ClashOfClansClient(commands.Cog):
             )
         
         waiters = len(bot_client.coc.http._HTTPClient__lock._waiters) if bot_client.coc.http._HTTPClient__lock._waiters else 0
+        api_connect_time = pendulum.now() - bot_client._last_login
+
+        dd, hh, mm, ss = s_convert_seconds_to_str(api_connect_time.total_seconds())
 
         embed.add_field(
             name="**API Client**",
             value="```ini"
+                + f"\n{'[Last Login]':<15} {int(dd)}D {int(hh)}H {int(mm)}M {int(ss)}S"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
                 + f"\n{'[API Requests]':<15} " + f"{(bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit) - bot_client.coc.http._HTTPClient__lock._value} / {bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit}" + f" (Waiters: {waiters:,})"

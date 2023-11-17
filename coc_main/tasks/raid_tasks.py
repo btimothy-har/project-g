@@ -1,6 +1,7 @@
 import coc
 import asyncio
 import pendulum
+import aiohttp
 
 from typing import *
 
@@ -210,15 +211,15 @@ class ClanRaidLoop(TaskLoop):
                 st = pendulum.now()
                 try:
                     clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                except (InvalidTag,ClashAPIError):
+                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
                     return self.unlock(lock)
                 
                 raid_log = None
                 new_raid = None
                 try:
                     raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                except (coc.NotFound,coc.Maintenance,coc.GatewayError):
-                    return
+                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
+                    return self.unlock(lock)
                 finally:
                     if raid_log and len(raid_log) > 0:
                         new_raid = raid_log[0]

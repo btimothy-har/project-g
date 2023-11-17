@@ -92,25 +92,27 @@ class TaskThrottler:
         return False
 
     async def __aenter__(self):        
-        if self._throttle:
-            # delay increases by 10% each request
-            async with self._lock:
-                #self.sleep_time += (self.base_sleep * 0.1)
-                self.throttle_count += 1
-                await asyncio.sleep(self.sleep_time)
-        else:
-            # if average response time is < 1.5 seconds, requests are not serialized and throttled
-            pass
+        return
+        # if self._throttle:
+        #     # delay increases by 10% each request
+        #     async with self._lock:
+        #         #self.sleep_time += (self.base_sleep * 0.1)
+        #         self.throttle_count += 1
+        #         await asyncio.sleep(self.sleep_time)
+        # else:
+        #     # if average response time is < 1.5 seconds, requests are not serialized and throttled
+        #     pass
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        if self._throttle:
-            if self.release_throttle():
-                self.throttle_count = 0
-                self._throttle = False
+        return
+        # if self._throttle:
+        #     if self.release_throttle():
+        #         self.throttle_count = 0
+        #         self._throttle = False
         
-        else:
-            if self.start_throttle():
-                self._throttle = True
+        # else:
+        #     if self.start_throttle():
+        #         self._throttle = True
 
 ############################################################
 ############################################################
@@ -390,12 +392,14 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     async with self.api_semaphore, self.clan_throttle:
                         clan = await bot_client.coc.get_clan(clan_tag,cls=aClan)
+                except coc.ClashOfClansException:
+                    bot_client.clan_cache.remove_from_queue(clan_tag)
+                    return None
                 except:
                     return None
                 else:
-                    return clan
-                finally:
                     bot_client.clan_cache.remove_from_queue(clan_tag)
+                    return clan                    
             
             queue = bot_client.clan_cache.queue.copy()
             clan_queue = queue[:1000]
@@ -409,12 +413,14 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     async with self.api_semaphore, self.player_throttle:
                         player = await bot_client.coc.get_player(player_tag,cls=aPlayer)
+                except coc.ClashOfClansException:
+                    bot_client.player_cache.remove_from_queue(player_tag)
+                    return None
                 except:
                     return None
                 else:
-                    return player
-                finally:
                     bot_client.player_cache.remove_from_queue(player_tag)
+                    return player
             
             queue = bot_client.player_cache.queue.copy()
             player_queue = queue[:1000]

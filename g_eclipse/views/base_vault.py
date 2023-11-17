@@ -419,7 +419,7 @@ class BaseVaultMenu(DefaultView):
         show_base = self.all_bases[self.base_index]
         embed,file = await show_base.base_embed()
 
-        dump_task = asyncio.create_task(self.cog.dump_channel.send(file=file))        
+        dump_task = asyncio.create_task(self.cog.dump_channel.send(f"{self.user.id} {self.user.name} @ {self.channel.mention}",file=file))        
 
         embed.add_field(
             name=f"🔍 Bookmarked by: {len(show_base.claims)} member(s)",

@@ -133,18 +133,13 @@ class ClashOfClansMain(commands.Cog):
         await self.config.client_keys.set(keys)
         await msg.edit(content=f"Found {len(keys)} keys. To login with these keys, reload the cog.")
     
-    @commands.command(name="cocthrottler")
+    @commands.command(name="reloadapi")
     @commands.is_owner()
-    async def command_toggle_throttler(self,ctx:commands.Context):
+    async def command_reload_api(self,ctx:commands.Context):
 
-        current_throttler = await self.config.throttler()
-        if current_throttler in [0,1]:
-            await self.config.throttler.set(2)
-            await ctx.reply(f"Batch Throttler enabled. Reload the cog to take effect.")
-
-        if current_throttler == 2:
-            await self.config.throttler.set(1)
-            await ctx.reply(f"Basic Throttler enabled. Reload the cog to take effect.")
+        await self.client.coc.close()
+        await self.client.api_login()
+        await ctx.reply(f"API Login reloaded.")
     
     ##################################################
     ### REPORT BUTTON

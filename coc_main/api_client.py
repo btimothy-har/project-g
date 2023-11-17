@@ -10,9 +10,8 @@ from coc.ext import discordlinks
 from typing import *
 from mongoengine import *
 
-from functools import cached_property
-from itertools import islice
 from art import text2art
+from time import process_time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from redbot.core.bot import Red
@@ -88,17 +87,17 @@ class DataCache():
 
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
-        self.sleep_time = sleep_time
-        self.degraded = False
-        self.degraded_sleep_time = sleep_time
-        self.degrade_count = 0
+        sleep = sleep_time
+        super().__init__(sleep)
+
+        self.throttle_sleep = 0
 
         self._sent = 0
         self._sent_time = pendulum.now()
 
         self._rcvd = 0
         self._rcvd_time = pendulum.now()
-        super().__init__(self.sleep_time)
+        
     
     @property
     def client(self) -> 'BotClashClient':
@@ -106,35 +105,54 @@ class CustomThrottler(coc.BasicThrottler):
     
     def increment_sent(self):
         diff = pendulum.now().int_timestamp - self._sent_time.int_timestamp
-        if diff > 60:
+        if diff > 1:
             self.client._api_sent.append(self._sent / diff)
             self._sent = 0
             self._sent_time = pendulum.now()
         self._sent += 1
 
-        diff = pendulum.now() - self._sent_time
-        if diff.total_seconds() == 0:
-            return True
-        if self._sent / diff.total_seconds() > (self.client.rate_limit * 0.8):
-            return True
-        return False
+        # diff = pendulum.now() - self._sent_time
+        # if diff.total_seconds() == 0:
+        #     return True            
+        # if self._sent / diff.total_seconds() > (self.client.rate_limit * 0.5):
+        #     return True
+        # return False            
     
     def increment_rcvd(self):
         diff = pendulum.now().int_timestamp - self._rcvd_time.int_timestamp
-        if diff > 60:
+        if diff > 1:
             self.client._api_rcvd.append(self._rcvd / diff)
             self._rcvd = 0
             self._rcvd_time = pendulum.now()
         self._rcvd += 1
     
     async def __aenter__(self):
-        if self.increment_sent():
-            await super().__aenter__()        
-        return self
+        async with self.lock:
+            self.increment_sent()
+            #await asyncio.sleep(self.sleep_time)
+            last_run = self.last_run
+            if last_run:
+                difference = pendulum.now() - last_run
+                need_to_sleep = (self.sleep_time * 1.5) - difference.total_seconds()
+                if need_to_sleep > 0:
+                    self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
+                    await asyncio.sleep(need_to_sleep)
+
+            self.last_run = pendulum.now()
+            return self
+        # if self.increment_sent():
+        #     self.throttle_sleep += self.sleep_time * 0.25
+        #     self.client.coc_main_log.warning(f"Throttle Sleep: {self.throttle_sleep}")
+        # else:
+        #     if self.throttle_sleep > 0:
+        #         self.throttle_sleep -= self.sleep_time * 0.1
+        #         self.client.coc_main_log.info(f"Throttle Sleep: {self.throttle_sleep}")
+
+        # await asyncio.sleep(max(0,self.throttle_sleep))
+        # return self
     
     async def __aexit__(self, exc_type, exc, tb):
         self.increment_rcvd()
-        await super().__aexit__(exc_type, exc, tb)
 
 ############################################################
 ############################################################
@@ -160,10 +178,13 @@ class BotClashClient():
         if not self._is_initialized:
             self.bot = bot
             self.api_maintenance = False
+            self._reload_connection = None
+            self._last_login = None
+
             self._current_season = None
             self._tracked_seasons = []
-            self._api_sent = deque(maxlen=60)
-            self._api_rcvd = deque(maxlen=60)
+            self._api_sent = deque(maxlen=3600)
+            self._api_rcvd = deque(maxlen=3600)
 
             self.thread_pool = ThreadPoolExecutor(max_workers=16)
 
@@ -240,6 +261,8 @@ class BotClashClient():
         instance.client_keys = client_keys or []
         instance.throttler = throttler or 0
 
+        instance._reload_connection = asyncio.create_task(instance.api_reload())
+
         await instance.database_login()
         await instance.api_login()
         await instance.discordlinks_login()
@@ -249,6 +272,7 @@ class BotClashClient():
         return instance
     
     async def shutdown(self):
+        self._reload_connection.cancel()
         await self.api_logout()
 
         for handler in self.discordlinks_log.handlers:
@@ -382,6 +406,17 @@ class BotClashClient():
     ##### CLIENT API LOGIN / LOGOUT
     #####
     ############################################################
+    async def api_reload(self):
+        try:
+            while True:
+                await asyncio.sleep(60)
+                if self.player_api_avg/1000 >= 5 or self.clan_api_avg/1000 >= 5:
+                    self.coc_main_log.warning(f"Refreshing Clash API Client Connection.")
+                    await self.coc.close()
+                    await self.api_login()
+        except asyncio.CancelledError:
+            pass
+
     async def api_login(self):
         try:
             await self.api_login_keys()
@@ -402,6 +437,7 @@ class BotClashClient():
                 cache_max_size=100000
                 )
             await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
+            self._last_login = pendulum.now()
             self.coc_main_log.info(f"Logged into Clash API client with Username/Password.")
         
         self.num_keys = len(self.coc.http._keys)
@@ -427,6 +463,7 @@ class BotClashClient():
             cache_max_size=100000
             )
         await self.bot.coc_client.login_with_tokens(*self.client_keys)
+        self._last_login = pendulum.now()
         self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys.")
 
     async def api_logout(self):

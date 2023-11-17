@@ -3,6 +3,7 @@ import asyncio
 import pendulum
 import random
 import copy
+import aiohttp
 
 from redbot.core.utils import AsyncIter
 
@@ -201,7 +202,7 @@ class ClanLoop(TaskLoop):
                     try:
                         new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
                     
-                    except (coc.ClashOfClansException) as exc:
+                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
                         return self.unlock(lock)
                     
                     finally:

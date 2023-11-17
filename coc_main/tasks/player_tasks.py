@@ -2,6 +2,7 @@ import asyncio
 import coc
 import pendulum
 import copy
+import aiohttp
 
 from typing import *
 from ..api_client import BotClashClient as client
@@ -544,7 +545,7 @@ class PlayerLoop(TaskLoop):
                     new_player = None
                     try:
                         new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
-                    except (coc.ClashOfClansException) as exc:
+                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
                         return self.unlock(lock)
                     
                     finally:
