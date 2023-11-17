@@ -399,18 +399,24 @@ class BotClashClient():
     async def api_reload(self):
         try:
             while True:
-                await asyncio.sleep(30)
-                reload = False
-                if self.player_api_avg > 5000 or max(self.player_api[-100:]) > 15000:
-                    reload = True                
-                if self.clan_api_avg > 5000 or max(self.clan_api[-100:]) > 15000:
-                    reload = True
+                try:
+                    await asyncio.sleep(30)
+                    reload = False
+                    if self.player_api_avg > 5000 or max(self.player_api[-100:]) > 15000:
+                        reload = True                
+                    if self.clan_api_avg > 5000 or max(self.clan_api[-100:]) > 15000:
+                        reload = True
+                    
+                    if reload:
+                        api_connect_time = pendulum.now() - self._last_login
+                        self.coc_main_log.warning(f"Refreshing Clash API Client Connection. Uptime: {api_connect_time.total_seconds()}.")
+                        await self.api_logout()
+                        await self.api_login()
                 
-                if reload:
-                    api_connect_time = pendulum.now() - self._last_login
-                    self.coc_main_log.warning(f"Refreshing Clash API Client Connection. Uptime: {api_connect_time.total_seconds()}.")
-                    await self.api_logout()
-                    await self.api_login()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    continue
                     
         except asyncio.CancelledError:
             pass
@@ -440,9 +446,9 @@ class BotClashClient():
         # use sample of 100 keys
         keys = random.sample(self.client_keys,100)
             
-        await self.bot.coc_client.login_with_tokens(*keys)
+        await self.bot.coc_client.login_with_tokens(*self.client_keys)
         self._last_login = pendulum.now()
-        self.coc_main_log.info(f"Logged into Clash API client with {len(keys)} keys.")
+        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys.")
     
     async def api_login_username(self,rate_limit):
         clashapi_login = await self.bot.get_shared_api_tokens('clashapi')

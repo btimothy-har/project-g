@@ -135,7 +135,7 @@ class ClashOfClansMain(commands.Cog):
     @commands.is_owner()
     async def command_reload_api(self,ctx:commands.Context):
 
-        await self.client.coc.close()
+        await self.client.api_logout()
         await self.client.api_login()
         await ctx.reply(f"API Login reloaded.")
     
