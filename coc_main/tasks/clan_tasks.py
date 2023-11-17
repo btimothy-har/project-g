@@ -212,7 +212,7 @@ class ClanLoop(TaskLoop):
                         except:
                             if count_try > 10:
                                 return self.unlock(lock)
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(5)
                             continue
 
                     if new_clan:
