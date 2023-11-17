@@ -431,7 +431,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(bot_client.player_cache):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_cache.queue):,}"
-                + f"\n{'[Running]':<10} {self.player_loop._running:,}"
+                + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
                 + f"\n{'[Last]':<10} {self.player_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"
                 + "```",
@@ -442,7 +442,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(bot_client.clan_cache):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_cache.queue):,}"
-                + f"\n{'[Running]':<10} {self.clan_loop._running:,}"
+                + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
                 + f"\n{'[Last]':<10} {self.clan_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.clan_loop._queue.qsize():,}"
                 + "```",
@@ -453,7 +453,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
                 + f"\n{'[Clans]':<10} {len(self.war_loop._tags):,}"
-                + f"\n{'[Running]':<10} {self.war_loop._running:,}"
+                + f"\n{'[Running]':<10} {'True' if self.war_loop._running else 'False'}"
                 + f"\n{'[Last]':<10} {self.war_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
                 + "```",
@@ -464,7 +464,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
                 + f"\n{'[Clans]':<10} {len(self.raid_loop._tags):,}"
-                + f"\n{'[Running]':<10} {self.raid_loop._running:,}"
+                + f"\n{'[Running]':<10} {'True' if self.raid_loop._running else 'False'}"
                 + f"\n{'[Last]':<10} {self.raid_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
                 + "```",
@@ -475,7 +475,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
-                + f"\n{'[Running]':<10} {self.discord_loop._running:,}"
+                + f"\n{'[Running]':<10} {'True' if self.discord_loop._running else 'False'}"
                 + f"\n{'[Last]':<10} {self.discord_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + "```",

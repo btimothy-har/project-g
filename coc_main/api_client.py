@@ -400,7 +400,7 @@ class BotClashClient():
         try:
             while True:
                 try:
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(10)
                     reload = False
                     if self.player_api_avg > 5000 or max(self.player_api[-100:]) > 15000:
                         reload = True                
@@ -421,7 +421,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=5):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -442,13 +442,17 @@ class BotClashClient():
                 throttle_limit=rate_limit,
                 cache_max_size=100000
                 )
+            self.coc_main_log.info(f"New Client Created: {self.bot.coc_client}")
         
         # use sample of 100 keys
         keys = random.sample(self.client_keys,100)
             
         await self.bot.coc_client.login_with_tokens(*self.client_keys)
         self._last_login = pendulum.now()
-        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys.")
+        self.coc_main_log.info(
+            f"Logged into Clash API client with {len(self.client_keys)} keys."
+            + f"\n\tClient: {self.bot.coc_client}"
+            )
     
     async def api_login_username(self,rate_limit):
         clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
@@ -467,9 +471,14 @@ class BotClashClient():
                 throttle_limit=rate_limit,
                 cache_max_size=100000
                 )
+            self.coc_main_log.info(f"New Client Created: {self.bot.coc_client}")
+
         await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
         self._last_login = pendulum.now()
-        self.coc_main_log.info(f"Logged into Clash API client with Username/Password.")
+        self.coc_main_log.info(
+            f"Logged into Clash API client with Username/Password."
+            + f"\n\tClient: {self.bot.coc_client}"
+            )
 
     async def api_logout(self):
         await self.coc.close()
