@@ -457,7 +457,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Last]':<10} {self.war_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
                 + "```",
-            inline=True
+            inline=False
             )
         embed.add_field(
             name="**Capital Raids**",
@@ -468,7 +468,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Last]':<10} {self.raid_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
                 + "```",
-            inline=True
+            inline=False
             )
         embed.add_field(
             name="**Discord**",
@@ -479,7 +479,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Last]':<10} {self.discord_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + "```",
-            inline=True
+            inline=False
             )
         return embed
     
