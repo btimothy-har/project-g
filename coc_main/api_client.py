@@ -31,8 +31,6 @@ coc_data_logger.setLevel(logging.INFO)
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
 
-rate_limit = 5
-
 ############################################################
 ############################################################
 #####
@@ -97,7 +95,6 @@ class CustomThrottler(coc.BasicThrottler):
 
         self._rcvd = 0
         self._rcvd_time = pendulum.now()
-        
     
     @property
     def client(self) -> 'BotClashClient':
@@ -109,14 +106,7 @@ class CustomThrottler(coc.BasicThrottler):
             self.client._api_sent.append(self._sent / diff)
             self._sent = 0
             self._sent_time = pendulum.now()
-        self._sent += 1
-
-        # diff = pendulum.now() - self._sent_time
-        # if diff.total_seconds() == 0:
-        #     return True            
-        # if self._sent / diff.total_seconds() > (self.client.rate_limit * 0.5):
-        #     return True
-        # return False            
+        self._sent += 1       
     
     def increment_rcvd(self):
         diff = pendulum.now().int_timestamp - self._rcvd_time.int_timestamp
@@ -129,7 +119,6 @@ class CustomThrottler(coc.BasicThrottler):
     async def __aenter__(self):
         async with self.lock:
             self.increment_sent()
-            #await asyncio.sleep(self.sleep_time)
             last_run = self.last_run
             if last_run:
                 difference = pendulum.now() - last_run
@@ -140,16 +129,6 @@ class CustomThrottler(coc.BasicThrottler):
 
             self.last_run = pendulum.now()
             return self
-        # if self.increment_sent():
-        #     self.throttle_sleep += self.sleep_time * 0.25
-        #     self.client.coc_main_log.warning(f"Throttle Sleep: {self.throttle_sleep}")
-        # else:
-        #     if self.throttle_sleep > 0:
-        #         self.throttle_sleep -= self.sleep_time * 0.1
-        #         self.client.coc_main_log.info(f"Throttle Sleep: {self.throttle_sleep}")
-
-        # await asyncio.sleep(max(0,self.throttle_sleep))
-        # return self
     
     async def __aexit__(self, exc_type, exc, tb):
         self.increment_rcvd()
@@ -176,25 +155,36 @@ class BotClashClient():
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
-            self.bot = bot
-            self.api_maintenance = False
-            self._reload_connection = None
-            self._last_login = None
-
-            self._current_season = None
-            self._tracked_seasons = []
-            self._api_sent = deque(maxlen=3600)
-            self._api_rcvd = deque(maxlen=3600)
-
             self.thread_pool = ThreadPoolExecutor(max_workers=16)
 
-            self.last_status_update = None
-            self.client_keys = []
-
+            # LOGGERS
             self.coc_main_log = coc_main_logger
             self.coc_data_log = coc_data_logger
             self.discordlinks_log = clashlinks_log
 
+            # BOT HELPERS
+            self.bot = bot
+            self.last_status_update = None
+
+            # SEASONS
+            self._current_season = None
+            self._tracked_seasons = []
+
+            # API HELPERS
+            self.client_keys = []
+            self.coc_client = None
+            self.api_maintenance = False
+            self._api_sent = deque(maxlen=3600)
+            self._api_rcvd = deque(maxlen=3600)
+
+            self._connector_task = None
+            self._last_login = None
+
+            # DISCORDLINKS
+            self.discordlinks_sandbox = False
+            self.discordlinks_client = None
+            
+            # LOGGER SET UP
             log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
             main_logpath = f"{self.bot.coc_log_path}/main"
             if not os.path.exists(main_logpath):
@@ -228,11 +218,6 @@ class BotClashClient():
                 )
             clashlinks_log_handler.setFormatter(log_formatter)
             self.discordlinks_log.addHandler(clashlinks_log_handler)
-
-            self.coc_client = None
-
-            self.discordlinks_sandbox = False
-            self.discordlinks_client = None
     
     def run_in_thread(self, func, *args):
         def _run_func(func, *args):
@@ -248,8 +233,7 @@ class BotClashClient():
         bot:Red,
         author:str,
         version:str,
-        client_keys:Optional[List[str]]=None,
-        throttler:Optional[int]=None):
+        client_keys:Optional[List[str]]=None):
 
         instance = cls(bot)
 
@@ -259,20 +243,26 @@ class BotClashClient():
         instance.author = author
         instance.version = version
         instance.client_keys = client_keys or []
-        instance.throttler = throttler or 0
 
-        instance._reload_connection = asyncio.create_task(instance.api_reload())
+        instance._connector_task = asyncio.create_task(instance.api_reload())
 
         await instance.database_login()
         await instance.api_login()
         await instance.discordlinks_login()
         await instance.load_seasons()
 
+        bot.coc_client.add_events(
+            clash_maintenance_start,
+            clash_maintenance_complete,
+            end_of_trophy_season,
+            end_of_clan_games
+            )
+
         instance._is_initialized = True
         return instance
     
     async def shutdown(self):
-        self._reload_connection.cancel()
+        self._connector_task.cancel()
         await self.api_logout()
 
         for handler in self.discordlinks_log.handlers:
@@ -409,33 +399,60 @@ class BotClashClient():
     async def api_reload(self):
         try:
             while True:
-                await asyncio.sleep(60)
+                await asyncio.sleep(30)
                 reload = False
-                if len(self.player_api) >= 500 and self.player_api_avg/1000 >= 5:
+                if len(self.player_api) >= 500 and (self.player_api_avg > 5000 or max(self.player_api[-100:]) > 15000):
                     reload = True                
-                if len(self.clan_api) >= 500 and self.clan_api_avg/1000 >= 5:
+                if len(self.clan_api) >= 500 and (self.clan_api_avg > 5000 or max(self.clan_api[-100:]) > 15000):
                     reload = True
                 
                 if reload:
                     api_connect_time = pendulum.now() - self._last_login
                     self.coc_main_log.warning(f"Refreshing Clash API Client Connection. Uptime: {api_connect_time.total_seconds()}.")
-                    await self.coc.close()
+                    await self.api_logout()
                     await self.api_login()
                     
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self):
+    async def api_login(self,rate_limit:int=10):
         try:
-            await self.api_login_keys()
+            await self.api_login_keys(rate_limit)
         except:
-            clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
+            await self.api_login_username(rate_limit)
+        
+        self.num_keys = len(self.coc.http._keys)
+        self.rate_limit = self.num_keys * rate_limit
+        self._api_logged_in = True
 
-            if clashapi_login.get("username") is None:
-                raise LoginNotSet(f"Clash API Username is not set.")
-            if clashapi_login.get("password") is None:
-                raise LoginNotSet(f"Clash API Password is not set.")
+    async def api_login_keys(self,rate_limit):
+        if len(self.client_keys) == 0:
+            raise LoginNotSet(f"Clash API Keys are not set.")
+                
+        if not getattr(self.bot,"coc_client",None):
+            self.bot.coc_client = coc.EventsClient(
+                load_game_data=coc.LoadGameData(always=True),
+                throttler=CustomThrottler,
+                throttle_limit=rate_limit,
+                cache_max_size=100000
+                )
+        
+        # use sample of 100 keys
+        keys = random.sample(self.client_keys,100)
+            
+        await self.bot.coc_client.login_with_tokens(*keys)
+        self._last_login = pendulum.now()
+        self.coc_main_log.info(f"Logged into Clash API client with {len(keys)} keys.")
+    
+    async def api_login_username(self,rate_limit):
+        clashapi_login = await self.bot.get_shared_api_tokens('clashapi')
 
+        if clashapi_login.get("username") is None:
+            raise LoginNotSet(f"Clash API Username is not set.")
+        if clashapi_login.get("password") is None:
+            raise LoginNotSet(f"Clash API Password is not set.")
+
+        if not getattr(self.bot,"coc_client",None):
             self.bot.coc_client = coc.EventsClient(
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='Created for Project G, from coc.py',
@@ -444,38 +461,13 @@ class BotClashClient():
                 throttle_limit=rate_limit,
                 cache_max_size=100000
                 )
-            await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
-            self._last_login = pendulum.now()
-            self.coc_main_log.info(f"Logged into Clash API client with Username/Password.")
-        
-        self.num_keys = len(self.coc.http._keys)
-        self.rate_limit = self.num_keys * rate_limit
-        self.default_sleep = (1 / self.rate_limit) * 2
-        self._api_logged_in = True
-
-        self.bot.coc_client.add_events(
-            clash_maintenance_start,
-            clash_maintenance_complete,
-            end_of_trophy_season,
-            end_of_clan_games
-            )
-
-    async def api_login_keys(self):
-        if len(self.client_keys) == 0:
-            raise LoginNotSet(f"Clash API Keys are not set.")
-                
-        self.bot.coc_client = coc.EventsClient(
-            load_game_data=coc.LoadGameData(always=True),
-            throttler=CustomThrottler,
-            throttle_limit=rate_limit,
-            cache_max_size=100000
-            )
-        await self.bot.coc_client.login_with_tokens(*self.client_keys)
+        await self.bot.coc_client.login(clashapi_login.get("username"),clashapi_login.get("password"))
         self._last_login = pendulum.now()
-        self.coc_main_log.info(f"Logged into Clash API client with {len(self.client_keys)} keys.")
+        self.coc_main_log.info(f"Logged into Clash API client with Username/Password.")
 
     async def api_logout(self):
         await self.coc.close()
+        self.coc_main_log.info(f"Logged out of Clash API client.")
 
     ############################################################
     #####
@@ -680,6 +672,8 @@ async def clash_maintenance_start():
 @coc.ClientEvents.maintenance_completion()
 async def clash_maintenance_complete(time_started):
     client = BotClashClient()
+    client._api_sent = deque(maxlen=3600)
+    client._api_rcvd = deque(maxlen=3600)
     client.api_maintenance = False
 
     maint_start = pendulum.instance(time_started)

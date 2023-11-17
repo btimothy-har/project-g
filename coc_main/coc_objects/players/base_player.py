@@ -157,7 +157,7 @@ class BasicPlayer():
                 set__first_seen=player.first_seen.int_timestamp,
                 upsert=True
                 )
-            bot_client.coc_data_log.info(f"{player}: first_seen changed to {player.first_seen}.")
+            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}.")
         
         player = cls(tag=coc.utils.correct_tag(tag))
 

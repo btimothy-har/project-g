@@ -37,7 +37,9 @@ class TaskLoop():
 
     def __init__(self):
         self._active = False
+        self._running = False
         self._collector = None
+        self._last_loop = None
         self._queue = asyncio.Queue()
 
         self.run_time = deque(maxlen=100)
@@ -51,6 +53,12 @@ class TaskLoop():
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
+    
+    @property
+    def last_loop(self) -> pendulum.DateTime:
+        if self._last_loop:
+            return self._last_loop
+        return pendulum.now()
 
     @property
     def coc_client(self) -> ClashOfClansClient:
@@ -84,9 +92,12 @@ class TaskLoop():
         await self._loop_task()
     
     async def stop(self):
-        self._active = False
-        self._collector.cancel()
-        await self._collector
+        self._active = False        
+        try:
+            self._collector.cancel()
+            await self._collector
+        except:
+            pass
     
     def unlock(self,lock:asyncio.Lock):
         try:

@@ -55,12 +55,20 @@ class DiscordGuildLoop(TaskLoop):
             while self.loop_active:
                 await bot_client.bot.wait_until_red_ready()
 
+                self._running = True
+
                 num_guilds = len(bot_client.bot.guilds)
                 sleep = (1/num_guilds)
 
+                tasks = []
                 for guild in bot_client.bot.guilds:
                     await asyncio.sleep(sleep)
-                    await self._run_single_loop(guild)
+                    tasks.append(asyncio.create_task(self._run_single_loop(guild)))
+
+                await asyncio.gather(*tasks,return_exceptions=True)
+
+                self._running = False
+                self._last_loop = pendulum.now()
 
                 await asyncio.sleep(10)
 

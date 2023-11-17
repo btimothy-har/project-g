@@ -181,6 +181,8 @@ class ClanWarLoop(TaskLoop):
                     await asyncio.sleep(30)
                     continue
 
+                self._running = True
+
                 sleep = (1 / len(self._tags))
                 tasks = []
                 for tag in self._tags:
@@ -188,6 +190,10 @@ class ClanWarLoop(TaskLoop):
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
                 await asyncio.gather(*tasks,return_exceptions=True)
+
+                self._last_loop = pendulum.now()
+                self._running = False
+                
                 await asyncio.sleep(30)
             
         except Exception as exc:

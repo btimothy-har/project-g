@@ -470,6 +470,8 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
+                self._running = True
+
                 all_player_tags = copy.copy(bot_client.player_cache.keys)
                 sleep = (10 / len(all_player_tags))
 
@@ -479,6 +481,10 @@ class PlayerLoop(TaskLoop):
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
                 await asyncio.gather(*tasks,return_exceptions=True)
+
+                self._last_loop = pendulum.now()
+                self._running = False
+                
                 await asyncio.sleep(10)
         
         except Exception as exc:

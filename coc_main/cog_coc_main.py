@@ -76,14 +76,12 @@ class ClashOfClansMain(commands.Cog):
             os.makedirs(self.bot.coc_imggen_path)
 
         keys = await self.config.client_keys()
-        throttler = await self.config.throttler()
             
         self.client = await BotClashClient.initialize(
             bot=self.bot,
             author=self.__author__,
             version=self.__version__,
             client_keys=keys,
-            throttler=throttler
             )
     
     ##################################################

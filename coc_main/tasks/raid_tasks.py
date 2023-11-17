@@ -133,14 +133,15 @@ class ClanRaidLoop(TaskLoop):
                     await asyncio.sleep(30)
                     continue
 
-                st = pendulum.now()
-                if st.day_of_week not in [5,6,7,1]:
+                if pendulum.now().day_of_week not in [5,6,7,1]:
                     await asyncio.sleep(60)
                     continue
 
                 if len(self._tags) == 0:
                     await asyncio.sleep(30)
                     continue
+
+                self._running = True
 
                 sleep = (1 / len(self._tags))
                 tasks = []
@@ -149,6 +150,10 @@ class ClanRaidLoop(TaskLoop):
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
                 await asyncio.gather(*tasks,return_exceptions=True)
+
+                self._last_loop = pendulum.now()
+                self._running = False
+                
                 await asyncio.sleep(30)
 
         except Exception as exc:

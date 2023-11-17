@@ -117,7 +117,7 @@ class ClanLoop(TaskLoop):
     async def _loop_task(self):
         try:
             while self.loop_active:
-                               
+
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
@@ -125,6 +125,8 @@ class ClanLoop(TaskLoop):
                 if not bot_client.clan_cache.keys:
                     await asyncio.sleep(10)
                     continue
+
+                self._running = True
 
                 all_clan_tags = copy.copy(bot_client.clan_cache.keys)
                 sleep = (10 / len(all_clan_tags))
@@ -135,6 +137,10 @@ class ClanLoop(TaskLoop):
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
             
                 await asyncio.gather(*tasks,return_exceptions=True)
+
+                self._last_loop = pendulum.now()
+                self._running = False
+
                 await asyncio.sleep(10)
         
         except Exception as exc:

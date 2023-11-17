@@ -45,78 +45,6 @@ semaphore_limit = 100000
 ############################################################
 ############################################################
 #####
-##### TASK THROTTLER
-#####
-############################################################
-############################################################
-class TaskThrottler:
-    def __init__(self,cog:'ClashOfClansTasks',type:str):
-        self.cog = cog
-        self.type = type
-        self._sleep_time = 1 / bot_client.rate_limit
-        self.throttle_count = 0
-        
-        self._lock = asyncio.Lock()
-        self._throttle = False
-
-        self._start_throttle_index = 100 #len(bot_client.coc.http._keys) * 10
-        self._release_throttle_index = 300 #len(bot_client.coc.http._keys) * 20
-    
-    @property
-    def api_performance(self):
-        if self.type == 'player':
-            return bot_client.player_api
-        elif self.type == 'clan':
-            return bot_client.clan_api
-        else:
-            return 0
-    
-    @property
-    def sleep_time(self):
-        if self._sleep_time == 0:
-            self._sleep_time = 1 / bot_client.rate_limit
-        return self._sleep_time
-    
-    def start_throttle(self):
-        api = list(islice(self.api_performance,0,self._start_throttle_index))
-        avg = sum(api) / len(api) if len(api) > 0 else 0
-        if avg > 3000:
-            return True
-        return False
-    
-    def release_throttle(self) -> bool:
-        api = list(islice(self.api_performance,0,self._release_throttle_index))
-        avg = sum(api) / len(api) if len(api) > 0 else 0
-        if avg <= 1800:
-            return True
-        return False
-
-    async def __aenter__(self):        
-        return
-        # if self._throttle:
-        #     # delay increases by 10% each request
-        #     async with self._lock:
-        #         #self.sleep_time += (self.base_sleep * 0.1)
-        #         self.throttle_count += 1
-        #         await asyncio.sleep(self.sleep_time)
-        # else:
-        #     # if average response time is < 1.5 seconds, requests are not serialized and throttled
-        #     pass
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        return
-        # if self._throttle:
-        #     if self.release_throttle():
-        #         self.throttle_count = 0
-        #         self._throttle = False
-        
-        # else:
-        #     if self.start_throttle():
-        #         self._throttle = True
-
-############################################################
-############################################################
-#####
 ##### TASKS COG
 #####
 ############################################################
@@ -207,7 +135,7 @@ class ClashOfClansTasks(commands.Cog):
         
         asyncio.create_task(self.start_recruiting_loop())
 
-        self._controller_loop = asyncio.create_task(self.coc_task_controller())
+        #self._controller_loop = asyncio.create_task(self.coc_task_controller())
         self.clash_season_check.start()
         self.coc_data_queue.start()        
         self.refresh_coc_loops.start()
@@ -243,7 +171,7 @@ class ClashOfClansTasks(commands.Cog):
         self.coc_data_queue.cancel()
         self.clash_season_check.cancel()
         
-        self._controller_loop.cancel()
+        #self._controller_loop.cancel()
 
         bot_client.coc_main_log.info(f"Stopped Clash Data Loop.")
 
@@ -485,15 +413,6 @@ class ClashOfClansTasks(commands.Cog):
             self.last_task_refresh = pendulum.now()
         
     async def status_embed(self):
-        def _query_player():
-            return [t.tag for t in db_Player.objects().only('tag')]        
-        def _query_clan():
-            return [t.tag for t in db_Clan.objects().only('tag')]        
-        def _query_wars():
-            return [t for t in db_ClanWar.objects()]
-        def _query_raids():
-            return [t for t in db_RaidWeekend.objects()]
-        
         embed = await clash_embed(self.bot,
             title="**Clash of Clans Data Status**",
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
@@ -516,59 +435,63 @@ class ClashOfClansTasks(commands.Cog):
                 + "```",
             inline=False
             )
-        db_players = await bot_client.run_in_thread(_query_player)
+        diff = pendulum.now() - self.player_loop.last_loop
         embed.add_field(
             name="**Player Loops**",
             value="```ini"
-                + f"\n{'[Mem/DB]':<15} {len(bot_client.player_cache):,} / {len(db_players):,}"
-                + f"\n{'[Queue]':<15} {len(bot_client.player_cache.queue):,}"
-                + f"\n{'[Tasks]':<15} {self.player_loop._queue.qsize():,}"
-                + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg(),1)}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
+                + f"\n{'[Cache]':<10} {len(bot_client.player_cache):,}"
+                + f"\n{'[Queue]':<10} {len(bot_client.player_cache.queue):,}"
+                + f"\n{'[Running]':<10} {self.player_loop._running:,}"
+                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"
                 + "```",
             inline=False
             )
-        db_clan = await bot_client.run_in_thread(_query_clan)
+        diff = pendulum.now() - self.clan_loop.last_loop
         embed.add_field(
             name="**Clans**",
             value="```ini"
-                + f"\n{'[Mem/DB]':<15} {len(bot_client.clan_cache):,} / {len(db_clan):,}"
-                + f"\n{'[Queue]':<15} {len(bot_client.clan_cache.queue):,}"
-                + f"\n{'[Tasks]':<15} {self.clan_loop._queue.qsize():,}"
-                + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg(),1)}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
+                + f"\n{'[Cache]':<10} {len(bot_client.clan_cache):,}"
+                + f"\n{'[Queue]':<10} {len(bot_client.clan_cache.queue):,}"
+                + f"\n{'[Running]':<10} {self.clan_loop._running:,}"
+                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Tasks]':<10} {self.clan_loop._queue.qsize():,}"
                 + "```",
             inline=False
             )
-        db_wars = await bot_client.run_in_thread(_query_wars)
+        diff = pendulum.now() - self.war_loop.last_loop
         embed.add_field(
             name="**Clan Wars**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
-                + f"\n{'[Database]':<10} {len(db_wars):,}"
                 + f"\n{'[Clans]':<10} {len(self.war_loop._tags):,}"
+                + f"\n{'[Running]':<10} {self.war_loop._running:,}"
+                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
-                + f"\n{'[Runtime]':<10} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
-        db_raids = await bot_client.run_in_thread(_query_raids)
+        diff = pendulum.now() - self.raid_loop.last_loop
         embed.add_field(
             name="**Capital Raids**",
             value="```ini"
                 + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
-                + f"\n{'[Database]':<10} {len(db_raids):,}"
                 + f"\n{'[Clans]':<10} {len(self.raid_loop._tags):,}"
+                + f"\n{'[Running]':<10} {self.raid_loop._running:,}"
+                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
-                + f"\n{'[Runtime]':<10} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
+        diff = pendulum.now() - self.discord_loop.last_loop
         embed.add_field(
             name="**Discord**",
             value="```ini"
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
+                + f"\n{'[Running]':<10} {self.discord_loop._running:,}"
+                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
-                + f"\n{'[Runtime]':<10} {round(DiscordGuildLoop.runtime_avg())}s"
                 + "```",
             inline=True
             )
