@@ -182,11 +182,12 @@ class ClanWarLoop(TaskLoop):
                     continue
 
                 sleep = (1 / len(self._tags))
+                tasks = []
                 for tag in self._tags:
                     await asyncio.sleep(sleep)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
+                await asyncio.gather(*tasks,return_exceptions=True)
                 await asyncio.sleep(30)
             
         except Exception as exc:
@@ -255,27 +256,16 @@ class ClanWarLoop(TaskLoop):
                 try:
                     clan = await self.coc_client.fetch_clan(tag,no_cache=True)
                 except:
-                    return self.unlock(lock)
+                    return self.loop.call_later(10,self.unlock,lock)
                 
                 if not getattr(clan,'public_war_log',False):
                     return self.unlock(lock)
                 
-                current_war = None
-                count_try = 0
-                
-                while True:
-                    await asyncio.sleep(0)
-                    try:
-                        count_try += 1
-                        current_war = await bot_client.coc.get_current_war(tag)
-                        break
-                    except coc.ClashOfClansException:
-                        return self.unlock(lock)
-                    except:
-                        if count_try > 10:
-                            return self.unlock(lock)
-                        await asyncio.sleep(5)
-                        continue
+                current_war = None                
+                try:
+                    current_war = await bot_client.coc.get_current_war(tag)
+                except:
+                    return self.loop.call_later(10,self.unlock,lock) 
 
                 self._cached[tag]['current_war'] = current_war
                 wait = getattr(current_war,'_response_retry',default_sleep)

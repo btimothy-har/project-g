@@ -129,11 +129,12 @@ class ClanLoop(TaskLoop):
                 all_clan_tags = copy.copy(bot_client.clan_cache.keys)
                 sleep = (10 / len(all_clan_tags))
 
+                tasks = []
                 for tag in all_clan_tags:
                     await asyncio.sleep(sleep)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
             
+                await asyncio.gather(*tasks,return_exceptions=True)
                 await asyncio.sleep(10)
         
         except Exception as exc:
@@ -194,26 +195,15 @@ class ClanLoop(TaskLoop):
 
                 cached_clan = self._cached.get(tag,None)
                 if self.defer(cached_clan):
-                    return self.unlock(lock)
+                    return self.loop.call_later(10,self.unlock,lock)
 
                 st = pendulum.now()
                 async with self.api_semaphore: 
                     new_clan = None
-                    count_try = 0
-
-                    while True:
-                        await asyncio.sleep(0)
-                        try:
-                            count_try += 1
-                            new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                            break                        
-                        except coc.ClashOfClansException as exc:
-                            return self.unlock(lock)
-                        except:
-                            if count_try > 10:
-                                return self.unlock(lock)
-                            await asyncio.sleep(5)
-                            continue
+                    try:
+                        new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
+                    except:
+                        return self.loop.call_later(10,self.unlock,lock)                            
 
                     if new_clan:
                         self._cached[tag] = new_clan

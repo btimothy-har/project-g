@@ -143,11 +143,12 @@ class ClanRaidLoop(TaskLoop):
                     continue
 
                 sleep = (1 / len(self._tags))
+                tasks = []
                 for tag in self._tags:
                     await asyncio.sleep(sleep)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
+                await asyncio.gather(*tasks,return_exceptions=True)
                 await asyncio.sleep(30)
 
         except Exception as exc:
@@ -212,25 +213,15 @@ class ClanRaidLoop(TaskLoop):
                 try:
                     clan = await self.coc_client.fetch_clan(tag,no_cache=True)
                 except:
-                    return self.unlock(lock)
+                    return self.loop.call_later(10,self.unlock,lock)
                 
                 raid_log = None
                 new_raid = None
-                count_try = 0
-                
-                while True:
-                    await asyncio.sleep(0)
-                    try:
-                        count_try += 1
-                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                        break
-                    except coc.ClashOfClansException:
-                        return self.unlock(lock)
-                    except:
-                        if count_try > 10:
-                            return self.unlock(lock)
-                        await asyncio.sleep(5)
-                        continue
+            
+                try:
+                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                except:
+                    return self.loop.call_later(10,self.unlock,lock)
                     
                 if raid_log and len(raid_log) > 0:
                     new_raid = raid_log[0]

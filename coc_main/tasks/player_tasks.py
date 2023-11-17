@@ -473,11 +473,12 @@ class PlayerLoop(TaskLoop):
                 all_player_tags = copy.copy(bot_client.player_cache.keys)
                 sleep = (10 / len(all_player_tags))
 
+                tasks = []
                 for tag in all_player_tags:
                     await asyncio.sleep(sleep)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
+                await asyncio.gather(*tasks,return_exceptions=True)
                 await asyncio.sleep(10)
         
         except Exception as exc:
@@ -538,26 +539,16 @@ class PlayerLoop(TaskLoop):
 
                 cached_player = self._cached.get(tag,bot_client.player_cache.get(tag))
                 if self.defer(cached_player):
-                    return self.unlock(lock)
+                    return self.loop.call_later(10,self.unlock,lock)
 
                 st = pendulum.now()
                 async with self.api_semaphore:
                     new_player = None
-                    count_try = 0
                     
-                    while True:
-                        await asyncio.sleep(0)
-                        try:
-                            count_try += 1
-                            new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
-                            break
-                        except coc.ClashOfClansException as exc:
-                            return self.unlock(lock)
-                        except:
-                            if count_try > 10:
-                                return self.unlock(lock)
-                            await asyncio.sleep(5)
-                            continue
+                    try:
+                        new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
+                    except:
+                        return self.loop.call_later(10,self.unlock,lock)
                         
                     if new_player:
                         self._cached[tag] = new_player
