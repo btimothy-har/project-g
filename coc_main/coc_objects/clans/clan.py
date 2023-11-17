@@ -30,9 +30,7 @@ class aClan(coc.Clan,BasicClan):
         BasicClan.__init__(self,tag=self.tag)
 
         self.timestamp = pendulum.now()
-        self._badge = getattr(self.badge,'url',"")
-
-        bot_client.clan_cache.set(self.tag,self)        
+        self._badge = getattr(self.badge,'url',"")   
 
     ##################################################
     ### DATA FORMATTERS
