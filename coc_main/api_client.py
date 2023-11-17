@@ -31,7 +31,7 @@ coc_data_logger.setLevel(logging.INFO)
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
 
-rate_limit = 10
+rate_limit = 5
 
 ############################################################
 ############################################################
