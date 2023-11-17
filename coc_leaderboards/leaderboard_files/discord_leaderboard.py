@@ -408,7 +408,7 @@ class ClanWarLeaderboard(Leaderboard):
         query_players = await bot_client.run_in_thread(_db_query)
         lb_players = []
         for tag in query_players:
-            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+            async with leaderboard.tasks.api_semaphore:
                 try:
                     player = await leaderboard.client.fetch_player(tag=tag)
                 except:
@@ -505,7 +505,7 @@ class ResourceLootLeaderboard(Leaderboard):
         query_players = await bot_client.run_in_thread(_db_query)
         lb_players = []
         for tag in query_players:
-            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+            async with leaderboard.tasks.api_semaphore:
                 try:
                     player = await leaderboard.client.fetch_player(tag=tag)
                 except:
@@ -600,7 +600,7 @@ class DonationsLeaderboard(Leaderboard):
         query_players = await bot_client.run_in_thread(_db_query)
         lb_players = []
         for tag in query_players:
-            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+            async with leaderboard.tasks.api_semaphore:
                 try:
                     player = await leaderboard.client.fetch_player(tag=tag)
                 except:
@@ -691,7 +691,7 @@ class ClanGamesLeaderboard(Leaderboard):
         query_players = await bot_client.run_in_thread(_db_query)
         lb_players = []
         for tag in query_players:
-            async with leaderboard.tasks.api_semaphore, leaderboard.tasks.player_throttle:
+            async with leaderboard.tasks.api_semaphore:
                 try:
                     player = await leaderboard.client.fetch_player(tag=tag)
                 except:

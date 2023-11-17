@@ -210,23 +210,34 @@ class ClanRaidLoop(TaskLoop):
                 
                 st = pendulum.now()
                 try:
-                    clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
+                    clan = await self.coc_client.fetch_clan(tag,no_cache=True)
+                except:
                     return self.unlock(lock)
                 
                 raid_log = None
                 new_raid = None
-                try:
-                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
-                    return self.unlock(lock)
-                finally:
-                    if raid_log and len(raid_log) > 0:
-                        new_raid = raid_log[0]
-                        self._cached[tag] = new_raid
+                count_try = 0
+                
+                while True:
+                    await asyncio.sleep(0)
+                    try:
+                        count_try += 1
+                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                        break
+                    except coc.ClashOfClansException:
+                        return self.unlock(lock)
+                    except:
+                        if count_try > 10:
+                            return self.unlock(lock)
+                        await asyncio.sleep(1)
+                        continue
                     
-                    wait = getattr(raid_log,'_response_retry',default_sleep)
-                    self.loop.call_later(wait,self.unlock,lock)
+                if raid_log and len(raid_log) > 0:
+                    new_raid = raid_log[0]
+                    self._cached[tag] = new_raid
+                
+                wait = getattr(raid_log,'_response_retry',default_sleep)
+                self.loop.call_later(wait,self.unlock,lock)
                 
                 if cached_raid and new_raid:
                     await self._dispatch_events(clan,cached_raid,new_raid)

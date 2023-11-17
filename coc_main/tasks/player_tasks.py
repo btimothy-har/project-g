@@ -541,19 +541,29 @@ class PlayerLoop(TaskLoop):
                     return self.unlock(lock)
 
                 st = pendulum.now()
-                async with self.api_semaphore, self.throttle:
+                async with self.api_semaphore:
                     new_player = None
-                    try:
-                        new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
-                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
-                        return self.unlock(lock)
+                    count_try = 0
                     
-                    finally:
-                        if new_player:
-                            self._cached[tag] = new_player
-                        wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
-                        #wait = getattr(new_player,'_response_retry',default_sleep)
-                        self.loop.call_later(wait,self.unlock,lock)
+                    while True:
+                        await asyncio.sleep(0)
+                        try:
+                            count_try += 1
+                            new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
+                            break
+                        except coc.ClashOfClansException as exc:
+                            return self.unlock(lock)
+                        except:
+                            if count_try > 10:
+                                return self.unlock(lock)
+                            await asyncio.sleep(1)
+                            continue
+                        
+                    if new_player:
+                        self._cached[tag] = new_player
+                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
+                    #wait = getattr(new_player,'_response_retry',default_sleep)
+                    self.loop.call_later(wait,self.unlock,lock)
                 
                 await new_player._sync_cache()
                 if cached_player:

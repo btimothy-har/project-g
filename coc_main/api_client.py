@@ -31,7 +31,7 @@ coc_data_logger.setLevel(logging.INFO)
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
 
-rate_limit = 5
+rate_limit = 10
 
 ############################################################
 ############################################################
@@ -410,10 +410,18 @@ class BotClashClient():
         try:
             while True:
                 await asyncio.sleep(60)
-                if self.player_api_avg/1000 >= 5 or self.clan_api_avg/1000 >= 5:
-                    self.coc_main_log.warning(f"Refreshing Clash API Client Connection.")
+                reload = False
+                if len(self.player_api) >= 500 and self.player_api_avg/1000 >= 5:
+                    reload = True                
+                if len(self.clan_api) >= 500 and self.clan_api_avg/1000 >= 5:
+                    reload = True
+                
+                if reload:
+                    api_connect_time = pendulum.now() - self._last_login
+                    self.coc_main_log.warning(f"Refreshing Clash API Client Connection. Uptime: {api_connect_time.total_seconds()}.")
                     await self.coc.close()
                     await self.api_login()
+                    
         except asyncio.CancelledError:
             pass
 

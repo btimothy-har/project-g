@@ -253,22 +253,33 @@ class ClanWarLoop(TaskLoop):
                 
                 st = pendulum.now()
                 try:
-                    clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
+                    clan = await self.coc_client.fetch_clan(tag,no_cache=True)
+                except:
                     return self.unlock(lock)
                 
                 if not getattr(clan,'public_war_log',False):
                     return self.unlock(lock)
                 
                 current_war = None
-                try:
-                    current_war = await bot_client.coc.get_current_war(tag)
-                except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
-                    return self.unlock(lock)
-                finally:
-                    self._cached[tag]['current_war'] = current_war
-                    wait = getattr(current_war,'_response_retry',default_sleep)
-                    self.loop.call_later(wait,self.unlock,lock)
+                count_try = 0
+                
+                while True:
+                    await asyncio.sleep(0)
+                    try:
+                        count_try += 1
+                        current_war = await bot_client.coc.get_current_war(tag)
+                        break
+                    except coc.ClashOfClansException:
+                        return self.unlock(lock)
+                    except:
+                        if count_try > 10:
+                            return self.unlock(lock)
+                        await asyncio.sleep(1)
+                        continue
+
+                self._cached[tag]['current_war'] = current_war
+                wait = getattr(current_war,'_response_retry',default_sleep)
+                self.loop.call_later(wait,self.unlock,lock)
                         
                 if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
                     await self._update_league_group(clan)

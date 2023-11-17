@@ -140,8 +140,6 @@ class ClashOfClansTasks(commands.Cog):
 
         #API CONTROLLER
         self.api_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.9))
-        self.player_throttle = TaskThrottler(self,'player')
-        self.clan_throttle = TaskThrottler(self,'clan')
         
         # TASK CONTROLLER
         self._master_lock = asyncio.Lock()
@@ -385,21 +383,19 @@ class ClashOfClansTasks(commands.Cog):
         if self.queue_lock.locked():
             return
         
-        sleep = (1 / bot_client.rate_limit)
+        sleep = (1 / bot_client.rate_limit) * 3
         
         async def load_clan_queue():            
             async def fetch_clan(clan_tag):
                 try:
-                    async with self.api_semaphore, self.clan_throttle:
-                        clan = await bot_client.coc.get_clan(clan_tag,cls=aClan)
-                except coc.ClashOfClansException:
+                    async with self.api_semaphore:
+                        await bot_client.coc.get_clan(clan_tag,cls=aClan)
+                        bot_client.clan_cache.remove_from_queue(clan_tag)
+                except coc.NotFound:
                     bot_client.clan_cache.remove_from_queue(clan_tag)
                     return None
                 except:
                     return None
-                else:
-                    bot_client.clan_cache.remove_from_queue(clan_tag)
-                    return clan                    
             
             queue = bot_client.clan_cache.queue.copy()
             clan_queue = queue[:1000]
@@ -411,16 +407,14 @@ class ClashOfClansTasks(commands.Cog):
         async def load_player_queue():
             async def fetch_player(player_tag):
                 try:
-                    async with self.api_semaphore, self.player_throttle:
-                        player = await bot_client.coc.get_player(player_tag,cls=aPlayer)
-                except coc.ClashOfClansException:
-                    bot_client.player_cache.remove_from_queue(player_tag)
+                    async with self.api_semaphore:
+                        await bot_client.coc.get_player(player_tag,cls=aPlayer)
+                        bot_client.player_cache.remove_from_queue(player_tag)
+                except coc.NotFound:
+                    bot_client.player_cache.remove_from_queue(player_tag)                    
                     return None
                 except:
                     return None
-                else:
-                    bot_client.player_cache.remove_from_queue(player_tag)
-                    return player
             
             queue = bot_client.player_cache.queue.copy()
             player_queue = queue[:1000]
@@ -529,7 +523,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Mem/DB]':<15} {len(bot_client.player_cache):,} / {len(db_players):,}"
                 + f"\n{'[Queue]':<15} {len(bot_client.player_cache.queue):,}"
                 + f"\n{'[Tasks]':<15} {self.player_loop._queue.qsize():,}"
-                + f"\n{'[Throttle]':<15} " + f"{'On' if self.player_throttle._throttle else 'Off'}: {self.player_throttle.throttle_count} ({self.player_throttle.sleep_time*1000:.3f}ms)"
                 + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg(),1)}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
                 + "```",
             inline=False
@@ -541,7 +534,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Mem/DB]':<15} {len(bot_client.clan_cache):,} / {len(db_clan):,}"
                 + f"\n{'[Queue]':<15} {len(bot_client.clan_cache.queue):,}"
                 + f"\n{'[Tasks]':<15} {self.clan_loop._queue.qsize():,}"
-                + f"\n{'[Throttle]':<15} " + f"{'On' if self.clan_throttle._throttle else 'Off'}: {self.clan_throttle.throttle_count} ({self.clan_throttle.sleep_time*1000:.3f}ms)"
                 + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg(),1)}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
                 + "```",
             inline=False

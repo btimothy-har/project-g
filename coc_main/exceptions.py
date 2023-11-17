@@ -23,8 +23,8 @@ class DiscordLinksError(ClashOfClansError):
         return f'{self.message}'
     
 class ClashAPIError(ClashOfClansError):
-    def __init__(self,exception):
-        if isinstance(exception,coc.Maintenance):
+    def __init__(self,exception=None):
+        if exception and isinstance(exception,coc.Maintenance):
             self.message = f"Clash of Clans API is currently under maintenance. Please try again later."
         else:
             self.message = f"The Clash of Clans API isn't available right now. Please try again later."

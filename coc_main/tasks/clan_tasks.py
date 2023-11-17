@@ -197,20 +197,29 @@ class ClanLoop(TaskLoop):
                     return self.unlock(lock)
 
                 st = pendulum.now()
-                async with self.api_semaphore, self.throttle: 
+                async with self.api_semaphore: 
                     new_clan = None
-                    try:
-                        new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
-                    
-                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
-                        return self.unlock(lock)
-                    
-                    finally:
-                        if new_clan:
-                            self._cached[tag] = new_clan
-                        wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
-                        #wait = getattr(new_clan,'_response_retry',default_sleep)
-                        self.loop.call_later(wait,self.unlock,lock)
+                    count_try = 0
+
+                    while True:
+                        await asyncio.sleep(0)
+                        try:
+                            count_try += 1
+                            new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
+                            break                        
+                        except coc.ClashOfClansException as exc:
+                            return self.unlock(lock)
+                        except:
+                            if count_try > 10:
+                                return self.unlock(lock)
+                            await asyncio.sleep(1)
+                            continue
+
+                    if new_clan:
+                        self._cached[tag] = new_clan
+                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
+                    #wait = getattr(new_clan,'_response_retry',default_sleep)
+                    self.loop.call_later(wait,self.unlock,lock)
                 
                 await new_clan._sync_cache()
                 if cached_clan:

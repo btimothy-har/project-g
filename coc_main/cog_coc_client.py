@@ -177,17 +177,28 @@ class ClashOfClansClient(commands.Cog):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
             
-        try:          
-            player = await self.client.coc.get_player(n_tag,cls=aPlayer)
-            return player
-
-        except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
-        except (coc.InvalidArgument,coc.InvalidCredentials,coc.Maintenance,coc.Forbidden,coc.GatewayError) as exc:
-            if cached:
-                return cached
-            else:
-                raise ClashAPIError(exc) from exc                
+        count_try = 0
+        while True:
+            await asyncio.sleep(0)
+            try:
+                count_try += 1
+                player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+                break
+            except coc.NotFound as exc:
+                raise InvalidTag(tag) from exc            
+            except coc.ClashOfClansException as exc:
+                if cached:
+                    player = cached
+                    break
+                else:
+                    raise ClashAPIError(exc) from exc
+            except:
+                if count_try > 10:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
+                continue
+                  
+        return player
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         def _db_query(q_clan,q_season):
@@ -232,17 +243,27 @@ class ClashOfClansClient(commands.Cog):
             if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
                 return cached
 
-        try:
-            clan = await self.client.coc.get_clan(n_tag,cls=aClan)
-            return clan
-
-        except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            if cached:
-                return cached
-            else:
-                raise ClashAPIError(exc) from exc               
+        count_try = 0
+        while True:
+            await asyncio.sleep(0)
+            try:
+                count_try += 1
+                clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+                break                
+            except coc.NotFound as exc:
+                raise InvalidTag(tag) from exc
+            except coc.ClashOfClansException as exc:
+                if cached:
+                    clan = cached
+                    break
+                else:
+                    raise ClashAPIError(exc) from exc
+            except:
+                if count_try > 10:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
+                continue
+        return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
         def _db_query():
@@ -295,37 +316,57 @@ class ClashOfClansClient(commands.Cog):
     ############################################################    
     async def get_clan_war(self,clan:aClan) -> aClanWar:
         api_war = None
-        try:
-            api_war = await self.client.coc.get_clan_war(clan.tag)
-
-        except coc.PrivateWarLog:
-            return None
-        except coc.NotFound as exc:
-            raise InvalidTag(clan.tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            raise ClashAPIError(exc) from exc
-        finally:
-            if api_war:                
-                if getattr(api_war,'state','notInWar') != 'notInWar':
-                    clan_war = await aClanWar.create_from_api(api_war)
-                    return clan_war
-            return None
+        
+        count_try = 0
+        while True:
+            await asyncio.sleep(0)
+            try:
+                count_try += 1
+                api_war = await self.client.coc.get_clan_war(clan.tag)
+                break
+            except coc.PrivateWarLog:
+                break
+            except coc.NotFound as exc:
+                raise InvalidTag(clan.tag) from exc
+            except coc.ClashOfClansException as exc:
+                raise ClashAPIError(exc) from exc
+            except:
+                if count_try > 10:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
+                continue
+        
+        if api_war:                
+            if getattr(api_war,'state','notInWar') != 'notInWar':
+                clan_war = await aClanWar.create_from_api(api_war)
+                return clan_war
+        return None
             
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
         api_group = None
-        try:
-            api_group = await self.client.coc.get_league_group(clan.tag)
-
-        except coc.NotFound:
-            pass
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            raise ClashAPIError(exc)
-        finally:
-            if api_group:
-                if api_group.state in ['preparation','inWar','ended','warEnded']:
-                    league_group = await WarLeagueGroup.from_api(clan,api_group)
-                    return league_group
-            return None        
+        
+        count_try = 0
+        while True:
+            await asyncio.sleep(0)
+            try:
+                count_try += 1
+                api_group = await self.client.coc.get_league_group(clan.tag)
+                break
+            except coc.NotFound:
+                break
+            except coc.ClashOfClansException as exc:
+                raise ClashAPIError(exc)
+            except:
+                if count_try > 10:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
+                continue
+                
+        if api_group:
+            if api_group.state in ['preparation','inWar','ended','warEnded']:
+                league_group = await WarLeagueGroup.from_api(clan,api_group)
+                return league_group
+        return None
                 
     ############################################################
     #####
@@ -335,23 +376,34 @@ class ClashOfClansClient(commands.Cog):
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
         raidloggen = None
         api_raid = None
-        try:
-            raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+        
+        count_try = 0
+        while True:
+            await asyncio.sleep(0)
+            try:
+                count_try += 1
+                raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+                break
 
-        except coc.PrivateWarLog:
-            return None
-        except coc.NotFound as exc:
-            raise InvalidTag(self.tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            raise ClashAPIError(exc) from exc
-        finally:
-            if raidloggen:
-                if len(raidloggen) > 0:
-                    api_raid = raidloggen[0]
-                    if api_raid:
-                        raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
-                        return raid_weekend
-            return None                
+            except coc.PrivateWarLog:
+                break
+            except coc.NotFound as exc:
+                raise InvalidTag(self.tag) from exc
+            except coc.ClashOfClansException as exc:
+                raise ClashAPIError(exc) from exc
+            except:
+                if count_try > 10:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
+                continue
+                
+        if raidloggen:
+            if len(raidloggen) > 0:
+                api_raid = raidloggen[0]
+                if api_raid:
+                    raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
+                    return raid_weekend
+        return None
             
     ############################################################
     #####
