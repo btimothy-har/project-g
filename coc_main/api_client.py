@@ -400,11 +400,11 @@ class BotClashClient():
         try:
             while True:
                 try:
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(1)
                     reload = False
-                    if self.player_api_avg > 5000 or max(self.player_api[-100:]) > 15000:
+                    if self.player_api_avg > 3000 or max(self.player_api[-100:]) > 10000:
                         reload = True                
-                    if self.clan_api_avg > 5000 or max(self.clan_api[-100:]) > 15000:
+                    if self.clan_api_avg > 3000 or max(self.clan_api[-100:]) > 10000:
                         reload = True
                     
                     if reload:
