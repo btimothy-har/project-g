@@ -132,6 +132,11 @@ class CustomThrottler(coc.BasicThrottler):
     
     async def __aexit__(self, exc_type, exc, tb):
         self.increment_rcvd()
+        if max(self.client.player_api[-100:]) > 20000 or max(self.client.clan_api[-100:]) > 20000:
+            api_connect_time = pendulum.now() - self.client._last_login
+            self.coc_main_log.warning(f"Refreshing Clash API Client Connection. Uptime: {api_connect_time.total_seconds()}.")
+            await self.client.api_logout()
+            await self.client.api_login()
 
 ############################################################
 ############################################################
