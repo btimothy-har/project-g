@@ -470,14 +470,13 @@ class ClashOfClansTasks(commands.Cog):
                 + "```",
             inline=True
             )
-        diff = pendulum.now() - self.discord_loop.last_loop
         embed.add_field(
             name="**Discord**",
             value="```ini"
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
                 + f"\n{'[Running]':<10} {self.discord_loop._running:,}"
-                + f"\n{'[Last]':<10} {diff.diff_for_humans()}"
+                + f"\n{'[Last]':<10} {self.discord_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + "```",
             inline=True
