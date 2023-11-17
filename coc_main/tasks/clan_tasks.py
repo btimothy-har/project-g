@@ -70,15 +70,14 @@ class ClanLoop(TaskLoop):
     
     async def start(self):
         bot_client.coc_main_log.info(f"Clan Loop started.")
-        self._active = True
-        await self._loop_task()
+        await super().start()
             
-    def stop(self):
-        self._active = False
+    async def stop(self):
         try:
             bot_client.coc_main_log.info(f"Clan Loop stopped.")
         except:
             pass
+        await super().stop()
     
     @property
     def throttle(self):
@@ -131,7 +130,8 @@ class ClanLoop(TaskLoop):
 
                 for tag in all_clan_tags:
                     await asyncio.sleep(sleep)
-                    asyncio.create_task(self._run_single_loop(tag))
+                    task = asyncio.create_task(self._run_single_loop(tag))
+                    await self._queue.put(task)
             
                 await asyncio.sleep(10)
         
@@ -144,7 +144,40 @@ class ClanLoop(TaskLoop):
                     message="FATAL CLAN LOOP ERROR",
                     error=exc,
                     )
-                await self.start()
+                await self._loop_task()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"CLAN TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="CLAN TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _run_single_loop(self,tag:str):
         try:
@@ -203,16 +236,19 @@ class ClanLoop(TaskLoop):
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
         for event in ClanLoop._clan_events:
-            asyncio.create_task(event(old_clan,new_clan))
+            task = asyncio.create_task(event(old_clan,new_clan))
+            await self._queue.put(task)
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
                 for event in ClanLoop._member_leave_events:
-                    asyncio.create_task(event(member,new_clan))
+                    task = asyncio.create_task(event(member,new_clan))
+                    await self._queue.put(task)
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
                 for event in ClanLoop._member_join_events:
-                    asyncio.create_task(event(member,new_clan))
+                    task = asyncio.create_task(event(member,new_clan))
+                    await self._queue.put(task)

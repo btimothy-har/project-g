@@ -37,20 +37,15 @@ class TaskLoop():
 
     def __init__(self):
         self._active = False
-
-        self.task = None
-        self.tags = []
+        self._collector = None
+        self._queue = asyncio.Queue()
 
         self.run_time = deque(maxlen=100)
-
-        self.defer_count = 0
-        self.deferred = True
-    
-    def __del__(self):
-        if self.task:
-            self.task.cancel()
     
     async def _loop_task(self):
+        pass
+
+    async def _collector_task(self):
         pass
 
     @property
@@ -85,21 +80,13 @@ class TaskLoop():
     ##################################################
     async def start(self):
         self._active = True
-        if not self.task or self.task.done():
-            self.task = asyncio.create_task(self._loop_task())
-            return self.task
-        return None
+        self._collector = asyncio.create_task(self._collector_task())
+        await self._loop_task()
     
     async def stop(self):
         self._active = False
-        if self.task:
-            task = self.task
-            task.cancel()
-            self.task = None
-            try:
-                await task
-            except:
-                pass
+        self._collector.cancel()
+        await self._collector
     
     def unlock(self,lock:asyncio.Lock):
         try:
@@ -118,25 +105,6 @@ class TaskLoop():
             return False
         except:
             return False
-    
-    @property
-    def to_defer(self) -> bool:        
-        if self.defer_count < 6:
-            rand = random.randint(1,11000) #0.01%
-            if rand % 10 == 0:
-                return False
-            return True
-        if self.defer_count < 12:
-            rand = random.randint(1,2200) #0.05%
-            if rand % 10 == 0:
-                return False
-            return True
-        if self.defer_count < 18:
-            rand = random.randint(1,1100) #1%
-            if rand % 10 == 0:
-                return False
-            return True        
-        return False
     
     @classmethod
     def runtime_min(cls) -> int:

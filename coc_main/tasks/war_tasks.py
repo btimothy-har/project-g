@@ -141,20 +141,19 @@ class ClanWarLoop(TaskLoop):
     def __init__(self):        
         if self._is_new:
             super().__init__()
-            self._is_new = False
             self._tags = []
+            self._is_new = False            
     
     async def start(self):
         bot_client.coc_main_log.info(f"War Loop started.")
-        self._active = True
-        await self._loop_task()
+        await super().start()
     
-    def stop(self):
-        self._active = False
+    async def stop(self):
         try:
-            bot_client.coc_main_log.debug(f"War Loop stopped.")
+            bot_client.coc_main_log.info(f"War Loop stopped.")
         except:
             pass
+        await super().stop()
     
     def add_to_loop(self,tag:str):
         n_tag = coc.utils.correct_tag(tag)
@@ -185,7 +184,8 @@ class ClanWarLoop(TaskLoop):
                 sleep = (1 / len(self._tags))
                 for tag in self._tags:
                     await asyncio.sleep(sleep)
-                    asyncio.create_task(self._run_single_loop(tag))
+                    task = asyncio.create_task(self._run_single_loop(tag))
+                    await self._queue.put(task)
 
                 await asyncio.sleep(30)
             
@@ -198,7 +198,40 @@ class ClanWarLoop(TaskLoop):
                     message="FATAL WAR LOOP ERROR",
                     error=exc,
                     )
-                await self.start()
+                await self._loop_task()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"WAR TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="WAR TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _run_single_loop(self,tag:str):
         try:
@@ -220,7 +253,7 @@ class ClanWarLoop(TaskLoop):
                 
                 st = pendulum.now()
                 try:
-                    clan = await self.coc_client.fetch_clan(tag=tag)
+                    clan = await bot_client.coc.get_clan(tag,cls=aClan)
                 except (InvalidTag,ClashAPIError):
                     return self.unlock(lock)
                 
@@ -277,31 +310,37 @@ class ClanWarLoop(TaskLoop):
 
         if getattr(cached_war,'state',None) != 'preparation' and new_war.state == 'preparation':
             for event in ClanWarLoop._new_war_events:
-                asyncio.create_task(event(clan,current_war))  
+                task = asyncio.create_task(event(clan,current_war))
+                await self._queue.put(task)
             
         #War Started
         elif getattr(cached_war,'state',None) == 'preparation' and new_war.state == 'inWar':
             for event in ClanWarLoop._war_start_events:
-                asyncio.create_task(event(clan,current_war))
+                task = asyncio.create_task(event(clan,current_war))
+                await self._queue.put(task)
 
         #War Ended
         elif getattr(cached_war,'state',None) == 'inWar' and new_war.state == 'warEnded':
             for event in ClanWarLoop._war_ended_events:
-                asyncio.create_task(event(clan,current_war))
+                task = asyncio.create_task(event(clan,current_war))
+                await self._queue.put(task)
                
         else:
             for event in ClanWarLoop._ongoing_war_events:
-                asyncio.create_task(event(clan,current_war))
+                task = asyncio.create_task(event(clan,current_war))
+                await self._queue.put(task)
         
             new_attacks = [a for a in new_war.attacks if a.order not in [ca.order for ca in getattr(cached_war,'attacks',[])]]
             for event in ClanWarLoop._new_attack_events:
                 for a in new_attacks:
-                    asyncio.create_task(event(current_war,a.order))
+                    task = asyncio.create_task(event(current_war,a.order))
+                    await self._queue.put(task)
 
         if is_current:
             war_reminders = await EventReminders.war_reminders_for_clan(clan)
             for r in war_reminders:
-                asyncio.create_task(self._setup_war_reminder(clan,current_war, r))
+                task = asyncio.create_task(self._setup_war_reminder(clan,current_war, r))
+                await self._queue.put(task)
         
     async def _update_league_group(self,clan:aClan):
         war_reminders = await EventReminders.war_reminders_for_clan(clan)

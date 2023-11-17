@@ -96,20 +96,19 @@ class ClanRaidLoop(TaskLoop):
     def __init__(self):        
         if self._is_new:
             super().__init__()
-            self._is_new = False
             self._tags = []
+            self._is_new = False            
     
     async def start(self):
         bot_client.coc_main_log.info(f"Raid Loop started.")
-        self._active = True
-        await self._loop_task()
+        await super().start()
     
-    def stop(self):
-        self._active = False
+    async def stop(self):
         try:
             bot_client.coc_main_log.info(f"Raid Loop stopped.")
         except:
             pass
+        await super().stop()
 
     def add_to_loop(self,tag:str):
         n_tag = coc.utils.correct_tag(tag)
@@ -145,7 +144,8 @@ class ClanRaidLoop(TaskLoop):
                 sleep = (1 / len(self._tags))
                 for tag in self._tags:
                     await asyncio.sleep(sleep)
-                    asyncio.create_task(self._run_single_loop(tag))                
+                    task = asyncio.create_task(self._run_single_loop(tag))
+                    await self._queue.put(task)
 
                 await asyncio.sleep(30)
 
@@ -158,7 +158,40 @@ class ClanRaidLoop(TaskLoop):
                     message="FATAL RAID LOOP ERROR",
                     error=exc,
                     )
-                await self.start()
+                await self._loop_task()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"RAID TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="RAID TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _run_single_loop(self,tag:str):
         try:
@@ -176,7 +209,7 @@ class ClanRaidLoop(TaskLoop):
                 
                 st = pendulum.now()
                 try:
-                    clan = await self.coc_client.fetch_clan(tag=tag)
+                    clan = await bot_client.coc.get_clan(tag,cls=aClan)
                 except (InvalidTag,ClashAPIError):
                     return self.unlock(lock)
                 
@@ -222,16 +255,19 @@ class ClanRaidLoop(TaskLoop):
         #New Raid Started
         if new_raid.start_time != cached_raid.start_time:
             for event in ClanRaidLoop._raid_start_events:
-                asyncio.create_task(event(clan,current_raid))
+                task = asyncio.create_task(event(clan,current_raid))
+                await self._queue.put(task)
 
         #Raid Ended
         elif new_raid.state in ['ended'] and getattr(cached_raid,'state',None) == 'ongoing':
             for event in ClanRaidLoop._raid_ended_events:
-                asyncio.create_task(event(clan,current_raid))
+                task = asyncio.create_task(event(clan,current_raid))
+                await self._queue.put(task)
         
         raid_reminders = await EventReminders.raid_reminders_for_clan(clan)
         for r in raid_reminders:
-            asyncio.create_task(self._setup_raid_reminder(clan,current_raid,r))
+            task = asyncio.create_task(self._setup_raid_reminder(clan,current_raid,r))
+            await self._queue.put(task)
     
     ##################################################
     ### SUPPORTING FUNCTIONS

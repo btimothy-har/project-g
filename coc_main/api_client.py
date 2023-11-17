@@ -115,7 +115,7 @@ class CustomThrottler(coc.BasicThrottler):
         diff = pendulum.now() - self._sent_time
         if diff.total_seconds() == 0:
             return True
-        if self._sent / diff.total_seconds() > self.client.rate_limit:
+        if self._sent / diff.total_seconds() > (self.client.rate_limit * 0.8):
             return True
         return False
     

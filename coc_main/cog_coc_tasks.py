@@ -252,11 +252,14 @@ class ClashOfClansTasks(commands.Cog):
         for handler in bot_client.coc_data_log.handlers:
             bot_client.coc_data_log.removeHandler(handler)
 
-        self.discord_loop.stop()
-        self.raid_loop.stop()
-        self.war_loop.stop()
-        self.clan_loop.stop()
-        self.player_loop.stop()
+        stop_tasks = []
+        stop_tasks.append(asyncio.create_task(self.discord_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.raid_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.war_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.clan_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.player_loop.stop()))
+        
+        await asyncio.gather(*stop_tasks,return_exceptions=True)
 
         aMember._global = {}
         aMember._local = {}
@@ -519,6 +522,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB]':<15} {len(bot_client.player_cache):,} / {len(db_players):,}"
                 + f"\n{'[Queue]':<15} {len(bot_client.player_cache.queue):,}"
+                + f"\n{'[Tasks]':<15} {self.player_loop._queue.qsize():,}"
                 + f"\n{'[Throttle]':<15} " + f"{'On' if self.player_throttle._throttle else 'Off'}: {self.player_throttle.throttle_count} ({self.player_throttle.sleep_time*1000:.3f}ms)"
                 + f"\n{'[Runtime]':<15} {round(PlayerLoop.runtime_avg(),1)}s ({round(PlayerLoop.runtime_min())}s - {round(PlayerLoop.runtime_max())}s)"
                 + "```",
@@ -530,6 +534,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Mem/DB]':<15} {len(bot_client.clan_cache):,} / {len(db_clan):,}"
                 + f"\n{'[Queue]':<15} {len(bot_client.clan_cache.queue):,}"
+                + f"\n{'[Tasks]':<15} {self.clan_loop._queue.qsize():,}"
                 + f"\n{'[Throttle]':<15} " + f"{'On' if self.clan_throttle._throttle else 'Off'}: {self.clan_throttle.throttle_count} ({self.clan_throttle.sleep_time*1000:.3f}ms)"
                 + f"\n{'[Runtime]':<15} {round(ClanLoop.runtime_avg(),1)}s ({round(ClanLoop.runtime_min())}s - {round(ClanLoop.runtime_max())}s)"
                 + "```",
@@ -542,6 +547,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
                 + f"\n{'[Database]':<10} {len(db_wars):,}"
                 + f"\n{'[Clans]':<10} {len(self.war_loop._tags):,}"
+                + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
                 + f"\n{'[Runtime]':<10} {round(ClanWarLoop.runtime_avg())}s"
                 + "```",
             inline=True
@@ -553,6 +559,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
                 + f"\n{'[Database]':<10} {len(db_raids):,}"
                 + f"\n{'[Clans]':<10} {len(self.raid_loop._tags):,}"
+                + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
                 + f"\n{'[Runtime]':<10} {round(ClanRaidLoop.runtime_avg())}s"
                 + "```",
             inline=True
@@ -562,6 +569,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
+                + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + f"\n{'[Runtime]':<10} {round(DiscordGuildLoop.runtime_avg())}s"
                 + "```",
             inline=True

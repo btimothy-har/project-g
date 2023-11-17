@@ -46,7 +46,7 @@ class PlayerTasks():
 
             if old_player.name != new_player.name:
                 update = True        
-            if old_player.war_opted_in != None and new_player.war_opted_in != None and old_player.war_opted_in != new_player.war_opted_in:
+            if old_player.clan and new_player.clan and old_player.war_opted_in != new_player.war_opted_in:
                 update = True        
             if old_player.label_ids != new_player.label_ids:
                 update = True
@@ -406,15 +406,14 @@ class PlayerLoop(TaskLoop):
 
     async def start(self):
         bot_client.coc_main_log.info(f"Player Loop started.")
-        self._active = True
-        await self._loop_task()
+        await super().start()
     
-    def stop(self):
-        self._active = False
+    async def stop(self):
         try:
             bot_client.coc_main_log.info(f"Player Loop stopped.")
         except:
             pass
+        await super().stop()        
     
     @property
     def throttle(self):
@@ -475,7 +474,8 @@ class PlayerLoop(TaskLoop):
 
                 for tag in all_player_tags:
                     await asyncio.sleep(sleep)
-                    asyncio.create_task(self._run_single_loop(tag))
+                    task = asyncio.create_task(self._run_single_loop(tag))
+                    await self._queue.put(task)
 
                 await asyncio.sleep(10)
         
@@ -488,7 +488,40 @@ class PlayerLoop(TaskLoop):
                     message="FATAL PLAYER LOOP ERROR",
                     error=exc,
                     )
-                await self.start()
+                await self._loop_task()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"PLAYER TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="PLAYER TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+                        
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _run_single_loop(self,tag:str):
         try:
@@ -502,7 +535,7 @@ class PlayerLoop(TaskLoop):
                     return
                 await lock.acquire()
 
-                cached_player = self._cached.get(tag,None)
+                cached_player = self._cached.get(tag,bot_client.player_cache.get(tag))
                 if self.defer(cached_player):
                     return self.unlock(lock)
 
@@ -546,9 +579,11 @@ class PlayerLoop(TaskLoop):
     
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
         for event in PlayerLoop._player_events:
-            asyncio.create_task(event(old_player,new_player))
+            task = asyncio.create_task(event(old_player,new_player))
+            await self._queue.put(task)
 
         achievement_iter = AsyncIter(new_player.achievements)
         async for achievement in achievement_iter:
             for event in PlayerLoop._achievement_events:
-                asyncio.create_task(event(old_player,new_player,achievement))
+                task = asyncio.create_task(event(old_player,new_player,achievement))
+                await self._queue.put(task)

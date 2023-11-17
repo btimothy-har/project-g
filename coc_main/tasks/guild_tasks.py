@@ -30,28 +30,26 @@ class DiscordGuildLoop(TaskLoop):
     
     async def start(self):
         bot_client.coc_main_log.info(f"Guild Loop started.")
-        self._active = True
-        await self._loop_task()
+        await super().start()
     
-    def stop(self):
-        self._active = False
+    async def stop(self):
         try:
             bot_client.coc_main_log.info(f"Guild Loop stopped.")
         except:
             pass
+        await super().stop()
 
     @property
     def start_recruiting(self) -> bool:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.recruiting_loop_started
+        try:
+            cog = bot_client.bot.get_cog('ClashOfClansTasks')
+            return cog.recruiting_loop_started
+        except:
+            return False
 
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
-    @property
-    def guild(self):
-        return bot_client.bot.get_guild(self.guild_id)
-
     async def _loop_task(self):
         try:
             while self.loop_active:
@@ -62,7 +60,7 @@ class DiscordGuildLoop(TaskLoop):
 
                 for guild in bot_client.bot.guilds:
                     await asyncio.sleep(sleep)
-                    asyncio.create_task(self._run_single_loop(guild))
+                    await self._run_single_loop(guild)
 
                 await asyncio.sleep(10)
 
@@ -75,7 +73,40 @@ class DiscordGuildLoop(TaskLoop):
                     message="FATAL GUILD LOOP ERROR",
                     error=exc,
                     )
-                await self.start()
+                await self._loop_task()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"GUILD TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="GUILD TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+                        
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _run_single_loop(self,guild:discord.Guild):
         try:
@@ -83,24 +114,23 @@ class DiscordGuildLoop(TaskLoop):
         except KeyError:
             self._locks[guild.id] = locks = {}
 
-        st = pendulum.now()
+        task = asyncio.create_task(self._refresh_member_cache(guild,locks))
+        await self._queue.put(task)
+        
+        task = asyncio.create_task(self._save_member_roles(guild,locks))
+        await self._queue.put(task)
 
-        tasks = [
-            asyncio.create_task(self._refresh_member_cache(guild,locks)),
-            asyncio.create_task(self._save_member_roles(guild,locks)),
-            asyncio.create_task(self._update_clocks(guild,locks)),
-            asyncio.create_task(self._update_clan_panels(guild,locks)),
-            asyncio.create_task(self._update_application_panels(guild,locks)),
-            asyncio.create_task(self._update_recruiting_reminder(guild,locks))
-            ]
-        await asyncio.gather(*tasks)
+        task = asyncio.create_task(self._update_clocks(guild,locks))
+        await self._queue.put(task)
+        
+        task = asyncio.create_task(self._update_clan_panels(guild,locks))
+        await self._queue.put(task)
 
-        et = pendulum.now()
-        try:
-            runtime = et-st
-            self.run_time.append(runtime.total_seconds())
-        except:
-            pass
+        task = asyncio.create_task(self._update_application_panels(guild,locks))
+        await self._queue.put(task)
+        
+        task = asyncio.create_task(self._update_recruiting_reminder(guild,locks))
+        await self._queue.put(task)
     
     async def _refresh_member_cache(self,guild:discord.Guild,locks:dict):
         try:
@@ -111,6 +141,8 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        st = pendulum.now()
+
         self.loop.call_later(30,self.unlock,lock)
         
         try:
@@ -127,6 +159,14 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error refreshing Member Cache."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _save_member_roles(self,guild:discord.Guild,locks:dict):
         try:
@@ -137,6 +177,8 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+
+        st = pendulum.now()
         self.loop.call_later(300,self.unlock,lock)
         
         try:
@@ -152,6 +194,14 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error saving Member roles."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _update_clocks(self,guild:discord.Guild,locks:dict):
         try:
@@ -162,6 +212,7 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        st = pendulum.now()
         self.loop.call_later(300,self.unlock,lock)
         
         try:
@@ -172,6 +223,14 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error updating Guild Clocks."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _update_clan_panels(self,guild:discord.Guild,locks:dict):
         try:
@@ -182,6 +241,7 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        st = pendulum.now()
         self.loop.call_later(1800,self.unlock,lock)
 
         try:
@@ -192,6 +252,14 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error updating Guild Clan Panels."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _update_application_panels(self,guild:discord.Guild,locks:dict):
         try:
@@ -202,6 +270,7 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        st = pendulum.now()
         self.loop.call_later(1800,self.unlock,lock)
 
         try:
@@ -212,6 +281,14 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error updating Guild Application Panels."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _update_recruiting_reminder(self,guild:discord.Guild,locks:dict):
         if not self.start_recruiting:
@@ -225,6 +302,7 @@ class DiscordGuildLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        st = pendulum.now()
         self.loop.call_later(60,self.unlock,lock)
         
         try:
@@ -235,3 +313,11 @@ class DiscordGuildLoop(TaskLoop):
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error updating Recruiting Reminders."
                 )
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et-st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
