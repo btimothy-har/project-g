@@ -287,7 +287,7 @@ class Bank(commands.Cog):
         async def _hero_reward(hero:str):
             old_hero = old_player.get_hero(hero)
             new_hero = new_player.get_hero(hero)
-            upgrades = range(old_hero.level+1,new_hero.level+1)
+            upgrades = range(getattr(old_hero,'level',0)+1,new_hero.level+1)
             async for u in AsyncIter(upgrades):
                 if u > new_hero.min_level and rew > 0:
                     await bank.deposit_credits(member,rew)
