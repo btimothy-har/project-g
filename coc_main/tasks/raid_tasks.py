@@ -1,7 +1,7 @@
 import coc
 import asyncio
 import pendulum
-import aiohttp
+import copy
 
 from typing import *
 
@@ -97,7 +97,6 @@ class ClanRaidLoop(TaskLoop):
     def __init__(self):        
         if self._is_new:
             super().__init__()
-            self._tags = []
             self._is_new = False            
     
     async def start(self):
@@ -112,16 +111,14 @@ class ClanRaidLoop(TaskLoop):
         await super().stop()
 
     def add_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag not in self._tags:
-            self._tags.append(n_tag)
-            bot_client.coc_main_log.info(f"Added {n_tag} to Raid Loop.")
+        add, n_tag = super().add_to_loop(tag)
+        if add:
+            bot_client.coc_main_log.debug(f"Added {n_tag} to Raid Loop.")
     
     def remove_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag in self._tags:
-            self._tags.remove(n_tag)
-            bot_client.coc_main_log.info(f"Removed {n_tag} from Raid Loop.")
+        remove, n_tag = super().remove_to_loop(tag)
+        if remove:
+            bot_client.coc_main_log.debug(f"Removed {n_tag} from Raid Loop.")
     
     ##################################################
     ### PRIMARY TASK LOOP
@@ -130,22 +127,23 @@ class ClanRaidLoop(TaskLoop):
         try:
             while self.loop_active:
                 if self.api_maintenance:
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(10)
                     continue
 
                 if pendulum.now().day_of_week not in [5,6,7,1]:
-                    await asyncio.sleep(60)
+                    await asyncio.sleep(10)
                     continue
 
-                if len(self._tags) == 0:
-                    await asyncio.sleep(30)
+                tags = copy.copy(self._tags)
+                if len(tags) == 0:
+                    await asyncio.sleep(10)
                     continue
 
+                st = pendulum.now()
                 self._running = True
-
-                sleep = (1 / len(self._tags))
+                sleep = (1 / len(tags))
                 tasks = []
-                for tag in self._tags:
+                for tag in tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
@@ -153,8 +151,12 @@ class ClanRaidLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-                
-                await asyncio.sleep(30)
+                try:
+                    runtime = self._last_loop-st
+                    self.run_time.append(runtime.total_seconds())
+                except:
+                    pass
+                await asyncio.sleep(10)
 
         except Exception as exc:
             if self.loop_active:
@@ -214,9 +216,8 @@ class ClanRaidLoop(TaskLoop):
 
                 cached_raid = self._cached.get(tag,None)
                 
-                st = pendulum.now()
                 try:
-                    clan = await self.coc_client.fetch_clan(tag,no_cache=True)
+                    clan = await self.coc_client.fetch_clan(tag)
                 except:
                     return self.loop.call_later(10,self.unlock,lock)
                 
@@ -248,14 +249,6 @@ class ClanRaidLoop(TaskLoop):
                     error=exc,
                     )
             return self.unlock(lock)
-
-        finally:
-            et = pendulum.now()
-            try:
-                runtime = et - st
-                self.run_time.append(runtime.total_seconds())
-            except:
-                pass
     
     async def _dispatch_events(self,clan:aClan,cached_raid:coc.RaidLogEntry,new_raid:coc.RaidLogEntry):        
         current_raid = await aRaidWeekend.create_from_api(clan,new_raid)

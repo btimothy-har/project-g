@@ -70,6 +70,16 @@ class ClashOfClansClient(commands.Cog):
     @property
     def clan_api_avg(self) -> float:
         return bot_client.clan_api_avg
+    
+    async def get_player_from_loop(self,tag:str) -> Optional[aPlayer]:
+        n_tag = coc.utils.correct_tag(tag)
+        task_cog = self.bot.get_cog("ClashOfClansTasks")
+        return task_cog.player_loop._cached.get(n_tag,None)
+    
+    async def get_clan_from_loop(self,tag:str) -> Optional[aClan]:
+        n_tag = coc.utils.correct_tag(tag)
+        task_cog = self.bot.get_cog("ClashOfClansTasks")
+        return task_cog.clan_loop._cached.get(n_tag,None)
 
     ##################################################
     ### COG LOAD
@@ -109,9 +119,9 @@ class ClashOfClansClient(commands.Cog):
             f"Found {len(clans):,} Clans in database."
             )
         
-        c_queue_task = asyncio.create_task(bot_client.clan_cache.add_many_to_queue([c.tag for c in clans]))
-        p_queue_task = asyncio.create_task(bot_client.player_cache.add_many_to_queue([p.tag for p in players]))
-        await asyncio.gather(c_queue_task,p_queue_task)
+        # c_queue_task = asyncio.create_task(bot_client.clan_queue.add_many([c.tag for c in clans]))
+        # p_queue_task = asyncio.create_task(bot_client.player_queue.add_many([p.tag for p in players]))
+        #await asyncio.gather(c_queue_task,p_queue_task)
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
@@ -162,43 +172,32 @@ class ClashOfClansClient(commands.Cog):
     ##### COC: PLAYERS
     #####
     ############################################################
-    async def fetch_player(self,tag:str,no_cache=False,enforce_lock=False) -> aPlayer:
-        player = None
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)        
-        
-        try:
-            cached = self.client.player_cache.get(n_tag)
-        except:
-            cached = None
-
-        if not no_cache and isinstance(cached,aPlayer):
-            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
-                return cached
-            
+    async def fetch_player(self,tag:str) -> aPlayer:
+        player = None            
         count_try = 0
         while True:
             await asyncio.sleep(0)
             try:
                 count_try += 1
-                player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+                player = await self.client.coc.get_player(tag,cls=aPlayer)
                 break
+
             except coc.NotFound as exc:
-                raise InvalidTag(tag) from exc            
+                raise InvalidTag(tag) from exc
+            
             except coc.ClashOfClansException as exc:
+                cached = await self.get_player_from_loop(tag)
                 if cached:
                     player = cached
                     break
                 else:
                     raise ClashAPIError(exc) from exc
+                
             except:
-                if count_try > 10:
+                if count_try > 3:
                     raise ClashAPIError()
                 await asyncio.sleep(1)
-                continue
-                  
-        bot_client.player_cache.set(player.tag,player)
+                continue            
         return player
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
@@ -229,42 +228,32 @@ class ClashOfClansClient(commands.Cog):
     ##### COC: CLANS
     #####
     ############################################################
-    async def fetch_clan(self,tag:str,no_cache:bool=False,enforce_lock=False) -> aClan:
-        clan = None
-        n_tag = coc.utils.correct_tag(tag)
-        if not coc.utils.is_valid_tag(tag):
-            raise InvalidTag(tag)
-
-        try:
-            cached = self.client.clan_cache.get(n_tag)
-        except:
-            cached = None
-
-        if not no_cache and isinstance(cached,aClan):
-            if pendulum.now().int_timestamp - cached.timestamp.int_timestamp < 3600:
-                return cached
-
+    async def fetch_clan(self,tag:str) -> aClan:
+        clan = None       
         count_try = 0
         while True:
             await asyncio.sleep(0)
             try:
                 count_try += 1
-                clan = await self.client.coc.get_clan(n_tag,cls=aClan)
-                break                
+                clan = await self.client.coc.get_clan(tag,cls=aClan)
+                break
+
             except coc.NotFound as exc:
                 raise InvalidTag(tag) from exc
+            
             except coc.ClashOfClansException as exc:
+                cached = await self.get_clan_from_loop(tag)
                 if cached:
                     clan = cached
                     break
                 else:
                     raise ClashAPIError(exc) from exc
+                
             except:
-                if count_try > 10:
+                if count_try > 3:
                     raise ClashAPIError()
                 await asyncio.sleep(1)
                 continue
-        bot_client.clan_cache.set(clan.tag,clan)
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:

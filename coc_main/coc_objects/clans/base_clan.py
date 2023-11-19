@@ -505,7 +505,7 @@ class _ClanAttributes():
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
             self._lock = asyncio.Lock()
-            bot_client.clan_cache.add_to_queue(self.tag)
+            bot_client.clan_queue.add(self.tag)
             
         self._is_new = False
 

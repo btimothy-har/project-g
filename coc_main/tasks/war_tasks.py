@@ -2,6 +2,7 @@ import coc
 import asyncio
 import pendulum
 import aiohttp
+import copy
 
 from typing import *
 
@@ -32,14 +33,14 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_found(clan:aClan,war:aClanWar):
         try:
-            await bot_client.player_cache.add_many_to_queue([m.tag for m in war.members])
+            await bot_client.player_queue.add_many([m.tag for m in war.members])
         except Exception:
             bot_client.coc_main_log.exception(f"Error in New War task.")
 
     @staticmethod
     async def _war_start(clan:aClan,war:aClanWar):
         try:
-            await bot_client.player_cache.add_many_to_queue([m.tag for m in war.members])
+            await bot_client.player_queue.add_many([m.tag for m in war.members])
             if clan.is_registered_clan and len(clan.abbreviation) > 0:
                 await bot_client.update_bot_status(
                     cooldown=60,
@@ -141,7 +142,6 @@ class ClanWarLoop(TaskLoop):
     def __init__(self):        
         if self._is_new:
             super().__init__()
-            self._tags = []
             self._is_new = False            
     
     async def start(self):
@@ -156,16 +156,14 @@ class ClanWarLoop(TaskLoop):
         await super().stop()
     
     def add_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag not in self._tags:
-            self._tags.append(n_tag)
-            bot_client.coc_main_log.info(f"Added {n_tag} to War Loop.")
+        add, n_tag = super().add_to_loop(tag)
+        if add:
+            bot_client.coc_main_log.debug(f"Added {n_tag} to War Loop.")
     
     def remove_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag in self._tags:
-            self._tags.remove(n_tag)
-            bot_client.coc_main_log.info(f"Removed {n_tag} from War Loop.")
+        remove, n_tag = super().remove_to_loop(tag)
+        if remove:
+            bot_client.coc_main_log.debug(f"Removed {n_tag} from War Loop.")
 
     ##################################################
     ### PRIMARY TASK LOOP
@@ -174,18 +172,20 @@ class ClanWarLoop(TaskLoop):
         try:
             while self.loop_active:
                 if self.api_maintenance:
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(10)
                     continue
 
-                if len(self._tags) == 0:
-                    await asyncio.sleep(30)
+                tags = copy.copy(self._tags)
+                if len(tags) == 0:
+                    await asyncio.sleep(10)
                     continue
 
+                st = pendulum.now()
                 self._running = True
 
-                sleep = (1 / len(self._tags))
+                sleep = (1 / len(tags))
                 tasks = []
-                for tag in self._tags:
+                for tag in tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
@@ -193,8 +193,12 @@ class ClanWarLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-                
-                await asyncio.sleep(30)
+                try:
+                    runtime = self._last_loop-st
+                    self.run_time.append(runtime.total_seconds())
+                except:
+                    pass
+                await asyncio.sleep(10)
             
         except Exception as exc:
             if self.loop_active:
@@ -258,9 +262,8 @@ class ClanWarLoop(TaskLoop):
 
                 cached_war = cached_events.get('current_war',None)
                 
-                st = pendulum.now()
                 try:
-                    clan = await self.coc_client.fetch_clan(tag,no_cache=True)
+                    clan = await self.coc_client.fetch_clan(tag)
                 except:
                     return self.loop.call_later(10,self.unlock,lock)
                 
@@ -304,14 +307,6 @@ class ClanWarLoop(TaskLoop):
                     error=exc,
                     )
             return self.unlock(lock)
-
-        finally:
-            et = pendulum.now()
-            try:
-                runtime = et - st
-                self.run_time.append(runtime.total_seconds())
-            except:
-                pass
 
     async def _dispatch_events(self,clan:aClan,cached_war:coc.ClanWar,new_war:coc.ClanWar,is_current:bool=False):
         if new_war.state == 'notInWar':

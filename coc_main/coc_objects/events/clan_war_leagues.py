@@ -448,8 +448,7 @@ class WarLeagueClan(BasicClan):
         cwl_id = {
             'season':league_group.season.id,
             'tag':api_data.tag
-            }          
-        bot_client.clan_cache.add_to_queue(api_data.tag)
+            }
         await bot_client.run_in_thread(_save_to_db)
 
         await asyncio.gather(*[WarLeaguePlayer.from_api(league_group,api_data.tag,member) for member in api_data.members],return_exceptions=True)
@@ -809,8 +808,6 @@ class WarLeaguePlayer(BasicPlayer):
             'season':league_group.season.id,
             'tag':api_data.tag
             }
-
-        bot_client.player_cache.add_to_queue(api_data.tag)
         await bot_client.run_in_thread(_save_to_db)
 
         player = cls(api_data.tag,league_group.season)

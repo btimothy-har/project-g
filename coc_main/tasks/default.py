@@ -40,9 +40,24 @@ class TaskLoop():
         self._running = False
         self._collector = None
         self._last_loop = None
+        self._tags = set()
         self._queue = asyncio.Queue()
 
         self.run_time = deque(maxlen=100)
+    
+    def add_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)        
+        if n_tag not in self._tags:
+            self._tags.add(n_tag)
+            return True, n_tag
+        return False, n_tag
+    
+    def remove_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)
+        if n_tag in self._tags:
+            self._tags.discard(n_tag)
+            return True, n_tag
+        return False, n_tag
     
     async def _loop_task(self):
         pass
@@ -117,24 +132,21 @@ class TaskLoop():
         except:
             return False
     
-    @classmethod
-    def runtime_min(cls) -> int:
-        loop = cls()
+    @property
+    def runtime_min(self) -> int:
         try:
-            return min(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
+            return min(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
         except:
             return 0    
-    @classmethod
-    def runtime_max(cls) -> int:
-        loop = cls()
+    @property
+    def runtime_max(self) -> int:
         try:
-            return max(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
+            return max(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
         except:
             return 0                
-    @classmethod
-    def runtime_avg(cls) -> int:
-        loop = cls()
+    @property
+    def runtime_avg(self) -> int:
         try:
-            return sum(loop.run_time)/len(loop.run_time) if loop.loop_active and len(loop.run_time) > 0 else 0
+            return sum(self.run_time)/len(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
         except:
             return 0

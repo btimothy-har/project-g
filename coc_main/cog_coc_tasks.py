@@ -13,7 +13,7 @@ from discord.ext import tasks
 from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
-from redbot.core.utils.chat_formatting import humanize_list
+from redbot.core.utils.chat_formatting import humanize_list,box
 
 from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
@@ -77,8 +77,8 @@ class ClashOfClansTasks(commands.Cog):
         self.task_semaphore = asyncio.Semaphore(semaphore_limit)
 
         # DATA QUEUE
-        self.queue_lock = asyncio.Lock()
-        self.last_queue_run = None
+        self._clan_queue_task = None
+        self._player_queue_task = None
 
         # TASK REFRESH
         self.refresh_lock = asyncio.Lock()
@@ -136,8 +136,9 @@ class ClashOfClansTasks(commands.Cog):
         asyncio.create_task(self.start_recruiting_loop())
 
         self._controller_loop = asyncio.create_task(self.coc_task_controller())
-        self.clash_season_check.start()
-        self.coc_data_queue.start()        
+        self._clan_queue_task = asyncio.create_task(self.clan_queue_task())
+        self._player_queue_task = asyncio.create_task(self.player_queue_task())
+        self.clash_season_check.start()    
         self.refresh_coc_loops.start()
 
         asyncio.create_task(self.player_loop.start())
@@ -167,8 +168,9 @@ class ClashOfClansTasks(commands.Cog):
     ### COG LOAD
     ##################################################
     async def cog_unload(self):
+        self._clan_queue_task.cancel()
+        self._player_queue_task.cancel()
         self.refresh_coc_loops.cancel()
-        self.coc_data_queue.cancel()
         self.clash_season_check.cancel()
         
         self._controller_loop.cancel()
@@ -259,6 +261,39 @@ class ClashOfClansTasks(commands.Cog):
         
         except asyncio.CancelledError:
             return
+    
+    async def clan_queue_task(self):
+        try:
+            while True:
+                await asyncio.sleep((1/bot_client.rate_limit) * 3)
+                try:
+                    tag = await bot_client.clan_queue.get()
+                    self.clan_loop.add_to_loop(tag)
+                    bot_client.clan_queue.task_done()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    continue
+
+        except asyncio.CancelledError:
+            return
+    
+    async def player_queue_task(self):
+        try:
+            while True:
+                await asyncio.sleep((1/bot_client.rate_limit) * 3)
+                try:
+                    tag = await bot_client.player_queue.get()
+                    self.player_loop.add_to_loop(tag)
+                    bot_client.player_queue.task_done()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    continue
+        except asyncio.CancelledError:
+            return
 
     @tasks.loop(seconds=10.0)
     async def clash_season_check(self):
@@ -305,69 +340,6 @@ class ClashOfClansTasks(commands.Cog):
                 )        
         finally:
             self.last_season_check = pendulum.now()
-
-    @tasks.loop(seconds=10)
-    async def coc_data_queue(self):
-        if self.queue_lock.locked():
-            return
-        
-        sleep = (1 / bot_client.rate_limit) * 3
-        
-        async def load_clan_queue():            
-            async def fetch_clan(clan_tag):
-                try:
-                    async with self.api_semaphore:
-                        clan = await bot_client.coc.get_clan(clan_tag,cls=aClan)
-                        bot_client.clan_cache.set(clan.tag,clan)
-                        bot_client.clan_cache.remove_from_queue(clan_tag)
-                except coc.NotFound:
-                    bot_client.clan_cache.remove_from_queue(clan_tag)
-                    return None
-                except:
-                    return None
-            
-            queue = bot_client.clan_cache.queue.copy()
-            clan_queue = queue[:1000]
-            if len(clan_queue) > 0:
-                async for c in AsyncIter(clan_queue):
-                    await asyncio.sleep(sleep)
-                    asyncio.create_task(fetch_clan(c))
-            
-        async def load_player_queue():
-            async def fetch_player(player_tag):
-                try:
-                    async with self.api_semaphore:
-                        player = await bot_client.coc.get_player(player_tag,cls=aPlayer)
-                        bot_client.player_cache.set(player.tag,player)
-                        bot_client.player_cache.remove_from_queue(player_tag)
-                except coc.NotFound:
-                    bot_client.player_cache.remove_from_queue(player_tag)
-                    return None
-                except:
-                    return None
-            
-            queue = bot_client.player_cache.queue.copy()
-            player_queue = queue[:1000]
-            if len(player_queue) > 0:
-                async for p in AsyncIter(player_queue):
-                    await asyncio.sleep(sleep)
-                    asyncio.create_task(fetch_player(p))
-            
-        try:
-            async with self.queue_lock:
-                t = []
-                t.append(asyncio.create_task(load_clan_queue()))
-                t.append(asyncio.create_task(load_player_queue()))
-                await asyncio.gather(*t,return_exceptions=True)
-
-        except Exception as exc:
-            await self.bot.send_to_owners(f"An error occured during Clash Data Queue. Check logs for details."
-                + f"```{exc}```")
-            self.coc_main_log.exception(
-                f"Error in Clash Data Queue"
-                )
-        finally:
-            self.last_queue_run = pendulum.now()
     
     @tasks.loop(minutes=1.0)
     async def refresh_coc_loops(self):
@@ -382,7 +354,6 @@ class ClashOfClansTasks(commands.Cog):
         
         try:
             async with self.refresh_lock:
-
                 alliance_tags = await bot_client.run_in_thread(_get_alliance_tags)
                 alliance_clans = AsyncIter(alliance_tags)
                 async for tag in alliance_clans:
@@ -409,85 +380,104 @@ class ClashOfClansTasks(commands.Cog):
         embed = await clash_embed(self.bot,
             title="**Clash of Clans Data Status**",
             message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}"
-                + f"\n\n**Current Season: {bot_client.current_season.description}**"
-                + f"\n\n**__Loop Refresh__**\n"
-                + ("Running" if self.refresh_lock.locked() else "Not Running")
-                + "\nLast: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
-                + f"\n\n**__Queue Check__**\n"
-                + ("Running" if self.queue_lock.locked() else "Not Running")
-                + "\nLast: " + (f"<t:{self.last_queue_run.int_timestamp}:R>" if self.last_queue_run else "None")
-                + f"\n\n**__Season Check__**\n"
-                + ("Running" if self.season_lock.locked() else "Not Running")
-                + "\nLast: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None"),
+                + f"\n\n**Current Season: {bot_client.current_season.description}**",
             timestamp=pendulum.now()
             )
         
+        embed.add_field(
+            name="**Loop Refresh**",
+            value=f"Last: " + (f"<t:{self.last_task_refresh.int_timestamp}:R>" if self.last_task_refresh else "None")
+                + "```ini"
+                + f"\n{'[Running]':<10} " + (f"{'True':<5}" if self.refresh_lock.locked() else f"{'False':<5}")
+                + "```",
+            inline=True
+            )
+        embed.add_field(
+            name="**Season Check**",
+            value=f"Last: " + (f"<t:{self.last_season_check.int_timestamp}:R>" if self.last_season_check else "None")
+                + "```ini"
+                + f"\n{'[Running]':<10} " + (f"{'True':<5}" if self.season_lock.locked() else f"{'False':<5}")
+                + "```",
+            inline=True
+            )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
+
         client_waiters = len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0
         embed.add_field(
             name="**Tasks Client**",
             value="```ini"
-                + f"\n{'[Master Lock]':<15} " + (f"Locked" if self._master_lock.locked() else 'Unlocked')
-                + f"\n{'[Control Lock]':<15} " + (f"Locked" if self._task_lock.locked() else 'Unlocked') + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,}"
-                + f"\n{'[API Slots]':<15} " + f"{int(bot_client.rate_limit * 0.9) - self.api_semaphore._value:,} / {int(bot_client.rate_limit * 0.9):,} (Waiting: {client_waiters:,})"
+                + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
+                + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
+                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:<10,}"
+                + f"\n{'[API Slots]':<15} " + f"{int(bot_client.rate_limit * 0.9) - self.api_semaphore._value:,} / {int(bot_client.rate_limit * 0.9):,} (Wait: {client_waiters:,})"
                 + "```",
             inline=False
             )
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Player Loops**",
-            value="```ini"
-                + f"\n{'[Cache]':<10} {len(bot_client.player_cache):,}"
-                + f"\n{'[Queue]':<10} {len(bot_client.player_cache.queue):,}"
+            value="Last: " + (f"<t:{self.player_loop.last_loop.int_timestamp}:R>" if self.player_loop.last_loop else "None")
+                + "```ini"
+                + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
+                + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
-                + f"\n{'[Last]':<10} {self.player_loop.last_loop.diff_for_humans()}"
+                + f"\n{'[Runtime]':<10} {self.player_loop.runtime_avg:.2f}s"
                 + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"
                 + "```",
-            inline=False
+            inline=True
             )
         embed.add_field(
-            name="**Clans**",
-            value="```ini"
-                + f"\n{'[Cache]':<10} {len(bot_client.clan_cache):,}"
-                + f"\n{'[Queue]':<10} {len(bot_client.clan_cache.queue):,}"
+            name="**Clan Loops**",
+            value="Last: " + (f"<t:{self.clan_loop.last_loop.int_timestamp}:R>" if self.clan_loop.last_loop else "None")
+                + "```ini"
+                + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
+                + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
-                + f"\n{'[Last]':<10} {self.clan_loop.last_loop.diff_for_humans()}"
+                + f"\n{'[Runtime]':<10} {self.clan_loop.runtime_avg:.2f}s"
                 + f"\n{'[Tasks]':<10} {self.clan_loop._queue.qsize():,}"
                 + "```",
-            inline=False
+            inline=True
             )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Clan Wars**",
-            value="```ini"
-                + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
-                + f"\n{'[Clans]':<10} {len(self.war_loop._tags):,}"
+            value="Last: " + (f"<t:{self.war_loop.last_loop.int_timestamp}:R>" if self.war_loop.last_loop else "None")
+                + "```ini"                
+                + f"\n{'[Tags]':<10} {len(self.war_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.war_loop._running else 'False'}"
-                + f"\n{'[Last]':<10} {self.war_loop.last_loop.diff_for_humans()}"
+                + f"\n{'[Runtime]':<10} {self.war_loop.runtime_avg:.2f}s"
                 + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
+                + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
                 + "```",
-            inline=False
+            inline=True
             )
         embed.add_field(
             name="**Capital Raids**",
-            value="```ini"
-                + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
-                + f"\n{'[Clans]':<10} {len(self.raid_loop._tags):,}"
+            value="Last: " + (f"<t:{self.raid_loop.last_loop.int_timestamp}:R>" if self.raid_loop.last_loop else "None")
+                + "```ini"                
+                + f"\n{'[Tags]':<10} {len(self.raid_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.raid_loop._running else 'False'}"
-                + f"\n{'[Last]':<10} {self.raid_loop.last_loop.diff_for_humans()}"
+                + f"\n{'[Runtime]':<10} {self.raid_loop.runtime_avg:.2f}s"
                 + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
+                + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
                 + "```",
-            inline=False
+            inline=True
             )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Discord**",
-            value="```ini"
+            value="Last: " + (f"<t:{self.discord_loop.last_loop.int_timestamp}:R>" if self.discord_loop.last_loop else "None")
+                + "```ini"
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
                 + f"\n{'[Running]':<10} {'True' if self.discord_loop._running else 'False'}"
-                + f"\n{'[Last]':<10} {self.discord_loop.last_loop.diff_for_humans()}"
                 + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + "```",
-            inline=False
+            inline=True
             )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
         return embed
     
     @commands.group(name="cocdata")

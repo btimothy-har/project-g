@@ -80,11 +80,16 @@ class ClanLoop(TaskLoop):
             pass
         await super().stop()
     
-    @property
-    def throttle(self):
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.clan_throttle
-
+    def add_to_loop(self,tag:str):
+        add, n_tag = super().add_to_loop(tag)
+        if add:
+            bot_client.coc_main_log.debug(f"Added {n_tag} to Clan Loop.")
+    
+    def remove_to_loop(self,tag:str):
+        remove, n_tag = super().remove_to_loop(tag)
+        if remove:
+            bot_client.coc_main_log.debug(f"Removed {n_tag} from Clan Loop.")
+    
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
         if not clan:
             return 1
@@ -122,17 +127,17 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if not bot_client.clan_cache.keys:
+                tags = copy.copy(self._tags)
+                if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
 
+                st = pendulum.now()
                 self._running = True
 
-                all_clan_tags = copy.copy(bot_client.clan_cache.keys)
-                sleep = (10 / len(all_clan_tags))
-
+                sleep = (10 / len(tags))
                 tasks = []
-                for tag in all_clan_tags:
+                for tag in tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
             
@@ -140,7 +145,11 @@ class ClanLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-
+                try:
+                    runtime = self._last_loop-st
+                    self.run_time.append(runtime.total_seconds())
+                except:
+                    pass
                 await asyncio.sleep(10)
         
         except Exception as exc:
@@ -203,7 +212,6 @@ class ClanLoop(TaskLoop):
                 if self.defer(cached_clan):
                     return self.loop.call_later(10,self.unlock,lock)
 
-                st = pendulum.now()
                 async with self.api_semaphore: 
                     new_clan = None
                     try:
@@ -213,7 +221,6 @@ class ClanLoop(TaskLoop):
 
                     if new_clan:
                         self._cached[tag] = new_clan
-                        bot_client.clan_cache.set(new_clan.tag,new_clan)
                     wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
@@ -232,14 +239,6 @@ class ClanLoop(TaskLoop):
                     error=exc,
                     )
             return self.unlock(lock)
-
-        finally:
-            et = pendulum.now()
-            try:
-                runtime = et-st
-                self.run_time.append(runtime.total_seconds())
-            except:
-                pass
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
         for event in ClanLoop._clan_events:
