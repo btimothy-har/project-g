@@ -173,7 +173,7 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_player(self,tag:str) -> aPlayer:
-        player = None            
+        player = None
         count_try = 0
         while True:
             await asyncio.sleep(0)

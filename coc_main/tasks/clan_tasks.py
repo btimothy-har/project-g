@@ -227,7 +227,7 @@ class ClanLoop(TaskLoop):
                 
                 await new_clan._sync_cache()
                 if cached_clan:
-                    await self._dispatch_events(cached_clan,new_clan)                
+                    await self._dispatch_events(cached_clan,new_clan)
         
         except Exception as exc:
             if self.loop_active:
