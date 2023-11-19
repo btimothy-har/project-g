@@ -74,32 +74,26 @@ class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         sleep = sleep_time
         super().__init__(sleep)
-
-        self._sent = 0
-        self._sent_time = pendulum.now()
-
-        self._rcvd = 0
-        self._rcvd_time = pendulum.now()
     
     @property
     def client(self) -> 'BotClashClient':
         return BotClashClient()
     
     def increment_sent(self):
-        diff = pendulum.now() - self._sent_time
+        diff = pendulum.now() - self.client._sent_time
         if diff.total_seconds() > 1:
-            self.client._api_sent.append(self._sent / diff.total_seconds())
-            self._sent = 0
-            self._sent_time = pendulum.now()
-        self._sent += 1       
+            self.client._api_sent.append(self.client._api_current_sent / diff.total_seconds())
+            self.client._api_current_sent = 0
+            self.client._sent_time = pendulum.now()
+        self.client._api_current_sent += 1       
     
     def increment_rcvd(self):
-        diff = pendulum.now() - self._rcvd_time
+        diff = pendulum.now() - self.client._rcvd_time
         if diff.total_seconds() > 1:
-            self.client._api_rcvd.append(self._rcvd / diff.total_seconds())
-            self._rcvd = 0
-            self._rcvd_time = pendulum.now()
-        self._rcvd += 1
+            self.client._api_rcvd.append(self.client._api_current_rcvd / diff.total_seconds())
+            self.client._api_current_rcvd = 0
+            self.client._rcvd_time = pendulum.now()
+        self.client._api_current_rcvd += 1
     
     async def __aenter__(self):
         async with self.lock:
@@ -107,7 +101,7 @@ class CustomThrottler(coc.BasicThrottler):
             last_run = self.last_run
             if last_run:
                 difference = pendulum.now() - last_run
-                need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
+                need_to_sleep = (self.sleep_time * 1.2) - difference.total_seconds()
                 if need_to_sleep > 0:
                     self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
@@ -159,6 +153,10 @@ class BotClashClient():
             self.client_keys = []
             self.coc_client = None
             self.api_maintenance = False
+            self._api_current_sent = 0
+            self._api_current_rcvd = 0
+            self._sent_time = pendulum.now()
+            self._rcvd_time = pendulum.now()
             self._api_sent = deque(maxlen=3600)
             self._api_rcvd = deque(maxlen=3600)
 
@@ -289,10 +287,10 @@ class BotClashClient():
     
     @property
     def api_current_throughput(self) -> (float, float):
-        diff = pendulum.now() - self.throttle._sent_time
-        sent_avg = self.throttle._sent / diff.total_seconds() if self.throttle._sent > 0 else 0
-        diff = pendulum.now() - self.throttle._rcvd_time
-        rcvd_avg = self.throttle._rcvd / diff.total_seconds() if self.throttle._rcvd > 0 else 0
+        diff = pendulum.now() - self._sent_time
+        sent_avg = self._api_current_sent / diff.total_seconds() if self._api_current_sent > 0 else 0
+        diff = pendulum.now() - self._rcvd_time
+        rcvd_avg = self._api_current_rcvd / diff.total_seconds() if self._api_current_rcvd > 0 else 0
         return sent_avg, rcvd_avg
     
     @property
@@ -432,7 +430,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=5):
+    async def api_login(self,rate_limit:int=20):
         try:
             await self.api_login_keys(rate_limit)
         except:

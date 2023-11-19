@@ -67,7 +67,8 @@ class ClashOfClansTasks(commands.Cog):
         self.discord_loop = DiscordGuildLoop()
 
         #API CONTROLLER
-        self.api_semaphore = asyncio.Semaphore(int(bot_client.rate_limit * 0.9))
+        self.task_api_slots = int(bot_client.rate_limit * 0.7)
+        self.api_semaphore = asyncio.Semaphore(self.task_api_slots)
         
         # TASK CONTROLLER
         self._master_lock = asyncio.Lock()
@@ -409,7 +410,7 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
                 + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:<10,}"
-                + f"\n{'[API Slots]':<15} " + f"{int(bot_client.rate_limit * 0.9) - self.api_semaphore._value:,} / {int(bot_client.rate_limit * 0.9):,} (Wait: {client_waiters:,})"
+                + f"\n{'[API Slots]':<15} " + f"{self.task_api_slots - self.api_semaphore._value:,} / {self.task_api_slots:,} (Wait: {client_waiters:,})"
                 + "```",
             inline=False
             )
