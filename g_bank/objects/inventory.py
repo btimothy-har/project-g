@@ -122,6 +122,7 @@ class UserInventory():
     async def purchase_item(self,item:ShopItem):
         member = item.guild.get_member(self.user.id)
         await item.purchase(member)
+
         if item.type in ['random']:
             item = await item.random_select()
 
@@ -130,10 +131,10 @@ class UserInventory():
         
         if item.type in ['role']:
             if item.bidirectional_role:
-                if item.assigns_role in self.user.roles:
-                    await self.user.remove_roles(item.assigns_role)
+                if item.assigns_role in member.roles:
+                    await member.remove_roles(item.assigns_role)
                 else:
-                    await self.user.add_roles(item.assigns_role)
+                    await member.add_roles(item.assigns_role)
             else:
                 if item.exclusive_role:
                     if item.category == 'Uncategorized':
@@ -145,10 +146,10 @@ class UserInventory():
 
                     #remove_role_from_user
                     async for role in AsyncIter(roles_from_similar_items):
-                        if role in self.user.roles:
-                            await self.user.remove_roles(role)
+                        if role in member.roles:
+                            await member.remove_roles(role)
                 
-                await self.user.add_roles(item.assigns_role)
+                await member.add_roles(item.assigns_role)
         
         await bank.withdraw_credits(self.user,item.price)
         return item

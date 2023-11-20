@@ -104,29 +104,32 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.member_accounts])
+        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
         player_accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
+
+        self.clear_items()
         
-        dropdown_list = [discord.SelectOption(
-            label=f"{account.name} | {account.tag}",
-            value=f"{account.tag}",
-            description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
-            emoji=f"{account.town_hall.emoji}")
-            for account in player_accounts[:25]
-            ]
-        account_select_menu = DiscordSelectMenu(
-            function=self._callback_menu_tags,
-            options=dropdown_list,
-            placeholder="Select one or more account(s)...",
-            min_values=1,
-            max_values=len(dropdown_list),
-            )
+        if len(player_accounts) > 0:
+            dropdown_list = [discord.SelectOption(
+                label=f"{account.name} | {account.tag}",
+                value=f"{account.tag}",
+                description=f"{account.clan_description}" + " | " + f"{account.alliance_rank}" + (f" ({account.home_clan.abbreviation})" if account.home_clan else ""),
+                emoji=f"{account.town_hall.emoji}")
+                for account in player_accounts[:25]
+                ]
+            account_select_menu = DiscordSelectMenu(
+                function=self._callback_menu_tags,
+                options=dropdown_list,
+                placeholder="Select one or more account(s)...",
+                min_values=1,
+                max_values=len(dropdown_list),
+                )
+            self.add_item(account_select_menu)
+
         enter_tags_button = DiscordButton(
             function=self._callback_manual_tag_entry,
             label="Enter Tags Manually")
-            
-        self.clear_items
-        self.add_item(account_select_menu)
+        
         self.add_item(enter_tags_button)
         self.add_item(self.stop_button)
             
