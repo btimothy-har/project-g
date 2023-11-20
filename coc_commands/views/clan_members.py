@@ -80,26 +80,9 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            rm = await asyncio.gather(
-                *(self.coc_client.fetch_player(member) for member in self.clan.alliance_members),
-                return_exceptions=True
-                )
-            
-            if len([e for e in rm if isinstance(e,ClashAPIError)]) > 0:
-                raise ClashAPIError([e for e in rm if isinstance(e,ClashAPIError)][0])
-            
-            registered_members = [m for m in rm if isinstance(m,aPlayer)]
+            registered_members = await self.coc_client.fetch_many_players(*self.clan.alliance_members)
 
-        mc = await asyncio.gather(
-            *(self.coc_client.fetch_player(member.tag) for member in self.clan.members),
-            return_exceptions=True
-            )
-        
-        if len([e for e in mc if isinstance(e,ClashAPIError)]) > 0:
-            raise ClashAPIError([e for e in mc if isinstance(e,ClashAPIError)][0])
-        
-        self.members_in_clan = [m for m in mc if isinstance(m,aPlayer)]
-                                                            
+        self.members_in_clan = await self.coc_client.fetch_many_players(*[member.tag for member in self.clan.members])
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan
         self.is_active = True

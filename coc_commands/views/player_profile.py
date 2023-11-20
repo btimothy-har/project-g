@@ -21,7 +21,7 @@ bot_client = BotClashClient()
 class PlayerProfileMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
-        accounts:List[aPlayer]):
+        accounts:List[str]):
         
         self.accounts = accounts
         self.current_page = "summary"

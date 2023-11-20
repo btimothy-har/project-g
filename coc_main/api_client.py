@@ -101,7 +101,7 @@ class CustomThrottler(coc.BasicThrottler):
             last_run = self.last_run
             if last_run:
                 difference = pendulum.now() - last_run
-                need_to_sleep = (self.sleep_time * 1.2) - difference.total_seconds()
+                need_to_sleep = (self.sleep_time * 1.5) - difference.total_seconds()
                 if need_to_sleep > 0:
                     self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
@@ -436,7 +436,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=5):
+    async def api_login(self,rate_limit:int=10):
         try:
             await self.api_login_keys(rate_limit)
         except:

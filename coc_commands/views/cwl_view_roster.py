@@ -83,7 +83,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.clan = await self.client.fetch_clan(self.league_clan.tag)
 
         if self.league_clan.status == 'CWL Started':
-            roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
+            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
             self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
 
         else:
@@ -101,10 +101,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
                     await self.ctx.reply(embed=embed,view=None)
                 return
 
-            roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
+            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
             self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
             
-            mem_in_clan = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.members))
+            mem_in_clan = await self.client.fetch_many_players(*[p.tag for p in self.clan.members])
             async for mem in AsyncIter(mem_in_clan):
                 if mem.tag not in [p.tag for p in self.reference_list]:
                     self.reference_list.append(mem)
@@ -185,11 +185,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
+                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
                 header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
+                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
                 header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
@@ -241,11 +241,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.master_roster))
+                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
                 header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.league_clan.participants))
+                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
                 header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"

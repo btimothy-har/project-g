@@ -349,8 +349,7 @@ class ClanApplyMenuUser(DefaultView):
         dropdown_options = []
 
         account_tags = await bot_client.run_in_thread(_get_player_tags)
-        get_accounts = await asyncio.gather(*(self.coc_client.fetch_player(tag=a) for a in account_tags[:10]),return_exceptions=True)
-        accounts = [a for a in get_accounts if isinstance(a,aPlayer)]
+        accounts = self.coc_client.fetch_many_players(*account_tags[:10])
         
         dropdown_options.extend([
             discord.SelectOption(
@@ -519,7 +518,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             )
         return await channel.send(embed=embed)
     
-    application_accounts = await asyncio.gather(*(coc_client.fetch_player(tag=i) for i in application.tags),return_exceptions=True)
+    application_accounts = await coc_client.fetch_many_players(*application.tags)
     application_clans = await asyncio.gather(*(coc_client.fetch_clan(tag=i) for i in application.clans),return_exceptions=True)
     
     member = channel.guild.get_member(application.applicant_id)    

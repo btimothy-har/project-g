@@ -111,7 +111,7 @@ class ClanLoop(TaskLoop):
                 return False
             if clan.is_registered_clan:
                 return False
-            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= (10 * 60):
+            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= (15 * 60):
                 return False
             return True
         return False
@@ -215,20 +215,22 @@ class ClanLoop(TaskLoop):
                 async with self.api_semaphore: 
                     new_clan = None
                     try:
-                        new_clan = await bot_client.coc.get_clan(tag,cls=aClan)
+                        new_clan = await self.coc_client.fetch_clan(tag)
                     except:
                         return self.loop.call_later(10,self.unlock,lock)                            
-
-                    if new_clan:
-                        self._cached[tag] = new_clan
+                    
                     wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
                 await new_clan._sync_cache()
                 if cached_clan:
-                    await self._dispatch_events(cached_clan,new_clan)
-        
+                    if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
+                        self._cached[tag] = new_clan
+                        await self._dispatch_events(cached_clan,new_clan)
+                else:
+                    self._cached[tag] = new_clan
+                    
         except Exception as exc:
             if self.loop_active:
                 bot_client.coc_main_log.exception(

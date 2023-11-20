@@ -18,6 +18,7 @@ from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from coc_main.utils.utils import chunks
+from coc_main.exceptions import ClashAPIError
 
 bot_client = BotClashClient()
 
@@ -544,8 +545,8 @@ class CWLRosterMenu(DefaultView):
                 style=discord.ButtonStyle.blurple,
                 row=4
                 ))
-            
-        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.participants))
+        
+        participants = await self.client.fetch_many_players(*self.clan.participants)
         _add_main_menu(participants)
     
     ##################################################
@@ -709,7 +710,7 @@ class CWLRosterMenu(DefaultView):
             return True
         
         signups = await WarLeaguePlayer.signups_by_season(self.season)
-        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in signups))
+        participants = self.client.fetch_many_players(*[p.tag for p in signups])
 
         all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
         eligible_participants = sorted(
@@ -725,7 +726,7 @@ class CWLRosterMenu(DefaultView):
             )
         
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
-        unrostered_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in participants_not_rostered))
+        unrostered_players = await self.client.fetch_many_players(*[p.tag for p in participants_not_rostered])
 
         async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
             cwl_player = p.war_league_season(self.season)
@@ -754,8 +755,8 @@ class CWLRosterMenu(DefaultView):
             show_author=False,
             )
         
-        participants = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.participants[:35]))
-        
+        participants = await self.client.fetch_many_players(*self.clan.participants[:35])
+
         a_participants = AsyncIter(participants)
         async for i,p in a_participants.enumerate(start=1):
             if i <= 15:
@@ -896,10 +897,10 @@ class CWLRosterMenu(DefaultView):
         header_text += f"\n**Status:** {clan.status}"
         header_text += f"\n**League:** {EmojisLeagues.get(clan.league)}{clan.league}"
         if clan.status in ["CWL Started"]:
-            roster_players = await asyncio.gather(*(coc.fetch_player(p.tag) for p in clan.master_roster))
+            roster_players = await coc.fetch_many_players(*[p.tag for p in clan.master_roster])
             header_text += f"\n\n**Participants:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.master_roster])} in CWL"
         else:
-            roster_players = await asyncio.gather(*(coc.fetch_player(p.tag) for p in clan.participants))
+            roster_players = await coc.fetch_many_players(*[p.tag for p in clan.participants])
             header_text += f"\n\n**Rostered:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.participants])} Rostered"
 
         header_text += f"\n"
@@ -909,11 +910,12 @@ class CWLRosterMenu(DefaultView):
         header_text += f"{EmojisUI.LOGOUT}: this player is not in the in-game Clan.\n\n"
             
         if clan.status in ["CWL Started"]:
-            ref_members = await asyncio.gather(*(coc.fetch_player(m.tag) for m in clan.master_roster))
+            ref_members = await coc.fetch_many_players(*[p.tag for p in clan.master_roster])
         else:
-            ref_members = await asyncio.gather(*(coc.fetch_player(m.tag) for m in clan.participants))
+            ref_members = await coc.fetch_many_players(*[p.tag for p in clan.participants])
+        
             full_clan = await coc.fetch_clan(clan.tag)
-            mem_in_clan = await asyncio.gather(*(coc.fetch_player(m.tag) for m in full_clan.members))
+            mem_in_clan = await coc.fetch_many_players(*[p.tag for p in full_clan.members])
                                                
             async for mem in AsyncIter(mem_in_clan):
                 if mem.tag not in [p.tag for p in ref_members]:

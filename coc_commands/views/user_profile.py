@@ -103,7 +103,7 @@ class UserProfileMenu(DefaultView):
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
 
         cog = bot_client.bot.get_cog("ClashOfClansClient")
-        m_accounts = await asyncio.gather(*(cog.fetch_player(p) for p in member.account_tags))
+        m_accounts = await cog.fetch_many_players(*member.account_tags)
 
         m_accounts.sort(key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
 
@@ -298,7 +298,7 @@ class DeleteLinkMenu(DefaultView):
     ################################################## 
     async def _start_delete_link(self):
 
-        m_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.account_tags))
+        m_accounts = await self.client.fetch_many_players(*self.member.account_tags)
         m_accounts.sort(key=lambda x:(x.town_hall_level,x.exp_level,x.clean_name),reverse=True)
 
         select_options = [discord.SelectOption(
@@ -335,7 +335,7 @@ class DeleteLinkMenu(DefaultView):
         
     async def _callback_remove_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
-        remove_accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in menu.values))
+        remove_accounts = await self.client.fetch_many_players(*menu.values)
 
         for account in remove_accounts:
             await BasicPlayer.set_discord_link(account.tag,0)

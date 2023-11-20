@@ -194,11 +194,25 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError(exc) from exc
                 
             except:
-                if count_try > 3:
+                if count_try > 5:
                     raise ClashAPIError()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 continue            
         return player
+    
+    async def fetch_many_players(self,*tags) -> List[aPlayer]:
+        tasks = []
+
+        for tag in tags:
+            await asyncio.sleep(0)
+            tasks.append(asyncio.create_task(self.fetch_player(tag)))
+
+        ret = await asyncio.gather(*tasks,return_exceptions=True)
+        if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
+            raise ClashAPIError([e for e in ret if isinstance(e,ClashAPIError)][0])
+        
+        ret_players = [p for p in ret if isinstance(p,aPlayer)]
+        return ret_players
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         def _db_query(q_clan,q_season):
@@ -220,7 +234,7 @@ class ClashOfClansClient(commands.Cog):
         
         query = await bot_client.run_in_thread(_db_query,clan,season)     
         
-        ret_players = await asyncio.gather(*(self.fetch_player(p) for p in query))
+        ret_players = await self.fetch_many_players(*query)
         return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)     
     
     ############################################################
@@ -250,9 +264,9 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError(exc) from exc
                 
             except:
-                if count_try > 3:
+                if count_try > 5:
                     raise ClashAPIError()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 continue
         return clan
 
@@ -322,9 +336,9 @@ class ClashOfClansClient(commands.Cog):
             except coc.ClashOfClansException as exc:
                 raise ClashAPIError(exc) from exc
             except:
-                if count_try > 10:
+                if count_try > 5:
                     raise ClashAPIError()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 continue
         
         if api_war:                
@@ -348,9 +362,9 @@ class ClashOfClansClient(commands.Cog):
             except coc.ClashOfClansException as exc:
                 raise ClashAPIError(exc)
             except:
-                if count_try > 10:
+                if count_try > 5:
                     raise ClashAPIError()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 continue
                 
         if api_group:
@@ -383,9 +397,9 @@ class ClashOfClansClient(commands.Cog):
             except coc.ClashOfClansException as exc:
                 raise ClashAPIError(exc) from exc
             except:
-                if count_try > 10:
+                if count_try > 5:
                     raise ClashAPIError()
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 continue
                 
         if raidloggen:

@@ -26,6 +26,7 @@ from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from coc_main.discord.clan_link import ClanGuildLink
 from coc_main.coc_objects.players.mongo_player import db_PlayerStats
+from coc_main.exceptions import ClashAPIError
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu
@@ -423,12 +424,10 @@ class Clans(commands.Cog):
             thumbnail=clan.badge,
             )
                    
-        get_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members),return_exceptions=True)
-        ingame_members = [member for member in get_members if isinstance(member,aPlayer)]
+        ingame_members = await self.client.fetch_many_players(*[member.tag for member in clan.members])
 
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            get_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members),return_exceptions=True)
-            clan_members = [member for member in get_members if isinstance(member,aPlayer)]
+            clan_members = await self.client.fetch_many_players(*[member for member in clan.alliance_members])
             townhall_levels = [member.town_hall.level for member in clan_members]
             townhall_levels.sort(reverse=True)
             average_townhall = round(sum(townhall_levels)/len(townhall_levels),2)
@@ -509,10 +508,10 @@ class Clans(commands.Cog):
         
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
             showing_registered = True
-            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
+            clan_members = await self.client.fetch_many_players(*[member for member in clan.alliance_members])
         else:
             showing_registered = False
-            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
+            clan_members = await self.client.fetch_many_players(*[member.tag for member in clan.members])
         
         townhall_levels = list(set([member.town_hall.level for member in clan_members]))
         townhall_levels.sort(reverse=True)
@@ -598,7 +597,7 @@ class Clans(commands.Cog):
             return embed
         
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            clan_members = await asyncio.gather(*(self.client.fetch_player(m) for m in clan.alliance_members))
+            clan_members = await self.client.fetch_many_players(*[member for member in clan.alliance_members])
             clan_members.sort(key=lambda member: member.current_season.donations_sent.season_total,reverse=True)
 
             stats_text = "\n".join([
@@ -618,7 +617,7 @@ class Clans(commands.Cog):
                 thumbnail=clan.badge,
                 )    
         else:
-            clan_members = await asyncio.gather(*(self.client.fetch_player(member.tag) for member in clan.members))
+            clan_members = await self.client.fetch_many_players(*[member.tag for member in clan.members])
             clan_members.sort(key=lambda member: member.donations,reverse=True)
 
             stats_text = "\n".join([
@@ -744,9 +743,8 @@ class Clans(commands.Cog):
             season = aClashSeason.last_completed_clangames()
         
         query = await bot_client.run_in_thread(_db_query)        
-        players = await asyncio.gather(*(self.client.fetch_player(p) for p in query))
-
-        clangames_players = [p.get_season_stats(season) for p in players if isinstance(p,aPlayer)]
+        players = await self.client.fetch_many_players(*query)
+        clangames_players = [p.get_season_stats(season) for p in players]
 
         embed = await clash_embed(
             context=context,

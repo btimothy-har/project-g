@@ -451,7 +451,7 @@ class Bank(commands.Cog):
         
         reward_per_trophy = 20
         member_tags = await bot_client.run_in_thread(_db_query)
-        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))
+        alliance_members = await self.client.fetch_many_players(*member_tags)
         
         await asyncio.gather(*(_distribute_rewards(player) for player in alliance_members))
     
@@ -484,7 +484,7 @@ class Bank(commands.Cog):
             return
         
         member_tags = await bot_client.run_in_thread(_db_query)
-        alliance_members = await asyncio.gather(*(self.client.fetch_player(tag) for tag in member_tags))        
+        alliance_members = await self.client.fetch_many_players(*member_tags)
         await asyncio.gather(*(_distribute_rewards(player) for player in alliance_members))            
 
     ############################################################

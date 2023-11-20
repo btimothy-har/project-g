@@ -270,11 +270,20 @@ class ClanWarLoop(TaskLoop):
                 if not getattr(clan,'public_war_log',False):
                     return self.unlock(lock)
                 
-                current_war = None                
-                try:
-                    current_war = await bot_client.coc.get_current_war(tag)
-                except:
-                    return self.loop.call_later(10,self.unlock,lock) 
+                current_war = None
+                count_try = 0
+                while True:
+                    try:
+                        count_try += 1
+                        current_war = await bot_client.coc.get_current_war(tag)
+                        break
+                    except coc.ClashOfClansException:
+                        return self.loop.call_later(10,self.unlock,lock) 
+                    except:
+                        if count_try > 5:
+                            return self.loop.call_later(10,self.unlock,lock) 
+                        await asyncio.sleep(0.5)
+                        continue
 
                 self._cached[tag]['current_war'] = current_war
                 wait = getattr(current_war,'_response_retry',default_sleep)
@@ -282,12 +291,18 @@ class ClanWarLoop(TaskLoop):
                         
                 if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
                     await self._update_league_group(clan)
+                    previous_round = None
                     #update previous round
-                    try:
-                        previous_round = await bot_client.coc.get_current_war(tag,cwl_round=coc.WarRound.previous_war)
-                    except (coc.ClashOfClansException,RuntimeError,aiohttp.ServerDisconnectedError) as exc:
-                        pass
-                    else:
+                    while True:
+                        try:
+                            previous_round = await bot_client.coc.get_current_war(tag,cwl_round=coc.WarRound.previous_war)
+                            break
+                        except coc.ClashOfClansException:
+                            pass
+                        except:
+                            await asyncio.sleep(0.5)
+                            continue
+                        
                         if previous_round:
                             cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
                             if cached_round:

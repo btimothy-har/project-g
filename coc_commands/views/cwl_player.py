@@ -8,7 +8,7 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
@@ -18,6 +18,8 @@ from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, D
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, WarResult, CWLLeagueGroups, MultiplayerLeagues
 from coc_main.utils.constants.ui_emojis import EmojisUI
+
+from coc_main.exceptions import ClashAPIError
 
 bot_client = BotClashClient()
 
@@ -89,7 +91,7 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-        self.accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in self.member.account_tags))
+        self.accounts = await self.client.fetch_many_players(*self.member.account_tags)
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
@@ -502,7 +504,8 @@ class CWLPlayerMenu(DefaultView):
             message=f"*Accounts 11-20 are shown below.\nIf you have more than 20 accounts, these may not be reflected.*",
             show_author=False
             )        
-        player_accounts = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.current_signups))
+        
+        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.current_signups])
         async for a in AsyncIter(player_accounts):
             cwl_player = a.war_league_season(self.season)
 

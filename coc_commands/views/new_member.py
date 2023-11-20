@@ -104,7 +104,7 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = await asyncio.gather(*(self.client.fetch_player(p) for p in self.member.account_tags))
+        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.member_accounts])
         player_accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         
         dropdown_list = [discord.SelectOption(
@@ -215,10 +215,7 @@ class NewMemberMenu(DefaultView):
     ### COLLATE ACCOUNTS
     ##################################################    
     async def _collate_player_accounts(self,tags:List[str]):
-        accounts = await asyncio.gather(*(self.client.fetch_player(tag) for tag in tags),return_exceptions=True)
-        for account in accounts:
-            if isinstance(account,aPlayer):
-                self.accounts.append(account)        
+        self.accounts = await self.client.fetch_many_players(*tags)
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         await self._get_home_clans()
     

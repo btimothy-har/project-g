@@ -223,11 +223,20 @@ class ClanRaidLoop(TaskLoop):
                 
                 raid_log = None
                 new_raid = None
-            
-                try:
-                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                except:
-                    return self.loop.call_later(10,self.unlock,lock)
+                count_try = 0
+
+                while True:
+                    try:
+                        count_try += 1
+                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                        break
+                    except coc.ClashOfClansException:
+                        return self.loop.call_later(10,self.unlock,lock)
+                    except:
+                        if count_try > 5:
+                            return self.loop.call_later(10,self.unlock,lock)
+                        await asyncio.sleep(0.5)
+                        continue
                     
                 if raid_log and len(raid_log) > 0:
                     new_raid = raid_log[0]

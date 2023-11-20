@@ -2,11 +2,9 @@ import asyncio
 import coc
 import pendulum
 import copy
-import aiohttp
 
 from typing import *
 from ..api_client import BotClashClient as client
-from ..exceptions import InvalidTag, ClashAPIError
 
 from redbot.core.utils import AsyncIter
 
@@ -14,7 +12,7 @@ from .default import TaskLoop
 
 from ..discord.feeds.capital_contribution import CapitalContributionFeed
 
-from ..coc_objects.players.player import aPlayer, db_PlayerStats
+from ..coc_objects.players.player import db_Player, aPlayer, db_PlayerStats
 from ..utils.constants.coc_constants import activity_achievements
 
 bot_client = client()
@@ -558,21 +556,22 @@ class PlayerLoop(TaskLoop):
 
                 async with self.api_semaphore:
                     new_player = None
-                    
                     try:
-                        new_player = await bot_client.coc.get_player(tag,cls=aPlayer)
+                        new_player = await self.coc_client.fetch_player(tag)
                     except:
                         return self.loop.call_later(10,self.unlock,lock)
-                        
-                    if new_player:
-                        self._cached[tag] = new_player                        
+                    
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
-                await new_player._sync_cache()
-                if cached_player:
-                    await self._dispatch_events(cached_player,new_player)
+                await new_player._sync_cache()    
+                if cached_player:        
+                    if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
+                        self._cached[tag] = new_player
+                        await self._dispatch_events(cached_player,new_player)
+                else:
+                    self._cached[tag] = new_player
 
         except Exception as exc:
             if self.loop_active:
