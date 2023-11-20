@@ -430,7 +430,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=30):
+    async def api_login(self,rate_limit:int=10):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -453,8 +453,8 @@ class BotClashClient():
                 )
             self.coc_main_log.info(f"New Client Created: {self.bot.coc_client}")
 
-        keys = random.sample(self.client_keys,min(100,len(self.client_keys)))
-        #keys = self.client_keys
+        #keys = random.sample(self.client_keys,min(100,len(self.client_keys)))
+        keys = self.client_keys
             
         await self.bot.coc_client.login_with_tokens(*keys)
         self._last_login = pendulum.now()
