@@ -120,7 +120,8 @@ class UserInventory():
             await self.save()
 
     async def purchase_item(self,item:ShopItem):
-        await item.purchase(self.user)
+        member = item.guild.get_member(self.user.id)
+        await item.purchase(member)
         if item.type in ['random']:
             item = await item.random_select()
 
