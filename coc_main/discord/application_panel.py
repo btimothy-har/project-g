@@ -349,7 +349,7 @@ class ClanApplyMenuUser(DefaultView):
         dropdown_options = []
 
         account_tags = await bot_client.run_in_thread(_get_player_tags)
-        accounts = self.coc_client.fetch_many_players(*account_tags[:10])
+        accounts = await self.coc_client.fetch_many_players(*account_tags[:10])
         
         dropdown_options.extend([
             discord.SelectOption(

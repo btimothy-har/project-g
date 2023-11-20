@@ -710,7 +710,7 @@ class CWLRosterMenu(DefaultView):
             return True
         
         signups = await WarLeaguePlayer.signups_by_season(self.season)
-        participants = self.client.fetch_many_players(*[p.tag for p in signups])
+        participants = await self.client.fetch_many_players(*[p.tag for p in signups])
 
         all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
         eligible_participants = sorted(
