@@ -385,40 +385,46 @@ class BotClashClient():
     ############################################################
     async def api_reload(self):
         async def reconnect():
-            api_connect_time = pendulum.now() - self._last_login
             await self.api_logout()
             await self.api_login()
-            return api_connect_time
         
         try:
             while True:
                 try:
                     await asyncio.sleep(1)
+                    connect = pendulum.now() - self._last_login
                     if self.player_api_avg > 3000:
-                        connect = await reconnect()
-                        self.coc_main_log.warning(
+                        await reconnect()
+                        self.coc_main_log.debug(
                             f"Player API exceeds average threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
                             )
                         continue
                         
                     if max(self.player_api[-100:]) > 20000:
-                        connect = await reconnect()
-                        self.coc_main_log.warning(
+                        await reconnect()
+                        self.coc_main_log.debug(
                             f"Player API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
                             )
                         continue
 
                     if self.clan_api_avg > 3000:
-                        connect = await reconnect()
-                        self.coc_main_log.warning(
+                        await reconnect()
+                        self.coc_main_log.debug(
                             f"Clan API exceeds average threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
                             )
                         continue
                         
                     if max(self.clan_api[-100:]) > 20000:
-                        connect = await reconnect()
-                        self.coc_main_log.warning(
+                        await reconnect()
+                        self.coc_main_log.debug(
                             f"Clan API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
+                            )
+                        continue
+                        
+                    if connect.total_seconds() > 600:
+                        await reconnect()
+                        self.coc_main_log.debug(
+                            f"Clash API Client Connection Refreshed. Uptime: {connect.total_seconds()}."
                             )
                         continue
                 
@@ -430,7 +436,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=5):
         try:
             await self.api_login_keys(rate_limit)
         except:

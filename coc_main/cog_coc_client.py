@@ -416,7 +416,7 @@ class ClashOfClansClient(commands.Cog):
         embed.add_field(
             name="**API Client**",
             value="```ini"
-                + f"\n{'[Connect Time]':<15} {int(dd)}D {int(hh)}H {int(mm)}M {int(ss)}S"
+                + f"\n{'[Connect Time]':<15} {int(mm)}M {int(ss)}S"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
                 + f"\n{'[API Requests]':<15} " + f"{(bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit) - bot_client.coc.http._HTTPClient__lock._value} / {bot_client.coc.http.key_count * bot_client.coc.http.throttle_limit}" + f" (Waiters: {waiters:,})"
