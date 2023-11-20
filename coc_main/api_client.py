@@ -72,8 +72,7 @@ class DataQueue(asyncio.Queue):
 
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
-        sleep = sleep_time
-        super().__init__(sleep)
+        super().__init__(sleep_time)
     
     @property
     def client(self) -> 'BotClashClient':
@@ -101,7 +100,7 @@ class CustomThrottler(coc.BasicThrottler):
             last_run = self.last_run
             if last_run:
                 difference = pendulum.now() - last_run
-                need_to_sleep = (self.sleep_time * 1.5) - difference.total_seconds()
+                need_to_sleep = (self.sleep_time * 1.3) - difference.total_seconds()
                 if need_to_sleep > 0:
                     self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
@@ -436,7 +435,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=5):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -497,7 +496,7 @@ class BotClashClient():
 
     async def api_logout(self):
         await self.coc.close()
-        self.coc_main_log.info(f"Logged out of Clash API client.")
+        self.coc_main_log.debug(f"Logged out of Clash API client.")
 
     ############################################################
     #####
