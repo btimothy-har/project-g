@@ -373,7 +373,7 @@ class ClashOfClansTasks(commands.Cog):
                     await asyncio.sleep(0)
                     self.clan_loop.add_to_loop(clan.tag)
                 
-                players = bot_client.coc.get_location_players()
+                players = await bot_client.coc.get_location_players()
                 for player in players:
                     await asyncio.sleep(0)
                     self.player_loop.add_to_loop(player.tag)
