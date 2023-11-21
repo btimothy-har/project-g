@@ -67,7 +67,7 @@ class ClashOfClansTasks(commands.Cog):
         self.discord_loop = DiscordGuildLoop()
 
         #API CONTROLLER
-        self.task_api_slots = int(bot_client.rate_limit * 0.7)
+        self.task_api_slots = int(bot_client.rate_limit * 1)
         self.api_semaphore = asyncio.Semaphore(self.task_api_slots)
         
         # TASK CONTROLLER
