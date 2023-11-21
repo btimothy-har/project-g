@@ -425,6 +425,7 @@ class PlayerLoop(TaskLoop):
             bot_client.coc_main_log.debug(f"Removed {n_tag} from Player Loop.")
     
     def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
+        return 1
         if not player:
             return 1
         if player.is_member:

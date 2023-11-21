@@ -91,6 +91,7 @@ class ClanLoop(TaskLoop):
             bot_client.coc_main_log.debug(f"Removed {n_tag} from Clan Loop.")
     
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
+        return 1
         if not clan:
             return 1
         if clan.is_alliance_clan:
