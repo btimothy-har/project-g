@@ -226,7 +226,7 @@ class BotClashClient():
         instance.version = version
         instance.client_keys = client_keys or []
 
-        instance._connector_task = asyncio.create_task(instance.api_reload())
+        #instance._connector_task = asyncio.create_task(instance.api_reload())
 
         await instance.database_login()
         await instance.api_login()
@@ -244,8 +244,8 @@ class BotClashClient():
         return instance
     
     async def shutdown(self):
-        self._connector_task.cancel()
-        await self._connector_task
+        #self._connector_task.cancel()
+        #await self._connector_task
         await self.api_logout()
 
         for handler in self.discordlinks_log.handlers:
