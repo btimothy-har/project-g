@@ -106,7 +106,7 @@ class aClan(coc.Clan,BasicClan):
     
     async def _sync_cache(self):
         #if self.is_registered_clan or self.is_active_league_clan:
-        asyncio.create_task(bot_client.clan_queue.add_many([m.tag for m in self.members]))
+        asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
 
         if BasicClan(self.tag).name != self.name:
             await self.set_name(self.name)
