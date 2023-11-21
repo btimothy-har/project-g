@@ -526,7 +526,7 @@ class BotClashClient():
     #####
     ############################################################
     async def discordlinks_login(self):
-        if self.bot.user.id == 828838353977868368:
+        if self.bot.user.id in [828838353977868368,1176156235167449139]:
             self.discordlinks_log.warning(
                 f"Clash DiscordLinks initialized in Sandbox mode."
                 )
