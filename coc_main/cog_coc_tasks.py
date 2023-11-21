@@ -377,7 +377,7 @@ class ClashOfClansTasks(commands.Cog):
                         self.clan_loop.add_to_loop(clan.tag)
                     
                     bb_clan = await bot_client.coc.get_location_clans_builder_base(location.id)
-                    for clan in capital_clan:
+                    for clan in bb_clan:
                         await asyncio.sleep(0)
                         self.clan_loop.add_to_loop(clan.tag)
                     
