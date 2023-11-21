@@ -744,7 +744,7 @@ class Clans(commands.Cog):
         
         query = await bot_client.run_in_thread(_db_query)        
         players = await self.client.fetch_many_players(*query)
-        clangames_players = [p.get_season_stats(season) for p in players]
+        clangames_players = sorted([p.get_season_stats(season) for p in players],key=lambda p:(p.clangames.score,(p.clangames.completion_seconds*-1)),reverse=True)
 
         embed = await clash_embed(
             context=context,
@@ -761,10 +761,10 @@ class Clans(commands.Cog):
             thumbnail=clan.badge,
             )
         return embed
-
-    @commands.command(name="clangames",aliases=["cg"])
+    
+    @command_group_clan.command(name="games")
     @commands.guild_only()
-    async def command_clan_games(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def subcommand_clan_games(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
         View the Clan Games leaderboard for a Clan.
 
@@ -773,8 +773,8 @@ class Clans(commands.Cog):
 
         embed = await self._clan_games_helper(ctx,clan_tag_or_abbreviation)
         await ctx.reply(embed=embed)
-
-    @app_commands.command(name="clan-games",
+    
+    @app_command_group_clan.command(name="games",
         description="View Clan Games information. Defaults to the last completed Clan Games.")
     @app_commands.autocomplete(
         clan=autocomplete_clans,
@@ -783,7 +783,7 @@ class Clans(commands.Cog):
         clan="Select a Clan. If viewing non-Alliance clans, data may not be complete.",
         season="Select a Season to view for.")
     async def app_command_clan_games(self,interaction:discord.Interaction,clan:str,season:str):
-
+        
         await interaction.response.defer()
         get_season = aClashSeason(season)
         embed = await self._clan_games_helper(interaction,clan,get_season)

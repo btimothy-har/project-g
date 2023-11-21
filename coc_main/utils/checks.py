@@ -42,6 +42,8 @@ def is_bot_owner_or_guild_owner(interaction:discord.Interaction):
 ### COMMAND CHECKS
 ##################################################
 def has_manage_server(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = ctx.guild
@@ -58,6 +60,8 @@ def has_manage_server(ctx:Union[discord.Interaction,commands.Context]):
     return False
 
 def is_coleader(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = ctx.guild
@@ -79,6 +83,8 @@ def is_coleader(ctx:Union[discord.Interaction,commands.Context]):
     return False
 
 def is_admin_or_leader(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = ctx.guild
@@ -103,6 +109,8 @@ def is_admin_or_leader(ctx:Union[discord.Interaction,commands.Context]):
     return False
 
 def is_admin_or_coleader(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = ctx.guild
@@ -127,6 +135,8 @@ def is_admin_or_coleader(ctx:Union[discord.Interaction,commands.Context]):
     return False
 
 def is_member(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = ctx.guild
