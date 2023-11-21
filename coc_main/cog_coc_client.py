@@ -174,30 +174,24 @@ class ClashOfClansClient(commands.Cog):
     ############################################################
     async def fetch_player(self,tag:str) -> aPlayer:
         player = None
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                player = await self.client.coc.get_player(tag,cls=aPlayer)
-                break
+        # count_try = 0
+        # while True:
+        #     await asyncio.sleep(0)
+        try:
+            # count_try += 1
+            player = await self.client.coc.get_player(tag,cls=aPlayer)
+            # break
 
-            except coc.NotFound as exc:
-                raise InvalidTag(tag) from exc
-            
-            except coc.ClashOfClansException as exc:
-                cached = await self.get_player_from_loop(tag)
-                if cached:
-                    player = cached
-                    break
-                else:
-                    raise ClashAPIError(exc) from exc
-                
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue            
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        
+        except coc.ClashOfClansException as exc:
+            cached = await self.get_player_from_loop(tag)
+            if cached:
+                player = cached
+            else:
+                raise ClashAPIError(exc) from exc
+       
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
@@ -244,30 +238,24 @@ class ClashOfClansClient(commands.Cog):
     ############################################################
     async def fetch_clan(self,tag:str) -> aClan:
         clan = None       
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                clan = await self.client.coc.get_clan(tag,cls=aClan)
-                break
+        # count_try = 0
+        # while True:
+        #     await asyncio.sleep(0)
+        try:
+            # /count_try += 1
+            clan = await self.client.coc.get_clan(tag,cls=aClan)
+            # break
 
-            except coc.NotFound as exc:
-                raise InvalidTag(tag) from exc
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        
+        except coc.ClashOfClansException as exc:
+            cached = await self.get_clan_from_loop(tag)
+            if cached:
+                clan = cached
+            else:
+                raise ClashAPIError(exc) from exc
             
-            except coc.ClashOfClansException as exc:
-                cached = await self.get_clan_from_loop(tag)
-                if cached:
-                    clan = cached
-                    break
-                else:
-                    raise ClashAPIError(exc) from exc
-                
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:

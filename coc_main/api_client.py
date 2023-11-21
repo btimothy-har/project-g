@@ -95,8 +95,8 @@ class CustomThrottler(coc.BasicThrottler):
         self.client._api_current_rcvd += 1
     
     async def __aenter__(self):
-        self.increment_sent()
         await super().__aenter__()
+        self.increment_sent()
         # async with self.lock:
             
         #     last_run = self.last_run
