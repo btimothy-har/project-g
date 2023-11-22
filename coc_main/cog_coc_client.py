@@ -179,7 +179,7 @@ class ClashOfClansClient(commands.Cog):
         while True:
             try:
                 count_try += 1
-                player = await self.client.coc.get_player(tag,cls=aPlayer)
+                #player = await self.client.coc.get_player(tag,cls=aPlayer)
                 player = await self.client.coc.get_player(tag)
                 break
 
