@@ -37,7 +37,7 @@ clashhttp_log = logging.getLogger("coc.http")
 ############################################################
 ############################################################
 #####
-##### CACHE CLASS
+##### DATA QUEUE
 #####
 ############################################################
 ############################################################
@@ -73,6 +73,13 @@ class DataQueue(asyncio.Queue):
             await self.put(key)
             await asyncio.sleep(0)
 
+############################################################
+############################################################
+#####
+##### THROTTLER
+#####
+############################################################
+############################################################
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         self.rate_limit = 1 / sleep_time
@@ -83,26 +90,11 @@ class CustomThrottler(coc.BasicThrottler):
     def client(self) -> 'BotClashClient':
         return BotClashClient()
     
-    def increment_sent(self):
-        diff = pendulum.now() - self.client._sent_time
-        if diff.total_seconds() > 1:
-            self.client._api_sent.append(self.client._api_current_sent / diff.total_seconds())
-            self.client._api_current_sent = 0
-            self.client._sent_time = pendulum.now()
-        self.client._api_current_sent += 1       
-    
-    def increment_rcvd(self):
-        diff = pendulum.now() - self.client._rcvd_time
-        if diff.total_seconds() > 1:
-            self.client._api_rcvd.append(self.client._api_current_rcvd / diff.total_seconds())
-            self.client._api_current_rcvd = 0
-            self.client._rcvd_time = pendulum.now()
-        self.client._api_current_rcvd += 1
-    
     async def __aenter__(self):
         await self.limiter.acquire()
-        self.increment_sent()
+        await self.client.api_counter.increment_sent()
         return self
+            
         # async with self.lock:
         #     self.increment_sent()
         #     last_run = self.last_run
@@ -117,7 +109,48 @@ class CustomThrottler(coc.BasicThrottler):
         #     return self
     
     async def __aexit__(self, exc_type, exc, tb):
-        self.increment_rcvd()
+        await self.client.api_counter.increment_rcvd()
+
+############################################################
+############################################################
+#####
+##### REQUEST COUNTER
+#####
+############################################################
+############################################################
+class RequestCounter():
+    def __init__(self):
+        self.sent_lock = asyncio.Lock()
+        self.sent_time = process_time()
+        self.current_sent = 0
+        self.sent = deque(maxlen=3600)
+
+        self.rcvd_lock = asyncio.Lock()
+        self.rcvd_time = process_time()
+        self.current_rcvd = 0
+        self.rcvd = deque(maxlen=3600)
+    
+    @property
+    def client(self) -> 'BotClashClient':
+        return BotClashClient()
+    
+    async def increment_sent(self):
+        async with self.sent_lock:
+            nt = process_time()
+            if nt - self.sent_time > 1:
+                self.sent.append(self.current_sent / (nt - self.sent_time))
+                self.current_sent = 0
+                self.sent_time = nt
+            self.current_sent += 1
+    
+    async def increment_rcvd(self):
+        async with self.rcvd_lock:
+            nt = process_time()
+            if nt - self.rcvd_time > 1:
+                self.rcvd.append(self.current_rcvd / (nt - self.rcvd_time))
+                self.current_rcvd = 0
+                self.rcvd_time = nt
+            self.current_rcvd += 1
 
 ############################################################
 ############################################################
@@ -158,14 +191,8 @@ class BotClashClient():
 
             # API HELPERS
             self.client_keys = []
-            self.coc_client = None
             self.api_maintenance = False
-            self._api_current_sent = 0
-            self._api_current_rcvd = 0
-            self._sent_time = pendulum.now()
-            self._rcvd_time = pendulum.now()
-            self._api_sent = deque(maxlen=3600)
-            self._api_rcvd = deque(maxlen=3600)
+            self.api_counter = RequestCounter()
 
             self._connector_task = None
             self._last_login = None
