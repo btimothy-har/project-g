@@ -75,7 +75,7 @@ class DataQueue(asyncio.Queue):
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         super().__init__(sleep_time)
-        self.sleep_time = 1 / 1000
+        #self.sleep_time = 1 / 1000
     
     @property
     def client(self) -> 'BotClashClient':
@@ -451,7 +451,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=20):
+    async def api_login(self,rate_limit:int=25):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -495,7 +495,7 @@ class BotClashClient():
         if not getattr(self.bot,"coc_client",None):
             self.bot.coc_client = coc.EventsClient(
                 key_count=int(clashapi_login.get("keys",1)),
-                key_names=f'Created for Project-G, from coc.py',
+                key_names='Created for Project G, from coc.py',
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit,
