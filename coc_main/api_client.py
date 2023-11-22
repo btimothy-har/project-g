@@ -98,18 +98,29 @@ class CustomThrottler(coc.BasicThrottler):
     
     async def __aenter__(self):
         async with self.lock:
-            self.increment_sent()
-            
             last_run = self.last_run
             if last_run:
-                difference = pendulum.now() - last_run
-                need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
+                difference = process_time() - last_run
+                need_to_sleep = self.sleep_time - difference
                 if need_to_sleep > 0:
                     clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
 
-            self.last_run = pendulum.now()
+            self.last_run = process_time()
             return self
+        
+            # self.increment_sent()
+            
+            # last_run = self.last_run
+            # if last_run:
+            #     difference = pendulum.now() - last_run
+            #     need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
+            #     if need_to_sleep > 0:
+            #         clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
+            #         await asyncio.sleep(need_to_sleep)
+
+            # self.last_run = pendulum.now()
+            # return self
     
     async def __aexit__(self, exc_type, exc, tb):
         self.increment_rcvd()
