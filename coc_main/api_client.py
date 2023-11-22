@@ -98,6 +98,7 @@ class CustomThrottler(coc.BasicThrottler):
     
     async def __aenter__(self):
         async with self.lock:
+            self.increment_sent()
             last_run = self.last_run
             if last_run:
                 difference = process_time() - last_run
@@ -449,7 +450,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=30):
+    async def api_login(self,rate_limit:int=20):
         try:
             await self.api_login_keys(rate_limit)
         except:

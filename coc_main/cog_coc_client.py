@@ -179,8 +179,7 @@ class ClashOfClansClient(commands.Cog):
         while True:
             try:
                 count_try += 1
-                #player = await self.client.coc.get_player(tag,cls=aPlayer)
-                player = await self.client.coc.get_player(tag)
+                player = await self.client.coc.get_player(tag,cls=aPlayer)
                 break
 
             except coc.NotFound as exc:
@@ -249,8 +248,7 @@ class ClashOfClansClient(commands.Cog):
             await asyncio.sleep(0)
             try:
                 count_try += 1
-                #clan = await self.client.coc.get_clan(tag,cls=aClan)
-                clan = await self.client.coc.get_clan(tag)
+                clan = await self.client.coc.get_clan(tag,cls=aClan)
                 break
 
             except coc.NotFound as exc:
