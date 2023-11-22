@@ -2,6 +2,7 @@ import asyncio
 import coc
 import pendulum
 import copy
+import random
 
 from typing import *
 from ..api_client import BotClashClient as client
@@ -481,15 +482,13 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
                 
-                scope_tags = list(tags)[:100000]
+                scope_tags = random.sample(list(tags),min(len(tags),100000))
                 sleep = (5 / len(scope_tags))
                 tasks = []
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                for tag in scope_tags:
-                    await asyncio.sleep(0)
-                    await self._run_queue.put(asyncio.create_task(self._run_single_loop(tag)))
+                await asyncio.gather(*[self._run_single_loop(tag) for tag in scope_tags],return_exceptions=True)
                 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -514,36 +513,6 @@ class PlayerLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self._loop_task()
-    
-    async def _run_collector(self):
-        try:
-            while True:
-                await asyncio.sleep(0)
-                task = await self._run_queue.get()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    continue
-                except Exception as exc:
-                    if self.loop_active:
-                        bot_client.coc_main_log.exception(f"PLAYER TASK ERROR: {exc}")
-                        await TaskLoop.report_fatal_error(
-                            message="PLAYER TASK ERROR",
-                            error=exc,
-                            )
-                finally:
-                    self._queue.task_done()
-                        
-        except asyncio.CancelledError:
-            while not self._run_queue.empty():
-                await asyncio.sleep(0)
-                task = await self._run_queue.get()
-                try:
-                    await task
-                except:
-                    continue
-                finally:
-                    self._run_queue.task_done()
     
     async def _collector_task(self):
         try:

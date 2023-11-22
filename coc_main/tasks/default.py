@@ -39,10 +39,8 @@ class TaskLoop():
         self._active = False
         self._running = False
         self._collector = None
-        self._collect_run = None
         self._last_loop = None
         self._tags = set()
-        self._run_queue = asyncio.Queue()
         self._queue = asyncio.Queue()
 
         self.run_time = deque(maxlen=100)
@@ -62,9 +60,6 @@ class TaskLoop():
         return False, n_tag
     
     async def _loop_task(self):
-        pass
-
-    async def _run_collector(self):
         pass
 
     async def _collector_task(self):
