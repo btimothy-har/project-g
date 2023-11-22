@@ -494,7 +494,6 @@ class PlayerLoop(TaskLoop):
                 self._running = False
                 try:
                     runtime = self._last_loop-st
-                    self.run_time.append(runtime.total_seconds())
                     bot_client.coc_main_log.info(
                         f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
                         )
@@ -559,6 +558,7 @@ class PlayerLoop(TaskLoop):
                 if lock.locked():
                     return
                 await lock.acquire()
+                st = pendulum.now()
 
                 cached_player = self._cached.get(tag,None)
                 if self.defer(cached_player):
@@ -595,6 +595,15 @@ class PlayerLoop(TaskLoop):
                     error=exc,
                     )
             return self.unlock(lock)
+        
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et - st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
+                
     
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
         for event in PlayerLoop._player_events:

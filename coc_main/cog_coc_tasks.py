@@ -388,7 +388,7 @@ class ClashOfClansTasks(commands.Cog):
                         self.player_loop.add_to_loop(player.tag)
 
                 try:
-                    locations = await bot_client.coc.get_location()
+                    locations = await bot_client.coc.search_locations()
                 except:
                     pass
                 else:
