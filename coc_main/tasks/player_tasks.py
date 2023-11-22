@@ -8,7 +8,7 @@ from typing import *
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from .default import TaskLoop
 
@@ -483,12 +483,16 @@ class PlayerLoop(TaskLoop):
                 self._running = True
                 
                 scope_tags = random.sample(list(tags),min(len(tags),100000))
-                sleep = (5 / len(scope_tags))
+                semaphore = asyncio.Semaphore(100)
                 tasks = []
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                await asyncio.gather(*[self._run_single_loop(tag) for tag in scope_tags],return_exceptions=True)
+                tasks = bounded_gather(*(self._run_single_loop(tag) for tag in scope_tags),
+                    return_exceptions=True,
+                    semaphore=semaphore
+                    )
+                await tasks
                 
                 self._last_loop = pendulum.now()
                 self._running = False
