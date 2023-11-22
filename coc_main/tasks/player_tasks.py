@@ -407,6 +407,7 @@ class PlayerLoop(TaskLoop):
     async def start(self):
         bot_client.coc_main_log.info(f"Player Loop started.")
         await super().start()
+        self._collect_run = asyncio.create_task(self._run_collector())
     
     async def stop(self):
         try:
@@ -487,10 +488,8 @@ class PlayerLoop(TaskLoop):
                     f"Started loop for {len(scope_tags)} players."
                     )
                 for tag in scope_tags:
-                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
                     await asyncio.sleep(0)
-                
-                await asyncio.gather(*tasks,return_exceptions=True)
+                    await self._run_queue.put(asyncio.create_task(self._run_single_loop(tag)))
                 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -515,6 +514,69 @@ class PlayerLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self._loop_task()
+    
+    async def _run_collector(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._run_queue.get()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    continue
+                except Exception as exc:
+                    if self.loop_active:
+                        bot_client.coc_main_log.exception(f"PLAYER TASK ERROR: {exc}")
+                        await TaskLoop.report_fatal_error(
+                            message="PLAYER TASK ERROR",
+                            error=exc,
+                            )
+                finally:
+                    self._queue.task_done()
+                        
+        except asyncio.CancelledError:
+            while not self._run_queue.empty():
+                await asyncio.sleep(0)
+                task = await self._run_queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._run_queue.task_done()
+    
+    async def _collector_task(self):
+        try:
+            while True:
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                if task.done() or task.cancelled():
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception as exc:
+                        if self.loop_active:
+                            bot_client.coc_main_log.exception(f"PLAYER TASK ERROR: {exc}")
+                            await TaskLoop.report_fatal_error(
+                                message="PLAYER TASK ERROR",
+                                error=exc,
+                                )
+                    finally:
+                        self._queue.task_done()
+                else:
+                    await self._queue.put(task)
+                        
+        except asyncio.CancelledError:
+            while not self._queue.empty():
+                await asyncio.sleep(0)
+                task = await self._queue.get()
+                try:
+                    await task
+                except:
+                    continue
+                finally:
+                    self._queue.task_done()
     
     async def _collector_task(self):
         try:

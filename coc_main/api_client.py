@@ -112,6 +112,7 @@ class CustomThrottler(coc.BasicThrottler):
     
     async def __aexit__(self, exc_type, exc, tb):
         await self.client.api_counter.increment_rcvd()
+        return self
 
 ############################################################
 ############################################################
