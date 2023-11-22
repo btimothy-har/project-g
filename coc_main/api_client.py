@@ -75,6 +75,7 @@ class DataQueue(asyncio.Queue):
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         super().__init__(sleep_time)
+        self.sleep_time = 1 / 500
     
     @property
     def client(self) -> 'BotClashClient':
@@ -102,7 +103,7 @@ class CustomThrottler(coc.BasicThrottler):
             last_run = self.last_run
             if last_run:
                 difference = process_time() - last_run
-                need_to_sleep = (self.sleep_time * 1.2) - difference
+                need_to_sleep = (self.sleep_time * 1) - difference
                 if need_to_sleep > 0:
                     clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
