@@ -480,7 +480,7 @@ class PlayerLoop(TaskLoop):
                 self._running = True
                 
                 scope_tags = list(tags)[:100000]
-                sleep = (10 / len(scope_tags))
+                sleep = (1 / len(scope_tags))
                 tasks = []
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
