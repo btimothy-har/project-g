@@ -75,7 +75,7 @@ class DataQueue(asyncio.Queue):
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         super().__init__(sleep_time)
-        self.sleep_time = 1 / 1000
+        self.sleep_time = 1 / 800
     
     @property
     def client(self) -> 'BotClashClient':
