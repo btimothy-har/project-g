@@ -91,6 +91,8 @@ class CustomThrottler(coc.BasicThrottler):
         return BotClashClient()
     
     async def __aenter__(self):
+        if not self.limiter.has_capacity():
+            self.client.coc_main_log.warning(f"Throttling request. We've exceeded our limits.")
         await self.limiter.acquire()
         await self.client.api_counter.increment_sent()
         return self
