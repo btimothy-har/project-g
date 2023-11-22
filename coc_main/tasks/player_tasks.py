@@ -478,16 +478,21 @@ class PlayerLoop(TaskLoop):
 
                 st = pendulum.now()
                 self._running = True
-
-                sleep = (10 / len(tags))
-                tasks = []
+                
                 scope_tags = list(tags)[:100000]
+                sleep = (10 / len(scope_tags))
+                tasks = []
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
                 for tag in scope_tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
+
+                d = pendulum.now() - st
+                bot_client.coc_main_log.info(
+                    f"Tasks distributed for {len(scope_tags)} players. Took {round(d.total_seconds(),2)} seconds."
+                    )
 
                 await asyncio.gather(*tasks,return_exceptions=True)
 
