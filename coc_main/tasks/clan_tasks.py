@@ -137,7 +137,7 @@ class ClanLoop(TaskLoop):
                 self._running = True
 
                 scope_tags = list(tags)[:1000]
-                sleep = (1 / len(scope_tags))
+                sleep = (5 / len(scope_tags))
                 tasks = []                
                 for tag in scope_tags:
                     await asyncio.sleep(sleep)
