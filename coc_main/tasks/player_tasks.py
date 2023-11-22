@@ -497,7 +497,6 @@ class PlayerLoop(TaskLoop):
                     return_exceptions=True,
                     semaphore=semaphore
                     )
-                await tasks
                 
                 self._last_loop = pendulum.now()
                 self._running = False
