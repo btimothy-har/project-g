@@ -1,4 +1,5 @@
 import os
+from aiolimiter import AsyncLimiter
 import logging
 import pendulum
 import random
@@ -74,8 +75,9 @@ class DataQueue(asyncio.Queue):
 
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
+        self.rate_limit = 1 / sleep_time
+        self.limiter = AsyncLimiter(self.rate_limit,1)
         super().__init__(sleep_time)
-        #self.sleep_time = 1 / 1000
     
     @property
     def client(self) -> 'BotClashClient':
@@ -98,31 +100,21 @@ class CustomThrottler(coc.BasicThrottler):
         self.client._api_current_rcvd += 1
     
     async def __aenter__(self):
-        async with self.lock:
-            self.increment_sent()
-            last_run = self.last_run
-            if last_run:
-                difference = process_time() - last_run
-                need_to_sleep = (self.sleep_time * 1) - difference
-                if need_to_sleep > 0:
-                    clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
-                    await asyncio.sleep(need_to_sleep)
+        await self.limiter.acquire()
+        self.increment_sent()
+        return self
+        # async with self.lock:
+        #     self.increment_sent()
+        #     last_run = self.last_run
+        #     if last_run:
+        #         difference = process_time() - last_run
+        #         need_to_sleep = (self.sleep_time * 1) - difference
+        #         if need_to_sleep > 0:
+        #             clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
+        #             await asyncio.sleep(need_to_sleep)
 
-            self.last_run = process_time()
-            return self
-        
-            # self.increment_sent()
-            
-            # last_run = self.last_run
-            # if last_run:
-            #     difference = pendulum.now() - last_run
-            #     need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
-            #     if need_to_sleep > 0:
-            #         clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
-            #         await asyncio.sleep(need_to_sleep)
-
-            # self.last_run = pendulum.now()
-            # return self
+        #     self.last_run = process_time()
+        #     return self
     
     async def __aexit__(self, exc_type, exc, tb):
         self.increment_rcvd()
@@ -495,7 +487,7 @@ class BotClashClient():
         if not getattr(self.bot,"coc_client",None):
             self.bot.coc_client = coc.EventsClient(
                 key_count=int(clashapi_login.get("keys",1)),
-                key_names='Created for Project G, from coc.py',
+                key_names='project-g',
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit,

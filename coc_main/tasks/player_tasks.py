@@ -478,7 +478,6 @@ class PlayerLoop(TaskLoop):
 
                 st = pendulum.now()
                 self._running = True
-                queue = asyncio.Queue()
                 
                 scope_tags = list(tags)[:100000]
                 sleep = (5 / len(scope_tags))
@@ -487,28 +486,10 @@ class PlayerLoop(TaskLoop):
                     f"Started loop for {len(scope_tags)} players."
                     )
                 for tag in scope_tags:
-                    await asyncio.sleep(sleep)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await queue.put(task)
-
-                d = pendulum.now() - st
-                bot_client.coc_main_log.info(
-                    f"Tasks distributed for {len(scope_tags)} players. Took {round(d.total_seconds(),2)} seconds."
-                    )
-
-                while not queue.empty():
                     await asyncio.sleep(0)
-                    task = await queue.get()
-                    if task.done() or task.cancelled():
-                        try:
-                            await task
-                        except:
-                            continue
-                        finally:
-                            queue.task_done()
-                    else:
-                        await queue.put(task)
-
+                    task = asyncio.create_task(self._run_single_loop(tag))
+                    await self._queue.put(task)
+                
                 self._last_loop = pendulum.now()
                 self._running = False
                 try:

@@ -122,7 +122,7 @@ class ClashOfClansMain(commands.Cog):
 
             client = coc.Client(
                 key_count=int(clashapi_login.get("keys",1)),
-                key_names='Created for Project G, from coc.py',
+                key_names='project-g',
                 )
             await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
             keys.extend(client.http._keys)
