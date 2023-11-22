@@ -128,7 +128,7 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = list(copy.copy(self._tags))
+                tags = copy.copy(self._tags)
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
@@ -138,7 +138,8 @@ class ClanLoop(TaskLoop):
 
                 sleep = (10 / len(tags))
                 tasks = []
-                for tag in tags[:10]:
+                scope_tags = list(tags)
+                for tag in scope_tags[:1000]:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
             
@@ -162,6 +163,7 @@ class ClanLoop(TaskLoop):
                     message="FATAL CLAN LOOP ERROR",
                     error=exc,
                     )
+                await asyncio.sleep(60)
                 await self._loop_task()
     
     async def _collector_task(self):

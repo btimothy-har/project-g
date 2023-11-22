@@ -471,7 +471,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = list(copy.copy(self._tags))
+                tags = copy.copy(self._tags)
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
@@ -481,10 +481,11 @@ class PlayerLoop(TaskLoop):
 
                 sleep = (10 / len(tags))
                 tasks = []
+                scope_tags = list(tags)[:100000]
                 bot_client.coc_main_log.info(
-                    f"Started loop for {len(tags)} players."
+                    f"Started loop for {len(scope_tags)} players."
                     )
-                for tag in tags[:50000]:
+                for tag in scope_tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
@@ -496,7 +497,7 @@ class PlayerLoop(TaskLoop):
                     runtime = self._last_loop-st
                     self.run_time.append(runtime.total_seconds())
                     bot_client.coc_main_log.info(
-                        f"Loop for {len(tags)} players took {round(runtime.total_seconds(),2)} seconds."
+                        f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
                         )
                 except:
                     pass
@@ -512,6 +513,7 @@ class PlayerLoop(TaskLoop):
                     message="FATAL PLAYER LOOP ERROR",
                     error=exc,
                     )
+                await asyncio.sleep(60)
                 await self._loop_task()
     
     async def _collector_task(self):
