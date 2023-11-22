@@ -471,7 +471,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = copy.copy(self._tags)
+                tags = list(copy.copy(self._tags))
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
@@ -495,8 +495,12 @@ class PlayerLoop(TaskLoop):
                 try:
                     runtime = self._last_loop-st
                     self.run_time.append(runtime.total_seconds())
+                    bot_client.coc_main_log.info(
+                        f"Loop for {len(tags)} players took {round(runtime.total_seconds(),2)} seconds."
+                        )
                 except:
                     pass
+                
                 await asyncio.sleep(10)
         
         except Exception as exc:
