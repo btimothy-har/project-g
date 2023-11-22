@@ -483,12 +483,17 @@ class PlayerLoop(TaskLoop):
                 self._running = True
                 
                 scope_tags = random.sample(list(tags),min(len(tags),100000))
-                semaphore = asyncio.Semaphore(10)
+                semaphore = asyncio.Semaphore(100)
                 tasks = []
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                tasks = bounded_gather(*(self._run_single_loop(tag) for tag in scope_tags),
+                
+                for tag in scope_tags:
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
+                    await asyncio.sleep(0)
+
+                await bounded_gather(*tasks,
                     return_exceptions=True,
                     semaphore=semaphore
                     )
