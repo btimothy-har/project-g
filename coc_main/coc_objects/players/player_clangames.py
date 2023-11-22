@@ -127,6 +127,6 @@ class aPlayerClanGames():
                     f"Player {self.tag} {self.season.id}: Finished Clan Games at {timestamp}."
                     )
             
-            await bot_client.run_in_thread(db_update,db_id=self._db_id,stat_json=self.json)
+            await bot_client.run_in_thread(db_update,self._db_id,self.json)
         
         return self
