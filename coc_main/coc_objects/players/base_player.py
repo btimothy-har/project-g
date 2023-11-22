@@ -25,13 +25,21 @@ class BasicPlayer():
             return [db.tag for db in db_Player.objects.only('tag')]
         
         player_tags = await bot_client.run_in_thread(_get_from_db)
-        players = [cls(tag=tag) for tag in player_tags]
-        await asyncio.gather(*(player._load_attributes() for player in players)) 
+        players = []
+        for player in player_tags:
+            await asyncio.sleep(0)
+            players.append(await cls._load_attributes(player))
         return players
     
     @classmethod
     def clear_cache(cls):
         _PlayerAttributes._cache = {}
+    
+    @classmethod
+    async def _load_attributes(cls,tag):
+        attr = _PlayerAttributes(tag=tag)
+        await attr._load_attributes()
+        return cls(tag=tag)
     
     """
     The BasicPlayer class provides a consolidated interface for inheriting player objects.
@@ -46,10 +54,7 @@ class BasicPlayer():
         return f"Player {self.tag} ({self.name})"
     
     def __hash__(self):
-        return hash(self.tag)
-    
-    async def _load_attributes(self):
-        await self._attributes._load_attributes()
+        return hash(self.tag)   
     
     ##################################################
     #####

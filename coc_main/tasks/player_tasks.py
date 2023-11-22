@@ -480,6 +480,9 @@ class PlayerLoop(TaskLoop):
 
                 sleep = (10 / len(tags))
                 tasks = []
+                bot_client.coc_main_log.info(
+                    f"Started loop for {len(tags)} players."
+                    )
                 for tag in tags:
                     await asyncio.sleep(sleep)
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
@@ -557,10 +560,10 @@ class PlayerLoop(TaskLoop):
 
                 async with self.api_semaphore:
                     new_player = None
-                    try:
-                        new_player = await self.coc_client.fetch_player(tag)
-                    except:
-                        return self.loop.call_later(10,self.unlock,lock)
+                    #try:
+                    new_player = await self.coc_client.fetch_player(tag)
+                    # except:
+                    #     return self.loop.call_later(10,self.unlock,lock)
                     
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
                     #wait = getattr(new_player,'_response_retry',default_sleep)

@@ -25,9 +25,10 @@ class BasicClan():
             return [db.tag for db in db_Clan.objects.only('tag')]
         
         clan_tags = await bot_client.run_in_thread(_get_from_db)
-        clans = [cls(tag=tag) for tag in clan_tags]
-        await asyncio.gather(*(clan._load_attributes() for clan in clans))
-        
+        clans = []
+        for clan in clan_tags:
+            await asyncio.sleep(0)
+            clans.append(await cls._load_attributes(clan))        
         return clans
     
     @classmethod
@@ -49,8 +50,11 @@ class BasicClan():
     def __hash__(self):
         return hash(self.tag)
     
-    async def _load_attributes(self):
-        await self._attributes._load_attributes()
+    @classmethod
+    async def _load_attributes(cls,tag):
+        attr = _ClanAttributes(tag=tag)
+        await attr._load_attributes()
+        return cls(tag=tag)
     
     ##################################################
     #####

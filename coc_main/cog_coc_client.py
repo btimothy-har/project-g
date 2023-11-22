@@ -44,6 +44,7 @@ class ClashOfClansClient(commands.Cog):
 
     def __init__(self,bot:Red):
         self.bot = bot
+        self.start_task = None
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -85,47 +86,52 @@ class ClashOfClansClient(commands.Cog):
     ### COG LOAD
     ##################################################
     async def cog_load(self):
+        async def start_client_cog():
+            try:
+                while True:
+                    if getattr(bot_client,'_api_logged_in',False):
+                        break
+                    await asyncio.sleep(1)
+
+                war_tasks = asyncio.create_task(aClanWar.load_all())
+                raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
+                player_tasks = asyncio.create_task(BasicPlayer.load_all())
+                clan_tasks = asyncio.create_task(BasicClan.load_all())
+
+                wars = await war_tasks
+                self.client.coc_main_log.info(
+                    f"Loaded {len(wars):,} Clan Wars from database."
+                    )
+                raids = await raid_tasks
+                self.client.coc_main_log.info(
+                    f"Loaded {len(raids):,} Capital Raids from database."
+                    )
+                
+                players = await player_tasks
+                self.client.coc_main_log.info(
+                    f"Found {len(players):,} Players in database."
+                    )
+                
+                clans = await clan_tasks
+                self.client.coc_main_log.info(
+                    f"Found {len(clans):,} Clans in database."
+                    )
+                
+                # c_queue_task = asyncio.create_task(bot_client.clan_queue.add_many([c.tag for c in clans]))
+                # p_queue_task = asyncio.create_task(bot_client.player_queue.add_many([p.tag for p in players]))
+                #await asyncio.gather(c_queue_task,p_queue_task)
+            except asyncio.CancelledError:
+                return
+
         self.bot_status_update_loop.start()
-        self.reset_counter.start()
-        asyncio.create_task(self.start_client_cog())
+        self.start_task = asyncio.create_task(start_client_cog())
     
-    async def start_client_cog(self):
-        while True:
-            if getattr(bot_client,'_api_logged_in',False):
-                break
-            await asyncio.sleep(1)
-
-        war_tasks = asyncio.create_task(aClanWar.load_all())
-        raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
-        player_tasks = asyncio.create_task(BasicPlayer.load_all())
-        clan_tasks = asyncio.create_task(BasicClan.load_all())
-
-        wars = await war_tasks
-        self.client.coc_main_log.info(
-            f"Loaded {len(wars):,} Clan Wars from database."
-            )
-        raids = await raid_tasks
-        self.client.coc_main_log.info(
-            f"Loaded {len(raids):,} Capital Raids from database."
-            )
-        
-        players = await player_tasks
-        self.client.coc_main_log.info(
-            f"Found {len(players):,} Players in database."
-            )
-        
-        clans = await clan_tasks
-        self.client.coc_main_log.info(
-            f"Found {len(clans):,} Clans in database."
-            )
-        
-        # c_queue_task = asyncio.create_task(bot_client.clan_queue.add_many([c.tag for c in clans]))
-        # p_queue_task = asyncio.create_task(bot_client.player_queue.add_many([p.tag for p in players]))
-        #await asyncio.gather(c_queue_task,p_queue_task)
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
-        self.reset_counter.cancel()
+
+        self.start_task.cancel()
+        await self.start_task
         
         BasicPlayer.clear_cache()
         BasicClan.clear_cache()
@@ -162,11 +168,7 @@ class ClashOfClansClient(commands.Cog):
             self.client.coc_main_log.exception(
                 f"Error in Bot Status Loop"
                 )
-    
-    @tasks.loop(seconds=59)
-    async def reset_counter(self):
-        return
-    
+
     ############################################################
     #####
     ##### COC: PLAYERS

@@ -133,6 +133,8 @@ class ClashOfClansTasks(commands.Cog):
             if getattr(bot_client,'_api_logged_in',False):
                 break
             await asyncio.sleep(1)
+
+        await bot_client.bot.wait_until_red_ready()
         
         asyncio.create_task(self.start_recruiting_loop())
 
@@ -149,7 +151,6 @@ class ClashOfClansTasks(commands.Cog):
         asyncio.create_task(self.discord_loop.start())
     
     async def start_recruiting_loop(self):
-        await bot_client.bot.wait_until_red_ready()
         posts = await RecruitingReminder.get_all_active()
         async for post in AsyncIter(posts):
             count = 0

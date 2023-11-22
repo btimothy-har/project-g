@@ -31,6 +31,8 @@ coc_data_logger.setLevel(logging.INFO)
 clashlinks_log = logging.getLogger("coc.links")
 clashlinks_log.setLevel(logging.INFO)
 
+clashhttp_log = logging.getLogger("coc.http")
+
 ############################################################
 ############################################################
 #####
@@ -103,7 +105,7 @@ class CustomThrottler(coc.BasicThrottler):
                 difference = pendulum.now() - last_run
                 need_to_sleep = (self.sleep_time * 1) - difference.total_seconds()
                 if need_to_sleep > 0:
-                    self.client.coc_main_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
+                    clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
                     await asyncio.sleep(need_to_sleep)
 
             self.last_run = pendulum.now()
@@ -480,7 +482,7 @@ class BotClashClient():
         if not getattr(self.bot,"coc_client",None):
             self.bot.coc_client = coc.EventsClient(
                 key_count=int(clashapi_login.get("keys",1)),
-                key_names='Created for Project G, from coc.py',
+                key_names=f'Created for Project-G, from coc.py',
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit,
