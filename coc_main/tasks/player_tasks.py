@@ -5,6 +5,7 @@ import copy
 
 from typing import *
 from ..api_client import BotClashClient as client
+from ..exceptions import InvalidTag, ClashAPIError
 
 from redbot.core.utils import AsyncIter
 
@@ -560,10 +561,12 @@ class PlayerLoop(TaskLoop):
 
                 async with self.api_semaphore:
                     new_player = None
-                    #try:
-                    new_player = await self.coc_client.fetch_player(tag)
-                    # except:
-                    #     return self.loop.call_later(10,self.unlock,lock)
+                    try:
+                        new_player = await self.coc_client.fetch_player(tag)
+                    except InvalidTag:
+                        return self.loop.call_later(3600,self.unlock,lock)
+                    except ClashAPIError:
+                        return self.loop.call_later(10,self.unlock,lock)                    
                     
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
                     #wait = getattr(new_player,'_response_retry',default_sleep)

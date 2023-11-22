@@ -217,8 +217,10 @@ class ClanLoop(TaskLoop):
                     new_clan = None
                     try:
                         new_clan = await self.coc_client.fetch_clan(tag)
-                    except:
-                        return self.loop.call_later(10,self.unlock,lock)                            
+                    except InvalidTag:
+                        return self.loop.call_later(3600,self.unlock,lock)
+                    except ClashAPIError:
+                        return self.loop.call_later(10,self.unlock,lock)
                     
                     wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
