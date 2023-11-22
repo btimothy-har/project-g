@@ -133,6 +133,13 @@ class RequestCounter():
     @property
     def client(self) -> 'BotClashClient':
         return BotClashClient()
+
+    async def reset_counter(self):
+        async with self.sent_lock, self.rcvd_lock:
+            self.sent = deque(maxlen=3600)
+            self.sent_time = process_time()
+            self.rcvd = deque(maxlen=3600)
+            self.rcvd_time = process_time()
     
     async def increment_sent(self):
         async with self.sent_lock:
@@ -321,28 +328,31 @@ class BotClashClient():
     
     @property
     def api_current_throughput(self) -> (float, float):
-        diff = pendulum.now() - self._sent_time
-        sent_avg = self._api_current_sent / diff.total_seconds() if self._api_current_sent > 0 else 0
-        diff = pendulum.now() - self._rcvd_time
-        rcvd_avg = self._api_current_rcvd / diff.total_seconds() if self._api_current_rcvd > 0 else 0
+        nt = process_time()
+
+        diff = nt - self.api_counter.sent_time
+        sent_avg = self.api_counter.current_sent / diff if self.api_counter.current_sent > 0 else 0
+        
+        diff = nt - self.api_counter.rcvd_time
+        rcvd_avg = self.api_counter.current_rcvd / diff if self.api_counter.current_rcvd > 0 else 0
         return sent_avg, rcvd_avg
     
     @property
     def rcvd_stats(self) -> (float, float, float):
-        if len(self._api_rcvd) == 0:
+        if len(self.api_counter.rcvd) == 0:
             return 0,0,0
-        avg = sum(self._api_rcvd)/len(self._api_rcvd)
-        last = self._api_rcvd[-1]
-        maxr = max(self._api_rcvd)
+        avg = sum(self.api_counter.rcvd)/len(self.api_counter.rcvd)
+        last = list(self.api_counter.rcvd)[-1]
+        maxr = max(self.api_counter.rcvd)
         return avg, last, maxr
     
     @property
     def sent_stats(self) -> (float, float, float):
-        if len(self._api_sent) == 0:
+        if len(self.api_counter.sent) == 0:
             return 0,0,0
-        avg = sum(self._api_sent)/len(self._api_sent)
-        last = self._api_sent[-1]
-        maxr = max(self._api_sent)
+        avg = sum(self.api_counter.sent)/len(self.api_counter.sent)
+        last = list(self.api_counter.sent)[-1]
+        maxr = max(self.api_counter.sent)
         return avg, last, maxr
     
     ##################################################
@@ -736,8 +746,7 @@ async def clash_maintenance_start():
 @coc.ClientEvents.maintenance_completion()
 async def clash_maintenance_complete(time_started):
     client = BotClashClient()
-    client._api_sent = deque(maxlen=3600)
-    client._api_rcvd = deque(maxlen=3600)
+    await client.api_counter.reset_counter()
     client.api_maintenance = False
 
     maint_start = pendulum.instance(time_started)
