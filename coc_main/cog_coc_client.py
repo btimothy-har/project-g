@@ -180,6 +180,7 @@ class ClashOfClansClient(commands.Cog):
             try:
                 count_try += 1
                 player = await self.client.coc.get_player(tag,cls=aPlayer)
+                player = await self.client.coc.get_player(tag)
                 break
 
             except coc.NotFound as exc:
@@ -248,7 +249,8 @@ class ClashOfClansClient(commands.Cog):
             await asyncio.sleep(0)
             try:
                 count_try += 1
-                clan = await self.client.coc.get_clan(tag,cls=aClan)
+                #clan = await self.client.coc.get_clan(tag,cls=aClan)
+                clan = await self.client.coc.get_clan(tag)
                 break
 
             except coc.NotFound as exc:
@@ -265,8 +267,7 @@ class ClashOfClansClient(commands.Cog):
                 if count_try > 5:
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
-                continue       
-            
+                continue            
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:

@@ -226,13 +226,13 @@ class ClanLoop(TaskLoop):
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
-                await new_clan._sync_cache()
-                if cached_clan:
-                    if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
-                        self._cached[tag] = new_clan
-                        await self._dispatch_events(cached_clan,new_clan)
-                else:
-                    self._cached[tag] = new_clan
+                # await new_clan._sync_cache()
+                # if cached_clan:
+                #     if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
+                #         self._cached[tag] = new_clan
+                #         await self._dispatch_events(cached_clan,new_clan)
+                # else:
+                #     self._cached[tag] = new_clan
                     
         except Exception as exc:
             if self.loop_active:

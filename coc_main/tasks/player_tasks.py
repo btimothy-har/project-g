@@ -572,13 +572,13 @@ class PlayerLoop(TaskLoop):
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
-                await new_player._sync_cache()    
-                if cached_player:        
-                    if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
-                        self._cached[tag] = new_player
-                        await self._dispatch_events(cached_player,new_player)
-                else:
-                    self._cached[tag] = new_player
+                # await new_player._sync_cache()    
+                # if cached_player:        
+                #     if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
+                #         self._cached[tag] = new_player
+                #         await self._dispatch_events(cached_player,new_player)
+                # else:
+                #     self._cached[tag] = new_player
 
         except Exception as exc:
             if self.loop_active:
