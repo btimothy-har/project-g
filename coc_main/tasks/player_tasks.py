@@ -442,6 +442,7 @@ class PlayerLoop(TaskLoop):
         return 3
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
+        return False
         if self.task_lock.locked():
             if not player:
                 return False
@@ -486,9 +487,10 @@ class PlayerLoop(TaskLoop):
                     f"Started loop for {len(scope_tags)} players."
                     )
                 for tag in scope_tags:
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
                     await asyncio.sleep(0)
-                    task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                
+                await asyncio.gather(*tasks,return_exceptions=True)
                 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -561,8 +563,8 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
 
                 cached_player = self._cached.get(tag,None)
-                if self.defer(cached_player):
-                    return self.loop.call_later(10,self.unlock,lock)
+                # if self.defer(cached_player):
+                #     return self.loop.call_later(10,self.unlock,lock)
 
                 async with self.api_semaphore:
                     new_player = None
@@ -603,8 +605,7 @@ class PlayerLoop(TaskLoop):
                 self.run_time.append(runtime.total_seconds())
             except:
                 pass
-                
-    
+            
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
         for event in PlayerLoop._player_events:
             task = asyncio.create_task(event(old_player,new_player))
