@@ -107,7 +107,7 @@ class aPlayerClanGames():
         ):
         
         async with self._lock:
-            if self.score == 0:
+            if self.score == 0 and clan:
                 self.clan_tag = clan.tag
                 self.starting_time = timestamp
                 bot_client.coc_data_log.debug(
