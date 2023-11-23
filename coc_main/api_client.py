@@ -184,7 +184,7 @@ class BotClashClient():
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
-            self.thread_pool = ThreadPoolExecutor(max_workers=80)
+            self.thread_pool = ThreadPoolExecutor(max_workers=16)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger
