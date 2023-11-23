@@ -466,7 +466,7 @@ class PlayerLoop(TaskLoop):
             return 2
         if bot_client.bot.get_user(player.discord_user):
             return 2
-        return 3
+        return 10
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
         if self.task_lock.locked():
@@ -497,6 +497,11 @@ class PlayerLoop(TaskLoop):
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
+
+                if self._queue.qsize() > 1000000:
+                    while not self._queue.empty():
+                        await asyncio.sleep(10)
+                        continue
 
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
@@ -574,8 +579,7 @@ class PlayerLoop(TaskLoop):
                 except:
                     continue
                 finally:
-                    self._queue.task_done()
-                
+                    self._queue.task_done()                
                 await asyncio.sleep(0)
     
     async def _run_single_loop(self,tag:str):
@@ -604,7 +608,7 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)                    
                     
-                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),300))
+                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 

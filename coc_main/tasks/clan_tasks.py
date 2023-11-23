@@ -99,7 +99,7 @@ class ClanLoop(TaskLoop):
             return 1
         if clan.is_registered_clan:
             return 1
-        return 5
+        return 10
     
     def defer(self,clan:Optional[aClan]=None) -> bool:
         if self.task_lock.locked():
@@ -126,6 +126,11 @@ class ClanLoop(TaskLoop):
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
+
+                if self._queue.qsize() > 1000000:
+                    while not self._queue.empty():
+                        await asyncio.sleep(10)
+                        continue
 
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
