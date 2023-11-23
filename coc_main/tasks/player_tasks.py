@@ -453,7 +453,8 @@ class PlayerLoop(TaskLoop):
         if remove:
             bot_client.coc_main_log.debug(f"Removed {n_tag} from Player Loop.")
     
-    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:        
+    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
+        return 1
         if not player:
             return 1
         if player.is_member:
@@ -469,6 +470,7 @@ class PlayerLoop(TaskLoop):
         return 10
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
+        return False
         if self.task_lock.locked():
             if not player:
                 return False
