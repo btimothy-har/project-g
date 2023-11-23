@@ -38,6 +38,7 @@ class TaskLoop():
     def __init__(self):
         self._active = False
         self._running = False
+        self._status = "Not Running"
         self._collector = None
         self._last_loop = None
         self._tags = set()

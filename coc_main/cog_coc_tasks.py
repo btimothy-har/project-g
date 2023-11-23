@@ -475,7 +475,7 @@ class ClashOfClansTasks(commands.Cog):
                 + "```ini"
                 + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
-                + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
+                + f"\n{'[Status]':<10} {self.player_loop._status}"
                 + f"\n{'[Runtime]':<10} {self.player_loop.runtime_avg:.2f}s"
                 #+ f"\n{'[Running]':<10} {self.player_loop._run_queue.qsize():,}"
                 + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"

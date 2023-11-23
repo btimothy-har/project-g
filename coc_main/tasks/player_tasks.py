@@ -494,12 +494,15 @@ class PlayerLoop(TaskLoop):
         try:
             while self.loop_active:
 
+                self._status = "Not Running"
+
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 1000000:
+                if self._queue.qsize() > 100000:
                     while not self._queue.empty():
+                        self._status = "On Hold"
                         await asyncio.sleep(10)
                         continue
 
@@ -510,6 +513,7 @@ class PlayerLoop(TaskLoop):
 
                 st = pendulum.now()
                 self._running = True
+                self._status = "Running"
                 
                 scope_tags = random.sample(list(tags),min(len(tags),10000))                
                 bot_client.coc_main_log.info(
@@ -529,6 +533,8 @@ class PlayerLoop(TaskLoop):
                         )
                 except:
                     pass
+
+                self._status = "Not Running"
                 
                 if len(tags) > len(scope_tags):
                     await asyncio.sleep(0)

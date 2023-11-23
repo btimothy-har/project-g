@@ -127,7 +127,7 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 1000000:
+                if self._queue.qsize() > 100000:
                     while not self._queue.empty():
                         await asyncio.sleep(10)
                         continue
