@@ -495,25 +495,26 @@ class PlayerLoop(TaskLoop):
             while self.loop_active:
 
                 if self.api_maintenance:
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)
                     continue
 
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)
                     continue
 
                 st = pendulum.now()
                 self._running = True
                 
-                scope_tags = list(tags)
+                scope_tags = random.sample(list(tags),min(len(tags),10000))
+                
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
                 sleep = 1 / len(scope_tags)
                 
                 for tag in scope_tags:
-                    await asyncio.sleep(sleep)
+                    #await asyncio.sleep(sleep)
                     await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
                 self._last_loop = pendulum.now()
@@ -526,7 +527,7 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
                 
-                await asyncio.sleep(10)
+                await asyncio.sleep(5)
         
         except Exception as exc:
             if self.loop_active:
