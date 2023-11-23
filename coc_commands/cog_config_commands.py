@@ -262,7 +262,8 @@ class ClashServerConfig(commands.Cog):
             title="**Clan Panels**"
             )
         clan_panels = await GuildClanPanel.get_for_guild(ctx.guild.id)
-        for panel in clan_panels:
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -284,7 +285,8 @@ class ClashServerConfig(commands.Cog):
             title="**Clan Panels**"
             )
         clan_panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
-        for panel in clan_panels:
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -462,7 +464,8 @@ class ClashServerConfig(commands.Cog):
             )
         
         application_panels = await GuildApplicationPanel.get_for_guild(ctx.guild.id)
-        for panel in application_panels:
+        a_iter = AsyncIter(application_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"
@@ -500,7 +503,8 @@ class ClashServerConfig(commands.Cog):
             )
         
         application_panels = await GuildApplicationPanel.get_for_guild(interaction.guild.id)
-        for panel in application_panels:
+        a_iter = AsyncIter(application_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"

@@ -447,12 +447,12 @@ class BotClashClient():
                             )
                         continue
                         
-                    if max(self.player_api[-100:]) > 20000:
-                        await reconnect()
-                        self.coc_main_log.warning(
-                            f"Player API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
-                            )
-                        continue
+                    # if max(self.player_api[-100:]) > 20000:
+                    #     await reconnect()
+                    #     self.coc_main_log.warning(
+                    #         f"Player API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
+                    #         )
+                    #     continue
 
                     if self.clan_api_avg > 3000:
                         await reconnect()
@@ -461,12 +461,12 @@ class BotClashClient():
                             )
                         continue
                         
-                    if max(self.clan_api[-100:]) > 20000:
-                        await reconnect()
-                        self.coc_main_log.warning(
-                            f"Clan API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
-                            )
-                        continue
+                    # if max(self.clan_api[-100:]) > 20000:
+                    #     await reconnect()
+                    #     self.coc_main_log.warning(
+                    #         f"Clan API exceeds maximum threshold. Refreshing Clash API Client Connection. Uptime: {connect.total_seconds()}."
+                    #         )
+                    #     continue
                         
                     # if connect.total_seconds() > 600:
                     #     await reconnect()
