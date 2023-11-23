@@ -43,6 +43,9 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_main(old_player:aPlayer,new_player:aPlayer):
         try:
+            if not new_player.is_member:
+                return
+            
             update = False
 
             if old_player.name != new_player.name:
@@ -60,6 +63,9 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_achievement(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
+            if not new_player.is_member:
+                return
+            
             if achievement.name in activity_achievements:
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
@@ -82,6 +88,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             if new_player.current_season.attacks._prior_seen:
                 increment = new_player.attack_wins - new_player.current_season.attacks.last_update
             else:
@@ -110,6 +119,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             if new_player.current_season.defenses._prior_seen:
                 increment = new_player.defense_wins - new_player.current_season.defenses.last_update
             else:
@@ -138,6 +150,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             if new_player.current_season.donations._prior_seen:
                 increment = new_player.donations - new_player.current_season.donations.last_update
             else:
@@ -166,6 +181,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             if new_player.current_season.received._prior_seen:
                 increment = new_player.received - new_player.current_season.received.last_update
             else:
@@ -208,6 +226,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             #Loot Gold
             if achievement.name == "Gold Grab":
                 old_ach = old_player.get_achievement(achievement.name)
@@ -286,6 +307,9 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
+            if not new_player.is_member:
+                return
+            
             #Capital Contribution
             if achievement.name == "Most Valuable Clanmate":
                 old_ach = old_player.get_achievement(achievement.name)
@@ -324,6 +348,9 @@ class PlayerTasks():
                     )
         
         try:
+            if not new_player.is_member:
+                return
+            
             if achievement.name == "Games Champion":
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
@@ -408,7 +435,6 @@ class PlayerLoop(TaskLoop):
     async def start(self):
         bot_client.coc_main_log.info(f"Player Loop started.")
         await super().start()
-        self._collect_run = asyncio.create_task(self._run_collector())
     
     async def stop(self):
         try:
@@ -427,8 +453,7 @@ class PlayerLoop(TaskLoop):
         if remove:
             bot_client.coc_main_log.debug(f"Removed {n_tag} from Player Loop.")
     
-    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
-        return 1
+    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:        
         if not player:
             return 1
         if player.is_member:
@@ -444,7 +469,6 @@ class PlayerLoop(TaskLoop):
         return 3
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
-        return False
         if self.task_lock.locked():
             if not player:
                 return False
@@ -458,7 +482,7 @@ class PlayerLoop(TaskLoop):
                 return False
             if bot_client.bot.get_user(player.discord_user):
                 return False
-            if pendulum.now().int_timestamp - player.timestamp.int_timestamp >= (10 * 60):
+            if pendulum.now().int_timestamp - player.timestamp.int_timestamp >= 1800:
                 return False
             return True
         return False
@@ -482,22 +506,14 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
                 
-                scope_tags = random.sample(list(tags),min(len(tags),100000))
-                semaphore = asyncio.Semaphore(100)
-                tasks = []
+                scope_tags = list(tags)
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
                 
                 for tag in scope_tags:
-                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
-                    await asyncio.sleep(0)
+                    await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
-                await bounded_gather(*tasks,
-                    return_exceptions=True,
-                    semaphore=semaphore
-                    )
-                
                 self._last_loop = pendulum.now()
                 self._running = False
                 try:
@@ -569,8 +585,8 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
 
                 cached_player = self._cached.get(tag,None)
-                # if self.defer(cached_player):
-                #     return self.loop.call_later(10,self.unlock,lock)
+                if self.defer(cached_player):
+                    return self.loop.call_later(10,self.unlock,lock)
 
                 async with self.api_semaphore:
                     new_player = None

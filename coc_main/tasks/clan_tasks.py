@@ -91,7 +91,6 @@ class ClanLoop(TaskLoop):
             bot_client.coc_main_log.debug(f"Removed {n_tag} from Clan Loop.")
     
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
-        return 1
         if not clan:
             return 1
         if clan.is_alliance_clan:
@@ -112,7 +111,7 @@ class ClanLoop(TaskLoop):
                 return False
             if clan.is_registered_clan:
                 return False
-            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= (15 * 60):
+            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= 3600:
                 return False
             return True
         return False
@@ -136,14 +135,9 @@ class ClanLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
 
-                scope_tags = list(tags)[:1000]
-                sleep = (5 / len(scope_tags))
-                tasks = []                
+                scope_tags = list(tags)   
                 for tag in scope_tags:
-                    await asyncio.sleep(sleep)
-                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
-            
-                await asyncio.gather(*tasks,return_exceptions=True)
+                    await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
                 self._last_loop = pendulum.now()
                 self._running = False
