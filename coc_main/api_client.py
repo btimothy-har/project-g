@@ -82,8 +82,8 @@ class DataQueue(asyncio.Queue):
 ############################################################
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
-        self.rate_limit = int(min(1 / sleep_time,1000))
-        self.limiter = AsyncLimiter(1,1/self.rate_limit)
+        self.rate_limit = 1 / sleep_time
+        self.limiter = AsyncLimiter(1,sleep_time)
         super().__init__(sleep_time)
     
     @property
@@ -92,7 +92,7 @@ class CustomThrottler(coc.BasicThrottler):
     
     async def __aenter__(self):
         if not self.limiter.has_capacity():
-            self.client.coc_main_log.warning(f"Throttling request.")
+            self.client.coc_main_log.debug(f"Throttling request.")
         await self.limiter.acquire()
         await self.client.api_counter.increment_sent()
         return self
