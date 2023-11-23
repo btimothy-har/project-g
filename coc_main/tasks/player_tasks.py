@@ -514,7 +514,7 @@ class PlayerLoop(TaskLoop):
                     )
                                 
                 for tag in scope_tags:
-                    await asyncio.sleep(sleep)
+                    await asyncio.sleep(0)
                     await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
                 self._last_loop = pendulum.now()
