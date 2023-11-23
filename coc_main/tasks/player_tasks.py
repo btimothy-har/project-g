@@ -648,12 +648,14 @@ class PlayerLoop(TaskLoop):
                 pass
             
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
-        for event in PlayerLoop._player_events:
+        a_iter = AsyncIter(PlayerLoop._player_events)
+        async for event in a_iter:
             task = asyncio.create_task(event(old_player,new_player))
             await self._queue.put(task)
 
         achievement_iter = AsyncIter(new_player.achievements)
         async for achievement in achievement_iter:
-            for event in PlayerLoop._achievement_events:
+            a_iter = AsyncIter(PlayerLoop._achievement_events)
+            async for event in a_iter:
                 task = asyncio.create_task(event(old_player,new_player,achievement))
                 await self._queue.put(task)

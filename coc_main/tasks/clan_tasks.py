@@ -257,20 +257,23 @@ class ClanLoop(TaskLoop):
             return self.unlock(lock)
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
-        for event in ClanLoop._clan_events:
+        a_iter = AsyncIter(ClanLoop._clan_events)
+        async for event in a_iter:
             task = asyncio.create_task(event(old_clan,new_clan))
             await self._queue.put(task)
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
-                for event in ClanLoop._member_leave_events:
+                a_iter = AsyncIter(ClanLoop._member_leave_events)
+                async for event in a_iter:
                     task = asyncio.create_task(event(member,new_clan))
                     await self._queue.put(task)
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
-                for event in ClanLoop._member_join_events:
+                a_iter = AsyncIter(ClanLoop._member_join_events)
+                async for event in a_iter:
                     task = asyncio.create_task(event(member,new_clan))
                     await self._queue.put(task)
