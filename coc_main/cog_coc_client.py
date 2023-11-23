@@ -10,6 +10,7 @@ from collections import deque
 from discord.ext import tasks
 from redbot.core import commands
 from redbot.core.bot import Red
+from redbot.core.utils import AsyncIter
 from .api_client import BotClashClient, aClashSeason
 
 from .coc_objects.clans.clan import BasicClan, aClan, db_Clan, db_AllianceClan, db_WarLeagueClanSetup
@@ -202,9 +203,10 @@ class ClashOfClansClient(commands.Cog):
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
         tasks = []
 
-        for tag in tags:
-            await asyncio.sleep(0)
-            tasks.append(asyncio.create_task(self.fetch_player(tag)))
+        a_iter = AsyncIter(tags)
+        async for tag in a_iter:
+            task = asyncio.create_task(self.fetch_player(tag))
+            tasks.append(task)
 
         ret = await asyncio.gather(*tasks,return_exceptions=True)
         if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
