@@ -138,7 +138,7 @@ class ClanLoop(TaskLoop):
                 scope_tags = random.sample(list(tags),min(len(tags),10000))
                 sleep = 1/len(scope_tags)
                 for tag in scope_tags:
-                    #await asyncio.sleep(sleep)
+                    await asyncio.sleep(sleep)
                     await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
                 self._last_loop = pendulum.now()

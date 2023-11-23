@@ -507,14 +507,14 @@ class PlayerLoop(TaskLoop):
                 self._running = True
                 
                 scope_tags = random.sample(list(tags),min(len(tags),10000))
-                
-                bot_client.coc_main_log.info(
-                    f"Started loop for {len(scope_tags)} players."
-                    )
                 sleep = 1 / len(scope_tags)
                 
+                bot_client.coc_main_log.info(
+                    f"Started loop for {len(scope_tags)} players. Sleep: {sleep}"
+                    )
+                                
                 for tag in scope_tags:
-                    #await asyncio.sleep(sleep)
+                    await asyncio.sleep(sleep)
                     await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))
 
                 self._last_loop = pendulum.now()
