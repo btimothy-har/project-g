@@ -99,7 +99,7 @@ class ClanLoop(TaskLoop):
             return 1
         if clan.is_registered_clan:
             return 1
-        return 3
+        return 5
     
     def defer(self,clan:Optional[aClan]=None) -> bool:
         if self.task_lock.locked():
@@ -136,7 +136,7 @@ class ClanLoop(TaskLoop):
                 self._running = True
 
                 scope_tags = list(tags)
-                sleep = (10/len(scope_tags))
+                sleep = 1/len(scope_tags)
                 for tag in scope_tags:
                     await asyncio.sleep(sleep)
                     await self._queue.put(asyncio.create_task(self._run_single_loop(tag)))

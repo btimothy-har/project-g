@@ -459,7 +459,7 @@ class PlayerLoop(TaskLoop):
         if player.is_member:
             return 1
         if getattr(player.clan,'is_alliance_clan',False):
-            return 1.5
+            return 1
         if getattr(player.clan,'is_active_league_clan',False):
             return 1.5
         if getattr(player.clan,'is_registered_clan',False):
@@ -510,7 +510,7 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                sleep = 10 / len(scope_tags)
+                sleep = 1 / len(scope_tags)
                 
                 for tag in scope_tags:
                     await asyncio.sleep(sleep)
