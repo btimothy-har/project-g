@@ -147,7 +147,7 @@ class ClanLoop(TaskLoop):
                     self.run_time.append(runtime.total_seconds())
                 except:
                     pass
-                
+
                 if len(tags) > len(scope_tags):
                     await asyncio.sleep(0)
                 else:
@@ -169,7 +169,6 @@ class ClanLoop(TaskLoop):
     async def _collector_task(self):
         try:
             while True:
-                await asyncio.sleep(0)
                 task = await self._queue.get()
                 if task.done() or task.cancelled():
                     try:
@@ -186,11 +185,11 @@ class ClanLoop(TaskLoop):
                     finally:
                         self._queue.task_done()
                 else:
-                    await self._queue.put(task)
+                    await self._queue.put(task)                
+                await asyncio.sleep(0)
 
         except asyncio.CancelledError:
             while not self._queue.empty():
-                await asyncio.sleep(0)
                 task = await self._queue.get()
                 try:
                     await task
@@ -198,6 +197,8 @@ class ClanLoop(TaskLoop):
                     continue
                 finally:
                     self._queue.task_done()
+                await asyncio.sleep(0)
+
     
     async def _run_single_loop(self,tag:str):
         try:
