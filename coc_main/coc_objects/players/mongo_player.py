@@ -15,9 +15,6 @@ class db_Player(Document):
 
     meta = {
         'indexes': [
-            'tag',
-            '$tag',
-            '#tag',
             'discord_user',
             'is_member',
             'home_clan'
@@ -49,7 +46,6 @@ class db_PlayerStats(Document):
 
     meta = {
         'indexes': [
-            'stats_id',
             ('tag','season'),
             'is_member',
             'home_clan'

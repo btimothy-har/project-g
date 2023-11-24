@@ -14,9 +14,6 @@ class db_Clan(Document):
 
     meta = {
         'indexes': [
-            'tag',
-            '$tag',
-            '#tag',
             'abbreviation'
             ]
         }
@@ -37,14 +34,6 @@ class db_AllianceClan(Document):
     elder_role = IntField(default=0)
     coleader_role = IntField(default=0)
 
-    meta = {
-        'indexes': [
-            'tag',
-            '$tag',
-            '#tag'
-            ]
-        }
-
 class db_WarLeagueClanSetup(Document):
     tag = StringField(primary_key=True,required=True)
     is_active = BooleanField(default=False)
@@ -53,11 +42,3 @@ class db_WarLeagueClanSetup(Document):
 
     #deprecated
     webhook = IntField(default=0)
-
-    meta = {
-        'indexes': [
-            'tag',
-            '$tag',
-            '#tag'
-            ]
-        }
