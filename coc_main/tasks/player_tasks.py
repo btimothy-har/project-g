@@ -631,7 +631,9 @@ class PlayerLoop(TaskLoop):
                     except InvalidTag:
                         return self.loop.call_later(3600,self.unlock,lock)
                     except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)                    
+                        return self.loop.call_later(10,self.unlock,lock)        
+
+                    await new_player._sync_cache()            
                     
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
@@ -639,7 +641,7 @@ class PlayerLoop(TaskLoop):
 
                     bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
                 
-                await new_player._sync_cache()
+                
                 if cached_player:        
                     if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
                         self._cached[tag] = new_player

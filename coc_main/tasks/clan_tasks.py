@@ -233,6 +233,8 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
+                    await new_clan._sync_cache()
+                    
                     try:
                         wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
                     except CacheNotReady:
@@ -246,7 +248,7 @@ class ClanLoop(TaskLoop):
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
-                await new_clan._sync_cache()
+                
                 if cached_clan:
                     if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
                         self._cached[tag] = new_clan
