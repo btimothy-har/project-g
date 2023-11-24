@@ -185,8 +185,8 @@ class BotClashClient():
         
         if not self._is_initialized:
             self.thread_pool = ThreadPoolExecutor(max_workers=5)
-            self.read_thread_pool = ThreadPoolExecutor(max_workers=25)
-            self.write_thread_pool = ThreadPoolExecutor(max_workers=10)
+            self.read_thread_pool = ThreadPoolExecutor(max_workers=20)
+            self.write_thread_pool = ThreadPoolExecutor(max_workers=15)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger
