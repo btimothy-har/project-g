@@ -304,6 +304,9 @@ class BotClashClient():
             end_of_trophy_season,
             end_of_clan_games
             )
+        
+        loop = asyncio.get_running_loop()
+        loop.set_debug(True)
 
         instance._is_initialized = True
         return instance
