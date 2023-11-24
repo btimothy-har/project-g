@@ -48,6 +48,9 @@ class BasicClan(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _ClanAttributes(self.tag)
+        if not self._attributes._cache_loaded:
+            loop = asyncio.get_running_loop()       
+            loop.call_soon_threadsafe(self.load())
 
     def __str__(self):
         return f"Clan {self.tag}"
