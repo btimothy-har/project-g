@@ -59,9 +59,7 @@ class BasicPlayer(AwaitLoader):
         return hash(self.tag)
     
     async def load(self):
-        if self._attributes._cache_loaded:
-            return
-        self._attributes = await _PlayerAttributes(self.tag)
+        await self._attributes.load()
     
     ##################################################
     #####
@@ -301,7 +299,7 @@ class BasicPlayer(AwaitLoader):
             townhall = self._attributes.town_hall_level = new_value
             await bot_client.run_in_write_thread(_update_in_db)
 
-class _PlayerAttributes(AwaitLoader):
+class _PlayerAttributes():
     """
     This class enforces a singleton pattern that caches database responses.
 
@@ -330,6 +328,16 @@ class _PlayerAttributes(AwaitLoader):
         self._is_new = False
     
     async def load(self):
+        await self.name
+        await self.exp_level
+        await self.town_hall_level
+        await self.discord_user
+        await self.is_member
+        await self.home_clan
+        await self.first_seen
+        await self.last_joined
+        await self.last_removed
+        await self.is_new
         self._cache_loaded = True
     
     @async_property

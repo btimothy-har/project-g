@@ -60,10 +60,8 @@ class BasicClan(AwaitLoader):
         return hash(self.tag)
 
     async def load(self):
-        if self._attributes._cache_loaded:
-            return        
-        self._attributes = await _ClanAttributes(self.tag)
-    
+        await self._attributes.load()
+           
     ##################################################
     #####
     ##### FORMATTERS
@@ -535,7 +533,7 @@ class BasicClan(AwaitLoader):
     def linked_servers(self) -> List[discord.Guild]:
         return [bot_client.bot.get_guild(db.guild_id) for db in db_ClanGuildLink.objects(tag=self.tag)]
 
-class _ClanAttributes(AwaitLoader):
+class _ClanAttributes():
     """
     This class enforces a singleton pattern that caches database responses.
 
@@ -564,6 +562,27 @@ class _ClanAttributes(AwaitLoader):
         self._is_new = False
     
     async def load(self):
+        if self._cache_loaded:
+            return
+        await self.name
+        await self.badge
+        await self.level
+        await self.capital_hall
+        await self.war_league_name
+        await self.abbreviation
+        await self.emoji
+        await self.unicode_emoji
+        await self.is_alliance_clan
+        await self.recruitment_level
+        await self.recruitment_info
+        await self.description
+        await self.leader
+        await self.coleaders
+        await self.elders
+        await self.alliance_members
+        await self.is_active_league_clan
+        await self.league_clan_channel_id
+        await self.league_clan_role_id
         self._cache_loaded = True
 
     ##################################################
