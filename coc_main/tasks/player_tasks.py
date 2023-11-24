@@ -543,9 +543,6 @@ class PlayerLoop(TaskLoop):
                     task = asyncio.create_task(self._run_single_loop(tag))
                     tasks.append(task)
                     await asyncio.sleep(sleep)
-                
-                wrap_task = asyncio.create_task(gather(*tasks))
-                await self._queue.put(wrap_task)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -557,12 +554,10 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
 
+                wrap_task = asyncio.create_task(gather(*tasks))
+                await self._queue.put(wrap_task)
                 self._status = "Not Running"
-                
-                if len(tags) > len(scope_tags):
-                    await asyncio.sleep(5)
-                else:
-                    await asyncio.sleep(10)
+                await asyncio.sleep(10)
                 continue
         
         except Exception as exc:
