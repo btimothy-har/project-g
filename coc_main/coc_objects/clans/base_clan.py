@@ -60,8 +60,9 @@ class BasicClan(AwaitLoader):
         return hash(self.tag)
 
     async def load(self):
-        self._attributes._cache_loaded = True
-        self._attributes = await _ClanAttributes(self.tag)        
+        if self._attributes._cache_loaded:
+            return        
+        self._attributes = await _ClanAttributes(self.tag)
     
     ##################################################
     #####
@@ -561,6 +562,9 @@ class _ClanAttributes(AwaitLoader):
             bot_client.clan_queue.add(self.tag)
             
         self._is_new = False
+    
+    async def load(self):
+        self._cache_loaded = True
 
     ##################################################
     #####

@@ -61,12 +61,7 @@ class BasicPlayer(AwaitLoader):
     async def load(self):
         if self._attributes._cache_loaded:
             return
-        
-        time = pendulum.now()
-        self._attributes._cache_loaded = True
         self._attributes = await _PlayerAttributes(self.tag)
-        et = (pendulum.now() - time).total_seconds()
-        bot_client.coc_data_log.info(f"{self}: Loaded in {et} seconds.")
     
     ##################################################
     #####
@@ -333,6 +328,9 @@ class _PlayerAttributes(AwaitLoader):
             bot_client.player_queue.add(self.tag)
         
         self._is_new = False
+    
+    async def load(self):
+        self._cache_loaded = True
     
     @async_property
     async def _database(self) -> Optional[db_Player]:
