@@ -532,10 +532,12 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                sleep = 5 / len(scope_tags)
+                sleep = 1 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
+                task = asyncio.create_task(self._run_single_loop('#LJC8V0GCJ'))
+                await self._queue.put(task)
                 async for tag in a_iter:
-                    #await asyncio.sleep(sleep)
+                    await asyncio.sleep(sleep)
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
 
@@ -659,11 +661,10 @@ class PlayerLoop(TaskLoop):
             try:
                 runtime = et - st
                 self.run_time.append(runtime.total_seconds())
+                if tag == "#LJC8V0GCJ":
+                    bot_client.coc_main_log.info(f"Player Loop: {tag} took {round(runtime.total_seconds(),2)} seconds.")
             except:
                 pass
-
-            if tag == "#LJC8V0GCJ":
-                bot_client.coc_main_log.info(f"Player Loop: {tag} took {round(runtime.total_seconds(),2)} seconds.")
             
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
         a_iter = AsyncIter(PlayerLoop._player_events)
