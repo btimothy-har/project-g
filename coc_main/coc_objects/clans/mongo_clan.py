@@ -18,9 +18,7 @@ class db_Clan(Document):
             '$tag',
             '#tag',
             'abbreviation'
-            ],
-        'index_background': True,
-        'auto_create_index_on_save': True,
+            ]
         }
 
 class db_AllianceClan(Document):
@@ -44,9 +42,7 @@ class db_AllianceClan(Document):
             'tag',
             '$tag',
             '#tag'
-            ],
-        'index_background': True,
-        'auto_create_index_on_save': True,
+            ]
         }
 
 class db_WarLeagueClanSetup(Document):
@@ -63,7 +59,5 @@ class db_WarLeagueClanSetup(Document):
             'tag',
             '$tag',
             '#tag'
-            ],
-        'index_background': True,
-        'auto_create_index_on_save': True,
+            ]
         }

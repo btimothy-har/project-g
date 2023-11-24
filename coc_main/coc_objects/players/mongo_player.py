@@ -21,9 +21,7 @@ class db_Player(Document):
             'discord_user',
             'is_member',
             'home_clan'
-            ],
-        'index_background': True,
-        'auto_create_index_on_save': True,
+            ]
         }
 
 class db_PlayerStats(Document):
@@ -55,7 +53,5 @@ class db_PlayerStats(Document):
             ('tag','season'),
             'is_member',
             'home_clan'
-            ],
-        'index_background': True,
-        'auto_create_index_on_save': True,
+            ]
         }
