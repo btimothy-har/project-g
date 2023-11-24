@@ -643,8 +643,6 @@ class PlayerLoop(TaskLoop):
                 else:
                     self._cached[tag] = new_player
 
-                bot_client.coc_data_log.info(f"loop finished : {tag})")
-
         except Exception as exc:
             if self.loop_active:
                 bot_client.coc_main_log.exception(
