@@ -537,7 +537,7 @@ class PlayerLoop(TaskLoop):
                 task = asyncio.create_task(self._run_single_loop('#LJC8V0GCJ'))
                 await self._queue.put(task)
                 async for tag in a_iter:
-                    await asyncio.sleep(sleep)
+                    await asyncio.sleep(0)
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
 

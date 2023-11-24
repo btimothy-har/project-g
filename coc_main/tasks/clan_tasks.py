@@ -145,7 +145,7 @@ class ClanLoop(TaskLoop):
                 sleep = 1 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
-                    await asyncio.sleep(sleep)
+                    await asyncio.sleep(0)
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
 
