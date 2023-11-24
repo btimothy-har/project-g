@@ -60,8 +60,11 @@ class BasicPlayer(AwaitLoader):
         return hash(self.tag)
     
     async def load(self):
+        time = pendulum.now()
         self._attributes = await _PlayerAttributes(self.tag)
         self._attributes._cache_loaded = True
+        et = (pendulum.now() - time).total_seconds()
+        bot_client.coc_data_log.info(f"{self}: Loaded in {et} seconds.")
     
     ##################################################
     #####

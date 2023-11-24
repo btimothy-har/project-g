@@ -365,9 +365,7 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
-        if not self._attributes._cache_loaded:
-            if self.tag == "#LJC8V0GCJ":
-                bot_client.coc_main_log.info("Loading cache " + self.tag)
+        if not self._attributes._cache_loaded:                
             await self.load()
         
         if self.clan and not self.clan._attributes._cache_loaded:
