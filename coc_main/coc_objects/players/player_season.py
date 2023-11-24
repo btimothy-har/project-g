@@ -91,7 +91,7 @@ class aPlayerSeason(AwaitLoader):
     @async_property
     async def home_clan(self) -> Optional[aPlayerClan]:
         if await self.home_clan_tag:
-            return aPlayerClan(tag=self.home_clan_tag)
+            return await aPlayerClan(tag=await self.home_clan_tag)
         return None
     
     @async_cached_property
@@ -207,11 +207,11 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__name=self.name,
+                    set__name=name,
                     upsert=True
                     )
         async with self._lock:
-            self.name = new_name
+            name = self.name = new_name
             await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_townhall(self,new_th:int):
@@ -221,11 +221,11 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__town_hall=self.town_hall,
+                    set__town_hall=town_hall,
                     upsert=True
                     )
         async with self._lock:
-            self.town_hall = new_th
+            town_hall = self.town_hall = new_th
             await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_home_clan(self,new_tag:Optional[str]=None):
@@ -235,14 +235,14 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__home_clan=getattr(home_clan,'tag',None),
+                    set__home_clan=tag,
                     upsert=True
                     )
         async with self._lock:
             if new_tag:
-                self.home_clan_tag = new_tag
+                tag = self.home_clan_tag = new_tag
             else:
-                self.home_clan_tag = None
+                tag = self.home_clan_tag = None
             home_clan = await self.home_clan
             await bot_client.run_in_write_thread(_update_in_db,home_clan)
     
@@ -253,11 +253,11 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__is_member=self.is_member,
+                    set__is_member=m,
                     upsert=True
                     )
         async with self._lock:
-            self.is_member = is_member
+            m = self.is_member = is_member
             await bot_client.run_in_write_thread(_update_in_db)
     
     async def add_time_in_home_clan(self,duration:int):
@@ -267,11 +267,11 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__time_in_home_clan=self.time_in_home_clan,
+                    set__time_in_home_clan=time_in_home_clan,
                     upsert=True
                     )
         async with self._lock:
-            self.time_in_home_clan = await self.time_in_home_clan + duration
+            time_in_home_clan = self.time_in_home_clan = await self.time_in_home_clan + duration
             await bot_client.run_in_write_thread(_update_in_db)
             bot_client.coc_data_log.debug(f"{self}: Added {duration} to time in home clan")
     
@@ -282,13 +282,13 @@ class aPlayerSeason(AwaitLoader):
                 ).update_one(
                     set__season=self.season.id,
                     set__tag=self.tag,
-                    set__last_seen=self._last_seen,
+                    set__last_seen=last_seen,
                     upsert=True
                     )
             
         async with self._lock:
             if timestamp.int_timestamp not in await self._last_seen:
-                self._last_seen.append(timestamp.int_timestamp)
+                last_seen = self._last_seen.append(timestamp.int_timestamp)
                 await bot_client.run_in_write_thread(_update_in_db)
                 bot_client.coc_data_log.debug(f"{self}: Added last seen {timestamp}")
         
