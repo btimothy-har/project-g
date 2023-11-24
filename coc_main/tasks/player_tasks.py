@@ -616,15 +616,12 @@ class PlayerLoop(TaskLoop):
                 await lock.acquire()
                 st = pendulum.now()
 
-                bot_client.coc_data_log.info(f"loop started: {tag}")
-
                 cached_player = self._cached.get(tag,None)
                 if self.defer(cached_player):
                     bot_client.coc_data_log.info(f"loop deferred")
                     return self.loop.call_later(10,self.unlock,lock)
 
                 async with self.api_semaphore:
-                    bot_client.coc_data_log.info(f"api started: {tag}")
                     new_player = None
                     try:
                         new_player = await self.coc_client.fetch_player(tag)
@@ -638,9 +635,6 @@ class PlayerLoop(TaskLoop):
                 wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
                 #wait = getattr(new_player,'_response_retry',default_sleep)
                 self.loop.call_later(wait,self.unlock,lock)
-
-                bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
-                
                 
                 if cached_player:        
                     if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
