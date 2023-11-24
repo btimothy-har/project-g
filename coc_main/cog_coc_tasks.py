@@ -18,7 +18,7 @@ from redbot.core.utils.chat_formatting import humanize_list,box
 from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
 
-from .coc_objects.clans.clan import db_Clan, db_WarLeagueClanSetup, aClan
+from .coc_objects.clans.clan import db_Clan, db_WarLeagueClanSetup, aClan, BasicClan
 from .coc_objects.players.player import db_Player, db_PlayerStats, aPlayer, BasicPlayer
 from .coc_objects.events.clan_war import db_ClanWar, aClanWar
 from .coc_objects.events.raid_weekend import db_RaidWeekend, aRaidWeekend
@@ -270,7 +270,8 @@ class ClashOfClansTasks(commands.Cog):
                 await asyncio.sleep((1/bot_client.rate_limit) * 3)
                 try:
                     tag = await bot_client.clan_queue.get()
-                    self.clan_loop.add_to_loop(tag)
+                    clan = await BasicClan(tag)
+                    self.clan_loop.add_to_loop(clan.tag)
                     bot_client.clan_queue.task_done()
                 except asyncio.CancelledError:
                     raise
@@ -287,7 +288,8 @@ class ClashOfClansTasks(commands.Cog):
                 await asyncio.sleep((1/bot_client.rate_limit) * 3)
                 try:
                     tag = await bot_client.player_queue.get()
-                    self.player_loop.add_to_loop(tag)
+                    player = await BasicPlayer(tag)
+                    self.player_loop.add_to_loop(player.tag)
                     bot_client.player_queue.task_done()
                 except asyncio.CancelledError:
                     raise
