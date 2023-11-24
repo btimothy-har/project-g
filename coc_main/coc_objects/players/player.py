@@ -371,6 +371,7 @@ class aPlayer(coc.Player,BasicPlayer):
             await self.load()
         
         if self.clan and not self.clan._attributes._cache_loaded:
+            await self.clan.load()
 
         basic_player = BasicPlayer(self.tag)
         if basic_player.is_new:
