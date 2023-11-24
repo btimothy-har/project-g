@@ -387,39 +387,39 @@ class ClashOfClansTasks(commands.Cog):
                         await asyncio.sleep(0)
                         self.player_loop.add_to_loop(player.tag)
 
-                try:
-                    locations = await bot_client.coc.search_locations()
-                except:
-                    pass
-                else:
-                    for location in locations:
-                        await asyncio.sleep(0)
-                        try:
-                            clans = await bot_client.coc.get_location_clans(location.id,limit=100)
-                        except:
-                            pass
-                        else:
-                            for clan in clans:
-                                await asyncio.sleep(0)
-                                self.clan_loop.add_to_loop(clan.tag)
+                # try:
+                #     locations = await bot_client.coc.search_locations()
+                # except:
+                #     pass
+                # else:
+                #     for location in locations:
+                #         await asyncio.sleep(0)
+                #         try:
+                #             clans = await bot_client.coc.get_location_clans(location.id,limit=100)
+                #         except:
+                #             pass
+                #         else:
+                #             for clan in clans:
+                #                 await asyncio.sleep(0)
+                #                 self.clan_loop.add_to_loop(clan.tag)
                         
-                        try:
-                            bb_clan = await bot_client.coc.get_location_clans_builder_base(location.id,limit=100)
-                        except:
-                            pass
-                        else:
-                            for clan in bb_clan:
-                                await asyncio.sleep(0)
-                                self.clan_loop.add_to_loop(clan.tag)
+                #         try:
+                #             bb_clan = await bot_client.coc.get_location_clans_builder_base(location.id,limit=100)
+                #         except:
+                #             pass
+                #         else:
+                #             for clan in bb_clan:
+                #                 await asyncio.sleep(0)
+                #                 self.clan_loop.add_to_loop(clan.tag)
                         
-                        try:
-                            capital_clan = await bot_client.coc.get_location_clans_capital(location.id,limit=100)
-                        except:
-                            pass
-                        else:
-                            for clan in capital_clan:
-                                await asyncio.sleep(0)
-                                self.clan_loop.add_to_loop(clan.tag)
+                #         try:
+                #             capital_clan = await bot_client.coc.get_location_clans_capital(location.id,limit=100)
+                #         except:
+                #             pass
+                #         else:
+                #             for clan in capital_clan:
+                #                 await asyncio.sleep(0)
+                #                 self.clan_loop.add_to_loop(clan.tag)
                 
         except Exception as exc:
             await self.bot.send_to_owners(f"An error occured during Task Refresh. Check logs for details."
