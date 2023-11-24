@@ -370,27 +370,27 @@ class aPlayer(coc.Player,BasicPlayer):
         if basic_player.is_new:
             await BasicPlayer.player_first_seen(self.tag)
 
-        if basic_player.name != self.name:
+        if await basic_player.name != self.name:
             await self.set_name(self.name)
-        if basic_player.exp_level != self.exp_level:
+        if await basic_player.exp_level != self.exp_level:
             await self.set_exp_level(self.exp_level)
-        if basic_player.town_hall_level != self.town_hall_level:
+        if await basic_player.town_hall_level != self.town_hall_level:
             await self.set_town_hall_level(self.town_hall_level)
 
         if self.is_member:
             current_season = await self.get_current_season()
 
-            if self.name != current_season.name:
+            if self.name != await current_season.name:
                 await current_season.update_name(self.name)
 
-            if self.town_hall_level != current_season.town_hall:
+            if self.town_hall_level != await current_season.town_hall:
                 await current_season.update_townhall(self.town_hall_level)
 
-            if getattr(await self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
-                await current_season.update_home_clan(getattr(self.home_clan,'tag',None))
+            if getattr(await self.home_clan,'tag',None) != getattr(await current_season.home_clan,'tag',None):
+                await current_season.update_home_clan(getattr(await self.home_clan,'tag',None))
 
-            if await self.is_member != current_season.is_member:
-                await current_season.update_member(self.is_member)
+            if await self.is_member != await current_season.is_member:
+                await current_season.update_member(await self.is_member)
 
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)

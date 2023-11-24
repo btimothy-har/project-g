@@ -231,7 +231,7 @@ class BasicPlayer(AwaitLoader):
 
         async with self._attributes._lock:
             is_member = self._attributes.is_member = False
-            home_clan_tag = self._attributes.home_clan_tag = None
+            self._attributes.home_clan_tag = None
             last_removed = self._attributes.last_removed = pendulum.now()        
             await bot_client.run_in_write_thread(_update_in_db)
 
@@ -365,7 +365,7 @@ class _PlayerAttributes():
     @async_property
     async def home_clan(self) -> Optional[aPlayerClan]:
         if await self.home_clan_tag:
-            return await aPlayerClan(tag=tag)
+            return await aPlayerClan(tag=await self.home_clan_tag)
         return None
     
     @async_cached_property
