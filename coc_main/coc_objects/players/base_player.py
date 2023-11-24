@@ -30,7 +30,7 @@ class BasicPlayer(AwaitLoader):
         player_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(player_tags)
         async for tag in a_iter:
-            player = await cls(tag)
+            player = cls(tag)
             await bot_client.player_queue.put(player.tag)
             await asyncio.sleep(0.01)
     
@@ -63,8 +63,8 @@ class BasicPlayer(AwaitLoader):
             return
         
         time = pendulum.now()
-        self._attributes = await _PlayerAttributes(self.tag)
         self._attributes._cache_loaded = True
+        self._attributes = await _PlayerAttributes(self.tag)
         et = (pendulum.now() - time).total_seconds()
         bot_client.coc_data_log.info(f"{self}: Loaded in {et} seconds.")
     

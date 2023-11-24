@@ -31,7 +31,7 @@ class BasicClan(AwaitLoader):
         clan_tags = await bot_client.run_in_read_thread(_get_from_db)        
         a_iter = AsyncIter(clan_tags)
         async for tag in a_iter:
-            clan = await cls(tag)
+            clan = cls(tag)
             await bot_client.clan_queue.put(clan.tag)
             await asyncio.sleep(0.01)
     
@@ -60,8 +60,9 @@ class BasicClan(AwaitLoader):
         return hash(self.tag)
 
     async def load(self):
-        self._attributes = await _ClanAttributes(self.tag)
         self._attributes._cache_loaded = True
+        self._attributes = await _ClanAttributes(self.tag)
+        
     
     ##################################################
     #####
