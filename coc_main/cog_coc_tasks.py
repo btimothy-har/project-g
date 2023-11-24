@@ -139,8 +139,8 @@ class ClashOfClansTasks(commands.Cog):
         asyncio.create_task(self.start_recruiting_loop())
 
         self._controller_loop = asyncio.create_task(self.coc_task_controller())
-        self._clan_queue_task = asyncio.create_task(self.clan_queue_task())
         self._player_queue_task = asyncio.create_task(self.player_queue_task())
+        self._clan_queue_task = asyncio.create_task(self.clan_queue_task())        
         self.clash_season_check.start()    
         self.refresh_coc_loops.start()
 
@@ -267,7 +267,6 @@ class ClashOfClansTasks(commands.Cog):
     async def clan_queue_task(self):
         try:
             while True:
-                await asyncio.sleep((1/bot_client.rate_limit) * 3)
                 try:
                     tag = await bot_client.clan_queue.get()
                     clan = await BasicClan(tag)
@@ -285,7 +284,6 @@ class ClashOfClansTasks(commands.Cog):
     async def player_queue_task(self):
         try:
             while True:
-                await asyncio.sleep((1/bot_client.rate_limit) * 3)
                 try:
                     tag = await bot_client.player_queue.get()
                     player = await BasicPlayer(tag)
