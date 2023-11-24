@@ -48,14 +48,16 @@ class BasicPlayer(AwaitLoader):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
         if not self._attributes._cache_loaded:
+            def schedule_coroutine():
+                asyncio.create_task(self.load())
             loop = asyncio.get_running_loop()       
-            loop.call_soon_threadsafe(self.load())
+            loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Player {self.tag}"
     
     def __hash__(self):
-        return hash(self.tag)   
+        return hash(self.tag)
     
     async def load(self):
         self._attributes = await _PlayerAttributes(self.tag)

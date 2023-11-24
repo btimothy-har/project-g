@@ -49,8 +49,10 @@ class BasicClan(AwaitLoader):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _ClanAttributes(self.tag)
         if not self._attributes._cache_loaded:
+            def schedule_coroutine():
+                asyncio.create_task(self.load())
             loop = asyncio.get_running_loop()       
-            loop.call_soon_threadsafe(self.load())
+            loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Clan {self.tag}"
