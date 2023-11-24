@@ -27,11 +27,12 @@ class BasicPlayer(AwaitLoader):
         def _get_from_db():
             return [db.tag for db in db_Player.objects.only('tag')]
         
-        player_tags = await bot_client.run_in_read_thread(_get_from_db)        
+        player_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(player_tags)
         async for tag in a_iter:
             player = await cls(tag)
             await bot_client.player_queue.put(player.tag)
+            await asyncio.sleep(0.01)
     
     @classmethod
     def clear_cache(cls):
@@ -58,6 +59,9 @@ class BasicPlayer(AwaitLoader):
         return hash(self.tag)
     
     async def load(self):
+        if self._attributes._cache_loaded:
+            return
+        
         time = pendulum.now()
         self._attributes = await _PlayerAttributes(self.tag)
         self._attributes._cache_loaded = True
