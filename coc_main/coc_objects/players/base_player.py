@@ -28,7 +28,7 @@ class BasicPlayer(AwaitLoader):
             return [db.tag for db in db_Player.objects.only('tag')]
         
         player_tags = await bot_client.run_in_read_thread(_get_from_db)
-        a_iter = AsyncIter(player_tags)
+        a_iter = AsyncIter(player_tags[:500000])
         async for tag in a_iter:
             player = await cls(tag)
             await bot_client.player_queue.put(player.tag)

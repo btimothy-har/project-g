@@ -29,7 +29,7 @@ class BasicClan(AwaitLoader):
             return [db.tag for db in db_Clan.objects.only('tag')]
         
         clan_tags = await bot_client.run_in_read_thread(_get_from_db)        
-        a_iter = AsyncIter(clan_tags)
+        a_iter = AsyncIter(clan_tags[:10000])
         async for tag in a_iter:
             clan = await cls(tag)
             await bot_client.clan_queue.put(clan.tag)
