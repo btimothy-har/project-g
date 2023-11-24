@@ -455,7 +455,7 @@ class PlayerLoop(TaskLoop):
         await super().stop()        
     
     def add_to_loop(self,tag:str):
-        add, n_tag = super().add_to_loop("#LJC8V0GCJ")
+        add, n_tag = super().add_to_loop(tag)
         if add:
             bot_client.coc_main_log.debug(f"Added {n_tag} to Player Loop.")
     

@@ -33,7 +33,11 @@ class aPlayerSeason(AwaitLoader):
         if self._is_new:
             self.tag = tag
             self.season = season
+            
             self._lock = asyncio.Lock()
+            self._cached_db = None
+            self._last_db_query = None
+
         self._is_new = False
     
     def __str__(self):
@@ -57,7 +61,10 @@ class aPlayerSeason(AwaitLoader):
                 return db_PlayerStats.objects.get(stats_id=self._db_id)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_thread(_get_from_db)
+        if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
+            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._last_db_query = pendulum.now()
+        return self._cached_db
     
     @async_cached_property
     async def name(self) -> str:
@@ -205,7 +212,7 @@ class aPlayerSeason(AwaitLoader):
                     )
         async with self._lock:
             self.name = new_name
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_townhall(self,new_th:int):
         def _update_in_db():
@@ -219,7 +226,7 @@ class aPlayerSeason(AwaitLoader):
                     )
         async with self._lock:
             self.town_hall = new_th
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_home_clan(self,new_tag:Optional[str]=None):
         def _update_in_db(home_clan):
@@ -237,7 +244,7 @@ class aPlayerSeason(AwaitLoader):
             else:
                 self.home_clan_tag = None
             home_clan = await self.home_clan
-            await bot_client.run_in_thread(_update_in_db,home_clan)
+            await bot_client.run_in_write_thread(_update_in_db,home_clan)
     
     async def update_member(self,is_member:bool=False):
         def _update_in_db():
@@ -251,7 +258,7 @@ class aPlayerSeason(AwaitLoader):
                     )
         async with self._lock:
             self.is_member = is_member
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def add_time_in_home_clan(self,duration:int):
         def _update_in_db():
@@ -265,7 +272,7 @@ class aPlayerSeason(AwaitLoader):
                     )
         async with self._lock:
             self.time_in_home_clan = await self.time_in_home_clan + duration
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
             bot_client.coc_data_log.debug(f"{self}: Added {duration} to time in home clan")
     
     async def add_last_seen(self,timestamp:pendulum.DateTime):
@@ -282,7 +289,7 @@ class aPlayerSeason(AwaitLoader):
         async with self._lock:
             if timestamp.int_timestamp not in await self._last_seen:
                 self._last_seen.append(timestamp.int_timestamp)
-                await bot_client.run_in_thread(_update_in_db)
+                await bot_client.run_in_write_thread(_update_in_db)
                 bot_client.coc_data_log.debug(f"{self}: Added last seen {timestamp}")
         
         

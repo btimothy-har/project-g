@@ -177,8 +177,6 @@ class ClashOfClansClient(commands.Cog):
     async def fetch_player(self,tag:str) -> aPlayer:
         player = None
         count_try = 0
-        if tag == "#LJC8V0GCJ":
-            bot_client.coc_main_log.info("Fetching player: " + tag)
         while True:
             try:
                 count_try += 1
