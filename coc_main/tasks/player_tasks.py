@@ -661,6 +661,9 @@ class PlayerLoop(TaskLoop):
                 self.run_time.append(runtime.total_seconds())
             except:
                 pass
+
+            if tag == "#LJC8V0GCJ":
+                bot_client.coc_main_log.info(f"Player Loop: {tag} took {round(runtime.total_seconds(),2)} seconds.")
             
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
         a_iter = AsyncIter(PlayerLoop._player_events)
