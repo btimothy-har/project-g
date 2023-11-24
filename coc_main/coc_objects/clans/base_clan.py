@@ -1,6 +1,7 @@
 import coc
 import discord
 import asyncio
+import pendulum
 
 from typing import *
 from mongoengine import *
@@ -27,7 +28,7 @@ class BasicClan(AwaitLoader):
         def _get_from_db():
             return [db.tag for db in db_Clan.objects.only('tag')]
         
-        clan_tags = await bot_client.run_in_thread(_get_from_db)
+        clan_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(clan_tags)
         clans = []
         async for tag in a_iter:
@@ -276,7 +277,7 @@ class BasicClan(AwaitLoader):
             self._attributes.abbreviation = abbreviation.upper()
             self._attributes.emoji = emoji
             self._attributes.unicode_emoji = unicode_emoji
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def add_to_war_league(self,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):
         def _update_in_db():
@@ -306,7 +307,7 @@ class BasicClan(AwaitLoader):
             self._attributes.league_clan_channel_id = channel.id
             self._attributes.league_clan_role_id = role.id
             self._attributes.is_active_league_clan = True
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def remove_from_war_league(self):
         def _update_in_db():
@@ -320,7 +321,7 @@ class BasicClan(AwaitLoader):
             self._attributes.league_clan_channel_id = 0
             self._attributes.league_clan_role_id = 0
             self._attributes.is_active_league_clan = False
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
 
     async def new_leader(self,new_leader:int):
         def _update_in_db():
@@ -348,7 +349,7 @@ class BasicClan(AwaitLoader):
             if new_leader in self.elders:
                 self._attributes.elders.remove(new_leader)
 
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def new_coleader(self,new_coleader:int):
         def _update_in_db():
@@ -369,7 +370,7 @@ class BasicClan(AwaitLoader):
             if new_coleader in self.elders:
                 self._attributes.elders.remove(new_coleader)
 
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def remove_coleader(self,coleader:int):
         def _update_in_db():
@@ -382,7 +383,7 @@ class BasicClan(AwaitLoader):
         async with self._attributes._lock:
             if coleader in self.coleaders:
                 self._attributes.coleaders.remove(coleader)
-                await bot_client.run_in_thread(_update_in_db)
+                await bot_client.run_in_write_thread(_update_in_db)
     
     async def new_elder(self,new_elder:int):
         def _update_in_db():
@@ -403,7 +404,7 @@ class BasicClan(AwaitLoader):
             if new_elder in self.coleaders:
                 self._attributes.coleaders.remove(new_elder)
             
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
 
     async def remove_elder(self,elder:int):
         def _update_in_db():
@@ -416,7 +417,7 @@ class BasicClan(AwaitLoader):
         async with self._attributes._lock:
             if elder in self.elders:
                 self._attributes.elders.remove(elder)
-                await bot_client.run_in_thread(_update_in_db)
+                await bot_client.run_in_write_thread(_update_in_db)
         
     ##################################################
     #####
@@ -433,7 +434,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.name = new_name
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_badge(self,new_badge:str):
         def _update_in_db():
@@ -445,7 +446,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.badge = new_badge
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_level(self,new_level:int):
         def _update_in_db():
@@ -457,7 +458,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.level = new_level
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_capital_hall(self,new_capital_hall:int):
         def _update_in_db():
@@ -469,7 +470,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.capital_hall = new_capital_hall
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_war_league(self,new_war_league:str):
         def _update_in_db():
@@ -481,7 +482,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.war_league_name = new_war_league
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
         
     async def set_description(self,description:str):
         def _update_in_db():
@@ -493,7 +494,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.description = description
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_recruitment_level(self,recruitment_levels:list[int]):
         def _update_in_db():
@@ -505,7 +506,7 @@ class BasicClan(AwaitLoader):
 
         async with self._attributes._lock:
             self._attributes.recruitment_level = sorted(list(set(recruitment_levels)))
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_recruitment_info(self,new_recruitment_info:str):
         def _update_in_db():
@@ -517,7 +518,7 @@ class BasicClan(AwaitLoader):
         
         async with self._attributes._lock:
             self._attributes.recruitment_info = new_recruitment_info
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     ##################################################
     #####
@@ -547,8 +548,11 @@ class _ClanAttributes(AwaitLoader):
     def __init__(self,tag:str):
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
-            self._cache_loaded = False
             self._lock = asyncio.Lock()
+            self._cache_loaded = False            
+            self._cached_db = None
+            self._last_db_query = None
+
             bot_client.clan_queue.add(self.tag)
             
         self._is_new = False
@@ -567,7 +571,10 @@ class _ClanAttributes(AwaitLoader):
                 return db_Clan.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_thread(_get_from_db)        
+        if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
+            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._last_db_query = pendulum.now()
+        return self._cached_db
         
     @async_property
     async def _db_alliance(self) -> Optional[db_AllianceClan]:
@@ -578,7 +585,7 @@ class _ClanAttributes(AwaitLoader):
                 return db_AllianceClan.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_thread(_get_from_db)
+        return await bot_client.run_in_read_thread(_get_from_db)
     
     @async_property
     async def _league_clan(self) -> Optional[db_WarLeagueClanSetup]:
@@ -589,7 +596,7 @@ class _ClanAttributes(AwaitLoader):
                 return db_WarLeagueClanSetup.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_thread(_get_from_db)
+        return await bot_client.run_in_read_thread(_get_from_db)
     
     ##################################################
     #####
@@ -676,7 +683,7 @@ class _ClanAttributes(AwaitLoader):
     async def alliance_members(self) -> List[str]:
         def _get_from_db():
             return [p.tag for p in db_Player.objects(is_member=True,home_clan=self.tag)]
-        tags = await bot_client.run_in_thread(_get_from_db)
+        tags = await bot_client.run_in_read_thread(_get_from_db)
         return list(set(tags))
     
     ##################################################

@@ -184,7 +184,9 @@ class BotClashClient():
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
-            self.thread_pool = ProcessPoolExecutor(max_workers=20)
+            self.thread_pool = ThreadPoolExecutor(max_workers=10)
+            self.read_thread_pool = ThreadPoolExecutor(max_workers=40)
+            self.write_thread_pool = ThreadPoolExecutor(max_workers=40)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger
@@ -254,6 +256,24 @@ class BotClashClient():
                 self.coc_main_log.exception(f"Error in thread: {exc}")
         loop = asyncio.get_running_loop()
         return loop.run_in_executor(self.thread_pool, _run_func, func, *args)
+    
+    def run_in_read_thread(self, func, *args):
+        def _run_func(func, *args):
+            try:
+                return func(*args)
+            except Exception as exc:
+                self.coc_main_log.exception(f"Error in read thread: {exc}")
+        loop = asyncio.get_running_loop()
+        return loop.run_in_executor(self.read_thread_pool, _run_func, func, *args)
+    
+    def run_in_write_thread(self, func, *args):
+        def _run_func(func, *args):
+            try:
+                return func(*args)
+            except Exception as exc:
+                self.coc_main_log.exception(f"Error in write thread: {exc}")
+        loop = asyncio.get_running_loop()
+        return loop.run_in_executor(self.write_thread_pool, _run_func, func, *args)
     
     @classmethod
     async def initialize(cls,

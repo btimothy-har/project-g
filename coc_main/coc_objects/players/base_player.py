@@ -27,7 +27,7 @@ class BasicPlayer(AwaitLoader):
         def _get_from_db():
             return [db.tag for db in db_Player.objects.only('tag')]
         
-        player_tags = await bot_client.run_in_thread(_get_from_db)
+        player_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(player_tags)
         players = []
         async for tag in a_iter:
@@ -190,7 +190,7 @@ class BasicPlayer(AwaitLoader):
         async with player._attributes._lock:
             first_seen = player._attributes.first_seen = pendulum.now()
             player._attributes.is_new = False            
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
@@ -204,7 +204,7 @@ class BasicPlayer(AwaitLoader):
         player = cls(tag=coc.utils.correct_tag(tag))
         async with player._attributes._lock:
             user = player._attributes.discord_user = discord_user
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
 
     async def new_member(self,user_id:int,home_clan:BasicClan):
         def _update_in_db():
@@ -229,7 +229,7 @@ class BasicPlayer(AwaitLoader):
             is_member = self._attributes.is_member = True
             clan = self._attributes.home_clan = aPlayerClan(tag=home_clan.tag)
             await clan.new_member(self.tag)
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
         
     async def remove_member(self):
         def _update_in_db():
@@ -252,7 +252,7 @@ class BasicPlayer(AwaitLoader):
             is_member = self._attributes.is_member = False
             home_clan = self._attributes.home_clan = None
             last_removed = self._attributes.last_removed = pendulum.now()        
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
 
     ##################################################
     #####
@@ -269,7 +269,7 @@ class BasicPlayer(AwaitLoader):
 
         async with self._attributes._lock:
             name = self._attributes.name = new_name
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_exp_level(self,new_value:int):
         def _update_in_db():
@@ -281,7 +281,7 @@ class BasicPlayer(AwaitLoader):
         
         async with self._attributes._lock:
             exp_level = self._attributes.exp_level = new_value
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
         
     async def set_town_hall_level(self,new_value:int):
         def _update_in_db():
@@ -293,7 +293,7 @@ class BasicPlayer(AwaitLoader):
         
         async with self._attributes._lock:
             townhall = self._attributes.town_hall_level = new_value
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.run_in_write_thread(_update_in_db)
 
 class _PlayerAttributes(AwaitLoader):
     """
@@ -314,8 +314,11 @@ class _PlayerAttributes(AwaitLoader):
     def __init__(self,tag:str):
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
-            self._cache_loaded = False
             self._lock = asyncio.Lock()
+            self._cache_loaded = False
+            self._cached_db = None
+            self._last_db_query = None
+            
             bot_client.player_queue.add(self.tag)
         
         self._is_new = False
@@ -327,7 +330,10 @@ class _PlayerAttributes(AwaitLoader):
                 return db_Player.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_thread(_get_from_db)
+        if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
+            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._last_db_query = pendulum.now()
+        return self._cached_db
 
     @async_cached_property
     async def name(self) -> str:
