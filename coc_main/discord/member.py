@@ -5,6 +5,7 @@ import asyncio
 from typing import *
 from mongoengine import *
 
+from async_property import AwaitLoader, AwaitableOnly, async_property, async_cached_property
 from redbot.core import commands
 from redbot.core.utils import chat_formatting as chat
 from redbot.core.utils import AsyncIter
@@ -23,7 +24,7 @@ from ..utils.constants.coc_constants import ClanRanks
 
 bot_client = client()
 
-class aMember():
+class aMember(AwaitLoader):
     _global = {}
     _local = {}
 

@@ -36,18 +36,18 @@ class PlayerTasks():
     async def player_time_in_home_clan(old_player:aPlayer,new_player:aPlayer):
         try:
             if new_player.is_member and getattr(new_player.clan,'tag',False) == getattr(new_player.home_clan,'tag',True):
-                await new_player.current_season.add_time_in_home_clan(new_player.timestamp.int_timestamp - old_player.timestamp.int_timestamp)
+                current_season = await new_player.get_current_season()
+                await current_season.add_time_in_home_clan(new_player.timestamp.int_timestamp - old_player.timestamp.int_timestamp)
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Home Clan Timer task.")
 
     @staticmethod
     async def player_last_seen_main(old_player:aPlayer,new_player:aPlayer):
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
             update = False
-
             if old_player.name != new_player.name:
                 update = True        
             if old_player.clan and new_player.clan and old_player.war_opted_in != new_player.war_opted_in:
@@ -56,7 +56,8 @@ class PlayerTasks():
                 update = True
             
             if update:
-                await new_player.current_season.add_last_seen(new_player.timestamp)
+                current_season = await new_player.get_current_season()
+                await current_season.add_last_seen(new_player.timestamp)
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Last Seen Main task.")
 
@@ -71,7 +72,8 @@ class PlayerTasks():
                 new_ach = new_player.get_achievement(achievement.name)
 
                 if old_ach.value != new_ach.value:
-                    await new_player.current_season.add_last_seen(new_player.timestamp)
+                    current_season = await new_player.get_current_season()
+                    await current_season.add_last_seen(new_player.timestamp)
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Last Seen Achievement task.")
 
@@ -88,22 +90,23 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
-            if new_player.current_season.attacks._prior_seen:
-                increment = new_player.attack_wins - new_player.current_season.attacks.last_update
+            current_season = await new_player.get_current_season()
+            if current_season.attacks._prior_seen:
+                increment = new_player.attack_wins - current_season.attacks.last_update
             else:
                 increment = new_player.attack_wins - old_player.attack_wins
             
-            if increment > 0 or new_player.attack_wins != new_player.current_season.attacks.last_update:
-                stat = await new_player.current_season.attacks.increment_stat(
+            if increment > 0 or new_player.attack_wins != current_season.attacks.last_update:
+                stat = await current_season.attacks.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.attack_wins,
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.debug(
+                bot_client.coc_data_log.info(
                     f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
                     )
         except:
@@ -119,22 +122,23 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
-            if new_player.current_season.defenses._prior_seen:
-                increment = new_player.defense_wins - new_player.current_season.defenses.last_update
+            current_season = await new_player.get_current_season()
+            if current_season.defenses._prior_seen:
+                increment = new_player.defense_wins - current_season.defenses.last_update
             else:
                 increment = new_player.defense_wins - old_player.defense_wins
 
-            if increment > 0 or new_player.defense_wins != new_player.current_season.defenses.last_update:
-                stat = await new_player.current_season.defenses.increment_stat(
+            if increment > 0 or new_player.defense_wins != current_season.defenses.last_update:
+                stat = await current_season.defenses.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.defense_wins,
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.debug(
+                bot_client.coc_data_log.info(
                     f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
                     )
         except:
@@ -150,22 +154,23 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
-            if new_player.current_season.donations._prior_seen:
-                increment = new_player.donations - new_player.current_season.donations.last_update
+            current_season = await new_player.get_current_season()            
+            if current_season.donations._prior_seen:
+                increment = new_player.donations - current_season.donations.last_update
             else:
                 increment = new_player.donations - old_player.donations
             
-            if increment > 0 or new_player.donations != new_player.current_season.donations.last_update:
-                stat = await new_player.current_season.donations.increment_stat(
+            if increment > 0 or new_player.donations != current_season.donations.last_update:
+                stat = await current_season.donations.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.donations,
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.debug(
+                bot_client.coc_data_log.info(
                     f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
                     )
         except:
@@ -181,22 +186,23 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
-            if new_player.current_season.received._prior_seen:
-                increment = new_player.received - new_player.current_season.received.last_update
+            current_season = await new_player.get_current_season()            
+            if current_season.received._prior_seen:
+                increment = new_player.received - current_season.received.last_update
             else:
                 increment = new_player.received - old_player.received
 
-            if increment > 0 or new_player.received != new_player.current_season.received.last_update:
-                stat = await new_player.current_season.received.increment_stat(
+            if increment > 0 or new_player.received != current_season.received.last_update:
+                stat = await current_season.received.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.received,
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.debug(
+                bot_client.coc_data_log.info(
                     f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
                     )
         except:
@@ -226,28 +232,29 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
             
+            current_season = await new_player.get_current_season()
+
             #Loot Gold
             if achievement.name == "Gold Grab":
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
 
-                if new_player.current_season.loot_gold._prior_seen:
-                    increment = new_ach.value - new_player.current_season.loot_gold.last_update
+                if current_season.loot_gold._prior_seen:
+                    increment = new_ach.value - current_season.loot_gold.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != new_player.current_season.loot_gold.last_update:
-                    stat = await new_player.current_season.loot_gold.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_gold.last_update:
+                    stat = await current_season.loot_gold.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         db_update=_update_gold_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
-                        )
-                
-                    bot_client.coc_data_log.debug(
+                        )                
+                    bot_client.coc_data_log.info(
                         f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
             
@@ -256,13 +263,13 @@ class PlayerTasks():
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
 
-                if new_player.current_season.loot_elixir._prior_seen:
-                    increment = new_ach.value - new_player.current_season.loot_elixir.last_update
+                if current_season.loot_elixir._prior_seen:
+                    increment = new_ach.value - current_season.loot_elixir.last_update
                 else:
                     increment = new_ach.value - old_ach.value
 
-                if increment > 0 or new_ach.value != new_player.current_season.loot_elixir.last_update:
-                    stat = await new_player.current_season.loot_elixir.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_elixir.last_update:
+                    stat = await current_season.loot_elixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         db_update=_update_elixir_db,
@@ -278,13 +285,13 @@ class PlayerTasks():
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
 
-                if new_player.current_season.loot_darkelixir._prior_seen:
-                    increment = new_ach.value - new_player.current_season.loot_darkelixir.last_update
+                if current_season.loot_darkelixir._prior_seen:
+                    increment = new_ach.value - current_season.loot_darkelixir.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != new_player.current_season.loot_darkelixir.last_update:
-                    stat = await new_player.current_season.loot_darkelixir.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_darkelixir.last_update:
+                    stat = await current_season.loot_darkelixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         db_update=_update_darkelixir_db,
@@ -307,21 +314,23 @@ class PlayerTasks():
                     upsert=True
                     )
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return
+            
+            current_season = await new_player.get_current_season()
             
             #Capital Contribution
             if achievement.name == "Most Valuable Clanmate":
                 old_ach = old_player.get_achievement(achievement.name)
                 new_ach = new_player.get_achievement(achievement.name)
 
-                if new_player.current_season.capitalcontribution._prior_seen:
-                    increment = new_ach.value - new_player.current_season.capitalcontribution.last_update
+                if current_season.capitalcontribution._prior_seen:
+                    increment = new_ach.value - current_season.capitalcontribution.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != new_player.current_season.capitalcontribution.last_update:
-                    stat = await new_player.current_season.capitalcontribution.increment_stat(
+                if increment > 0 or new_ach.value != current_season.capitalcontribution.last_update:
+                    stat = await current_season.capitalcontribution.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         db_update=_update_capitalcontribution_db,
@@ -331,7 +340,7 @@ class PlayerTasks():
                     if increment > 0:
                         await CapitalContributionFeed.send_feed_update(new_player,increment)
                     
-                    bot_client.coc_data_log.debug(
+                    bot_client.coc_data_log.info(
                         f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
         except:
@@ -348,8 +357,10 @@ class PlayerTasks():
                     )
         
         try:
-            if not new_player.is_member:
-                return
+            # if not new_player.is_member:
+            #     return 
+            
+            current_season = await new_player.get_current_season()
             
             if achievement.name == "Games Champion":
                 old_ach = old_player.get_achievement(achievement.name)
@@ -358,7 +369,7 @@ class PlayerTasks():
                 if new_ach.value != old_ach.value:
                     increment = new_ach.value - old_ach.value
 
-                    await new_player.current_season.clangames.update(
+                    await current_season.clangames.update(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         timestamp=new_player.timestamp,
@@ -444,7 +455,7 @@ class PlayerLoop(TaskLoop):
         await super().stop()        
     
     def add_to_loop(self,tag:str):
-        add, n_tag = super().add_to_loop(tag)
+        add, n_tag = super().add_to_loop("#LJC8V0GCJ")
         if add:
             bot_client.coc_main_log.debug(f"Added {n_tag} to Player Loop.")
     
@@ -524,7 +535,7 @@ class PlayerLoop(TaskLoop):
                 sleep = 5 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
-                    #await asyncio.sleep(sleep)
+                    await asyncio.sleep(sleep)
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
 
@@ -541,7 +552,7 @@ class PlayerLoop(TaskLoop):
                 self._status = "Not Running"
                 
                 if len(tags) > len(scope_tags):
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(5)
                 else:
                     await asyncio.sleep(10)
                 continue
@@ -605,11 +616,15 @@ class PlayerLoop(TaskLoop):
                 await lock.acquire()
                 st = pendulum.now()
 
+                bot_client.coc_data_log.info(f"loop started: {tag}")
+
                 cached_player = self._cached.get(tag,None)
                 if self.defer(cached_player):
+                    bot_client.coc_data_log.info(f"loop deferred")
                     return self.loop.call_later(10,self.unlock,lock)
 
                 async with self.api_semaphore:
+                    bot_client.coc_data_log.info(f"api started: {tag}")
                     new_player = None
                     try:
                         new_player = await self.coc_client.fetch_player(tag)
@@ -621,6 +636,8 @@ class PlayerLoop(TaskLoop):
                     wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
+
+                    bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
                 
                 await new_player._sync_cache()    
                 if cached_player:        
@@ -629,6 +646,8 @@ class PlayerLoop(TaskLoop):
                         await self._dispatch_events(cached_player,new_player)
                 else:
                     self._cached[tag] = new_player
+
+                bot_client.coc_data_log.info(f"loop finished : {tag})")
 
         except Exception as exc:
             if self.loop_active:

@@ -197,7 +197,12 @@ class ClashOfClansClient(commands.Cog):
                 if count_try > 5:
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
-                continue       
+                continue
+        
+        if not player._attributes._cache_loaded:
+            await player.load()
+        if player.clan and not player.clan._attributes._cache_loaded:
+            await player.clan.load()
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
@@ -267,7 +272,10 @@ class ClashOfClansClient(commands.Cog):
                 if count_try > 5:
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
-                continue            
+                continue
+        
+        if not clan._attributes._cache_loaded:
+            await clan.load()
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:

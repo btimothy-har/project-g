@@ -14,7 +14,7 @@ from mongoengine import *
 from art import text2art
 from time import process_time
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import humanize_list
@@ -91,8 +91,8 @@ class CustomThrottler(coc.BasicThrottler):
         return BotClashClient()
     
     async def __aenter__(self):
-        if not self.limiter.has_capacity():
-            self.client.coc_main_log.debug(f"Throttling request.")
+        # if not self.limiter.has_capacity():
+        #     self.client.coc_main_log.debug(f"Throttling request.")
         await self.limiter.acquire()
         await self.client.api_counter.increment_sent()
         return self
@@ -184,7 +184,7 @@ class BotClashClient():
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
-            self.thread_pool = ThreadPoolExecutor(max_workers=16)
+            self.thread_pool = ProcessPoolExecutor(max_workers=20)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger

@@ -6,18 +6,21 @@ from typing import *
 from mongoengine import *
 
 from functools import cached_property
+from async_property import AwaitLoader, AwaitableOnly, async_property, async_cached_property
+from redbot.core.utils import AsyncIter
 from ...api_client import BotClashClient as client
 from .mongo_player import db_Player
 
 from ...utils.constants.coc_emojis import EmojisTownHall
 from ...utils.constants.ui_emojis import EmojisUI
 from ...utils.utils import check_rtl
+from ...exceptions import CacheNotReady
 
 from ..clans.player_clan import *
 
 bot_client = client()
 
-class BasicPlayer():
+class BasicPlayer(AwaitLoader):
 
     @classmethod
     async def load_all(cls) -> List['BasicPlayer']:
@@ -25,21 +28,15 @@ class BasicPlayer():
             return [db.tag for db in db_Player.objects.only('tag')]
         
         player_tags = await bot_client.run_in_thread(_get_from_db)
+        a_iter = AsyncIter(player_tags)
         players = []
-        for player in player_tags:
-            await asyncio.sleep(0)
-            players.append(await cls._load_attributes(player))
+        async for tag in a_iter:
+            players.append(await cls(tag))
         return players
     
     @classmethod
     def clear_cache(cls):
         _PlayerAttributes._cache = {}
-    
-    @classmethod
-    async def _load_attributes(cls,tag):
-        attr = _PlayerAttributes(tag=tag)
-        await attr._load_attributes()
-        return cls(tag=tag)
     
     """
     The BasicPlayer class provides a consolidated interface for inheriting player objects.
@@ -51,10 +48,14 @@ class BasicPlayer():
         self._attributes = _PlayerAttributes(tag=self.tag)
 
     def __str__(self):
-        return f"Player {self.tag} ({self.name})"
+        return f"Player {self.tag}"
     
     def __hash__(self):
         return hash(self.tag)   
+    
+    async def load(self):
+        self._attributes = await _PlayerAttributes(self.tag)
+        self._attributes._cache_loaded = True
     
     ##################################################
     #####
@@ -62,7 +63,7 @@ class BasicPlayer():
     #####
     ##################################################
     @property
-    def title(self):
+    def title(self) -> str:
         return f"{EmojisTownHall.get(self.town_hall_level)} {self.name} ({self.tag})"
 
     @property
@@ -73,23 +74,23 @@ class BasicPlayer():
     
     @property
     def member_description(self):
-        if self.is_member:
-            return f"{self.home_clan.emoji} {self.alliance_rank} of {self.home_clan.name}"
+        if self._attributes.is_member:
+            return f"{getattr(self.home_clan,'emoji','')} {self.alliance_rank} of {getattr(self.home_clan,'clean_name','')}"
         return ""
         
     @property
     def member_description_no_emoji(self) -> str:
         if self.is_member:
-            return f"{self.alliance_rank} of {self.home_clan.name}"
+            return f"{self.alliance_rank} of {getattr(self.home_clan,'clean_name','')}"
         return ""
-    
-    @property
-    def share_link(self) -> str:
-        return f"https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=%23{self.tag.strip('#')}"
     
     @property
     def discord_user_str(self):
         return f"{EmojisUI.DISCORD} <@{str(self.discord_user)}>" if self.discord_user else ""
+
+    @property
+    def share_link(self) -> str:
+        return f"https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=%23{self.tag.strip('#')}"
     
     ##################################################
     #####
@@ -98,26 +99,38 @@ class BasicPlayer():
     ##################################################
     @property
     def name(self) -> str:
+        if isinstance(self._attributes.name,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.name
     
     @property
     def exp_level(self) -> int:
+        if isinstance(self._attributes.exp_level,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.exp_level
     
     @property
     def town_hall_level(self) -> int:
+        if isinstance(self._attributes.town_hall_level,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.town_hall_level
     
     @property
     def discord_user(self) -> int:
+        if isinstance(self._attributes.discord_user,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.discord_user
     
     @property
     def is_member(self) -> bool:
+        if isinstance(self._attributes.is_member,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.is_member
     
     @property
     def home_clan(self) -> Optional[aPlayerClan]:
+        if isinstance(self._attributes.home_clan,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.home_clan
 
     @property
@@ -136,18 +149,26 @@ class BasicPlayer():
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
+        if isinstance(self._attributes.first_seen,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.first_seen
     
     @property
     def last_joined(self) -> Optional[pendulum.DateTime]:
+        if isinstance(self._attributes.last_joined,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.last_joined
 
     @property
     def last_removed(self) -> Optional[pendulum.DateTime]:
+        if isinstance(self._attributes.last_removed,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.last_removed
     
     @property
     def is_new(self) -> bool:
+        if isinstance(self._attributes.is_new,AwaitableOnly):
+            raise CacheNotReady
         return self._attributes.is_new
     
     ##################################################
@@ -159,89 +180,78 @@ class BasicPlayer():
     async def player_first_seen(cls,tag:str):
         def _update_in_db():
             db_Player.objects(tag=player.tag).update_one(
-                set__first_seen=player.first_seen.int_timestamp,
+                set__first_seen=first_seen.int_timestamp,
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}.")
+            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {first_seen}.")
         
         player = cls(tag=coc.utils.correct_tag(tag))
 
         async with player._attributes._lock:
-            player._attributes.first_seen = pendulum.now()
-            player._attributes.is_new = False
-            
+            first_seen = player._attributes.first_seen = pendulum.now()
+            player._attributes.is_new = False            
             await bot_client.run_in_thread(_update_in_db)
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
         def _update_in_db():
             db_Player.objects(tag=player.tag).update_one(
-                set__discord_user=player.discord_user,
+                set__discord_user=user,
                 upsert=True
                 )
-            bot_client.coc_data_log.info(f"{player}: discord_user changed to {player.discord_user}.")
+            bot_client.coc_data_log.info(f"{player}: discord_user changed to {user}.")
 
         player = cls(tag=coc.utils.correct_tag(tag))
         async with player._attributes._lock:
-            player._attributes.discord_user = discord_user
+            user = player._attributes.discord_user = discord_user
             await bot_client.run_in_thread(_update_in_db)
 
     async def new_member(self,user_id:int,home_clan:BasicClan):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
-                set__is_member=self.is_member,
-                upsert=True
-                )
-            db_Player.objects(tag=self.tag).update_one(
-                set__home_clan=getattr(home_clan,'tag',None),
-                upsert=True
-                )
-            db_Player.objects(tag=self.tag).update_one(
-                set__last_joined=self.last_joined.int_timestamp,
+                set__is_member=is_member,
+                set__home_clan=getattr(clan,'tag',None),
+                set__last_joined=last_joined.int_timestamp,
                 upsert=True
                 )
             bot_client.coc_data_log.info(
                 f"Player {self} is now an Alliance member!"
-                    + f"\n\tHome Clan: {self.home_clan.tag} {self.home_clan.name}"
-                    + f"\n\tLast Joined: {self.last_joined}"
+                    + f"\n\tHome Clan: {clan.tag} {clan.name}"
+                    + f"\n\tLast Joined: {last_joined}"
                     )
 
         await BasicPlayer.set_discord_link(self.tag,user_id)
         async with self._attributes._lock:
             if not self.is_member or not self.last_joined:
                 self._attributes.last_joined = pendulum.now()
-            self._attributes.is_member = True
-            self._attributes.home_clan = aPlayerClan(tag=home_clan.tag)
-            await self.home_clan.new_member(self.tag)
+            
+            last_joined = self.last_joined
+            is_member = self._attributes.is_member = True
+            clan = self._attributes.home_clan = aPlayerClan(tag=home_clan.tag)
+            await clan.new_member(self.tag)
             await bot_client.run_in_thread(_update_in_db)
         
     async def remove_member(self):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
-                set__is_member=self.is_member,
-                upsert=True
-                )
-            db_Player.objects(tag=self.tag).update_one(
-                set__home_clan=getattr(self.home_clan,'tag',None),
-                upsert=True
-                )
-            db_Player.objects(tag=self.tag).update_one(
-                set__last_removed=self.last_removed.int_timestamp,
+                set__is_member=is_member,
+                set__home_clan=getattr(home_clan,'tag',None),
+                set__last_removed=last_removed.int_timestamp,
                 upsert=True
                 )
             bot_client.coc_data_log.info(
                 f"Player {self} has been removed as a member."
-                    + f"\n\tHome Clan: {self.home_clan}"
-                    + f"\n\tLast Removed: {self.last_removed}"
+                    + f"\n\tHome Clan: {home_clan}"
+                    + f"\n\tLast Removed: {last_removed}"
                     )
             
-        if self.home_clan:
+        if await self.home_clan:
             await self.home_clan.remove_member(self.tag)
 
         async with self._attributes._lock:
-            self._attributes.is_member = False
-            self._attributes.home_clan = None
-            self._attributes.last_removed = pendulum.now()
+            is_member = self._attributes.is_member = False
+            home_clan = self._attributes.home_clan = None
+            last_removed = self._attributes.last_removed = pendulum.now()        
             await bot_client.run_in_thread(_update_in_db)
 
     ##################################################
@@ -252,40 +262,40 @@ class BasicPlayer():
     async def set_name(self,new_name:str):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
-                set__name=self.name,
+                set__name=name,
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
+            bot_client.coc_data_log.debug(f"{self}: name changed to {name}.")
 
         async with self._attributes._lock:
-            self._attributes.name = new_name
+            name = self._attributes.name = new_name
             await bot_client.run_in_thread(_update_in_db)
     
     async def set_exp_level(self,new_value:int):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
-                set__xp_level=self.exp_level,
+                set__xp_level=exp_level,
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: exp_level changed to {self.exp_level}.")
+            bot_client.coc_data_log.debug(f"{self}: exp_level changed to {exp_level}.")
         
         async with self._attributes._lock:
-            self._attributes.exp_level = new_value
+            exp_level = self._attributes.exp_level = new_value
             await bot_client.run_in_thread(_update_in_db)
         
     async def set_town_hall_level(self,new_value:int):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
-                set__townhall=self.town_hall_level,
+                set__townhall=townhall,
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: town_hall_level changed to {self.town_hall_level}.")
+            bot_client.coc_data_log.debug(f"{self}: town_hall_level changed to {townhall}.")
         
         async with self._attributes._lock:
-            self._attributes.town_hall_level = new_value
+            townhall = self._attributes.town_hall_level = new_value
             await bot_client.run_in_thread(_update_in_db)
 
-class _PlayerAttributes():    
+class _PlayerAttributes(AwaitLoader):
     """
     This class enforces a singleton pattern that caches database responses.
 
@@ -304,90 +314,75 @@ class _PlayerAttributes():
     def __init__(self,tag:str):
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
+            self._cache_loaded = False
             self._lock = asyncio.Lock()
             bot_client.player_queue.add(self.tag)
         
         self._is_new = False
-
-    async def _load_attributes(self):
+    
+    @async_property
+    async def _database(self) -> Optional[db_Player]:
         def _get_from_db() -> db_Player:
             try:
                 return db_Player.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        db = await bot_client.run_in_thread(_get_from_db)
-        if db:
-            self.name = db.name
-            self.exp_level = db.xp_level
-            self.town_hall_level = db.townhall
-            self.discord_user = db.discord_user
-            self.is_member = db.is_member
-            self.home_clan = aPlayerClan(tag=db.home_clan) if db.home_clan else None
-            
-            self.first_seen = pendulum.from_timestamp(db.first_seen) if db.first_seen > 0 else None
-            self.last_joined = pendulum.from_timestamp(db.last_joined) if db.last_joined > 0 else None
-            self.last_removed = pendulum.from_timestamp(db.last_removed) if db.last_removed > 0 else None
-    
-    @property
-    def _database(self) -> Optional[db_Player]:
-        try:
-            return db_Player.objects.get(tag=self.tag)
-        except DoesNotExist:
-            return None
+        return await bot_client.run_in_thread(_get_from_db)
 
-    @cached_property
-    def name(self) -> str:
-        return getattr(self._database,'name',"")
+    @async_cached_property
+    async def name(self) -> str:
+        return getattr(await self._database,'name',"")
     
-    @cached_property
-    def exp_level(self) -> int:
-        return getattr(self._database,'xp_level',0)    
+    @async_cached_property
+    async def exp_level(self) -> int:
+        return getattr(await self._database,'xp_level',0)
   
-    @cached_property
-    def town_hall_level(self) -> int:
-        return getattr(self._database,'townhall',0)
+    @async_cached_property
+    async def town_hall_level(self) -> int:
+        return getattr(await self._database,'townhall',0)
     
-    @cached_property
-    def discord_user(self) -> int:
-        return getattr(self._database,'discord_user',0)
+    @async_cached_property
+    async def discord_user(self) -> int:
+        return getattr(await self._database,'discord_user',0)
     
-    @cached_property
-    def is_member(self) -> bool:
-        val = getattr(self._database,'is_member',False)
-        if val and not getattr(self.home_clan,'is_alliance_clan',False):
-            asyncio.create_task(self.remove_member())
+    @async_cached_property
+    async def is_member(self) -> bool:
+        val = getattr(await self._database,'is_member',False)
+        if val and not getattr(await self.home_clan,'is_alliance_clan',False):
+            player = BasicPlayer(tag=self.tag)
+            await player.remove_member()
             bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
             return False
         return val
     
-    @cached_property
-    def home_clan(self) -> Optional[aPlayerClan]:
-        tag = getattr(self._database,'home_clan',None)
+    @async_cached_property
+    async def home_clan(self) -> Optional[aPlayerClan]:
+        tag = getattr(await self._database,'home_clan',None)
         if tag:
             return aPlayerClan(tag=tag)
         return None
     
-    @cached_property
-    def first_seen(self) -> Optional[pendulum.DateTime]:
-        fs = getattr(self._database,'first_seen',0)
+    @async_cached_property
+    async def first_seen(self) -> Optional[pendulum.DateTime]:
+        fs = getattr(await self._database,'first_seen',0)
         if fs > 0:
             return pendulum.from_timestamp(fs)
         return None
     
-    @cached_property
-    def last_joined(self) -> Optional[pendulum.DateTime]:
-        lj = getattr(self._database,'last_joined',0)
+    @async_cached_property
+    async def last_joined(self) -> Optional[pendulum.DateTime]:
+        lj = getattr(await self._database,'last_joined',0)
         if lj > 0:
             return pendulum.from_timestamp(lj)
         return None
 
-    @cached_property
-    def last_removed(self) -> Optional[pendulum.DateTime]:
-        lr = getattr(self._database,'last_removed',0)
+    @async_cached_property
+    async def last_removed(self) -> Optional[pendulum.DateTime]:
+        lr = getattr(await self._database,'last_removed',0)
         if lr > 0:
             return pendulum.from_timestamp(lr)
         return None
     
-    @cached_property
-    def is_new(self) -> bool:
-        return True if not self.first_seen else False
+    @async_cached_property
+    async def is_new(self) -> bool:
+        return True if not await self.first_seen else False

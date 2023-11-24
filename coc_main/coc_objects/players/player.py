@@ -4,6 +4,7 @@ import pendulum
 from typing import *
 
 from functools import cached_property
+from async_property import async_property, async_cached_property
 
 from ...api_client import BotClashClient as client
 
@@ -364,28 +365,34 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
-        if BasicPlayer(self.tag).is_new:
+        basic_player = BasicPlayer(self.tag)
+        if basic_player.is_new:
             await BasicPlayer.player_first_seen(self.tag)
 
-        if BasicPlayer(self.tag).name != self.name:
+        if basic_player.name != self.name:
             await self.set_name(self.name)
-        if BasicPlayer(self.tag).exp_level != self.exp_level:
+        if basic_player.exp_level != self.exp_level:
             await self.set_exp_level(self.exp_level)
-        if BasicPlayer(self.tag).town_hall_level != self.town_hall_level:
+        if basic_player.town_hall_level != self.town_hall_level:
             await self.set_town_hall_level(self.town_hall_level)
-        
-        if self.name != self.current_season.name:
-            await self.current_season.update_name(self.name)
-        if self.town_hall_level != self.current_season.town_hall:
-            await self.current_season.update_townhall(self.town_hall_level)
-        if getattr(self.home_clan,'tag',None) != getattr(self.current_season.home_clan,'tag',None):
-            await self.current_season.update_home_clan(getattr(self.home_clan,'tag',None))
-        if self.is_member != self.current_season.is_member:
-            await self.current_season.update_member(self.is_member)
 
-    @property
-    def current_season(self):
-        return aPlayerSeason(self.tag,bot_client.current_season)
+        if self.is_member:
+            current_season = await self.get_current_season()
+
+            if self.name != current_season.name:
+                await current_season.update_name(self.name)
+
+            if self.town_hall_level != current_season.town_hall:
+                await current_season.update_townhall(self.town_hall_level)
+
+            if getattr(await self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
+                await current_season.update_home_clan(getattr(self.home_clan,'tag',None))
+
+            if await self.is_member != current_season.is_member:
+                await current_season.update_member(self.is_member)
+
+    async def get_current_season(self) -> aPlayerSeason:
+        return await aPlayerSeason(self.tag,bot_client.current_season)
     
     @property
     def season_data(self):

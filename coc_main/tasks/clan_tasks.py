@@ -18,6 +18,7 @@ from ..coc_objects.clans.clan import aClan
 
 from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
+from ..exceptions import CacheNotReady
 
 bot_client = client()
 default_sleep = 60
@@ -144,7 +145,7 @@ class ClanLoop(TaskLoop):
                 sleep = 5 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
-                    #await asyncio.sleep(sleep)
+                    await asyncio.sleep(sleep)
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
 
@@ -157,7 +158,7 @@ class ClanLoop(TaskLoop):
                     pass
 
                 if len(tags) > len(scope_tags):
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(5)
                 else:
                     await asyncio.sleep(10)
                 continue
@@ -207,7 +208,6 @@ class ClanLoop(TaskLoop):
                     self._queue.task_done()
                 await asyncio.sleep(0)
 
-    
     async def _run_single_loop(self,tag:str):
         try:
             lock = self._locks[tag]
@@ -233,7 +233,16 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
+                    try:
+                        wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
+                    except CacheNotReady:
+                        bot_client.coc_main_log.exception(
+                            f"CLAN LOOP CACHE NOT READY: {tag}"
+                            + f"\n\t{new_clan._attributes._cache_loaded}"
+                            + f"\n\t{new_clan._attributes.is_alliance_clan}"
+                            + f"\n\t{await new_clan._attributes.is_alliance_clan}"
+                            )
+                        await new_clan.load()
                     #wait = getattr(new_clan,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 
