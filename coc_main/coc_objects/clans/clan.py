@@ -123,6 +123,7 @@ class aClan(coc.Clan,BasicClan):
                 break
             
             except CacheNotReady:
+                await asyncio.sleep(0.01)
                 continue
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:

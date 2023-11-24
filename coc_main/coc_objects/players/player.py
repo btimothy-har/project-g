@@ -1,4 +1,5 @@
 import coc
+import asyncio
 import pendulum
 
 from typing import *
@@ -396,6 +397,7 @@ class aPlayer(coc.Player,BasicPlayer):
                 break
 
             except CacheNotReady:
+                await asyncio.sleep(0.01)
                 continue
 
     async def get_current_season(self) -> aPlayerSeason:
