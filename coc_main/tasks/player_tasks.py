@@ -534,13 +534,11 @@ class PlayerLoop(TaskLoop):
                     )
                 a_iter = AsyncIter(scope_tags)
                 await self._run_single_loop('#LJC8V0GCJ')
-
-                [asyncio.create_task(self._run_single_loop(tag)) for tag in scope_tags]
             
-                # async for tag in a_iter:
-                #     task = asyncio.create_task(self._run_single_loop(tag))
+                async for tag in a_iter:
+                    task = asyncio.create_task(self._run_single_loop(tag))
                 
-                # await self._queue.put(task)
+                #await self._queue.put(task)
 
                 self._last_loop = pendulum.now()
                 self._running = False
