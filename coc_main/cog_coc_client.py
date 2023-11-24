@@ -177,6 +177,8 @@ class ClashOfClansClient(commands.Cog):
     async def fetch_player(self,tag:str) -> aPlayer:
         player = None
         count_try = 0
+        if tag == "#LJC8V0GCJ":
+            bot_client.coc_main_log.info("Fetching player: " + tag)
         while True:
             try:
                 count_try += 1
@@ -199,9 +201,16 @@ class ClashOfClansClient(commands.Cog):
                 await asyncio.sleep(0.5)
                 continue
         
+        if tag == "#LJC8V0GCJ":
+            bot_client.coc_main_log.info("Fetchedplayer: " + tag)
+        
         if not player._attributes._cache_loaded:
+            if tag == "#LJC8V0GCJ":
+                bot_client.coc_main_log.info("Loading cache " + tag)
             await player.load()
         if player.clan and not player.clan._attributes._cache_loaded:
+            if tag == "#LJC8V0GCJ":
+                bot_client.coc_main_log.info("Loading clan cache " + tag)
             await player.clan.load()
         return player
     
