@@ -504,6 +504,9 @@ class PlayerLoop(TaskLoop):
     ### PRIMARY TASK LOOP
     ##################################################
     async def _loop_task(self):
+        async def gather(*args):
+            return await asyncio.gather(*args,return_exceptions=True)
+        
         try:
             while self.loop_active:
 
@@ -541,7 +544,7 @@ class PlayerLoop(TaskLoop):
                     tasks.append(task)
                     await asyncio.sleep(sleep)
                 
-                wrap_task = asyncio.create_task(asyncio.gather(*tasks,return_exceptions=True))
+                wrap_task = asyncio.create_task(gather(*tasks))
                 await self._queue.put(wrap_task)
 
                 self._last_loop = pendulum.now()
