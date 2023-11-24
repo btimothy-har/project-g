@@ -98,9 +98,11 @@ class BasicPlayer(AwaitLoader):
     ##### PLAYER ATTRIBUTES
     #####
     ##################################################
-    @async_property
-    async def name(self) -> str:
-        return await self._attributes.name
+    @property
+    def name(self) -> str:
+        if isinstance(self._attributes.name,AwaitableOnly):
+            raise CacheNotReady
+        return self._attributes.name
     
     @property
     def exp_level(self) -> int:
