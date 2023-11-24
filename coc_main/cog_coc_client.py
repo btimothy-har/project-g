@@ -196,9 +196,10 @@ class ClashOfClansClient(commands.Cog):
                 await asyncio.sleep(0.5)
                 continue
 
-            await BasicPlayer(player.tag)
+            await player
             if player.clan:
-                await BasicClan(player.clan.tag)
+                await player.clan
+                
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
@@ -269,7 +270,7 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
                 continue
-            await BasicClan(clan.tag)
+            await clan
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:

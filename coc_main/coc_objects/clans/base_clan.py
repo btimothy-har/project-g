@@ -58,10 +58,7 @@ class BasicClan(AwaitLoader):
     
     def __hash__(self):
         return hash(self.tag)
-
-    async def load(self):
-        await self._attributes.load()
-           
+    
     ##################################################
     #####
     ##### FORMATTERS
@@ -88,154 +85,121 @@ class BasicClan(AwaitLoader):
     ##### CACHED CLAN ATTRIBUTES
     #####
     ##################################################
-    @property
-    def name(self) -> str:
-        if isinstance(self._attributes.name,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.name
+    @async_cached_property
+    async def name(self) -> str:
+        return await self._attributes.name
     
-    @property
-    def badge(self) -> str:
-        if isinstance(self._attributes.badge,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.badge
+    @async_cached_property
+    async def badge(self) -> str:
+        return await self._attributes.badge
     
-    @property
-    def level(self) -> int:
-        if isinstance(self._attributes.level,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.level
+    @async_cached_property
+    async def level(self) -> int:
+        return await self._attributes.level
     
-    @property
-    def capital_hall(self) -> int:
-        if isinstance(self._attributes.capital_hall,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.capital_hall
+    @async_cached_property
+    async def capital_hall(self) -> int:
+        return await self._attributes.capital_hall
     
-    @property
-    def war_league_name(self) -> str:
-        if isinstance(self._attributes.war_league_name,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.war_league_name
+    @async_cached_property
+    async def war_league_name(self) -> str:
+        return await self._attributes.war_league_name
     
     ##################################################
     #####
     ##### REGISTERED CLAN
     #####
     ##################################################    
-    @property
-    def is_registered_clan(self) -> bool:
-        return True if len(self.emoji) > 0 else False
+    @async_cached_property
+    async def is_registered_clan(self) -> bool:
+        return True if len(await self.emoji) > 0 else False
     
-    @property
-    def abbreviation(self) -> str:
-        if isinstance(self._attributes.abbreviation,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.abbreviation
+    @async_cached_property
+    async def abbreviation(self) -> str:
+        return await self._attributes.abbreviation
 
-    @property
-    def emoji(self) -> str:
-        if isinstance(self._attributes.emoji,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.emoji
+    @async_cached_property
+    async def emoji(self) -> str:
+        return await self._attributes.emoji
     
-    @property
-    def unicode_emoji(self) -> str:
-        if isinstance(self._attributes.unicode_emoji,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.unicode_emoji
+    @async_cached_property
+    async def unicode_emoji(self) -> str:
+        return await self._attributes.unicode_emoji
     
     ##################################################
     #####
     ##### ALLIANCE CLAN
     #####
     ##################################################
-    @property
-    def is_alliance_clan(self) -> bool:
-        if isinstance(self._attributes.is_alliance_clan,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.is_alliance_clan
+    @async_cached_property
+    async def is_alliance_clan(self) -> bool:
+        return await self._attributes.is_alliance_clan
     
-    @property
-    def recruitment_level(self) -> List[int]:
-        if isinstance(self._attributes.recruitment_level,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.recruitment_level
+    @async_cached_property
+    async def recruitment_level(self) -> List[int]:
+        return await self._attributes.recruitment_level
         
-    @property
-    def max_recruitment_level(self) -> int:
-        return max(self.recruitment_level) if len(self.recruitment_level) > 0 else 0
+    @async_cached_property
+    async def max_recruitment_level(self) -> int:
+        return max(await self.recruitment_level) if len(await self.recruitment_level) > 0 else 0
     
-    @property
-    def recruitment_level_emojis(self) -> str:
-        return " ".join([EmojisTownHall.get(th_level) for th_level in self.recruitment_level])
+    @async_cached_property
+    async def recruitment_level_emojis(self) -> str:
+        return " ".join([EmojisTownHall.get(th_level) for th_level in await self.recruitment_level])
 
-    @property
-    def recruitment_info(self) -> str:
-        if isinstance(self._attributes.recruitment_info,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.recruitment_info
+    @async_cached_property
+    async def recruitment_info(self) -> str:
+        return await self._attributes.recruitment_info
     
-    @property
-    def description(self) -> str:
-        if isinstance(self._attributes.description,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.description
+    @async_cached_property
+    async def description(self) -> str:
+        return await self._attributes.description
     
-    @property
-    def leader(self) -> int:
-        if isinstance(self._attributes.leader,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.leader
+    @async_cached_property
+    async def leader(self) -> int:
+        return await self._attributes.leader
     
-    @property
-    def coleaders(self) -> List[int]:
-        if isinstance(self._attributes.coleaders,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.coleaders
+    @async_cached_property
+    async def coleaders(self) -> List[int]:
+        return await self._attributes.coleaders
     
-    @property
-    def elders(self) -> List[int]:
-        if isinstance(self._attributes.elders,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.elders
+    @async_cached_property
+    async def elders(self) -> List[int]:
+        return await self._attributes.elders
 
-    @property
-    def alliance_members(self) -> List[str]:
-        if isinstance(self._attributes.alliance_members,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.alliance_members
+    @async_cached_property
+    async def alliance_members(self) -> List[str]:
+        return await self._attributes.alliance_members
     
-    @property
-    def alliance_member_count(self) -> int:
-        return len(self.alliance_members)
+    @async_cached_property
+    async def alliance_member_count(self) -> int:
+        return len(await self.alliance_members)
     
     ##################################################
     #####
     ##### WAR LEAGUE CLAN
     #####
     ##################################################
-    @property
-    def is_active_league_clan(self) -> bool:
-        if isinstance(self._attributes.is_active_league_clan,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.is_active_league_clan
-    
-    @property
-    def league_clan_channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
-        if isinstance(self._attributes.league_clan_channel_id,AwaitableOnly):
-            raise CacheNotReady
-        channel = bot_client.bot.get_channel(self._attributes.league_clan_channel_id)
+    @async_cached_property
+    async def is_active_league_clan(self) -> bool:
+        return await self._attributes.is_active_league_clan
+        
+    @async_property
+    async def league_clan_channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
+        if not await self.is_active_league_clan:
+            return None
+        channel = bot_client.bot.get_channel(await self._attributes.league_clan_channel_id)
         if isinstance(channel,(discord.TextChannel,discord.Thread)):
             return channel
         return None
     
-    @property
-    def league_clan_role(self) -> Optional[discord.Role]:
-        if isinstance(self._attributes.league_clan_role_id,AwaitableOnly):
-            raise CacheNotReady
+    @async_property
+    async def league_clan_role_id(self) -> Optional[discord.Role]:
+        if not await self.is_active_league_clan:
+            return None
+        role_id = await self._attributes.league_clan_role_id
         for guild in bot_client.bot.guilds:
-            role = guild.get_role(self._attributes.league_clan_role_id)
+            role = guild.get_role(role_id)
             if isinstance(role,discord.Role):
                 return role
         return None
@@ -560,30 +524,6 @@ class _ClanAttributes():
             bot_client.clan_queue.add(self.tag)
             
         self._is_new = False
-    
-    async def load(self):
-        if self._cache_loaded:
-            return
-        await self.name
-        await self.badge
-        await self.level
-        await self.capital_hall
-        await self.war_league_name
-        await self.abbreviation
-        await self.emoji
-        await self.unicode_emoji
-        await self.is_alliance_clan
-        await self.recruitment_level
-        await self.recruitment_info
-        await self.description
-        await self.leader
-        await self.coleaders
-        await self.elders
-        await self.alliance_members
-        await self.is_active_league_clan
-        await self.league_clan_channel_id
-        await self.league_clan_role_id
-        self._cache_loaded = True
 
     ##################################################
     #####

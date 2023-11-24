@@ -58,9 +58,6 @@ class BasicPlayer(AwaitLoader):
     def __hash__(self):
         return hash(self.tag)
     
-    async def load(self):
-        await self._attributes.load()
-    
     ##################################################
     #####
     ##### FORMATTERS
@@ -101,41 +98,29 @@ class BasicPlayer(AwaitLoader):
     ##### PLAYER ATTRIBUTES
     #####
     ##################################################
-    @property
-    def name(self) -> str:
-        if isinstance(self._attributes.name,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.name
+    @async_cached_property
+    async def name(self) -> str:
+        return await self._attributes.name
     
-    @property
-    def exp_level(self) -> int:
-        if isinstance(self._attributes.exp_level,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.exp_level
+    @async_cached_property
+    async def exp_level(self) -> int:
+        return await self._attributes.exp_level
     
-    @property
-    def town_hall_level(self) -> int:
-        if isinstance(self._attributes.town_hall_level,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.town_hall_level
+    @async_cached_property
+    async def town_hall_level(self) -> int:
+        return await self._attributes.town_hall_level
     
-    @property
-    def discord_user(self) -> int:
-        if isinstance(self._attributes.discord_user,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.discord_user
+    @async_cached_property
+    async def discord_user(self) -> int:
+        return await self._attributes.discord_user
     
-    @property
-    def is_member(self) -> bool:
-        if isinstance(self._attributes.is_member,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.is_member
+    @async_cached_property
+    async def is_member(self) -> bool:
+        return await self._attributes.is_member
     
-    @property
-    def home_clan(self) -> Optional[aPlayerClan]:
-        if isinstance(self._attributes.home_clan,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.home_clan
+    @async_cached_property
+    async def home_clan(self) -> Optional[aPlayerClan]:
+        return await self._attributes.home_clan
 
     @property
     def alliance_rank(self) -> str:
@@ -151,29 +136,21 @@ class BasicPlayer(AwaitLoader):
         else:
             return 'Non-Member'
     
-    @property
-    def first_seen(self) -> Optional[pendulum.DateTime]:
-        if isinstance(self._attributes.first_seen,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.first_seen
+    @async_cached_property
+    async def first_seen(self) -> Optional[pendulum.DateTime]:
+        return await self._attributes.first_seen
     
-    @property
-    def last_joined(self) -> Optional[pendulum.DateTime]:
-        if isinstance(self._attributes.last_joined,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.last_joined
+    @async_cached_property
+    async def last_joined(self) -> Optional[pendulum.DateTime]:
+        return await self._attributes.last_joined
 
-    @property
-    def last_removed(self) -> Optional[pendulum.DateTime]:
-        if isinstance(self._attributes.last_removed,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.last_removed
+    @async_cached_property
+    async def last_removed(self) -> Optional[pendulum.DateTime]:
+        return await self._attributes.last_removed
     
-    @property
-    def is_new(self) -> bool:
-        if isinstance(self._attributes.is_new,AwaitableOnly):
-            raise CacheNotReady
-        return self._attributes.is_new
+    @async_cached_property
+    async def is_new(self) -> bool:
+        return await self._attributes.is_new
     
     ##################################################
     #####
@@ -231,7 +208,8 @@ class BasicPlayer(AwaitLoader):
             
             last_joined = self.last_joined
             is_member = self._attributes.is_member = True
-            clan = self._attributes.home_clan = aPlayerClan(tag=home_clan.tag)
+            clan_tag = self._attributes.home_clan_tag = home_clan.tag
+            clan = await aPlayerClan(tag=clan_tag)
             await clan.new_member(self.tag)
             await bot_client.run_in_write_thread(_update_in_db)
         
@@ -239,13 +217,12 @@ class BasicPlayer(AwaitLoader):
         def _update_in_db():
             db_Player.objects(tag=self.tag).update_one(
                 set__is_member=is_member,
-                set__home_clan=getattr(home_clan,'tag',None),
+                set__home_clan=None,
                 set__last_removed=last_removed.int_timestamp,
                 upsert=True
                 )
             bot_client.coc_data_log.info(
                 f"Player {self} has been removed as a member."
-                    + f"\n\tHome Clan: {home_clan}"
                     + f"\n\tLast Removed: {last_removed}"
                     )
             
@@ -254,7 +231,7 @@ class BasicPlayer(AwaitLoader):
 
         async with self._attributes._lock:
             is_member = self._attributes.is_member = False
-            home_clan = self._attributes.home_clan = None
+            home_clan_tag = self._attributes.home_clan_tag = None
             last_removed = self._attributes.last_removed = pendulum.now()        
             await bot_client.run_in_write_thread(_update_in_db)
 
@@ -379,10 +356,16 @@ class _PlayerAttributes():
         return val
     
     @async_cached_property
-    async def home_clan(self) -> Optional[aPlayerClan]:
+    async def home_clan_tag(self) -> Optional[str]:
         tag = getattr(await self._database,'home_clan',None)
         if tag:
-            return aPlayerClan(tag=tag)
+            return tag
+        return None
+    
+    @async_property
+    async def home_clan(self) -> Optional[aPlayerClan]:
+        if await self.home_clan_tag:
+            return await aPlayerClan(tag=tag)
         return None
     
     @async_cached_property
