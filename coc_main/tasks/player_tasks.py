@@ -633,13 +633,13 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)        
 
-                    await new_player._sync_cache()            
-                    
-                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
-                    #wait = getattr(new_player,'_response_retry',default_sleep)
-                    self.loop.call_later(wait,self.unlock,lock)
+                await new_player._sync_cache()            
+                
+                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
+                #wait = getattr(new_player,'_response_retry',default_sleep)
+                self.loop.call_later(wait,self.unlock,lock)
 
-                    bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
+                bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
                 
                 
                 if cached_player:        

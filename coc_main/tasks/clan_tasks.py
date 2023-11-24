@@ -233,20 +233,20 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                    await new_clan._sync_cache()
-                    
-                    try:
-                        wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
-                    except CacheNotReady:
-                        bot_client.coc_main_log.exception(
-                            f"CLAN LOOP CACHE NOT READY: {tag}"
-                            + f"\n\t{new_clan._attributes._cache_loaded}"
-                            + f"\n\t{new_clan._attributes.is_alliance_clan}"
-                            + f"\n\t{await new_clan._attributes.is_alliance_clan}"
-                            )
-                        await new_clan.load()
-                    #wait = getattr(new_clan,'_response_retry',default_sleep)
-                    self.loop.call_later(wait,self.unlock,lock)
+                await new_clan._sync_cache()
+                
+                try:
+                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
+                except CacheNotReady:
+                    bot_client.coc_main_log.exception(
+                        f"CLAN LOOP CACHE NOT READY: {tag}"
+                        + f"\n\t{new_clan._attributes._cache_loaded}"
+                        + f"\n\t{new_clan._attributes.is_alliance_clan}"
+                        + f"\n\t{await new_clan._attributes.is_alliance_clan}"
+                        )
+                    await new_clan.load()
+                #wait = getattr(new_clan,'_response_retry',default_sleep)
+                self.loop.call_later(wait,self.unlock,lock)
                 
                 
                 if cached_clan:
