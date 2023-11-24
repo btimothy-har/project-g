@@ -31,7 +31,7 @@ class BasicClan(AwaitLoader):
         clan_tags = await bot_client.run_in_read_thread(_get_from_db)        
         a_iter = AsyncIter(clan_tags)
         async for tag in a_iter:
-            clan = cls(tag)
+            clan = await cls(tag)
             await bot_client.clan_queue.put(clan.tag)
             await asyncio.sleep(0.01)
     
@@ -47,11 +47,11 @@ class BasicClan(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _ClanAttributes(self.tag)
-        if not self._attributes._cache_loaded:
-            def schedule_coroutine():
-                asyncio.create_task(self.load())
-            loop = asyncio.get_running_loop()       
-            loop.call_soon_threadsafe(schedule_coroutine)
+        # if not self._attributes._cache_loaded:
+        #     def schedule_coroutine():
+        #         asyncio.create_task(self.load())
+        #     loop = asyncio.get_running_loop()       
+        #     loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Clan {self.tag}"
@@ -61,8 +61,7 @@ class BasicClan(AwaitLoader):
 
     async def load(self):
         self._attributes._cache_loaded = True
-        self._attributes = await _ClanAttributes(self.tag)
-        
+        self._attributes = await _ClanAttributes(self.tag)        
     
     ##################################################
     #####

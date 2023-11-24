@@ -30,7 +30,7 @@ class BasicPlayer(AwaitLoader):
         player_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(player_tags)
         async for tag in a_iter:
-            player = cls(tag)
+            player = await cls(tag)
             await bot_client.player_queue.put(player.tag)
             await asyncio.sleep(0.01)
     
@@ -46,11 +46,11 @@ class BasicPlayer(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
-        if not self._attributes._cache_loaded:
-            def schedule_coroutine():
-                asyncio.create_task(self.load())
-            loop = asyncio.get_running_loop()       
-            loop.call_soon_threadsafe(schedule_coroutine)
+        # if not self._attributes._cache_loaded:
+        #     def schedule_coroutine():
+        #         asyncio.create_task(self.load())
+        #     loop = asyncio.get_running_loop()       
+        #     loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Player {self.tag}"
