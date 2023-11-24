@@ -118,9 +118,6 @@ class ClashOfClansClient(commands.Cog):
                     f"Found {len(clans):,} Clans in database."
                     )
                 
-                c_queue_task = asyncio.create_task(bot_client.clan_queue.add_many([c for c in clans]))
-                p_queue_task = asyncio.create_task(bot_client.player_queue.add_many([p for p in players]))
-                await asyncio.gather(c_queue_task,p_queue_task)
             except asyncio.CancelledError:
                 return
 

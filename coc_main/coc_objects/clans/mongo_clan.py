@@ -12,6 +12,17 @@ class db_Clan(Document):
     capital_hall = IntField(default=0)
     war_league = StringField(default="")
 
+    meta = {
+        'indexes': [
+            'tag',
+            '$tag',
+            '#tag',
+            'abbreviation'
+            ],
+        'index_background': True,
+        'auto_create_index_on_save': True,
+        }
+
 class db_AllianceClan(Document):
     tag = StringField(primary_key=True,required=True)
     description = StringField(default="")
@@ -28,6 +39,16 @@ class db_AllianceClan(Document):
     elder_role = IntField(default=0)
     coleader_role = IntField(default=0)
 
+    meta = {
+        'indexes': [
+            'tag',
+            '$tag',
+            '#tag'
+            ],
+        'index_background': True,
+        'auto_create_index_on_save': True,
+        }
+
 class db_WarLeagueClanSetup(Document):
     tag = StringField(primary_key=True,required=True)
     is_active = BooleanField(default=False)
@@ -36,3 +57,13 @@ class db_WarLeagueClanSetup(Document):
 
     #deprecated
     webhook = IntField(default=0)
+
+    meta = {
+        'indexes': [
+            'tag',
+            '$tag',
+            '#tag'
+            ],
+        'index_background': True,
+        'auto_create_index_on_save': True,
+        }
