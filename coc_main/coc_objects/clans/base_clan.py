@@ -31,8 +31,7 @@ class BasicClan(AwaitLoader):
         clan_tags = await bot_client.run_in_read_thread(_get_from_db)        
         a_iter = AsyncIter(clan_tags[:10000])
         async for tag in a_iter:
-            clan = await cls(tag)
-            await bot_client.clan_queue.put(clan.tag)
+            await bot_client.clan_queue.put(tag)
             await asyncio.sleep(0.1)
     
     @classmethod
