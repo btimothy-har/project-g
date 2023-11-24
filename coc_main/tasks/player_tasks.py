@@ -639,7 +639,7 @@ class PlayerLoop(TaskLoop):
 
                     bot_client.coc_data_log.info(f"api completed: {tag} {wait} ")
                 
-                await new_player._sync_cache()    
+                await new_player._sync_cache()
                 if cached_player:        
                     if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
                         self._cached[tag] = new_player

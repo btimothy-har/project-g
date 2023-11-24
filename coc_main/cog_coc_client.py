@@ -200,18 +200,6 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
                 continue
-        
-        if tag == "#LJC8V0GCJ":
-            bot_client.coc_main_log.info("Fetchedplayer: " + tag)
-        
-        if not player._attributes._cache_loaded:
-            if tag == "#LJC8V0GCJ":
-                bot_client.coc_main_log.info("Loading cache " + tag)
-            await player.load()
-        if player.clan and not player.clan._attributes._cache_loaded:
-            if tag == "#LJC8V0GCJ":
-                bot_client.coc_main_log.info("Loading clan cache " + tag)
-            await player.clan.load()
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
@@ -283,8 +271,6 @@ class ClashOfClansClient(commands.Cog):
                 await asyncio.sleep(0.5)
                 continue
         
-        if not clan._attributes._cache_loaded:
-            await clan.load()
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
