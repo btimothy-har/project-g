@@ -29,11 +29,12 @@ class BasicClan(AwaitLoader):
             return [db.tag for db in db_Clan.objects.only('tag')]
         
         clan_tags = await bot_client.run_in_read_thread(_get_from_db)
-        a_iter = AsyncIter(clan_tags)
-        clans = []
-        async for tag in a_iter:
-            clans.append(await cls(tag))
-        return clans
+        return clan_tags
+        # a_iter = AsyncIter(clan_tags)
+        # clans = []
+        # async for tag in a_iter:
+        #     clans.append(await cls(tag))
+        # return clans
     
     @classmethod
     def clear_cache(cls):

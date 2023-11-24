@@ -28,11 +28,12 @@ class BasicPlayer(AwaitLoader):
             return [db.tag for db in db_Player.objects.only('tag')]
         
         player_tags = await bot_client.run_in_read_thread(_get_from_db)
-        a_iter = AsyncIter(player_tags)
-        players = []
-        async for tag in a_iter:
-            players.append(await cls(tag))
-        return players
+        return player_tags
+        # a_iter = AsyncIter(player_tags)
+        # players = []
+        # async for tag in a_iter:
+        #     players.append(await cls(tag))
+        # return players
     
     @classmethod
     def clear_cache(cls):

@@ -69,9 +69,9 @@ class DataQueue(asyncio.Queue):
         loop.call_soon_threadsafe(schedule_coroutine)
     
     async def add_many(self,keys:List[str]):
-        for key in keys:
+        a_iter = AsyncIter(keys)
+        async for key in a_iter:
             await self.put(key)
-            await asyncio.sleep(0)
 
 ############################################################
 ############################################################

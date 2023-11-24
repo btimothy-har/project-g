@@ -128,7 +128,7 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 100000:
+                if self._queue.qsize() > 500000:
                     while not self._queue.empty():
                         await asyncio.sleep(10)
                         continue
@@ -142,12 +142,10 @@ class ClanLoop(TaskLoop):
                 self._running = True
 
                 scope_tags = random.sample(list(tags),min(len(tags),10000))
-                sleep = 1 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:                    
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
-                    await asyncio.sleep(0)
 
                 self._last_loop = pendulum.now()
                 self._running = False

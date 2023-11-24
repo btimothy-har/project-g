@@ -369,23 +369,23 @@ class ClashOfClansTasks(commands.Cog):
                     self.war_loop.add_to_loop(tag)
                     await asyncio.sleep(0)
 
-                try:
-                    players = await bot_client.coc.get_location_players()
-                except:
-                    pass
-                else:
-                    for player in players:
-                        await asyncio.sleep(0)
-                        self.player_loop.add_to_loop(player.tag)
+                # try:
+                #     players = await bot_client.coc.get_location_players()
+                # except:
+                #     pass
+                # else:
+                #     for player in players:
+                #         await asyncio.sleep(0)
+                #         self.player_loop.add_to_loop(player.tag)
                 
-                try:
-                    players = await bot_client.coc.get_location_players_builder_base()
-                except:
-                    pass
-                else:
-                    for player in players:
-                        await asyncio.sleep(0)
-                        self.player_loop.add_to_loop(player.tag)
+                # try:
+                #     players = await bot_client.coc.get_location_players_builder_base()
+                # except:
+                #     pass
+                # else:
+                #     for player in players:
+                #         await asyncio.sleep(0)
+                #         self.player_loop.add_to_loop(player.tag)
 
                 # try:
                 #     locations = await bot_client.coc.search_locations()

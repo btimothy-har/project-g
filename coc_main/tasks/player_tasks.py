@@ -106,7 +106,7 @@ class PlayerTasks():
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.info(
+                bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
                     )
         except:
@@ -138,7 +138,7 @@ class PlayerTasks():
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.info(
+                bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
                     )
         except:
@@ -170,7 +170,7 @@ class PlayerTasks():
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.info(
+                bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
                     )
         except:
@@ -202,7 +202,7 @@ class PlayerTasks():
                     db_update=_update_in_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
-                bot_client.coc_data_log.info(
+                bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
                     )
         except:
@@ -254,7 +254,7 @@ class PlayerTasks():
                         db_update=_update_gold_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
                         )                
-                    bot_client.coc_data_log.info(
+                    bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
             
@@ -340,7 +340,7 @@ class PlayerTasks():
                     if increment > 0:
                         await CapitalContributionFeed.send_feed_update(new_player,increment)
                     
-                    bot_client.coc_data_log.info(
+                    bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
         except:
@@ -513,7 +513,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 100000:
+                if self._queue.qsize() > 1000000:
                     while not self._queue.empty():
                         self._status = "On Hold"
                         await asyncio.sleep(10)
@@ -532,14 +532,12 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                sleep = 1 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)
                 task = asyncio.create_task(self._run_single_loop('#LJC8V0GCJ'))
                 await self._queue.put(task)
                 async for tag in a_iter:
                     task = asyncio.create_task(self._run_single_loop(tag))
                     await self._queue.put(task)
-                    await asyncio.sleep(0)
 
                 self._last_loop = pendulum.now()
                 self._running = False
