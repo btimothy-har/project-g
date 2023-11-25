@@ -530,7 +530,7 @@ class _ClanAttributes():
     #####
     ##################################################
     @async_property
-    async def _database(self) -> Optional[db_Clan]:
+    async def _database(self) -> Optional[dict]:
         if not self.tag:
             return None
         def _get_from_db():
@@ -539,12 +539,12 @@ class _ClanAttributes():
             except DoesNotExist:
                 return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._cached_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
         return self._cached_db
         
     @async_property
-    async def _db_alliance(self) -> Optional[db_AllianceClan]:
+    async def _db_alliance(self) -> Optional[dict]:
         if not self.tag:
             return None
         def _get_from_db():
@@ -552,10 +552,10 @@ class _ClanAttributes():
                 return db_AllianceClan.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_read_thread(_get_from_db)
+        return await bot_client.coc_db.db__allianceclan.find_one({'_id':self.tag})
     
     @async_property
-    async def _league_clan(self) -> Optional[db_WarLeagueClanSetup]:
+    async def _league_clan(self) -> Optional[dict]:
         if not self.tag:
             return None
         def _get_from_db():
@@ -563,7 +563,7 @@ class _ClanAttributes():
                 return db_WarLeagueClanSetup.objects.get(tag=self.tag)
             except DoesNotExist:
                 return None
-        return await bot_client.run_in_read_thread(_get_from_db)
+        return await bot_client.coc_db.db__warleagueclansetup.find_one({'_id':self.tag})
     
     ##################################################
     #####

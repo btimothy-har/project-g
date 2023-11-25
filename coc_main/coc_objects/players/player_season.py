@@ -62,7 +62,7 @@ class aPlayerSeason(AwaitLoader):
             except DoesNotExist:
                 return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._cached_db = await bot_client.coc_db.db__player_stats.find_one({'_id.season': self.season.id,'_id.tag': self.tag})
             self._last_db_query = pendulum.now()
         return self._cached_db
     

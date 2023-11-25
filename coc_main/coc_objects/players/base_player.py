@@ -30,7 +30,7 @@ class BasicPlayer(AwaitLoader):
         player_tags = await bot_client.run_in_read_thread(_get_from_db)
         a_iter = AsyncIter(player_tags[:500000])
         async for tag in a_iter:
-            await bot_client.player_queue.put(player.tag)
+            await bot_client.player_queue.put(tag)
             await asyncio.sleep(0.1)
     
     @classmethod
@@ -324,7 +324,7 @@ class _PlayerAttributes():
             except DoesNotExist:
                 return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            self._cached_db = await bot_client.run_in_read_thread(_get_from_db)
+            self._cached_db = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
         return self._cached_db
 

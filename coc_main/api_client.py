@@ -4,6 +4,7 @@ import logging
 import pendulum
 import random
 import asyncio
+import motor.motor_asyncio
 
 import coc
 from coc.ext import discordlinks
@@ -590,6 +591,11 @@ class BotClashClient():
             password=clash_database.get("password"),
             uuidRepresentation="pythonLegacy"
             )
+
+        client = motor.motor_asyncio.AsyncIOMotorClient(
+            f'mongodb://{clash_database.get("username")}:{clash_database.get("password")}@localhost:27017/admin'
+            )
+        self.coc_db = client[clash_database.get("dbprimary")]
 
     ############################################################
     #####
