@@ -66,15 +66,6 @@ class aPlayerStat():
         db_update:Callable,
         alliance:bool=False) -> 'aPlayerStat': 
 
-        def _create_in_db():
-            db_PlayerStats.objects(
-                stats_id=self._db_id
-                ).update_one(
-                    set__season=self.season.id,
-                    set__tag=self.tag,
-                    upsert=True
-                    )
-
         async with self._lock:
             self.last_update = latest_value
             self.season_total += increment
@@ -82,8 +73,8 @@ class aPlayerStat():
                 self.season_only_clan += increment
             
             self._prior_seen = True
-            await bot_client.run_in_write_thread(_create_in_db)
-            await bot_client.run_in_write_thread(db_update,self._db_id,self.json)
+
+            await db_update(self._db_id,self.json)
         
         #bot_client.coc_data_log.debug(f"{self.season.short_description} {self.tag}: Incremented {self.description} by {increment} to {self.season_total}")
         return self
