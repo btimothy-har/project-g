@@ -371,11 +371,11 @@ class aPlayer(coc.Player,BasicPlayer):
             await BasicPlayer.player_first_seen(self.tag)
 
         if await basic_player.name != self.name:
-            await self.set_name(self.name)
+            await basic_player.set_name(self.name)
         if await basic_player.exp_level != self.exp_level:
-            await self.set_exp_level(self.exp_level)
+            await basic_player.set_exp_level(self.exp_level)
         if await basic_player.town_hall_level != self.town_hall_level:
-            await self.set_town_hall_level(self.town_hall_level)
+            await basic_player.set_town_hall_level(self.town_hall_level)
 
         if self.is_member:
             current_season = await self.get_current_season()

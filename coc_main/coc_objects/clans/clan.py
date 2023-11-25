@@ -111,15 +111,15 @@ class aClan(coc.Clan,BasicClan):
         basic_clan = await BasicClan(self.tag)
 
         if basic_clan.name != self.name:
-            await self.set_name(self.name)
+            await basic_clan.set_name(self.name)
         if basic_clan.badge != self.badge:
-            await self.set_badge(self.badge)
+            await basic_clan.set_badge(self.badge)
         if basic_clan.level != self.level:
-            await self.set_level(self.level)
+            await basic_clan.set_level(self.level)
         if basic_clan.capital_hall != self.capital_hall:
-            await self.set_capital_hall(self.capital_hall)
+            await basic_clan.set_capital_hall(self.capital_hall)
         if basic_clan.war_league_name != self.war_league_name:
-            await self.set_war_league(self.war_league_name)
+            await basic_clan.set_war_league(self.war_league_name)
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
         return WarLeagueClan(self.tag,season)
