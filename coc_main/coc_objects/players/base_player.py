@@ -173,7 +173,7 @@ class BasicPlayer(AwaitLoader):
 
             await bot_client.coc_db.db__player.update_one(
                 {'_id':player.tag},
-                {'$set':{'first_seen':player.first_seen.int_timestamp}},
+                {'$set':{'first_seen':getattr(await player.first_seen,'int_timestamp',pendulum.now().int_timestamp)}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}.")
@@ -193,7 +193,7 @@ class BasicPlayer(AwaitLoader):
 
             await bot_client.coc_db.db__player.update_one(
                 {'_id':player.tag},
-                {'$set':{'discord_user':player.discord_user}},
+                {'$set':{'discord_user':await player.discord_user}},
                 upsert=True
                 )
             bot_client.coc_data_log.info(f"{player}: discord_user changed to {player.discord_user}.")            
@@ -226,9 +226,9 @@ class BasicPlayer(AwaitLoader):
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'is_member':self.is_member,
-                    'home_clan':self.home_clan.tag,
-                    'last_joined':self.last_joined.int_timestamp
+                    'is_member':await self.is_member,
+                    'home_clan':getattr(await self.home_clan,'tag',None),
+                    'last_joined':getattr(await self.last_joined,'int_timestamp',pendulum.now().int_timestamp)
                     }
                 },
                 upsert=True
@@ -264,9 +264,9 @@ class BasicPlayer(AwaitLoader):
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'is_member':self.is_member,
+                    'is_member':await self.is_member,
                     'home_clan':None,
-                    'last_removed':self.last_removed.int_timestamp
+                    'last_removed':getattr(await self.last_removed,'int_timestamp',pendulum.now().int_timestamp)
                     }
                 },
                 upsert=True
@@ -293,7 +293,7 @@ class BasicPlayer(AwaitLoader):
             self.name = self._attributes.name = new_name
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
-                {'$set':{'name':self.name}},
+                {'$set':{'name':await self.name}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
@@ -310,7 +310,7 @@ class BasicPlayer(AwaitLoader):
             self.exp_level = self._attributes.exp_level = new_value
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
-                {'$set':{'xp_level':self.exp_level}},
+                {'$set':{'xp_level':await self.exp_level}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: exp_level changed to {self.exp_level}.")
@@ -327,7 +327,7 @@ class BasicPlayer(AwaitLoader):
             self.town_hall_level = self._attributes.town_hall_level = new_value
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
-                {'$set':{'townhall':self.town_hall_level}},
+                {'$set':{'townhall':await self.town_hall_level}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: town_hall_level changed to {self.town_hall_level}.")

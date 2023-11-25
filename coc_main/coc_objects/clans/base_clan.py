@@ -403,7 +403,7 @@ class BasicClan(AwaitLoader):
             self.name = self._attributes.name = new_name
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'name':self.name}},
+                {'$set':{'name':await self.name}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
@@ -420,7 +420,7 @@ class BasicClan(AwaitLoader):
             self.badge = self._attributes.badge = new_badge
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'badge':self.badge}},
+                {'$set':{'badge':await self.badge}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: badge changed to {self.badge}.")
@@ -437,7 +437,7 @@ class BasicClan(AwaitLoader):
             self.level = self._attributes.level = new_level
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'level':self.badge}},
+                {'$set':{'level':await self.level}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: level changed to {self.level}.")
@@ -454,7 +454,7 @@ class BasicClan(AwaitLoader):
             self.capital_hall = self._attributes.capital_hall = new_capital_hall
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'capital_hall':self.capital_hall}},
+                {'$set':{'capital_hall':await self.capital_hall}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {self.capital_hall}.")
@@ -471,7 +471,7 @@ class BasicClan(AwaitLoader):
             self.war_league = self._attributes.war_league_name = new_war_league
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'war_league':self.war_league}},
+                {'$set':{'war_league':await self.war_league}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: war_league changed to {self.war_league_name}.")

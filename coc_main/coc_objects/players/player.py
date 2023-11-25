@@ -369,28 +369,33 @@ class aPlayer(coc.Player,BasicPlayer):
         basic_player = await BasicPlayer(self.tag)
         if basic_player.is_new:
             await BasicPlayer.player_first_seen(self.tag)
+        
+        tasks = []
 
         if await basic_player.name != self.name:
-            await basic_player.set_name(self.name)
+            tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
         if await basic_player.exp_level != self.exp_level:
-            await basic_player.set_exp_level(self.exp_level)
+            tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
         if await basic_player.town_hall_level != self.town_hall_level:
-            await basic_player.set_town_hall_level(self.town_hall_level)
+            tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
 
         if self.is_member:
             current_season = await self.get_current_season()
 
             if self.name != await current_season.name:
-                await current_season.update_name(self.name)
+                tasks.append(asyncio.create_task(current_season.update_name(self.name)))
 
             if self.town_hall_level != await current_season.town_hall:
-                await current_season.update_townhall(self.town_hall_level)
+                tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
 
             if getattr(await self.home_clan,'tag',None) != getattr(await current_season.home_clan,'tag',None):
-                await current_season.update_home_clan(getattr(await self.home_clan,'tag',None))
+                tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(await self.home_clan,'tag',None))))
 
             if await self.is_member != await current_season.is_member:
-                await current_season.update_member(await self.is_member)
+                tasks.append(asyncio.create_task(current_season.update_member(await self.is_member)))
+        
+        if tasks:
+            await asyncio.gather(*tasks)
 
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)

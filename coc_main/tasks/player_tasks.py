@@ -662,8 +662,7 @@ class PlayerLoop(TaskLoop):
                     except InvalidTag:
                         return self.loop.call_later(3600,self.unlock,lock)
                     except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)     
-
+                        return self.loop.call_later(10,self.unlock,lock)
                     
                 a = pendulum.now()
                 await new_player._sync_cache()
