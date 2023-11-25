@@ -178,7 +178,7 @@ class PlayerTasks():
             if donations._prior_seen:
                 increment = new_player.donations - donations.last_update
             else:
-                increment = new_player.donations - old_player.donations
+                increment = new_player.donations - old_player.donations            
             
             if increment > 0 or new_player.donations != donations.last_update:
                 stat = await donations.increment_stat(
@@ -678,7 +678,7 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                await new_player._sync_cache()                
+                await new_player._sync_cache()
                 
                 wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
                 #wait = getattr(new_player,'_response_retry',default_sleep)

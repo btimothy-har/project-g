@@ -176,7 +176,7 @@ class BasicPlayer(AwaitLoader):
                 {'$set':{'first_seen':getattr(await player.first_seen,'int_timestamp',pendulum.now().int_timestamp)}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}.")
+            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}. Is new: {player.is_new}")
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
