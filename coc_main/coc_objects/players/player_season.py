@@ -68,43 +68,50 @@ class aPlayerSeason(AwaitLoader):
     
     @async_cached_property
     async def name(self) -> str:
-        return getattr(await self._database,'name','')
+        db = await self._database
+        return db.get('name','') if db else ''
     
-    @async_property
-    async def clean_name(self) -> str:
-        if check_rtl(await self.name):
-            return '\u200F' + await self.name + '\u200E'
-        return await self.name    
+    @property
+    def clean_name(self) -> str:
+        if check_rtl(self.name):
+            return '\u200F' + self.name + '\u200E'
+        return self.name    
     
     @async_cached_property
     async def town_hall(self) -> int:
-        return getattr(await self._database,'town_hall',0)
+        db = await self._database
+        return db.get('town_hall',0) if db else 0
     
     @async_cached_property
     async def is_member(self) -> bool:
-        return getattr(await self._database,'is_member',False)
+        db = await self._database
+        return db.get('is_member',False) if db else False
     
     @async_cached_property
     async def home_clan_tag(self) -> Optional[str]:
-        return getattr(await self._database,'home_clan',None)
+        db = await self._database
+        return db.get('home_clan',None) if db else None
     
     @async_property
     async def home_clan(self) -> Optional[aPlayerClan]:
         if await self.home_clan_tag:
-            return await aPlayerClan(tag=await self.home_clan_tag)
+            return await aPlayerClan(tag=self.home_clan_tag)
         return None
     
     @async_cached_property
     async def other_clan_tags(self) -> List[str]:
-        return getattr(await self._database,'other_clans',[])
+        db = await self._database
+        return db.get('other_clans',[]) if db else []
     
     @async_cached_property
     async def time_in_home_clan(self) -> int:
-        return getattr(await self._database,'time_in_home_clan',0)
+        db = await self._database
+        return db.get('time_in_home_clan',0) if db else 0
     
     @async_cached_property
     async def _last_seen(self) -> List[int]:
-        return sorted(getattr(await self._database,'last_seen',[]))
+        db = await self._database
+        return db.get('last_seen',[]) if db else []
         
     @async_property
     async def last_seen(self) -> List[pendulum.DateTime]:
@@ -112,29 +119,32 @@ class aPlayerSeason(AwaitLoader):
     
     @async_cached_property
     async def attacks(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='attack_wins',
-            dict_value=getattr(await self._database,'attacks',{})
+            dict_value=db.get('attacks',{}) if db else {}
             )
 
     @async_cached_property
     async def defenses(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='defense_wins',
-            dict_value=getattr(await self._database,'defenses',{})
+            dict_value=db.get('defenses',{}) if db else {}
             )
     
     @async_cached_property
     async def donations_sent(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='donations_sent',
-            dict_value=getattr(await self._database,'donations_sent',{})
+            dict_value=db.get('donations_sent',{}) if db else {}
             )    
     @property
     def donations(self) -> aPlayerStat:
@@ -144,11 +154,12 @@ class aPlayerSeason(AwaitLoader):
 
     @async_cached_property
     async def donations_rcvd(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='donations_rcvd',
-            dict_value=getattr(await self._database,'donations_rcvd',{})
+            dict_value=db.get('donations_rcvd',{}) if db else {}
             )
     @property
     def received(self) -> aPlayerStat:
@@ -158,46 +169,51 @@ class aPlayerSeason(AwaitLoader):
 
     @async_cached_property
     async def loot_gold(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_gold',
-            dict_value=getattr(await self._database,'loot_gold',{})
+            dict_value=db.get('loot_gold',{}) if db else {}
             )
 
     @async_cached_property
     async def loot_elixir(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_elixir',
-            dict_value=getattr(await self._database,'loot_elixir',{})
+            dict_value=db.get('loot_elixir',{}) if db else {}
             )
     
     @async_cached_property
     async def loot_darkelixir(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_darkelixir',
-            dict_value=getattr(await self._database,'loot_darkelixir',{})
+            dict_value=db.get('loot_darkelixir',{}) if db else {}
             )
     
     @async_cached_property
     async def capitalcontribution(self) -> aPlayerStat:
+        db = await self._database
         return aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='capitalcontribution',
-            dict_value=getattr(await self._database,'capitalcontribution',{})
+            dict_value=db.get('capitalcontribution',{}) if db else {}
             )
     
     @async_cached_property
     async def clangames(self) -> aPlayerClanGames:
+        db = await self._database
         return aPlayerClanGames(
             tag=self.tag,
             season=self.season,
-            dict_value=getattr(await self._database,'clangames',{})
+            dict_value=db.get('clangames',{}) if db else {}
             )
 
     async def update_name(self,new_name:str):
@@ -229,7 +245,7 @@ class aPlayerSeason(AwaitLoader):
             await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_home_clan(self,new_tag:Optional[str]=None):
-        def _update_in_db(home_clan):
+        def _update_in_db():
             db_PlayerStats.objects(
                 stats_id=self._db_id
                 ).update_one(
@@ -244,7 +260,7 @@ class aPlayerSeason(AwaitLoader):
             else:
                 tag = self.home_clan_tag = None
             home_clan = await self.home_clan
-            await bot_client.run_in_write_thread(_update_in_db,home_clan)
+            await bot_client.run_in_write_thread(_update_in_db)
     
     async def update_member(self,is_member:bool=False):
         def _update_in_db():

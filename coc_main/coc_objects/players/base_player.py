@@ -317,7 +317,7 @@ class _PlayerAttributes():
         self._cache_loaded = True
     
     @async_property
-    async def _database(self) -> Optional[db_Player]:
+    async def _database(self) -> Optional[dict]:
         def _get_from_db() -> db_Player:
             try:
                 return db_Player.objects.get(tag=self.tag)
@@ -330,36 +330,32 @@ class _PlayerAttributes():
 
     @async_cached_property
     async def name(self) -> str:
-        return getattr(await self._database,'name',"")
+        db = await self._database
+        return db.get('name','') if db else ""
+        #return getattr(await self._database,'name',"")
     
     @async_cached_property
     async def exp_level(self) -> int:
-        return getattr(await self._database,'xp_level',0)
+        db = await self._database
+        return db.get('xp_level','') if db else 0
+        #return getattr(await self._database,'xp_level',0)
   
     @async_cached_property
     async def town_hall_level(self) -> int:
-        return getattr(await self._database,'townhall',0)
+        db = await self._database
+        return db.get('townhall','') if db else 0
+        #return getattr(await self._database,'townhall',0)
     
     @async_cached_property
     async def discord_user(self) -> int:
-        return getattr(await self._database,'discord_user',0)
-    
-    @async_cached_property
-    async def is_member(self) -> bool:
-        val = getattr(await self._database,'is_member',False)
-        if val and not getattr(await self.home_clan,'is_alliance_clan',False):
-            player = BasicPlayer(tag=self.tag)
-            await player.remove_member()
-            bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
-            return False
-        return val
-    
+        db = await self._database
+        return db.get('discord_user','') if db else 0
+        #return getattr(await self._database,'discord_user',0)
+
     @async_cached_property
     async def home_clan_tag(self) -> Optional[str]:
-        tag = getattr(await self._database,'home_clan',None)
-        if tag:
-            return tag
-        return None
+        db = await self._database
+        return db.get('home_clan',None) if db else None
     
     @async_property
     async def home_clan(self) -> Optional[aPlayerClan]:
@@ -368,22 +364,36 @@ class _PlayerAttributes():
         return None
     
     @async_cached_property
+    async def is_member(self) -> bool:
+        db = await self._database
+        is_member = db.get('is_member',False) if db else False
+        if is_member and not getattr(await self.home_clan,'is_alliance_clan',False):
+            player = BasicPlayer(tag=self.tag)
+            await player.remove_member()
+            bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
+            return False
+        return is_member
+    
+    @async_cached_property
     async def first_seen(self) -> Optional[pendulum.DateTime]:
-        fs = getattr(await self._database,'first_seen',0)
+        db = await self._database
+        fs = db.get('first_seen',0) if db else 0
         if fs > 0:
             return pendulum.from_timestamp(fs)
         return None
     
     @async_cached_property
     async def last_joined(self) -> Optional[pendulum.DateTime]:
-        lj = getattr(await self._database,'last_joined',0)
+        db = await self._database
+        lj = db.get('last_joined',0) if db else 0
         if lj > 0:
             return pendulum.from_timestamp(lj)
         return None
 
     @async_cached_property
     async def last_removed(self) -> Optional[pendulum.DateTime]:
-        lr = getattr(await self._database,'last_removed',0)
+        db = await self._database
+        lr = db.get('last_removed',0) if db else 0
         if lr > 0:
             return pendulum.from_timestamp(lr)
         return None

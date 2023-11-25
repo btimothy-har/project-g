@@ -572,23 +572,28 @@ class _ClanAttributes():
     ##################################################
     @async_cached_property
     async def name(self) -> str:
-        return getattr(await self._database,'name','')
+        db = await self._database
+        return db.get('name','') if db else ''
     
     @async_cached_property
     async def badge(self) -> str:
-        return getattr(await self._database,'badge','')
+        db = await self._database
+        return db.get('badge','') if db else ''
     
     @async_cached_property
     async def level(self) -> int:
-        return getattr(await self._database,'level',0)    
+        db = await self._database
+        return db.get('level',0) if db else 0
     
     @async_cached_property
     async def capital_hall(self) -> int:
-        return getattr(await self._database,'capital_hall',0)
+        db = await self._database
+        return db.get('capital_hall',0) if db else 0
     
     @async_cached_property
     async def war_league_name(self) -> str:
-        return getattr(await self._database,'war_league','')
+        db = await self._database
+        return db.get('war_league','') if db else ''
     
     ##################################################
     #####
@@ -597,15 +602,18 @@ class _ClanAttributes():
     ##################################################
     @async_cached_property
     async def abbreviation(self) -> str:
-        return getattr(await self._database,'abbreviation','')
+        db = await self._database
+        return db.get('abbreviation','') if db else ''
 
     @async_cached_property
     async def emoji(self) -> str:
-        return getattr(await self._database,'emoji','')
+        db = await self._database
+        return db.get('emoji','') if db else ''
     
     @async_cached_property
     async def unicode_emoji(self) -> str:
-        return getattr(await self._database,'unicode_emoji','')
+        db = await self._database
+        return db.get('unicode_emoji','') if db else ''
     
     ##################################################
     #####
@@ -621,37 +629,43 @@ class _ClanAttributes():
     
     @async_cached_property
     async def recruitment_level(self) -> List[int]:
-        i = getattr(await self._db_alliance,'recruitment_level',[])
+        db = await self._db_alliance
+        i = db.get('recruitment_level',[]) if db else []
         return sorted(i)
 
     @async_cached_property
     async def recruitment_info(self) -> str:
-        return getattr(await self._db_alliance,'recruitment_info','')
+        db = await self._db_alliance
+        return db.get('recruitment_info','') if db else ''
     
     @async_cached_property
     async def description(self) -> str:
-        return getattr(await self._db_alliance,'description','')
+        db = await self._db_alliance
+        return db.get('description','') if db else ''
     
     @async_cached_property
     async def leader(self) -> int:
-        return getattr(await self._db_alliance,'leader',0)
+        db = await self._db_alliance
+        return db.get('leader',0) if db else 0
     
     @async_cached_property
     async def coleaders(self) -> List[int]:
-        i = getattr(await self._db_alliance,'coleaders',[])
+        db = await self._db_alliance
+        i = db.get('coleaders',[]) if db else []
         return list(set(i))
     
     @async_cached_property
     async def elders(self) -> List[int]:
-        i = getattr(await self._db_alliance,'elders',[])
+        db = await self._db_alliance
+        i = db.get('elders',[]) if db else []
         return list(set(i))
 
     @async_cached_property
     async def alliance_members(self) -> List[str]:
         def _get_from_db():
             return [p.tag for p in db_Player.objects(is_member=True,home_clan=self.tag)]
-        tags = await bot_client.run_in_read_thread(_get_from_db)
-        return list(set(tags))
+        players = await bot_client.coc_db.db__clan.find({'is_member':True,'home_clan':self.tag},{'_id':1})
+        return [p['_id'] for p in players]
     
     ##################################################
     #####
@@ -660,16 +674,19 @@ class _ClanAttributes():
     ##################################################
     @async_cached_property
     async def is_active_league_clan(self) -> bool:
-        return getattr(await self._league_clan,'is_active',False)
+        db = await self._league_clan
+        return db.get('is_active',False) if db else False
     
     @async_cached_property
     async def league_clan_channel_id(self) -> int:
         if not await self.is_active_league_clan:
             return 0
-        return getattr(await self._league_clan,'channel',0)    
+        db = await self._league_clan
+        return db.get('channel',0) if db else 0
     
     @async_cached_property
     async def league_clan_role_id(self) -> int:
         if not await self.is_active_league_clan:
             return 0
-        return getattr(await self._league_clan,'role',0)
+        db = await self._league_clan
+        return db.get('role',0) if db else 0
