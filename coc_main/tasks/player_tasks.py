@@ -588,7 +588,7 @@ class PlayerLoop(TaskLoop):
                 await self._run_single_loop('#LJC8V0GCJ')            
                 async for tag in a_iter:
                     task = asyncio.create_task(self._run_single_loop(tag))
-                    tasks.append(task)
+                    #tasks.append(task)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -600,8 +600,8 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
 
-                wrap_task = asyncio.create_task(gather(*tasks))
-                await self._queue.put(wrap_task)
+                # wrap_task = asyncio.create_task(gather(*tasks))
+                # await self._queue.put(wrap_task)
                 self._status = "Not Running"
                 await asyncio.sleep(10)
                 continue
