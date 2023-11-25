@@ -73,7 +73,6 @@ class aPlayerStat():
                 self.season_only_clan += increment
             
             self._prior_seen = True
-
             await db_update(self._db_id,self.json)
         
         #bot_client.coc_data_log.debug(f"{self.season.short_description} {self.tag}: Incremented {self.description} by {increment} to {self.season_total}")
