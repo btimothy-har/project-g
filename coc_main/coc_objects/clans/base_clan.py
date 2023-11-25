@@ -664,7 +664,7 @@ class _ClanAttributes():
     async def alliance_members(self) -> List[str]:
         def _get_from_db():
             return [p.tag for p in db_Player.objects(is_member=True,home_clan=self.tag)]
-        query = await bot_client.coc_db.db__clan.find({'is_member':True,'home_clan':self.tag},{'_id':1})
+        query = bot_client.coc_db.db__clan.find({'is_member':True,'home_clan':self.tag},{'_id':1})
         return [p['_id'] async for p in query]
     
     ##################################################
