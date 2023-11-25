@@ -45,11 +45,6 @@ class BasicPlayer(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
-        # if not self._attributes._cache_loaded:
-        #     def schedule_coroutine():
-        #         asyncio.create_task(self.load())
-        #     loop = asyncio.get_running_loop()       
-        #     loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Player {self.tag}"
@@ -158,13 +153,6 @@ class BasicPlayer(AwaitLoader):
     ##################################################
     @classmethod
     async def player_first_seen(cls,tag:str):
-        # def _update_in_db():
-        #     db_Player.objects(tag=player.tag).update_one(
-        #         set__first_seen=first_seen.int_timestamp,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{player}: first_seen changed to {first_seen}.")
-        
         player = cls(tag=coc.utils.correct_tag(tag))
 
         async with player._attributes._lock:
@@ -180,13 +168,6 @@ class BasicPlayer(AwaitLoader):
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
-        # def _update_in_db():
-        #     db_Player.objects(tag=player.tag).update_one(
-        #         set__discord_user=user,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.info(f"{player}: discord_user changed to {user}.")
-
         player = cls(tag=coc.utils.correct_tag(tag))
         async with player._attributes._lock:
             player.discord_user = player._attributes.discord_user = discord_user
@@ -199,19 +180,6 @@ class BasicPlayer(AwaitLoader):
             bot_client.coc_data_log.info(f"{player}: discord_user changed to {player.discord_user}.")            
 
     async def new_member(self,user_id:int,home_clan:BasicClan):
-        # def _update_in_db():
-        #     db_Player.objects(tag=self.tag).update_one(
-        #         set__is_member=is_member,
-        #         set__home_clan=getattr(clan,'tag',None),
-        #         set__last_joined=last_joined.int_timestamp,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.info(
-        #         f"Player {self} is now an Alliance member!"
-        #             + f"\n\tHome Clan: {clan.tag} {clan.name}"
-        #             + f"\n\tLast Joined: {last_joined}"
-        #             )
-
         await BasicPlayer.set_discord_link(self.tag,user_id)
         async with self._attributes._lock:
             if not self.is_member or not self.last_joined:
@@ -241,18 +209,6 @@ class BasicPlayer(AwaitLoader):
                     )
             
     async def remove_member(self):
-        # def _update_in_db():
-        #     db_Player.objects(tag=self.tag).update_one(
-        #         set__is_member=is_member,
-        #         set__home_clan=None,
-        #         set__last_removed=last_removed.int_timestamp,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.info(
-        #         f"Player {self} has been removed as a member."
-        #             + f"\n\tLast Removed: {last_removed}"
-        #             )
-            
         if await self.home_clan:
             await self.home_clan.remove_member(self.tag)
 
@@ -282,13 +238,6 @@ class BasicPlayer(AwaitLoader):
     #####
     ##################################################    
     async def set_name(self,new_name:str):
-        # def _update_in_db():
-        #     db_Player.objects(tag=self.tag).update_one(
-        #         set__name=name,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: name changed to {name}.")
-
         async with self._attributes._lock:
             self.name = self._attributes.name = new_name
             await bot_client.coc_db.db__player.update_one(
@@ -298,14 +247,7 @@ class BasicPlayer(AwaitLoader):
                 )
             bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
     
-    async def set_exp_level(self,new_value:int):
-        # def _update_in_db():
-        #     db_Player.objects(tag=self.tag).update_one(
-        #         set__xp_level=exp_level,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: exp_level changed to {exp_level}.")
-        
+    async def set_exp_level(self,new_value:int):        
         async with self._attributes._lock:
             self.exp_level = self._attributes.exp_level = new_value
             await bot_client.coc_db.db__player.update_one(
@@ -315,14 +257,7 @@ class BasicPlayer(AwaitLoader):
                 )
             bot_client.coc_data_log.debug(f"{self}: exp_level changed to {self.exp_level}.")
         
-    async def set_town_hall_level(self,new_value:int):
-        # def _update_in_db():
-        #     db_Player.objects(tag=self.tag).update_one(
-        #         set__townhall=townhall,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: town_hall_level changed to {townhall}.")
-        
+    async def set_town_hall_level(self,new_value:int):        
         async with self._attributes._lock:
             self.town_hall_level = self._attributes.town_hall_level = new_value
             await bot_client.coc_db.db__player.update_one(
@@ -360,26 +295,8 @@ class _PlayerAttributes():
         
         self._is_new = False
     
-    async def load(self):
-        await self.name
-        await self.exp_level
-        await self.town_hall_level
-        await self.discord_user
-        await self.is_member
-        await self.home_clan
-        await self.first_seen
-        await self.last_joined
-        await self.last_removed
-        await self.is_new
-        self._cache_loaded = True
-    
     @async_property
     async def _database(self) -> Optional[dict]:
-        # def _get_from_db() -> db_Player:
-        #     try:
-        #         return db_Player.objects.get(tag=self.tag)
-        #     except DoesNotExist:
-        #         return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
             self._cached_db = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
