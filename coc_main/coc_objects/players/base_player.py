@@ -23,15 +23,11 @@ bot_client = client()
 class BasicPlayer(AwaitLoader):
 
     @classmethod
-    async def load_all(cls) -> List['BasicPlayer']:
-        def _get_from_db():
-            return [db.tag for db in db_Player.objects.only('tag')]
-        
-        player_tags = await bot_client.run_in_read_thread(_get_from_db)
-        a_iter = AsyncIter(player_tags[:500000])
-        async for tag in a_iter:
-            await bot_client.player_queue.put(tag)
-            await asyncio.sleep(0.1)
+    async def load_all(cls) -> List['BasicPlayer']:        
+        query = bot_client.coc_db.db__player.find({},{'_id':1})        
+        async for p in query:
+            player = await cls(tag=p['_id'])
+            await bot_client.player_queue.put(player.tag)
     
     @classmethod
     def clear_cache(cls):
@@ -199,8 +195,7 @@ class BasicPlayer(AwaitLoader):
                     'last_joined':getattr(await self.last_joined,'int_timestamp',pendulum.now().int_timestamp)
                     }
                 },
-                upsert=True
-                )
+                upsert=True)
             
             bot_client.coc_data_log.info(
                 f"Player {self} is now an Alliance member!"

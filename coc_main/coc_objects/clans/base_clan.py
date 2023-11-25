@@ -25,14 +25,10 @@ class BasicClan(AwaitLoader):
 
     @classmethod
     async def load_all(cls) -> List['BasicClan']:
-        def _get_from_db():
-            return [db.tag for db in db_Clan.objects.only('tag')]
-        
-        clan_tags = await bot_client.run_in_read_thread(_get_from_db)        
-        a_iter = AsyncIter(clan_tags[:10000])
-        async for tag in a_iter:
-            await bot_client.clan_queue.put(tag)
-            await asyncio.sleep(0.1)
+        query = bot_client.coc_db.db__clan.find({},{'_id':1})
+        async for c in query:
+            clan = await cls(c['_id'])
+            await bot_client.clan_queue.put(clan.tag)
     
     @classmethod
     def clear_cache(cls):
@@ -46,11 +42,6 @@ class BasicClan(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _ClanAttributes(self.tag)
-        # if not self._attributes._cache_loaded:
-        #     def schedule_coroutine():
-        #         asyncio.create_task(self.load())
-        #     loop = asyncio.get_running_loop()       
-        #     loop.call_soon_threadsafe(schedule_coroutine)
 
     def __str__(self):
         return f"Clan {self.tag}"
@@ -193,7 +184,7 @@ class BasicClan(AwaitLoader):
         return None
     
     @async_property
-    async def league_clan_role_id(self) -> Optional[discord.Role]:
+    async def league_clan_role(self) -> Optional[discord.Role]:
         if not await self.is_active_league_clan:
             return None
         role_id = await self._attributes.league_clan_role_id
@@ -210,8 +201,10 @@ class BasicClan(AwaitLoader):
     ##################################################
     async def new_member(self,player_tag:str):
         async with self._attributes._lock:
-            if player_tag not in self.alliance_members:
-                self._attributes.alliance_members.append(player_tag)
+            members = await self.alliance_members
+            if player_tag not in members:
+                members.append(player_tag)
+                self.alliance_members = self._attributes.alliance_members = members
     
     async def remove_member(self,player_tag:str):
         async with self._attributes._lock:
@@ -219,186 +212,192 @@ class BasicClan(AwaitLoader):
                 self._attributes.alliance_members.remove(player_tag)
 
     async def register(self,abbreviation:str,emoji:str,unicode_emoji:str):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__abbreviation=self.abbreviation,
-                upsert=True
-                )
-            db_Clan.objects(tag=self.tag).update_one(
-                set__emoji=self.emoji,
-                upsert=True
-                )
-            db_Clan.objects(tag=self.tag).update_one(
-                set__unicode_emoji=self.unicode_emoji,
-                upsert=True
-                )
+        async with self._attributes._lock:    
+            self.abbreviation = self._attributes.abbreviation = abbreviation.upper()
+            self.emoji = self._attributes.emoji = emoji
+            self.unicode_emoji = self._attributes.unicode_emoji = unicode_emoji
 
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'abbreviation':await self.abbreviation,
+                    'emoji':await self.emoji,
+                    'unicode_emoji':await self.unicode_emoji
+                    }
+                },
+                upsert=True)
+            
             bot_client.coc_data_log.info(
                 f"{self}: Clan Registered!"
-                + f"\n\tAbbreviation: {self.abbreviation}"
-                + f"\n\tEmoji: {self.emoji}"
-                + f"\n\tUnicode Emoji: {self.unicode_emoji}"
+                + f"\n\tAbbreviation: {await self.abbreviation}"
+                + f"\n\tEmoji: {await self.emoji}"
+                + f"\n\tUnicode Emoji: {await self.unicode_emoji}"
                 )
-        
-        async with self._attributes._lock:    
-            self._attributes.abbreviation = abbreviation.upper()
-            self._attributes.emoji = emoji
-            self._attributes.unicode_emoji = unicode_emoji
-            await bot_client.run_in_write_thread(_update_in_db)
     
-    async def add_to_war_league(self,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):
-        def _update_in_db():
-            db_WarLeagueClanSetup.objects(tag=self.tag).update_one(
-                set__channel=getattr(self.league_clan_channel,'id',0),
-                upsert=True
-                )
-            db_WarLeagueClanSetup.objects(tag=self.tag).update_one(
-                set__role=getattr(self.league_clan_role,'id',0),
-                upsert=True
-                )
-            db_WarLeagueClanSetup.objects(tag=self.tag).update_one(
-                set__is_active=self.is_active_league_clan,
-                upsert=True
-                )
-            
-            ch_guild = self.league_clan_channel.guild if self.league_clan_channel else None
-            rl_guild = self.league_clan_role.guild if self.league_clan_role else None
-
-            bot_client.coc_data_log.info(
-                f"{self}: Registered as CWL Clan."
-                + f"\n\tChannel: {getattr(ch_guild,'name',None)} {getattr(self.league_clan_channel,'name',None)} ({self._attributes.league_clan_channel_id})"
-                + f"\n\tRole: {getattr(rl_guild,'name',None)} {getattr(self.league_clan_role,'name',None)} ({self._attributes.league_clan_role_id})"
-                )
-        
+    async def add_to_war_league(self,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):        
         async with self._attributes._lock:
             self._attributes.league_clan_channel_id = channel.id
             self._attributes.league_clan_role_id = role.id
-            self._attributes.is_active_league_clan = True
-            await bot_client.run_in_write_thread(_update_in_db)
-    
-    async def remove_from_war_league(self):
-        def _update_in_db():
-            db_WarLeagueClanSetup.objects(tag=self.tag).update_one(
-                set__is_active=self.is_active_league_clan,
-                upsert=True
+            self.is_active_league_clan = self._attributes.is_active_league_clan = True
+
+            await bot_client.coc_db.db__war_league_clan_setup.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'channel':getattr(await self.league_clan_channel,'id',None),
+                    'role':getattr(await self.league_clan_role,'id',None),
+                    'is_active':await self.is_active_league_clan
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(
+                f"{self}: Registered as CWL Clan."
+                + f"\n\tChannel: {getattr(await self.league_clan_channel,'id',None)}"
+                + f"\n\tRole: {getattr(await self.league_clan_role,'id',None)}"
                 )
-            bot_client.coc_data_log.info(f"{self}: Removed as CWL Clan.")
-        
+    
+    async def remove_from_war_league(self):        
         async with self._attributes._lock:
             self._attributes.league_clan_channel_id = 0
             self._attributes.league_clan_role_id = 0
-            self._attributes.is_active_league_clan = False
-            await bot_client.run_in_write_thread(_update_in_db)
+            self.is_active_league_clan = self._attributes.is_active_league_clan = False
+
+            await bot_client.coc_db.db__war_league_clan_setup.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'is_active':await self.is_active_league_clan
+                    }
+                },
+                upsert=True)
 
     async def new_leader(self,new_leader:int):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__leader=self.leader,
-                set__coleaders=self.coleaders,
-                set__elders=self.elders,
-                upsert=True
-                )
-            bot_client.coc_data_log.info(f"{self}: leader is now {new_leader}.")
-
-        if new_leader == self.leader:
+        leader = await self.leader
+        if new_leader == leader:
             return
         
         async with self._attributes._lock:
+            coleaders = await self.coleaders
+            elders = await self.elders
+            
             #demote current Leader to Co-Leader
-            if self.leader not in self.coleaders:
-                self._attributes.coleaders.append(self.leader)
+            if leader not in coleaders:
+                coleaders.append(leader)
+                self.coleaders = self._attributes.coleaders = coleaders
 
-            self._attributes.leader = new_leader
+            self.leader = self._attributes.leader = new_leader
 
-            if new_leader in self.coleaders:
-                self._attributes.coleaders.remove(new_leader)
+            if new_leader in coleaders:
+                coleaders.remove(new_leader)
+                self.coleaders = self._attributes.coleaders = coleaders
 
-            if new_leader in self.elders:
-                self._attributes.elders.remove(new_leader)
-
-            await bot_client.run_in_write_thread(_update_in_db)
+            if new_leader in elders:
+                elders.remove(new_leader)
+                self.elders = self._attributes.elders = elders
+            
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'leader':await self.leader,
+                    'coleaders':await self.coleaders,
+                    'elders':await self.elders
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: leader is now {new_leader}.")
     
     async def new_coleader(self,new_coleader:int):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__coleaders=self.coleaders,
-                set__elders=self.elders,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: new coleader {new_coleader} added.")
-
-        if new_coleader == self.leader:
+        leader = await self.leader
+        if new_coleader == leader:
             return
-        
+               
         async with self._attributes._lock:
-            if new_coleader not in self.coleaders:
-                self._attributes.coleaders.append(new_coleader)
-            
-            if new_coleader in self.elders:
-                self._attributes.elders.remove(new_coleader)
+            coleaders = await self.coleaders 
+            elders = await self.elders
 
-            await bot_client.run_in_write_thread(_update_in_db)
+            if new_coleader not in coleaders:
+                coleaders.append(new_coleader)
+                self.coleaders = self._attributes.coleaders = coleaders
+            
+            if new_coleader in elders:
+                elders.remove(new_coleader)
+                self.elders = self._attributes.elders = elders
+
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'coleaders':await self.coleaders,
+                    'elders':await self.elders
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: new coleader {new_coleader} added.")
     
     async def remove_coleader(self,coleader:int):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__coleaders=self.coleaders,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: coleader {coleader} removed.")
-
         async with self._attributes._lock:
-            if coleader in self.coleaders:
-                self._attributes.coleaders.remove(coleader)
-                await bot_client.run_in_write_thread(_update_in_db)
+            coleaders = await self.coleaders
+
+            if coleader in coleaders:
+                coleaders.remove(coleader)
+                self.coleaders = self._attributes.coleaders = coleaders
+            
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'coleaders':await self.coleaders
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: coleader {coleader} removed.")                
     
     async def new_elder(self,new_elder:int):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__coleaders=self.coleaders,
-                set__elders=self.elders,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: new elder {new_elder} added.")
-
-        if new_elder == self.leader:
+        leader = await self.leader
+        if new_elder == leader:
             return
         
         async with self._attributes._lock:
-            if new_elder not in self.elders:
-                self._attributes.elders.append(new_elder)
+            coleaders = await self.coleaders
+            elders = await self.elders
 
-            if new_elder in self.coleaders:
-                self._attributes.coleaders.remove(new_elder)
+            if new_elder not in elders:
+                elders.append(new_elder)
+                self.elders = self._attributes.elders = elders
+
+            if new_elder in coleaders:
+                coleaders.remove(new_elder)
+                self.coleaders = self._attributes.coleaders = coleaders
             
-            await bot_client.run_in_write_thread(_update_in_db)
-
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'coleaders':await self.coleaders,
+                    'elders':await self.coleaders
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: new elder {new_elder} added.")
+            
     async def remove_elder(self,elder:int):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__elders=self.elders,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: elder {elder} removed.")
-
         async with self._attributes._lock:
-            if elder in self.elders:
-                self._attributes.elders.remove(elder)
-                await bot_client.run_in_write_thread(_update_in_db)
+            elders = await self.elders
+
+            if elder in elders:
+                elders.remove(elder)
+                self.elders = self._attributes.elders = elders
+            
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'elders':await self.coleaders
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: elder {elder} removed.")
         
     ##################################################
     #####
     ##### DATABASE INTERACTIONS
     #####
     ##################################################
-    async def set_name(self,new_name:str):
-        # def _update_in_db():
-        #     db_Clan.objects(tag=self.tag).update_one(
-        #         set__name=self.name,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
-        
+    async def set_name(self,new_name:str):        
         async with self._attributes._lock:
             self.name = self._attributes.name = new_name
             await bot_client.coc_db.db__clan.update_one(
@@ -406,16 +405,9 @@ class BasicClan(AwaitLoader):
                 {'$set':{'name':await self.name}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
+            bot_client.coc_data_log.debug(f"{self}: name changed to {await self.name}.")
 
-    async def set_badge(self,new_badge:str):
-        # def _update_in_db():
-        #     db_Clan.objects(tag=self.tag).update_one(
-        #         set__badge=self.badge,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: badge changed to {self.badge}.")
-        
+    async def set_badge(self,new_badge:str):        
         async with self._attributes._lock:
             self.badge = self._attributes.badge = new_badge
             await bot_client.coc_db.db__clan.update_one(
@@ -423,16 +415,9 @@ class BasicClan(AwaitLoader):
                 {'$set':{'badge':await self.badge}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: badge changed to {self.badge}.")
+            bot_client.coc_data_log.debug(f"{self}: badge changed to {await self.badge}.")
     
-    async def set_level(self,new_level:int):
-        # def _update_in_db():
-        #     db_Clan.objects(tag=self.tag).update_one(
-        #         set__level=self.level,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: level changed to {self.level}.")
-        
+    async def set_level(self,new_level:int):        
         async with self._attributes._lock:
             self.level = self._attributes.level = new_level
             await bot_client.coc_db.db__clan.update_one(
@@ -440,16 +425,9 @@ class BasicClan(AwaitLoader):
                 {'$set':{'level':await self.level}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: level changed to {self.level}.")
+            bot_client.coc_data_log.debug(f"{self}: level changed to {await self.level}.")
     
-    async def set_capital_hall(self,new_capital_hall:int):
-        # def _update_in_db():
-        #     db_Clan.objects(tag=self.tag).update_one(
-        #         set__capital_hall=self.capital_hall,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {self.capital_hall}.")
-        
+    async def set_capital_hall(self,new_capital_hall:int):        
         async with self._attributes._lock:
             self.capital_hall = self._attributes.capital_hall = new_capital_hall
             await bot_client.coc_db.db__clan.update_one(
@@ -457,16 +435,9 @@ class BasicClan(AwaitLoader):
                 {'$set':{'capital_hall':await self.capital_hall}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {self.capital_hall}.")
+            bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {await self.capital_hall}.")
     
     async def set_war_league(self,new_war_league:str):
-        # def _update_in_db():
-        #     db_Clan.objects(tag=self.tag).update_one(
-        #         set__war_league=self.war_league_name,
-        #         upsert=True
-        #         )
-        #     bot_client.coc_data_log.debug(f"{self}: war_league changed to {self.war_league_name}.")
-        
         async with self._attributes._lock:
             self.war_league = self._attributes.war_league_name = new_war_league
             await bot_client.coc_db.db__clan.update_one(
@@ -474,52 +445,43 @@ class BasicClan(AwaitLoader):
                 {'$set':{'war_league':await self.war_league}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: war_league changed to {self.war_league_name}.")
+            bot_client.coc_data_log.debug(f"{self}: war_league changed to {await self.war_league_name}.")
         
     async def set_description(self,description:str):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__description=self.description,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: description changed to {self.description}.")
-        
         async with self._attributes._lock:
-            self._attributes.description = description
-            await bot_client.run_in_write_thread(_update_in_db)
+            self.description = self._attributes.description = description
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'description':await self.description
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: description changed to {await self.description}.")
     
     async def set_recruitment_level(self,recruitment_levels:list[int]):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__recruitment_level=self.recruitment_level,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: recruitment_level changed to {sorted(self.recruitment_level)}.")
-
         async with self._attributes._lock:
-            self._attributes.recruitment_level = sorted(list(set(recruitment_levels)))
-            await bot_client.run_in_write_thread(_update_in_db)
+            self.recruitment_level = self._attributes.recruitment_level = sorted(list(set(recruitment_levels)))
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'recruitment_level':await self.recruitment_level
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: recruitment_level changed to {sorted(await self.recruitment_level)}.")
     
-    async def set_recruitment_info(self,new_recruitment_info:str):
-        def _update_in_db():
-            db_AllianceClan.objects(tag=self.tag).update_one(
-                set__recruitment_info=self.recruitment_info,
-                upsert=False
-                )
-            bot_client.coc_data_log.info(f"{self}: recruitment info changed to {self.recruitment_info}.")
-        
+    async def set_recruitment_info(self,new_recruitment_info:str):        
         async with self._attributes._lock:
-            self._attributes.recruitment_info = new_recruitment_info
-            await bot_client.run_in_write_thread(_update_in_db)
-    
-    ##################################################
-    #####
-    ##### DISCORD FEEDS
-    #####
-    ##################################################
-    @property
-    def linked_servers(self) -> List[discord.Guild]:
-        return [bot_client.bot.get_guild(db.guild_id) for db in db_ClanGuildLink.objects(tag=self.tag)]
+            self.recruitment_info = self._attributes.recruitment_info = new_recruitment_info
+            await bot_client.coc_db.db__alliance_clan.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'recruitment_info':await self.recruitment_info
+                    }
+                },
+                upsert=True)
+            bot_client.coc_data_log.info(f"{self}: recruitment info changed to {await self.recruitment_info}.")
 
 class _ClanAttributes():
     """
@@ -558,11 +520,6 @@ class _ClanAttributes():
     async def _database(self) -> Optional[dict]:
         if not self.tag:
             return None
-        def _get_from_db():
-            try:
-                return db_Clan.objects.get(tag=self.tag)
-            except DoesNotExist:
-                return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
             self._cached_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
@@ -572,23 +529,13 @@ class _ClanAttributes():
     async def _db_alliance(self) -> Optional[dict]:
         if not self.tag:
             return None
-        def _get_from_db():
-            try:
-                return db_AllianceClan.objects.get(tag=self.tag)
-            except DoesNotExist:
-                return None
-        return await bot_client.coc_db.db__allianceclan.find_one({'_id':self.tag})
+        return await bot_client.coc_db.db__alliance_clan.find_one({'_id':self.tag})
     
     @async_property
     async def _league_clan(self) -> Optional[dict]:
         if not self.tag:
             return None
-        def _get_from_db():
-            try:
-                return db_WarLeagueClanSetup.objects.get(tag=self.tag)
-            except DoesNotExist:
-                return None
-        return await bot_client.coc_db.db__warleagueclansetup.find_one({'_id':self.tag})
+        return await bot_client.coc_db.db__war_league_clan_setup.find_one({'_id':self.tag})
     
     ##################################################
     #####
@@ -687,8 +634,6 @@ class _ClanAttributes():
 
     @async_cached_property
     async def alliance_members(self) -> List[str]:
-        def _get_from_db():
-            return [p.tag for p in db_Player.objects(is_member=True,home_clan=self.tag)]
         query = bot_client.coc_db.db__clan.find({'is_member':True,'home_clan':self.tag},{'_id':1})
         return [p['_id'] async for p in query]
     

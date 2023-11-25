@@ -584,8 +584,7 @@ class PlayerLoop(TaskLoop):
                     f"Started loop for {len(scope_tags)} players."
                     )
                 #sleep = 10 / len(scope_tags)
-                a_iter = AsyncIter(scope_tags)
-                await self._run_single_loop('#LJC8V0GCJ')            
+                a_iter = AsyncIter(scope_tags)            
                 async for tag in a_iter:
                     task = asyncio.create_task(self._run_single_loop(tag))
                     #tasks.append(task)
