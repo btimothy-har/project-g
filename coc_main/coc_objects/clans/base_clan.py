@@ -392,64 +392,89 @@ class BasicClan(AwaitLoader):
     #####
     ##################################################
     async def set_name(self,new_name:str):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__name=self.name,
+        # def _update_in_db():
+        #     db_Clan.objects(tag=self.tag).update_one(
+        #         set__name=self.name,
+        #         upsert=True
+        #         )
+        #     bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
+        
+        async with self._attributes._lock:
+            self.name = self._attributes.name = new_name
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'name':self.name}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
+
+    async def set_badge(self,new_badge:str):
+        # def _update_in_db():
+        #     db_Clan.objects(tag=self.tag).update_one(
+        #         set__badge=self.badge,
+        #         upsert=True
+        #         )
+        #     bot_client.coc_data_log.debug(f"{self}: badge changed to {self.badge}.")
         
         async with self._attributes._lock:
-            self._attributes.name = new_name
-            await bot_client.run_in_write_thread(_update_in_db)
-    
-    async def set_badge(self,new_badge:str):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__badge=self.badge,
+            self.badge = self._attributes.badge = new_badge
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'badge':self.badge}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: badge changed to {self.badge}.")
-        
-        async with self._attributes._lock:
-            self._attributes.badge = new_badge
-            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_level(self,new_level:int):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__level=self.level,
+        # def _update_in_db():
+        #     db_Clan.objects(tag=self.tag).update_one(
+        #         set__level=self.level,
+        #         upsert=True
+        #         )
+        #     bot_client.coc_data_log.debug(f"{self}: level changed to {self.level}.")
+        
+        async with self._attributes._lock:
+            self.level = self._attributes.level = new_level
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'level':self.badge}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: level changed to {self.level}.")
-        
-        async with self._attributes._lock:
-            self._attributes.level = new_level
-            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_capital_hall(self,new_capital_hall:int):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__capital_hall=self.capital_hall,
+        # def _update_in_db():
+        #     db_Clan.objects(tag=self.tag).update_one(
+        #         set__capital_hall=self.capital_hall,
+        #         upsert=True
+        #         )
+        #     bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {self.capital_hall}.")
+        
+        async with self._attributes._lock:
+            self.capital_hall = self._attributes.capital_hall = new_capital_hall
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'capital_hall':self.capital_hall}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: capital_hall changed to {self.capital_hall}.")
-        
-        async with self._attributes._lock:
-            self._attributes.capital_hall = new_capital_hall
-            await bot_client.run_in_write_thread(_update_in_db)
     
     async def set_war_league(self,new_war_league:str):
-        def _update_in_db():
-            db_Clan.objects(tag=self.tag).update_one(
-                set__war_league=self.war_league_name,
+        # def _update_in_db():
+        #     db_Clan.objects(tag=self.tag).update_one(
+        #         set__war_league=self.war_league_name,
+        #         upsert=True
+        #         )
+        #     bot_client.coc_data_log.debug(f"{self}: war_league changed to {self.war_league_name}.")
+        
+        async with self._attributes._lock:
+            self.war_league = self._attributes.war_league_name = new_war_league
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'war_league':self.war_league}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: war_league changed to {self.war_league_name}.")
-        
-        async with self._attributes._lock:
-            self._attributes.war_league_name = new_war_league
-            await bot_client.run_in_write_thread(_update_in_db)
         
     async def set_description(self,description:str):
         def _update_in_db():
