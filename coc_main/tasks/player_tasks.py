@@ -506,13 +506,9 @@ class PlayerLoop(TaskLoop):
     
     def add_to_loop(self,tag:str):
         add, n_tag = super().add_to_loop(tag)
-        if add:
-            bot_client.coc_main_log.debug(f"Added {n_tag} to Player Loop.")
     
     def remove_to_loop(self,tag:str):
         remove, n_tag = super().remove_to_loop(tag)
-        if remove:
-            bot_client.coc_main_log.debug(f"Removed {n_tag} from Player Loop.")
     
     def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
         return 1

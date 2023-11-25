@@ -83,13 +83,9 @@ class ClanLoop(TaskLoop):
     
     def add_to_loop(self,tag:str):
         add, n_tag = super().add_to_loop(tag)
-        if add:
-            bot_client.coc_main_log.debug(f"Added {n_tag} to Clan Loop.")
     
     def remove_to_loop(self,tag:str):
         remove, n_tag = super().remove_to_loop(tag)
-        if remove:
-            bot_client.coc_main_log.debug(f"Removed {n_tag} from Clan Loop.")
     
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
         if not clan:
