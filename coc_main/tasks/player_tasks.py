@@ -505,7 +505,8 @@ class PlayerLoop(TaskLoop):
         await super().stop()        
     
     def add_to_loop(self,tag:str):
-        add, n_tag = super().add_to_loop(tag)
+        if len(self._tags) <= 100000:
+            add, n_tag = super().add_to_loop(tag)
     
     def remove_to_loop(self,tag:str):
         remove, n_tag = super().remove_to_loop(tag)
@@ -578,7 +579,7 @@ class PlayerLoop(TaskLoop):
                 self._status = "Running"
                 tasks = []
                 
-                scope_tags = random.sample(list(tags),min(len(tags),10000))                
+                scope_tags = list(tags)
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
