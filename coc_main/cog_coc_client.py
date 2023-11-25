@@ -108,15 +108,15 @@ class ClashOfClansClient(commands.Cog):
                     f"Loaded {len(raids):,} Capital Raids from database."
                     )
                 
-                players = await player_tasks
-                self.client.coc_main_log.info(
-                    f"Found {len(players):,} Players in database."
-                    )
+                # players = await player_tasks
+                # self.client.coc_main_log.info(
+                #     f"Found {len(players):,} Players in database."
+                #     )
                 
-                clans = await clan_tasks
-                self.client.coc_main_log.info(
-                    f"Found {len(clans):,} Clans in database."
-                    )
+                # clans = await clan_tasks
+                # self.client.coc_main_log.info(
+                #     f"Found {len(clans):,} Clans in database."
+                #     )
                 
             except asyncio.CancelledError:
                 return
@@ -199,7 +199,7 @@ class ClashOfClansClient(commands.Cog):
             await player
             if player.clan:
                 await player.clan
-                
+
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:

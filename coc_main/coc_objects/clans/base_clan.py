@@ -49,6 +49,9 @@ class BasicClan(AwaitLoader):
     
     def __hash__(self):
         return hash(self.tag)
+
+    async def load(self):
+        await bot_client.clan_queue.put(self.tag)
     
     ##################################################
     #####
