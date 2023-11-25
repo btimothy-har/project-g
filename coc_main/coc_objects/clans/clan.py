@@ -108,17 +108,17 @@ class aClan(coc.Clan,BasicClan):
         #if self.is_registered_clan or self.is_active_league_clan:
         asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
 
-        basic_clan = await BasicClan(self.tag)
+        basic_clan = BasicClan(self.tag)
 
-        if basic_clan.name != self.name:
+        if await basic_clan.name != self.name:
             await basic_clan.set_name(self.name)
-        if basic_clan.badge != self.badge:
+        if await basic_clan.badge != self.badge:
             await basic_clan.set_badge(self.badge)
-        if basic_clan.level != self.level:
+        if await basic_clan.level != self.level:
             await basic_clan.set_level(self.level)
-        if basic_clan.capital_hall != self.capital_hall:
+        if await basic_clan.capital_hall != self.capital_hall:
             await basic_clan.set_capital_hall(self.capital_hall)
-        if basic_clan.war_league_name != self.war_league_name:
+        if await basic_clan.war_league_name != self.war_league_name:
             await basic_clan.set_war_league(self.war_league_name)
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:

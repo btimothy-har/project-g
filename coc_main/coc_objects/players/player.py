@@ -368,12 +368,7 @@ class aPlayer(coc.Player,BasicPlayer):
     async def _sync_cache(self):
         
         basic_player = BasicPlayer(self.tag)
-        
 
-        
-        
-        a = pendulum.now()
-        
         if await basic_player.is_new:
             await BasicPlayer.player_first_seen(self.tag)
         
@@ -400,17 +395,9 @@ class aPlayer(coc.Player,BasicPlayer):
 
             if await self.is_member != await current_season.is_member:
                 tasks.append(asyncio.create_task(current_season.update_member(await self.is_member)))
-            
-        b = pendulum.now()
-
-        bot_client.coc_data_log.info(
-            f"Cache task generation took {round((b-a).total_seconds(),2)} seconds."
-            )
         
         if tasks:
             await asyncio.gather(*tasks)
-
-        
 
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)
