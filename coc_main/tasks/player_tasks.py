@@ -587,7 +587,8 @@ class PlayerLoop(TaskLoop):
                 a_iter = AsyncIter(scope_tags)            
                 async for tag in a_iter:
                     task = asyncio.create_task(self._run_single_loop(tag))
-                    #tasks.append(task)
+                    tasks.append(task)
+                    await asyncio.sleep(0)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -599,10 +600,11 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
 
-                # wrap_task = asyncio.create_task(gather(*tasks))
-                # await self._queue.put(wrap_task)
+                wrap_task = asyncio.create_task(gather(*tasks))
+                await self._queue.put(wrap_task)
                 self._status = "Not Running"
-                await asyncio.sleep(10)
+
+                await asyncio.sleep(5)
                 continue
         
         except Exception as exc:
@@ -662,12 +664,12 @@ class PlayerLoop(TaskLoop):
                 if lock.locked():
                     return
                 await lock.acquire()
-                st = pendulum.now()
 
                 cached_player = self._cached.get(tag,None)
                 if self.defer(cached_player):
                     return self.loop.call_later(10,self.unlock,lock)
-
+                
+                st = pendulum.now()
                 async with self.api_semaphore:
                     new_player = None
                     try:
@@ -706,8 +708,6 @@ class PlayerLoop(TaskLoop):
             try:
                 runtime = et - st
                 self.run_time.append(runtime.total_seconds())
-                if tag == "#LJC8V0GCJ":
-                    bot_client.coc_main_log.info(f"Player Loop: {tag} took {round(runtime.total_seconds(),2)} seconds.")
             except:
                 pass
             

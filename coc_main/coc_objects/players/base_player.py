@@ -14,7 +14,6 @@ from .mongo_player import db_Player
 from ...utils.constants.coc_emojis import EmojisTownHall
 from ...utils.constants.ui_emojis import EmojisUI
 from ...utils.utils import check_rtl
-from ...exceptions import CacheNotReady
 
 from ..clans.player_clan import *
 
@@ -28,7 +27,7 @@ class BasicPlayer(AwaitLoader):
         async for p in query:
             player = await cls(tag=p['_id'])
             await bot_client.player_queue.put(player.tag)
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
     
     @classmethod
     def clear_cache(cls):

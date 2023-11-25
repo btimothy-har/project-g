@@ -117,6 +117,9 @@ class ClanLoop(TaskLoop):
     ### PRIMARY TASK LOOP
     ############################################################
     async def _loop_task(self):
+        async def gather(*args):
+            return await asyncio.gather(*args,return_exceptions=True)
+        
         try:
             while self.loop_active:
 
@@ -136,25 +139,22 @@ class ClanLoop(TaskLoop):
 
                 st = pendulum.now()
                 self._running = True
+                tasks = []
 
-                scope_tags = random.sample(list(tags),min(len(tags),10000))
+                scope_tags = list(tags)
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:                    
                     task = asyncio.create_task(self._run_single_loop(tag))
-                    await self._queue.put(task)
+                    tasks.append(task)
+                    await asyncio.sleep(0)
 
                 self._last_loop = pendulum.now()
                 self._running = False
-                try:
-                    runtime = self._last_loop-st
-                    self.run_time.append(runtime.total_seconds())
-                except:
-                    pass
 
-                if len(tags) > len(scope_tags):
-                    await asyncio.sleep(5)
-                else:
-                    await asyncio.sleep(10)
+                wrap_task = asyncio.create_task(gather(*tasks))
+                await self._queue.put(wrap_task)
+                
+                await asyncio.sleep(5)
                 continue
         
         except Exception as exc:
@@ -217,7 +217,8 @@ class ClanLoop(TaskLoop):
                 cached_clan = self._cached.get(tag,None)
                 if self.defer(cached_clan):
                     return self.loop.call_later(10,self.unlock,lock)
-
+                
+                st = pendulum.now()
                 async with self.api_semaphore: 
                     new_clan = None
                     try:
@@ -260,6 +261,14 @@ class ClanLoop(TaskLoop):
                     error=exc,
                     )
             return self.unlock(lock)
+
+        finally:
+            et = pendulum.now()
+            try:
+                runtime = et - st
+                self.run_time.append(runtime.total_seconds())
+            except:
+                pass
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
         a_iter = AsyncIter(ClanLoop._clan_events)

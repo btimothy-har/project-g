@@ -29,7 +29,7 @@ class BasicClan(AwaitLoader):
         async for c in query:
             clan = await cls(c['_id'])
             await bot_client.clan_queue.put(clan.tag)
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
     
     @classmethod
     def clear_cache(cls):
