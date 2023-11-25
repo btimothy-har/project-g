@@ -28,6 +28,7 @@ class BasicPlayer(AwaitLoader):
         async for p in query:
             player = await cls(tag=p['_id'])
             await bot_client.player_queue.put(player.tag)
+            await asyncio.sleep(0.1)
     
     @classmethod
     def clear_cache(cls):
