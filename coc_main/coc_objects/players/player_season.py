@@ -233,7 +233,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'name':self.name
+                    'name':await self.name
                     }
                 },
                 upsert=True)
@@ -255,7 +255,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'town_hall':self.town_hall
+                    'town_hall':await self.town_hall
                     }
                 },
                 upsert=True)
@@ -277,7 +277,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'home_clan':self.home_clan_tag
+                    'home_clan':await self.home_clan_tag
                     }
                 },
                 upsert=True)
@@ -299,7 +299,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'is_member':self.is_member
+                    'is_member':await self.is_member
                     }
                 },
                 upsert=True)
@@ -321,22 +321,22 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'time_in_home_clan':self.time_in_home_clan
+                    'time_in_home_clan':await self.time_in_home_clan
                     }
                 },
                 upsert=True)
             bot_client.coc_data_log.debug(f"{self}: Added {duration} to time in home clan")
     
     async def add_last_seen(self,timestamp:pendulum.DateTime):
-        def _update_in_db():
-            db_PlayerStats.objects(
-                stats_id=self._db_id
-                ).update_one(
-                    set__season=self.season.id,
-                    set__tag=self.tag,
-                    set__last_seen=last_seen,
-                    upsert=True
-                    )
+        # def _update_in_db():
+        #     db_PlayerStats.objects(
+        #         stats_id=self._db_id
+        #         ).update_one(
+        #             set__season=self.season.id,
+        #             set__tag=self.tag,
+        #             set__last_seen=last_seen,
+        #             upsert=True
+        #             )
             
         async with self._lock:
             if timestamp.int_timestamp not in await self._last_seen:
@@ -349,7 +349,7 @@ class aPlayerSeason(AwaitLoader):
                     {'$set': {
                         'season':self.season.id,
                         'tag':self.tag,
-                        'last_seen':self._last_seen
+                        'last_seen':await self._last_seen
                         }
                     },
                     upsert=True)

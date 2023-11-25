@@ -366,7 +366,14 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
+        a = pendulum.now()
         basic_player = await BasicPlayer(self.tag)
+        b = pendulum.now()
+
+        bot_client.coc_data_log.info(
+            f"Loading basic player {round((b-a).total_seconds(),2)} seconds."
+            )   
+        
         if basic_player.is_new:
             await BasicPlayer.player_first_seen(self.tag)
         
