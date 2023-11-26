@@ -197,8 +197,7 @@ class PlayerTasks():
                 stat = await attacks.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.attack_wins,
-                    db_update=PlayerTasks._update_attack_wins_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    db_update=PlayerTasks._update_attack_wins_db
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
@@ -224,8 +223,7 @@ class PlayerTasks():
                 stat = await defenses.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.defense_wins,
-                    db_update=PlayerTasks._update_defense_wins_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    db_update=PlayerTasks._update_defense_wins_db
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
@@ -251,8 +249,7 @@ class PlayerTasks():
                 stat = await donations.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.donations,
-                    db_update=PlayerTasks._update_donations_sent_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    db_update=PlayerTasks._update_donations_sent_db
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
@@ -278,8 +275,7 @@ class PlayerTasks():
                 stat = await received.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.received,
-                    db_update=PlayerTasks._update_donations_rcvd_db,
-                    alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                    db_update=PlayerTasks._update_donations_rcvd_db
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
@@ -310,8 +306,7 @@ class PlayerTasks():
                     stat = await loot_gold.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_gold_db,
-                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        db_update=PlayerTasks._update_gold_db
                         )                
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
@@ -355,8 +350,7 @@ class PlayerTasks():
                     stat = await loot_darkelixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_darkelixir_db,
-                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        db_update=PlayerTasks._update_darkelixir_db
                         )
                     
                     bot_client.coc_data_log.debug(
@@ -387,8 +381,7 @@ class PlayerTasks():
                     stat = await capitalcontribution.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_capitalcontribution_db,
-                        alliance=getattr(new_player.clan,'is_alliance_clan',False)
+                        db_update=PlayerTasks._update_capitalcontribution_db
                         )
                 
                     if increment > 0:
