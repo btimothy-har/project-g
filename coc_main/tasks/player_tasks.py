@@ -579,11 +579,10 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )                
-                async for batch in chunks(scope_tags,1000):
+                async for batch in chunks(scope_tags,5000):
                     a_iter = AsyncIter(batch)
-                    tasks.extend([asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter])
-                
-                await asyncio.gather(*tasks,return_exceptions=True)
+                    tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
+                    await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
                 self._running = False
