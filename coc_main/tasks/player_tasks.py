@@ -642,7 +642,7 @@ class PlayerLoop(TaskLoop):
             
             st = pendulum.now()
             async with self.api_semaphore:
-                a = pendulum.now()
+                
                 new_player = None
                 try:
                     new_player = await self.coc_client.fetch_player(tag)
