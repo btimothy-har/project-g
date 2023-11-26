@@ -595,7 +595,7 @@ class BotClashClient():
         client = motor.motor_asyncio.AsyncIOMotorClient(
             f'mongodb://{clash_database.get("username")}:{clash_database.get("password")}@localhost:27017/admin',
             uuidRepresentation="pythonLegacy",
-            maxPoolSize=1000,
+            maxPoolSize=100000,
             )
         self.coc_db = client[clash_database.get("dbprimary")]
 
