@@ -509,6 +509,7 @@ class _ClanAttributes():
     def __init__(self,tag:str):
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
+            self._sync_lock = asyncio.Lock()
             self._lock = asyncio.Lock()
             self._last_sync = None           
             self._cached_db = None

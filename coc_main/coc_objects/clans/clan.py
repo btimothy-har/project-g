@@ -105,44 +105,36 @@ class aClan(coc.Clan,BasicClan):
         return description
     
     async def _sync_cache(self):
-        #if self.is_registered_clan or self.is_active_league_clan:
         asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
 
         if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
+            return        
+        if self._attributes._sync_lock.locked():
             return
         
-        basic_clan = BasicClan(self.tag)
+        async with self._attributes._sync_lock:            
+            basic_clan = BasicClan(self.tag)
 
-        if await basic_clan.name != self.name:
-            await basic_clan.set_name(self.name)
-        if await basic_clan.badge != self.badge:
-            await basic_clan.set_badge(self.badge)
-        if await basic_clan.level != self.level:
-            await basic_clan.set_level(self.level)
-        if await basic_clan.capital_hall != self.capital_hall:
-            await basic_clan.set_capital_hall(self.capital_hall)
-        if await basic_clan.war_league_name != self.war_league_name:
-            await basic_clan.set_war_league(self.war_league_name)
+            tasks = []
+
+            if await basic_clan.name != self.name:
+                tasks.append(basic_clan.set_name(self.name))
+
+            if await basic_clan.badge != self.badge:
+                tasks.append(basic_clan.set_badge(self.badge))
+
+            if await basic_clan.level != self.level:
+                tasks.append(basic_clan.set_level(self.level))
+
+            if await basic_clan.capital_hall != self.capital_hall:
+                tasks.append(basic_clan.set_capital_hall(self.capital_hall))
+
+            if await basic_clan.war_league_name != self.war_league_name:
+                tasks.append(basic_clan.set_war_league(self.war_league_name))
+            
+            if tasks:
+                await asyncio.gather(*tasks)
+                basic_clan._attributes._last_sync = pendulum.now()
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
         return WarLeagueClan(self.tag,season)
-    
-    ##################################################
-    ### CLAN METHODS
-    ##################################################
-    # async def cleanup_staff(self):
-    #     #Remove Leaders from Elders/Cos:
-    #     if self.leader in self.coleaders:
-    #         self.coleaders.remove(self.leader)
-    #     if self.leader in self.elders:
-    #         self.elders.remove(self.leader)
-
-    #     for m in self.coleaders:
-    #         mem = aMember(m)
-    #         if self.tag not in [c.tag for c in mem.home_clans]:
-    #             self.coleaders.remove(m)
-
-    #     for m in self.elders:
-    #         mem = aMember(m)
-    #         if self.tag not in [c.tag for c in mem.home_clans]:
-    #             self.elders.remove(m)
