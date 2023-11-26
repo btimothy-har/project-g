@@ -36,6 +36,97 @@ class PlayerTasks():
         new_ach = new_player.get_achievement(achievement.name)
         compare = old_ach.value != new_ach.value
         return compare, old_ach, new_ach
+
+    async def _update_attack_wins_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'attacks':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_defense_wins_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'defenses':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_donations_sent_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'donations_sent':stat_json
+                }
+            },
+            upsert=True)    
+    async def _update_donations_rcvd_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'donations_rcvd':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_gold_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'loot_gold':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_elixir_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'loot_elixir':stat_json
+                }
+            },
+            upsert=True)        
+    async def _update_darkelixir_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'loot_darkelixir':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_capitalcontribution_db(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'capitalcontribution':stat_json
+                }
+            },
+            upsert=True)
+    async def _update_clangames(db_id,stat_json):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':db_id},
+            {'$set': {
+                'season':db_id['season'],
+                'tag':db_id['tag'],
+                'clangames':stat_json
+                }
+            },
+            upsert=True)
     
     ############################################################
     ### PLAYER LAST SEEN
@@ -89,18 +180,7 @@ class PlayerTasks():
     ### PLAYER STAT UPDATES
     ############################################################
     @staticmethod
-    async def player_attack_wins(old_player:aPlayer,new_player:aPlayer):
-        async def _update_in_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'attacks':stat_json
-                    }
-                },
-                upsert=True)
-        
+    async def player_attack_wins(old_player:aPlayer,new_player:aPlayer):       
         try:
             # if not new_player.is_member:
             #     return
@@ -117,7 +197,7 @@ class PlayerTasks():
                 stat = await attacks.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.attack_wins,
-                    db_update=_update_in_db,
+                    db_update=PlayerTasks._update_attack_wins_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
                 bot_client.coc_data_log.debug(
@@ -127,17 +207,7 @@ class PlayerTasks():
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Attack Wins task.")
 
     @staticmethod
-    async def player_defense_wins(old_player:aPlayer,new_player:aPlayer):
-        async def _update_in_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'defenses':stat_json
-                    }
-                },
-                upsert=True)
+    async def player_defense_wins(old_player:aPlayer,new_player:aPlayer):        
         try:
             # if not new_player.is_member:
             #     return
@@ -154,7 +224,7 @@ class PlayerTasks():
                 stat = await defenses.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.defense_wins,
-                    db_update=_update_in_db,
+                    db_update=PlayerTasks._update_defense_wins_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
                 bot_client.coc_data_log.debug(
@@ -165,17 +235,6 @@ class PlayerTasks():
 
     @staticmethod
     async def player_donations_sent(old_player:aPlayer,new_player:aPlayer):
-        async def _update_in_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'donations_sent':stat_json
-                    }
-                },
-                upsert=True)
-            
         try:
             # if not new_player.is_member:
             #     return
@@ -192,7 +251,7 @@ class PlayerTasks():
                 stat = await donations.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.donations,
-                    db_update=_update_in_db,
+                    db_update=PlayerTasks._update_donations_sent_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
                 bot_client.coc_data_log.debug(
@@ -203,17 +262,6 @@ class PlayerTasks():
 
     @staticmethod
     async def player_donations_received(old_player:aPlayer,new_player:aPlayer):
-        async def _update_in_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'donations_rcvd':stat_json
-                    }
-                },
-                upsert=True)
-            
         try:
             # if not new_player.is_member:
             #     return
@@ -230,7 +278,7 @@ class PlayerTasks():
                 stat = await received.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.received,
-                    db_update=_update_in_db,
+                    db_update=PlayerTasks._update_donations_rcvd_db,
                     alliance=getattr(new_player.clan,'is_alliance_clan',False)
                     )
                 bot_client.coc_data_log.debug(
@@ -241,37 +289,6 @@ class PlayerTasks():
     
     @staticmethod
     async def player_stat_achievements(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
-        async def _update_gold_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'loot_gold':stat_json
-                    }
-                },
-                upsert=True)
-        async def _update_elixir_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'loot_elixir':stat_json
-                    }
-                },
-                upsert=True)
-        async def _update_darkelixir_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'loot_darkelixir':stat_json
-                    }
-                },
-                upsert=True)
-        
         try:
             # if not new_player.is_member:
             #     return
@@ -293,7 +310,7 @@ class PlayerTasks():
                     stat = await loot_gold.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=_update_gold_db,
+                        db_update=PlayerTasks._update_gold_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
                         )                
                     bot_client.coc_data_log.debug(
@@ -315,7 +332,7 @@ class PlayerTasks():
                     stat = await loot_elixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=_update_elixir_db,
+                        db_update=PlayerTasks._update_elixir_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
                         )
                     
@@ -338,7 +355,7 @@ class PlayerTasks():
                     stat = await loot_darkelixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=_update_darkelixir_db,
+                        db_update=PlayerTasks._update_darkelixir_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
                         )
                     
@@ -349,18 +366,7 @@ class PlayerTasks():
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Achievements task.")
 
     @staticmethod
-    async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
-        async def _update_capitalcontribution_db(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'capitalcontribution':stat_json
-                    }
-                },
-                upsert=True)
-            
+    async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):            
         try:
             # if not new_player.is_member:
             #     return
@@ -381,7 +387,7 @@ class PlayerTasks():
                     stat = await capitalcontribution.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
-                        db_update=_update_capitalcontribution_db,
+                        db_update=PlayerTasks._update_capitalcontribution_db,
                         alliance=getattr(new_player.clan,'is_alliance_clan',False)
                         )
                 
@@ -395,18 +401,7 @@ class PlayerTasks():
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Capital Contributions task.")
 
     @staticmethod
-    async def player_clan_games(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
-        async def _update_clangames(db_id,stat_json):
-            await bot_client.coc_db.db__player_stats.update_one(
-                {'_id':db_id},
-                {'$set': {
-                    'season':db_id['season'],
-                    'tag':db_id['tag'],
-                    'clangames':stat_json
-                    }
-                },
-                upsert=True)
-        
+    async def player_clan_games(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
         try:
             # if not new_player.is_member:
             #     return 
@@ -425,7 +420,7 @@ class PlayerTasks():
                         latest_value=new_ach.value,
                         timestamp=new_player.timestamp,
                         clan=new_player.clan,
-                        db_update=_update_clangames
+                        db_update=PlayerTasks._update_clangames
                         )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Clan Games task.")
