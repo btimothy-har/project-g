@@ -22,15 +22,12 @@ bot_client = client()
 class BasicPlayer(AwaitLoader):
 
     @classmethod
-    async def load_all(cls) -> List['BasicPlayer']:
-        async def load_player(tag:str):
-            player = await cls(tag=tag)
-            await bot_client.player_queue.put(player.tag)
-
+    async def load_all(cls) -> List['BasicPlayer']:           
         query = bot_client.coc_db.db__player.find({},{'_id':1})        
         async for p in query:
-            asyncio.create_task(load_player(p['_id']))
-            await asyncio.sleep(0.1)
+            player = await cls(tag=p['_id'])
+            await bot_client.player_queue.put(player.tag)
+            await asyncio.sleep(0.01)
     
     @classmethod
     def clear_cache(cls):
@@ -300,8 +297,6 @@ class _PlayerAttributes():
     @async_property
     async def _database(self) -> Optional[dict]:
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            if self.tag == '#LJC8V0GCJ':
-                bot_client.coc_data_log.info(f"{self}: Database query")
             self._cached_db = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
         return self._cached_db
