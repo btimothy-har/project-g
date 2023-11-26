@@ -30,6 +30,13 @@ default_sleep = 60
 ############################################################
 class PlayerTasks():
     
+    @staticmethod
+    async def compare_achievement(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
+        old_ach = old_player.get_achievement(achievement.name)
+        new_ach = new_player.get_achievement(achievement.name)
+        compare = old_ach.value != new_ach.value
+        return compare, old_ach, new_ach
+    
     ############################################################
     ### PLAYER LAST SEEN
     ############################################################
@@ -273,8 +280,7 @@ class PlayerTasks():
 
             #Loot Gold
             if achievement.name == "Gold Grab":
-                old_ach = old_player.get_achievement(achievement.name)
-                new_ach = new_player.get_achievement(achievement.name)
+                compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 loot_gold = await current_season.loot_gold
 
@@ -296,8 +302,7 @@ class PlayerTasks():
             
             #Loot Elixir
             if achievement.name == "Elixir Escapade":
-                old_ach = old_player.get_achievement(achievement.name)
-                new_ach = new_player.get_achievement(achievement.name)
+                compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 loot_elixir = await current_season.loot_elixir
 
@@ -320,8 +325,7 @@ class PlayerTasks():
             
             #Loot Dark Elixir
             if achievement.name == "Heroic Heist":
-                old_ach = old_player.get_achievement(achievement.name)
-                new_ach = new_player.get_achievement(achievement.name)
+                compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 loot_darkelixir = await current_season.loot_darkelixir
 
@@ -365,9 +369,7 @@ class PlayerTasks():
             
             #Capital Contribution
             if achievement.name == "Most Valuable Clanmate":
-                old_ach = old_player.get_achievement(achievement.name)
-                new_ach = new_player.get_achievement(achievement.name)
-
+                compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
                 capitalcontribution = await current_season.capitalcontribution
 
                 if capitalcontribution._prior_seen:
@@ -412,12 +414,10 @@ class PlayerTasks():
             current_season = await new_player.get_current_season()
             
             if achievement.name == "Games Champion":
-                old_ach = old_player.get_achievement(achievement.name)
-                new_ach = new_player.get_achievement(achievement.name)
+                compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 clangames = await current_season.clangames
-
-                if new_ach.value != old_ach.value:
+                if compare:
                     increment = new_ach.value - old_ach.value
 
                     await clangames.update(
