@@ -367,8 +367,7 @@ class aPlayer(coc.Player,BasicPlayer):
     ##################################################    
     async def _sync_cache(self):
         if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
-            return
-        
+            return        
         if self._attributes._sync_lock.locked():
             return
         

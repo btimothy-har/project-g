@@ -269,14 +269,16 @@ class ClashOfClansTasks(commands.Cog):
             while True:
                 try:
                     tag = await bot_client.clan_queue.get()
-                    self.clan_loop.add_to_loop(tag)
+                    clan = await BasicClan(tag)
+                    self.clan_loop.add_to_loop(clan.tag)
                     bot_client.clan_queue.task_done()
+                    await asyncio.sleep(0.1)
+
                 except asyncio.CancelledError:
                     raise
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
                     continue
-
         except asyncio.CancelledError:
             return
     
@@ -285,8 +287,11 @@ class ClashOfClansTasks(commands.Cog):
             while True:
                 try:
                     tag = await bot_client.player_queue.get()
-                    self.player_loop.add_to_loop(tag)
+                    player = await BasicPlayer(tag)
+                    self.player_loop.add_to_loop(player.tag)
                     bot_client.player_queue.task_done()
+                    await asyncio.sleep(0.1)
+
                 except asyncio.CancelledError:
                     raise
                 except Exception:

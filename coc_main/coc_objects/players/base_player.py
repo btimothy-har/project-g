@@ -25,8 +25,7 @@ class BasicPlayer(AwaitLoader):
     async def load_all(cls) -> List['BasicPlayer']:           
         query = bot_client.coc_db.db__player.find({},{'_id':1})        
         async for p in query:
-            player = await cls(tag=p['_id'])
-            await bot_client.player_queue.put(player.tag)
+            await bot_client.player_queue.put(p['_id'])
             await asyncio.sleep(0.1)
     
     @classmethod
