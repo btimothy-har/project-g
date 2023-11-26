@@ -265,6 +265,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def clan_queue_task(self):
+        sleep = (1 / bot_client.rate_limit) * 10
         try:
             while True:
                 try:
@@ -272,7 +273,7 @@ class ClashOfClansTasks(commands.Cog):
                     clan = await BasicClan(tag)
                     self.clan_loop.add_to_loop(clan.tag)
                     bot_client.clan_queue.task_done()
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(sleep)
 
                 except asyncio.CancelledError:
                     raise
@@ -283,6 +284,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def player_queue_task(self):
+        sleep = (1 / bot_client.rate_limit) * 10
         try:
             while True:
                 try:
@@ -290,7 +292,7 @@ class ClashOfClansTasks(commands.Cog):
                     player = await BasicPlayer(tag)
                     self.player_loop.add_to_loop(player.tag)
                     bot_client.player_queue.task_done()
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(sleep)
 
                 except asyncio.CancelledError:
                     raise
