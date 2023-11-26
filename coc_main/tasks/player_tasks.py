@@ -5,6 +5,7 @@ import copy
 import random
 
 from typing import *
+from collections import defaultdict
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
@@ -427,7 +428,7 @@ class PlayerTasks():
 class PlayerLoop(TaskLoop):
     _instance = None
     _cached = {}
-    _locks = {}
+    _locks = defaultdict(asyncio.Lock)
     
     _player_events = [
         PlayerTasks.player_time_in_home_clan,
@@ -499,7 +500,7 @@ class PlayerLoop(TaskLoop):
     def remove_to_loop(self,tag:str):
         remove, n_tag = super().remove_to_loop(tag)
     
-    def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
+    async def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
         if not player:
             return 1
         if player.is_member:
@@ -514,7 +515,7 @@ class PlayerLoop(TaskLoop):
             return 2
         return 10
     
-    def defer(self,player:Optional[aPlayer]=None) -> bool:
+    async def defer(self,player:Optional[aPlayer]=None) -> bool:
         if self.task_lock.locked():
             if not player:
                 return False
@@ -628,12 +629,8 @@ class PlayerLoop(TaskLoop):
                     self._queue.task_done()                
                 await asyncio.sleep(0)
     
-    async def _run_single_loop(self,tag:str):
-        try:
-            lock = self._locks[tag]
-        except KeyError:
-            self._locks[tag] = lock = asyncio.Lock()
-
+    async def _run_single_loop(self,tag:str):        
+        lock = self._locks[tag]
         try:
             async with self.task_semaphore:   
                 if lock.locked():
@@ -641,7 +638,7 @@ class PlayerLoop(TaskLoop):
                 await lock.acquire()
 
                 cached_player = self._cached.get(tag,None)
-                if self.defer(cached_player):
+                if await self.defer(cached_player):
                     return self.loop.call_later(10,self.unlock,lock)
                 
                 st = pendulum.now()
@@ -654,7 +651,7 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
+                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
                     #wait = getattr(new_player,'_response_retry',default_sleep)
                     self.loop.call_later(wait,self.unlock,lock)
                 

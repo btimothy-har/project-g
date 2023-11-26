@@ -8,6 +8,7 @@ import aiohttp
 from redbot.core.utils import AsyncIter
 
 from typing import *
+from collections import defaultdict
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
@@ -55,7 +56,7 @@ class ClanTasks():
 class ClanLoop(TaskLoop):
     _instance = None
     _cached = {}
-    _locks = {}
+    _locks = defaultdict(asyncio.Lock)
 
     _clan_events = [ClanTasks.clan_donation_change]
     _member_join_events = [ClanTasks.clan_member_join]
@@ -89,7 +90,7 @@ class ClanLoop(TaskLoop):
     def remove_to_loop(self,tag:str):
         remove, n_tag = super().remove_to_loop(tag)
     
-    def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
+    async def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
         if not clan:
             return 1
         if clan.is_alliance_clan:
@@ -100,7 +101,7 @@ class ClanLoop(TaskLoop):
             return 1
         return 10
     
-    def defer(self,clan:Optional[aClan]=None) -> bool:
+    async def defer(self,clan:Optional[aClan]=None) -> bool:
         if self.task_lock.locked():
             if not clan:
                 return False
@@ -198,10 +199,7 @@ class ClanLoop(TaskLoop):
                 await asyncio.sleep(0)
 
     async def _run_single_loop(self,tag:str):
-        try:
-            lock = self._locks[tag]
-        except KeyError:
-            self._locks[tag] = lock = asyncio.Lock()
+        lock = self._locks[tag]
 
         try:
             async with self.task_semaphore:
@@ -210,7 +208,7 @@ class ClanLoop(TaskLoop):
                 await lock.acquire()
 
                 cached_clan = self._cached.get(tag,None)
-                if self.defer(cached_clan):
+                if await self.defer(cached_clan):
                     return self.loop.call_later(10,self.unlock,lock)
                 
                 st = pendulum.now()
@@ -223,7 +221,7 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
+                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
                     self.loop.call_later(wait,self.unlock,lock)                
                 
                 if cached_clan:
