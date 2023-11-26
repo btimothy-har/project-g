@@ -36,7 +36,6 @@ class aPlayerStat():
     @property
     def json(self):
         return {
-            'season_only_clan': self.season_only_clan,
             'season_total': self.season_total,
             'lastUpdate': self.last_update,
             'priorSeen': self._prior_seen
