@@ -272,7 +272,7 @@ class ClashOfClansTasks(commands.Cog):
                     clan = await BasicClan(tag)
                     self.clan_loop.add_to_loop(clan.tag)
                     bot_client.clan_queue.task_done()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)
 
                 except asyncio.CancelledError:
                     raise
@@ -290,7 +290,7 @@ class ClashOfClansTasks(commands.Cog):
                     player = await BasicPlayer(tag)
                     self.player_loop.add_to_loop(player.tag)
                     bot_client.player_queue.task_done()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)
 
                 except asyncio.CancelledError:
                     raise
