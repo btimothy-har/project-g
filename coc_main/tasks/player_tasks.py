@@ -642,6 +642,7 @@ class PlayerLoop(TaskLoop):
             
             st = pendulum.now()
             async with self.api_semaphore:
+                a = pendulum.now()
                 new_player = None
                 try:
                     new_player = await self.coc_client.fetch_player(tag)
@@ -649,6 +650,8 @@ class PlayerLoop(TaskLoop):
                     return self.loop.call_later(3600,self.unlock,lock)
                 except ClashAPIError:
                     return self.loop.call_later(10,self.unlock,lock)
+                b = pendulum.now()
+                bot_client.coc_main_log.info(f"{tag}: API call took {round((b-a).total_seconds(),2)} seconds.")
                 
                 wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
                 #wait = getattr(new_player,'_response_retry',default_sleep)
