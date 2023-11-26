@@ -677,11 +677,9 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                await new_player._sync_cache()
-                
-                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
-                #wait = getattr(new_player,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)
+                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * self.delay_multiplier(new_player),600))
+                    #wait = getattr(new_player,'_response_retry',default_sleep)
+                    self.loop.call_later(wait,self.unlock,lock)
                 
                 if cached_player:        
                     if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
@@ -709,7 +707,9 @@ class PlayerLoop(TaskLoop):
             except:
                 pass
             
-    async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
+    async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):        
+        asyncio.create_task(new_player._sync_cache())
+
         a_iter = AsyncIter(PlayerLoop._player_events)
         async for event in a_iter:
             task = asyncio.create_task(event(old_player,new_player))

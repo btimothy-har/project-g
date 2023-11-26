@@ -228,20 +228,8 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                await new_clan._sync_cache()
-                
-                try:
                     wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * self.delay_multiplier(new_clan),600))
-                except CacheNotReady:
-                    bot_client.coc_main_log.exception(
-                        f"CLAN LOOP CACHE NOT READY: {tag}"
-                        + f"\n\t{new_clan._attributes._cache_loaded}"
-                        + f"\n\t{new_clan._attributes.is_alliance_clan}"
-                        + f"\n\t{await new_clan._attributes.is_alliance_clan}"
-                        )
-                    await new_clan.load()
-                #wait = getattr(new_clan,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)                
+                    self.loop.call_later(wait,self.unlock,lock)                
                 
                 if cached_clan:
                     if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
@@ -270,6 +258,8 @@ class ClanLoop(TaskLoop):
                 pass
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
+        asyncio.create_task(new_clan._sync_cache())
+
         a_iter = AsyncIter(ClanLoop._clan_events)
         async for event in a_iter:
             task = asyncio.create_task(event(old_clan,new_clan))
