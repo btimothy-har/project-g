@@ -88,6 +88,7 @@ class ClanLoop(TaskLoop):
         remove, n_tag = super().remove_to_loop(tag)
     
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
+        return 1
         if not clan:
             return 1
         if clan.is_alliance_clan:
@@ -99,6 +100,7 @@ class ClanLoop(TaskLoop):
         return 10
     
     def defer(self,clan:Optional[aClan]=None) -> bool:
+        return False
         if self.task_lock.locked():
             if not clan:
                 return False
@@ -137,7 +139,6 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                st = pendulum.now()
                 self._running = True
                 tasks = []
 
