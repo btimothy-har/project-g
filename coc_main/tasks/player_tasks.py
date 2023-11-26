@@ -575,8 +575,7 @@ class PlayerLoop(TaskLoop):
                     f"Started loop for {len(scope_tags)} players."
                     )                
                 async for batch in chunks(scope_tags,1000):
-                    a_iter = AsyncIter(batch)
-                    tasks.extend([asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter])
+                    tasks.extend([asyncio.create_task(self._run_single_loop(tag)) for tag in batch])
                 await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
