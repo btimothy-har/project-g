@@ -553,6 +553,7 @@ class PlayerLoop(TaskLoop):
     async def _loop_task(self):        
         try:
             while self.loop_active:
+
                 self._status = "Not Running"
 
                 if self.api_maintenance:
@@ -657,8 +658,9 @@ class PlayerLoop(TaskLoop):
                     return
                 await lock.acquire()
 
+                
+                cached_player = self._cached.get(tag,None)
                 if tag != '#LJC8V0GCJ':
-                    cached_player = self._cached.get(tag,None)
                     if self.defer(cached_player):
                         return self.loop.call_later(10,self.unlock,lock)
                 
