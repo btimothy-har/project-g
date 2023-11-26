@@ -143,7 +143,7 @@ class ClanLoop(TaskLoop):
                 async for batch in chunks(scope_tags,1000):
                     a_iter = AsyncIter(batch)
                     tasks.extend([asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter])
-                    
+
                 await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
@@ -185,6 +185,7 @@ class ClanLoop(TaskLoop):
                 else:
                     await self._queue.put(task)                
                 await asyncio.sleep(0)
+                continue
 
         except asyncio.CancelledError:
             while not self._queue.empty():

@@ -627,9 +627,9 @@ class PlayerLoop(TaskLoop):
                     finally:
                         self._queue.task_done()
                 else:
-                    await self._queue.put(task)
-                
+                    await self._queue.put(task)                
                 await asyncio.sleep(0)
+                continue
                         
         except asyncio.CancelledError:
             while not self._queue.empty():
