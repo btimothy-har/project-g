@@ -143,8 +143,8 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_main(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             update = False
             if old_player.name != new_player.name:
@@ -182,8 +182,8 @@ class PlayerTasks():
     @staticmethod
     async def player_attack_wins(old_player:aPlayer,new_player:aPlayer):       
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             attacks = await current_season.attacks
@@ -209,8 +209,8 @@ class PlayerTasks():
     @staticmethod
     async def player_defense_wins(old_player:aPlayer,new_player:aPlayer):        
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             defenses = await current_season.defenses
@@ -236,8 +236,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_sent(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             donations = await current_season.donations_sent
@@ -263,8 +263,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_received(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             received = await current_season.donations_rcvd
@@ -290,8 +290,8 @@ class PlayerTasks():
     @staticmethod
     async def player_stat_achievements(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
 
@@ -368,8 +368,8 @@ class PlayerTasks():
     @staticmethod
     async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):            
         try:
-            # if not new_player.is_member:
-            #     return
+            if not new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             
@@ -403,8 +403,8 @@ class PlayerTasks():
     @staticmethod
     async def player_clan_games(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
         try:
-            # if not new_player.is_member:
-            #     return 
+            if not new_player.is_member:
+                return 
             
             current_season = await new_player.get_current_season()
             
