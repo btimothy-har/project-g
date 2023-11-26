@@ -590,19 +590,20 @@ class PlayerLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-                try:
-                    runtime = self._last_loop-st
-                    bot_client.coc_main_log.info(
-                        f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
-                        )
-                except:
-                    pass
+
+                runtime = self._last_loop-st
+                bot_client.coc_main_log.info(
+                    f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
+                    )
 
                 wrap_task = asyncio.create_task(gather(*tasks))
                 await self._queue.put(wrap_task)
                 self._status = "Not Running"
 
-                await asyncio.sleep(0)
+                if runtime.total_seconds() < 10:
+                    await asyncio.sleep(10)
+                else:
+                    await asyncio.sleep(0)
                 continue
         
         except Exception as exc:
