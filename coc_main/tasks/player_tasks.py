@@ -512,7 +512,6 @@ class PlayerLoop(TaskLoop):
         remove, n_tag = super().remove_to_loop(tag)
     
     def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
-        return 1
         if not player:
             return 1
         if player.is_member:
@@ -528,7 +527,6 @@ class PlayerLoop(TaskLoop):
         return 10
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
-        return False
         if self.task_lock.locked():
             if not player:
                 return False

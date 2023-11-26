@@ -88,7 +88,6 @@ class ClanLoop(TaskLoop):
         remove, n_tag = super().remove_to_loop(tag)
     
     def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
-        return 1
         if not clan:
             return 1
         if clan.is_alliance_clan:
@@ -100,7 +99,6 @@ class ClanLoop(TaskLoop):
         return 10
     
     def defer(self,clan:Optional[aClan]=None) -> bool:
-        return False
         if self.task_lock.locked():
             if not clan:
                 return False
@@ -243,8 +241,7 @@ class ClanLoop(TaskLoop):
                         )
                     await new_clan.load()
                 #wait = getattr(new_clan,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)
-                
+                self.loop.call_later(wait,self.unlock,lock)                
                 
                 if cached_clan:
                     if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
