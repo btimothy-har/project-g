@@ -40,7 +40,7 @@ from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
-semaphore_limit = 100000
+semaphore_limit = 1000000
 
 ############################################################
 ############################################################
