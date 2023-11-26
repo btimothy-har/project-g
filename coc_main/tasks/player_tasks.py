@@ -512,6 +512,8 @@ class PlayerLoop(TaskLoop):
         remove, n_tag = super().remove_to_loop(tag)
     
     def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
+        if player.tag == "#LJC8V0GCJ":
+            return 1
         if not player:
             return 1
         if player.is_member:
@@ -551,7 +553,6 @@ class PlayerLoop(TaskLoop):
     async def _loop_task(self):        
         try:
             while self.loop_active:
-
                 self._status = "Not Running"
 
                 if self.api_maintenance:
@@ -656,9 +657,10 @@ class PlayerLoop(TaskLoop):
                     return
                 await lock.acquire()
 
-                cached_player = self._cached.get(tag,None)
-                if self.defer(cached_player):
-                    return self.loop.call_later(10,self.unlock,lock)
+                if tag != '#LJC8V0GCJ':
+                    cached_player = self._cached.get(tag,None)
+                    if self.defer(cached_player):
+                        return self.loop.call_later(10,self.unlock,lock)
                 
                 st = pendulum.now()
                 async with self.api_semaphore:
