@@ -603,7 +603,7 @@ class PlayerLoop(TaskLoop):
                 if runtime.total_seconds() < 10:
                     await asyncio.sleep(10)
                 else:
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(5)
                 continue
         
         except Exception as exc:
