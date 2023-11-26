@@ -366,7 +366,9 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
-        
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
+            return
+
         basic_player = BasicPlayer(self.tag)
 
         if await basic_player.is_new:
@@ -398,6 +400,7 @@ class aPlayer(coc.Player,BasicPlayer):
         
         if tasks:
             await asyncio.gather(*tasks)
+            basic_player._attributes._last_sync = pendulum.now()
 
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)

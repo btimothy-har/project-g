@@ -288,7 +288,7 @@ class _PlayerAttributes():
         if self._is_new:
             self.tag = coc.utils.correct_tag(tag)
             self._lock = asyncio.Lock()
-            self._cache_loaded = False
+            self._last_sync = None
             self._cached_db = None
             self._last_db_query = None
             

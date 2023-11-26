@@ -212,15 +212,6 @@ class aPlayerSeason(AwaitLoader):
             )
 
     async def update_name(self,new_name:str):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__name=name,
-        #             upsert=True
-        #             )
         async with self._lock:            
             self.name = new_name
             await bot_client.coc_db.db__player_stats.update_one(
@@ -234,15 +225,6 @@ class aPlayerSeason(AwaitLoader):
                 upsert=True)
     
     async def update_townhall(self,new_th:int):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__town_hall=town_hall,
-        #             upsert=True
-        #             )
         async with self._lock:
             self.town_hall = new_th
             await bot_client.coc_db.db__player_stats.update_one(
@@ -256,15 +238,6 @@ class aPlayerSeason(AwaitLoader):
                 upsert=True)
     
     async def update_home_clan(self,new_tag:Optional[str]=None):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__home_clan=tag,
-        #             upsert=True
-        #             )
         async with self._lock:
             self.home_clan_tag = new_tag
             await bot_client.coc_db.db__player_stats.update_one(
@@ -278,15 +251,6 @@ class aPlayerSeason(AwaitLoader):
                 upsert=True)
     
     async def update_member(self,is_member:bool=False):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__is_member=m,
-        #             upsert=True
-        #             )
         async with self._lock:
             self.is_member = is_member
             await bot_client.coc_db.db__player_stats.update_one(
@@ -300,15 +264,6 @@ class aPlayerSeason(AwaitLoader):
                 upsert=True)
     
     async def add_time_in_home_clan(self,duration:int):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__time_in_home_clan=time_in_home_clan,
-        #             upsert=True
-        #             )
         async with self._lock:
             self.time_in_home_clan = await self.time_in_home_clan + duration
             await bot_client.coc_db.db__player_stats.update_one(
@@ -323,16 +278,6 @@ class aPlayerSeason(AwaitLoader):
             bot_client.coc_data_log.debug(f"{self}: Added {duration} to time in home clan")
     
     async def add_last_seen(self,timestamp:pendulum.DateTime):
-        # def _update_in_db():
-        #     db_PlayerStats.objects(
-        #         stats_id=self._db_id
-        #         ).update_one(
-        #             set__season=self.season.id,
-        #             set__tag=self.tag,
-        #             set__last_seen=last_seen,
-        #             upsert=True
-        #             )
-            
         async with self._lock:
             if timestamp.int_timestamp not in await self._last_seen:
                 last_seen = await self._last_seen

@@ -108,6 +108,9 @@ class aClan(coc.Clan,BasicClan):
         #if self.is_registered_clan or self.is_active_league_clan:
         asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
 
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
+            return
+        
         basic_clan = BasicClan(self.tag)
 
         if await basic_clan.name != self.name:
