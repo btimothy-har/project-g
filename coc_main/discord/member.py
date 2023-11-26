@@ -30,7 +30,6 @@ class aMember(AwaitLoader):
 
     @classmethod
     async def load_all(cls) -> List['aMember']:
-
         all_members = []
         iter_guilds = AsyncIter(bot_client.bot.guilds)
         async for guild in iter_guilds:
@@ -221,7 +220,7 @@ class aMember(AwaitLoader):
             if await account.is_member and await account.home_clan:
                 if account.home_clan.tag in await self._scope_clans:
                     ret.append(account)
-        return sorted(ret, key=lambda x:(ClanRanks.get_number(x.alliance_rank),await x.town_hall_level,await x.exp_level),reverse=True)
+        return sorted(ret, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
 
     @async_property
     async def home_clans(self) -> List[aPlayerClan]:
