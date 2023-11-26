@@ -196,12 +196,12 @@ class ClashOfClansClient(commands.Cog):
                 await asyncio.sleep(0.5)
                 continue
             
-            a = pendulum.now()
-            await player
-            if player.clan:
-                await player.clan
-            b = pendulum.now()
-            bot_client.coc_main_log.info(f"{tag}: API call took {round((b-a).total_seconds(),2)} seconds.")
+        a = pendulum.now()
+        await player
+        if player.clan:
+            await player.clan
+        b = pendulum.now()
+        bot_client.coc_main_log.info(f"{tag}: API call took {round((b-a).total_seconds(),2)} seconds.")
 
         return player
     
@@ -273,7 +273,7 @@ class ClashOfClansClient(commands.Cog):
                     raise ClashAPIError()
                 await asyncio.sleep(0.5)
                 continue
-            await clan
+        await clan
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
