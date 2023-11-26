@@ -97,7 +97,7 @@ class aMember(AwaitLoader):
         if not user.guild:
             raise InvalidGuild(user.guild_id)
         
-        last_role_sync = await user.get_last_role_sync()
+        last_role_sync = await user.last_role_sync()
         if not last_role_sync or pendulum.now().int_timestamp - getattr(last_role_sync,'int_timestamp',0) >= 600:
             try:
                 await user.sync_clan_roles()
