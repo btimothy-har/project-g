@@ -56,13 +56,8 @@ class aPlayerSeason(AwaitLoader):
     
     @async_property
     async def _database(self) -> Optional[db_PlayerStats]:
-        def _get_from_db():
-            try:
-                return db_PlayerStats.objects.get(stats_id=self._db_id)
-            except DoesNotExist:
-                return None
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            self._cached_db = await bot_client.coc_db.db__player_stats.find_one({'_id.season': self.season.id,'_id.tag': self.tag})
+            self._cached_db = await bot_client.coc_db.db__player_stats.find_one({'_id':self._db_id})
             self._last_db_query = pendulum.now()
         return self._cached_db
     
