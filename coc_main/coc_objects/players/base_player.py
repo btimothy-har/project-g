@@ -300,6 +300,8 @@ class _PlayerAttributes():
     @async_property
     async def _database(self) -> Optional[dict]:
         if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
+            if self.tag == '#LJC8V0GCJ':
+                bot_client.coc_data_log.info(f"{self}: Database query")
             self._cached_db = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self._last_db_query = pendulum.now()
         return self._cached_db
