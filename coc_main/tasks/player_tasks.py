@@ -583,12 +583,12 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                #sleep = 10 / len(scope_tags)
+                sleep = 10 / len(scope_tags)
                 a_iter = AsyncIter(scope_tags)            
                 async for tag in a_iter:
                     task = asyncio.create_task(self._run_single_loop(tag))
                     tasks.append(task)
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(sleep)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -604,7 +604,7 @@ class PlayerLoop(TaskLoop):
                 await self._queue.put(wrap_task)
                 self._status = "Not Running"
 
-                await asyncio.sleep(5)
+                await asyncio.sleep(0)
                 continue
         
         except Exception as exc:

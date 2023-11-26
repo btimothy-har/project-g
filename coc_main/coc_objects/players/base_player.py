@@ -22,11 +22,15 @@ bot_client = client()
 class BasicPlayer(AwaitLoader):
 
     @classmethod
-    async def load_all(cls) -> List['BasicPlayer']:        
+    async def load_all(cls) -> List['BasicPlayer']:
+        async def load_player(tag:str):
+            player = await cls(tag=tag)
+            await bot_client.player_queue.put(player.tag)
+
         query = bot_client.coc_db.db__player.find({},{'_id':1})        
         async for p in query:
-            await bot_client.player_queue.put(p['_id'])
-            await asyncio.sleep(0.01)
+            asyncio.create_task(load_player(p['_id']))
+            await asyncio.sleep(0.1)
     
     @classmethod
     def clear_cache(cls):
