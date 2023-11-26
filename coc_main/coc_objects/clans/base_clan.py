@@ -443,10 +443,10 @@ class BasicClan(AwaitLoader):
     
     async def set_war_league(self,new_war_league:str):
         async with self._attributes._lock:
-            self.war_league = self._attributes.war_league_name = new_war_league
+            self.war_league_name = self._attributes.war_league_name = new_war_league
             await bot_client.coc_db.db__clan.update_one(
                 {'_id':self.tag},
-                {'$set':{'war_league':await self.war_league}},
+                {'$set':{'war_league':await self.war_league_name}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{self}: war_league changed to {await self.war_league_name}.")
