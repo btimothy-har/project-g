@@ -632,35 +632,34 @@ class PlayerLoop(TaskLoop):
     async def _run_single_loop(self,tag:str):        
         lock = self._locks[tag]
         try:
-            async with self.task_semaphore:   
-                if lock.locked():
-                    return
-                await lock.acquire()
+            if lock.locked():
+                return
+            await lock.acquire()
 
-                cached_player = self._cached.get(tag,None)
-                if await self.defer(cached_player):
+            cached_player = self._cached.get(tag,None)
+            if await self.defer(cached_player):
+                return self.loop.call_later(10,self.unlock,lock)
+            
+            st = pendulum.now()
+            async with self.api_semaphore:
+                new_player = None
+                try:
+                    new_player = await self.coc_client.fetch_player(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
                     return self.loop.call_later(10,self.unlock,lock)
                 
-                st = pendulum.now()
-                async with self.api_semaphore:
-                    new_player = None
-                    try:
-                        new_player = await self.coc_client.fetch_player(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                    
-                    wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
-                    #wait = getattr(new_player,'_response_retry',default_sleep)
-                    self.loop.call_later(wait,self.unlock,lock)
-                
-                if cached_player:        
-                    if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
-                        self._cached[tag] = new_player
-                        await self._dispatch_events(cached_player,new_player)
-                else:
+                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
+                #wait = getattr(new_player,'_response_retry',default_sleep)
+                self.loop.call_later(wait,self.unlock,lock)
+            
+            if cached_player:        
+                if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
                     self._cached[tag] = new_player
+                    await self._dispatch_events(cached_player,new_player)
+            else:
+                self._cached[tag] = new_player
 
         except Exception as exc:
             if self.loop_active:

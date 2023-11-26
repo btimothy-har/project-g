@@ -202,34 +202,33 @@ class ClanLoop(TaskLoop):
         lock = self._locks[tag]
 
         try:
-            async with self.task_semaphore:
-                if lock.locked():
-                    return
-                await lock.acquire()
+            if lock.locked():
+                return
+            await lock.acquire()
 
-                cached_clan = self._cached.get(tag,None)
-                if await self.defer(cached_clan):
+            cached_clan = self._cached.get(tag,None)
+            if await self.defer(cached_clan):
+                return self.loop.call_later(10,self.unlock,lock)
+            
+            st = pendulum.now()
+            async with self.api_semaphore: 
+                new_clan = None
+                try:
+                    new_clan = await self.coc_client.fetch_clan(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
                     return self.loop.call_later(10,self.unlock,lock)
                 
-                st = pendulum.now()
-                async with self.api_semaphore: 
-                    new_clan = None
-                    try:
-                        new_clan = await self.coc_client.fetch_clan(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                    
-                    wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
-                    self.loop.call_later(wait,self.unlock,lock)                
-                
-                if cached_clan:
-                    if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
-                        self._cached[tag] = new_clan
-                        await self._dispatch_events(cached_clan,new_clan)
-                else:
+                wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
+                self.loop.call_later(wait,self.unlock,lock)                
+            
+            if cached_clan:
+                if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
                     self._cached[tag] = new_clan
+                    await self._dispatch_events(cached_clan,new_clan)
+            else:
+                self._cached[tag] = new_clan
                     
         except Exception as exc:
             if self.loop_active:
