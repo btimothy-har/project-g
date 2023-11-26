@@ -27,8 +27,7 @@ class BasicClan(AwaitLoader):
     async def load_all(cls) -> List['BasicClan']:
         query = bot_client.coc_db.db__clan.find({},{'_id':1})
         async for c in query:
-            clan = await cls(c['_id'])
-            await bot_client.clan_queue.put(clan.tag)
+            await bot_client.clan_queue.put(c['_id'])
             await asyncio.sleep(0.01)
     
     @classmethod
