@@ -657,7 +657,10 @@ class PlayerLoop(TaskLoop):
             if cached_player:        
                 if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
                     self._cached[tag] = new_player
+                    a = pendulum.now()
                     await self._dispatch_events(cached_player,new_player)
+                    b = pendulum.now()
+                    bot_client.coc_main_log.info(f"{tag}: Dispatch call took {round((b-a).total_seconds(),2)} seconds.")
             else:
                 self._cached[tag] = new_player
 

@@ -85,6 +85,7 @@ class ClanLoop(TaskLoop):
         await super().stop()
     
     def add_to_loop(self,tag:str):
+        return
         add, n_tag = super().add_to_loop(tag)
     
     def remove_to_loop(self,tag:str):
