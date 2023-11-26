@@ -20,6 +20,8 @@ from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
 from ..exceptions import CacheNotReady
 
+from ..utils.utils import chunks
+
 bot_client = client()
 default_sleep = 60
 
@@ -116,10 +118,7 @@ class ClanLoop(TaskLoop):
     ############################################################
     ### PRIMARY TASK LOOP
     ############################################################
-    async def _loop_task(self):
-        async def gather(*args):
-            return await asyncio.gather(*args,return_exceptions=True)
-        
+    async def _loop_task(self):        
         try:
             while self.loop_active:
 
@@ -141,11 +140,10 @@ class ClanLoop(TaskLoop):
                 tasks = []
 
                 scope_tags = list(tags)
-
-                a_iter = AsyncIter(scope_tags)
-                tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
-
-                await asyncio.gather(*tasks,return_exceptions=True)
+                async for batch in chunks(scope_tags,1000):
+                    a_iter = AsyncIter(batch)
+                    tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
+                    await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
                 self._running = False

@@ -16,6 +16,7 @@ from ..discord.feeds.capital_contribution import CapitalContributionFeed
 
 from ..coc_objects.players.player import db_Player, aPlayer, db_PlayerStats
 from ..utils.constants.coc_constants import activity_achievements
+from ..utils.utils import chunks
 
 bot_client = client()
 default_sleep = 60
@@ -512,8 +513,6 @@ class PlayerLoop(TaskLoop):
         remove, n_tag = super().remove_to_loop(tag)
     
     def delay_multiplier(self,player:Optional[aPlayer]=None) -> int:
-        if player.tag == "#LJC8V0GCJ":
-            return 1
         if not player:
             return 1
         if player.is_member:
@@ -577,16 +576,13 @@ class PlayerLoop(TaskLoop):
                 tasks = []
                 
                 scope_tags = list(tags)
-                if '#LJC8V0GCJ' not in scope_tags:
-                    scope_tags.append('#LJC8V0GCJ')
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
-                    )
-                
-                a_iter = AsyncIter(scope_tags)
-                tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
-
-                await asyncio.gather(*tasks,return_exceptions=True)
+                    )                
+                async for batch in chunks(scope_tags,1000):
+                    a_iter = AsyncIter(batch)
+                    tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
+                    await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -658,11 +654,9 @@ class PlayerLoop(TaskLoop):
                     return
                 await lock.acquire()
 
-                
                 cached_player = self._cached.get(tag,None)
-                if tag != '#LJC8V0GCJ':
-                    if self.defer(cached_player):
-                        return self.loop.call_later(10,self.unlock,lock)
+                if self.defer(cached_player):
+                    return self.loop.call_later(10,self.unlock,lock)
                 
                 st = pendulum.now()
                 async with self.api_semaphore:

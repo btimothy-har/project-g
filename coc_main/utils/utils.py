@@ -21,7 +21,7 @@ def s_convert_seconds_to_str(seconds):
 
     return dtime_days, dtime_hours, dtime_minutes, dtime
 
-def chunks(lst, n):
+async def chunks(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
