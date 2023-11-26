@@ -548,10 +548,7 @@ class PlayerLoop(TaskLoop):
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
-    async def _loop_task(self):
-        async def gather(*args):
-            return await asyncio.gather(*args,return_exceptions=True)
-        
+    async def _loop_task(self):        
         try:
             while self.loop_active:
 
@@ -583,9 +580,11 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                sleep = 1 / len(scope_tags)
+                
                 a_iter = AsyncIter(scope_tags)
-                tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]                
+                tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
+
+                await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -593,16 +592,10 @@ class PlayerLoop(TaskLoop):
                 runtime = self._last_loop-st
                 bot_client.coc_main_log.info(
                     f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
-                    )
-
-                wrap_task = asyncio.create_task(gather(*tasks))
-                await self._queue.put(wrap_task)
+                    )               
                 self._status = "Not Running"
 
-                if runtime.total_seconds() < 10:
-                    await asyncio.sleep(10)
-                else:
-                    await asyncio.sleep(5)
+                await asyncio.sleep(10)
                 continue
         
         except Exception as exc:

@@ -137,27 +137,20 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                st = pendulum.now()
                 self._running = True
                 tasks = []
 
                 scope_tags = list(tags)
-                sleep = 1 / len(scope_tags)
+
                 a_iter = AsyncIter(scope_tags)
                 tasks = [asyncio.create_task(self._run_single_loop(tag)) async for tag in a_iter]
+
+                await asyncio.gather(*tasks,return_exceptions=True)
 
                 self._last_loop = pendulum.now()
                 self._running = False
 
-                runtime = self._last_loop - st
-
-                wrap_task = asyncio.create_task(gather(*tasks))
-                await self._queue.put(wrap_task)
-                
-                if runtime.total_seconds() < 10:
-                    await asyncio.sleep(10)
-                else:
-                    await asyncio.sleep(5)
+                await asyncio.sleep(10)
                 continue
         
         except Exception as exc:
