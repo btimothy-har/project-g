@@ -377,21 +377,9 @@ class BotClashClient():
     #####
     ##################################################  
     async def load_seasons(self):
-        def _find_current():
-            try:
-                s = dSeason.objects.get(s_is_current=True)
-            except DoesNotExist:
-                s = None
-            return getattr(s,'s_id',None)
-
-        def _find_tracked():
-            s = dSeason.objects(s_is_current=False).only('s_id')
-            return [ss.s_id for ss in s]
+        curr_season = await self.coc_db.d_season.find_one({"s_is_current":True})
+        season_id = curr_season.get("s_id",None) if curr_season else None
         
-        def _delete_invalid(ss):
-            dSeason.objects(s_id=ss).delete()
-        
-        season_id = await self.run_in_thread(_find_current)
         if season_id:
             self._current_season = aClashSeason(str(season_id))
         else:
@@ -400,13 +388,12 @@ class BotClashClient():
         
         self.coc_main_log.info(f"Current Season: {self.current_season.description}")
 
-        tracked_seasons = await self.run_in_thread(_find_tracked)
-        aiter = AsyncIter(tracked_seasons)
-        async for ss in aiter:
+        tracked_seasons = self.coc_db.d_season.find({"s_is_current":False})
+        async for ss in tracked_seasons:
             try:
-                s = aClashSeason(str(ss))
+                s = aClashSeason(str(ss["s_id"]))
             except:
-                await self.run_in_thread(_delete_invalid,ss)
+                await self.coc_db.d_season.delete_one({"s_id":ss["s_id"]})
                 self.coc_main_log.warning(f"Invalid Season: {ss} deleted.")
             else:
                 self._tracked_seasons.append(s)
