@@ -553,7 +553,6 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                st = pendulum.now()
                 self._running = True
                 self._status = "Running"
                 
@@ -564,20 +563,9 @@ class PlayerLoop(TaskLoop):
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
                     await self._launch_single_loop(tag)
-
-                z = pendulum.now()
-                tim = z-st                
-                bot_client.coc_main_log.info(
-                    f"Dispatch took {round(tim.total_seconds(),2)} seconds."
-                    )
                 
                 self._last_loop = pendulum.now()
                 self._running = False
-
-                runtime = self._last_loop-st
-                bot_client.coc_main_log.info(
-                    f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
-                    )               
                 self._status = "Not Running"
 
                 await asyncio.sleep(10)
@@ -596,7 +584,10 @@ class PlayerLoop(TaskLoop):
                 await self._loop_task()
     
     async def _launch_single_loop(self,tag:str):
+        a = pendulum.now()
         lock = self._locks[tag]
+        b = pendulum.now()
+        bot_client.coc_main_log.info(f"Lock: {b-a}")
         if lock.locked():
             return
         await lock.acquire()
