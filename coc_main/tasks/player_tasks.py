@@ -560,6 +560,8 @@ class PlayerLoop(TaskLoop):
                     continue
 
                 st = pendulum.now()
+                yappi.set_clock_type("wall")
+                yappi.start()
                 self._running = True
                 self._status = "Running"
                 tasks = []
@@ -574,6 +576,9 @@ class PlayerLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
+
+                yappi.stop()
+                yappi.get_func_stats().print_all()
 
                 runtime = self._last_loop-st
                 bot_client.coc_main_log.info(
