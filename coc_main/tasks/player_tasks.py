@@ -573,7 +573,7 @@ class PlayerLoop(TaskLoop):
 
                 bot_client.coc_main_log.info(f"Runtime for {len(scope_tags)} tags: {d.total_seconds()}")
 
-                await asyncio.sleep(10)
+                await asyncio.sleep(30)
                 continue
         
         except Exception as exc:
