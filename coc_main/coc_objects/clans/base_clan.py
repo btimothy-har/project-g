@@ -50,7 +50,7 @@ class BasicClan(AwaitLoader):
         return hash(self.tag)
 
     async def load(self):
-        await bot_client.clan_queue.put(self.tag)
+        asyncio.create_task(bot_client.clan_queue.put(self.tag))
     
     ##################################################
     #####

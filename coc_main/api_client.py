@@ -47,7 +47,7 @@ class DataQueue(asyncio.Queue):
     def __init__(self,bot,cache_name):
         self.bot = bot
         self.cache_name = cache_name
-        super().__init__(maxsize=10000)
+        super().__init__(maxsize=1000)
         self._items_set = set()
     
     def __len__(self):
