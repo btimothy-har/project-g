@@ -135,9 +135,12 @@ class ClanLoop(TaskLoop):
                 self._running = True
 
                 scope_tags = list(tags)
-                a_iter = AsyncIter(scope_tags)
                 sleep = 1 / len(scope_tags)
-                [asyncio.create_task(self._launch_single_loop(tag,index,sleep)) async for index,tag in a_iter.enumerate(start=1)]
+                running_index = 0
+                
+                async for chunk in chunks(scope_tags,100):
+                    [asyncio.create_task(self._launch_single_loop(tag,index+running_index,sleep)) for index,tag in enumerate(chunk,start=1)]
+                    running_index += len(chunk)
                 
                 self._last_loop = pendulum.now()
                 self._running = False
