@@ -74,7 +74,6 @@ class ClanLoop(TaskLoop):
             self._is_new = False
     
     async def start(self):
-        return
         bot_client.coc_main_log.info(f"Clan Loop started.")
         await super().start()
             
@@ -86,7 +85,6 @@ class ClanLoop(TaskLoop):
         await super().stop()
     
     def add_to_loop(self,tag:str):
-        return
         add, n_tag = super().add_to_loop(tag)
     
     def remove_to_loop(self,tag:str):
@@ -138,8 +136,9 @@ class ClanLoop(TaskLoop):
                 tasks = []
 
                 scope_tags = list(tags)
-                async for batch in chunks(scope_tags,1000):
-                    tasks.extend([asyncio.create_task(self._run_single_loop(tag)) for tag in batch])
+                a_iter = AsyncIter(scope_tags,steps=100)
+                async for tag in a_iter:
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
                 await asyncio.gather(*tasks,return_exceptions=True)
 

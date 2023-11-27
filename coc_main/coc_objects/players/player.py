@@ -66,6 +66,10 @@ class aPlayer(coc.Player,BasicPlayer):
     
     def __hash__(self):
         return hash(self.tag)
+
+    async def load(self):
+        if self.clan:
+            await self.clan
     
     @property
     def name(self) -> str:

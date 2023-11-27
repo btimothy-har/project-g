@@ -548,12 +548,6 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                # if self._queue.qsize() > 1000000:
-                #     while not self._queue.empty():
-                #         self._status = "On Hold"
-                #         await asyncio.sleep(10)
-                #         continue
-
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -568,8 +562,9 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                async for batch in chunks(scope_tags,1000):
-                    tasks.extend([asyncio.create_task(self._run_single_loop(tag)) for tag in batch])
+                a_iter = AsyncIter(scope_tags,steps=100)
+                async for tag in a_iter:
+                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
 
                 z = pendulum.now()
                 tim = z-st                

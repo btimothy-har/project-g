@@ -197,9 +197,6 @@ class ClashOfClansClient(commands.Cog):
                 continue
                     
         await player
-        if player.clan:
-            await player.clan
-
         return player
     
     async def fetch_many_players(self,*tags) -> List[aPlayer]:
