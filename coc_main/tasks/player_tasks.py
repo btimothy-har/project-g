@@ -597,6 +597,7 @@ class PlayerLoop(TaskLoop):
                 await self._loop_task()
     
     async def _collector_task(self):
+        return
         try:
             while True:
                 task = await self._queue.get()
@@ -652,7 +653,6 @@ class PlayerLoop(TaskLoop):
                     return self.loop.call_later(10,self.unlock,lock)                
                 
                 wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
-                #wait = getattr(new_player,'_response_retry',default_sleep)
                 self.loop.call_later(wait,self.unlock,lock)
             
             if cached_player:        
@@ -682,18 +682,6 @@ class PlayerLoop(TaskLoop):
                 pass
             
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
-        a = pendulum.now()
         tasks = [asyncio.create_task(new_player._sync_cache())]
         tasks.extend([asyncio.create_task(event(old_player,new_player)) for event in PlayerLoop._player_events])
         tasks.extend([asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in PlayerLoop._achievement_events])
-
-        # put_in_queue = []
-        # a_iter = AsyncIter(tasks)
-        # async for task in a_iter:
-        #     put_in_queue.append(asyncio.create_task(self._queue.put(task)))
-
-        # await asyncio.gather(*put_in_queue,return_exceptions=True)
-
-        b = pendulum.now()
-        runtime = b-a
-        bot_client.coc_main_log.info(f"Dispatched events for {new_player.tag} {new_player.name} in {round(runtime.total_seconds(),2)} seconds.")
