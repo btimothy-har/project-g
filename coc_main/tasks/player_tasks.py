@@ -558,8 +558,9 @@ class PlayerLoop(TaskLoop):
                 self._status = "Running"
                 
                 scope_tags = list(tags)
+                a_iter = AsyncIter(scope_tags)
                 sleep = 1/len(scope_tags)
-                [asyncio.create_task(self._launch_single_loop(tag,index,sleep)) for index,tag in enumerate(scope_tags,1)]
+                [asyncio.create_task(self._launch_single_loop(tag,index,sleep)) async for index,tag in a_iter.enumerate(start=1)]
 
                 self._last_loop = pendulum.now()
                 self._running = False
