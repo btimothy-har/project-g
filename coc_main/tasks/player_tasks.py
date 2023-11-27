@@ -574,6 +574,12 @@ class PlayerLoop(TaskLoop):
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
+
+                z = pendulum.now()
+                tim = z-st                
+                bot_client.coc_main_log.info(
+                    f"Dispatch took {round(tim.total_seconds(),2)} seconds."
+                    )
                     
                 await asyncio.gather(*tasks,return_exceptions=True)
 
