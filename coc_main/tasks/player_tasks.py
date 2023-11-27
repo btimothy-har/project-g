@@ -562,6 +562,7 @@ class PlayerLoop(TaskLoop):
         
     async def _run_single_loop(self):
         try:
+            finished = False
             if await self.defer():
                 return self.loop.call_later(10,self.unlock,self.lock)
             
@@ -589,6 +590,7 @@ class PlayerLoop(TaskLoop):
                 else:
                     self.cached = new_player
                 
+                finished = True
                 self._running = False
 
         except Exception as exc:
@@ -603,12 +605,13 @@ class PlayerLoop(TaskLoop):
             return self.unlock(self.lock)
         
         finally:
-            et = pendulum.now()
-            try:
-                runtime = et - st
-                self.run_time.append(runtime.total_seconds())
-                bot_client.coc_main_log.info(
-                    f"PLAYER LOOP: {self.tag} {runtime.total_seconds():.2f}s"
-                    )
-            except:
-                pass
+            if finished:
+                et = pendulum.now()
+                try:
+                    runtime = et - st
+                    self.run_time.append(runtime.total_seconds())
+                    bot_client.coc_main_log.info(
+                        f"PLAYER LOOP: {self.tag} {runtime.total_seconds():.2f}s"
+                        )
+                except:
+                    pass

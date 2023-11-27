@@ -153,11 +153,12 @@ class ClanLoop(TaskLoop):
 
     async def _run_single_loop(self):
         try:
+            finished = False
             if await self.defer():
                 return self.loop.call_later(10,self.unlock,self.lock)
             
             async with self.task_limiter:
-                st = pendulum.now()
+                st = pendulum.now()                
                 self._running = True
 
                 async with self.api_semaphore:                
@@ -180,6 +181,7 @@ class ClanLoop(TaskLoop):
                 else:
                     self.cached = new_clan
                 
+                finished = True
                 self._running = False
                     
         except Exception as exc:
@@ -194,11 +196,12 @@ class ClanLoop(TaskLoop):
             return self.unlock(self.lock)
 
         finally:
-            et = pendulum.now()
-            try:
-                runtime = et - st
-                self.run_time.append(runtime.total_seconds())
-            except:
-                pass
+            if finished:
+                et = pendulum.now()
+                try:
+                    runtime = et - st
+                    self.run_time.append(runtime.total_seconds())
+                except:
+                    pass
     
     
