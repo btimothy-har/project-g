@@ -51,9 +51,6 @@ class BasicPlayer(AwaitLoader):
     def __hash__(self):
         return hash(self.tag)
     
-    async def load(self):
-        asyncio.create_task(bot_client.player_queue.put(self.tag))
-    
     ##################################################
     #####
     ##### FORMATTERS
