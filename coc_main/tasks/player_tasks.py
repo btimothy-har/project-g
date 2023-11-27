@@ -571,9 +571,9 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                a_iter = AsyncIter(scope_tags)
-                async for tag in a_iter:
+                for tag in a_iter:
                     tasks.append(asyncio.create_task(self._run_single_loop(tag)))
+                    await asyncio.sleep(sleep)
 
                 z = pendulum.now()
                 tim = z-st                
