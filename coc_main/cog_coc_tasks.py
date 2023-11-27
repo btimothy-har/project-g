@@ -482,8 +482,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + f"\n{'[Status]':<10} {self.player_loop._status}"
                 + f"\n{'[Runtime]':<10} {self.player_loop.runtime_avg:.2f}s"
-                #+ f"\n{'[Running]':<10} {self.player_loop._run_queue.qsize():,}"
-                + f"\n{'[Tasks]':<10} {self.player_loop._queue.qsize():,}"
                 + "```",
             inline=True
             )
@@ -495,7 +493,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
                 + f"\n{'[Runtime]':<10} {self.clan_loop.runtime_avg:.2f}s"
-                + f"\n{'[Tasks]':<10} {self.clan_loop._queue.qsize():,}"
                 + "```",
             inline=True
             )
@@ -507,7 +504,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Tags]':<10} {len(self.war_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.war_loop._running else 'False'}"
                 + f"\n{'[Runtime]':<10} {self.war_loop.runtime_avg:.2f}s"
-                + f"\n{'[Tasks]':<10} {self.war_loop._queue.qsize():,}"
                 + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
                 + "```",
             inline=True
@@ -519,7 +515,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Tags]':<10} {len(self.raid_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.raid_loop._running else 'False'}"
                 + f"\n{'[Runtime]':<10} {self.raid_loop.runtime_avg:.2f}s"
-                + f"\n{'[Tasks]':<10} {self.raid_loop._queue.qsize():,}"
                 + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
                 + "```",
             inline=True
@@ -532,7 +527,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
                 + f"\n{'[Users]':<10} {len(self.bot.users):,}"
                 + f"\n{'[Running]':<10} {'True' if self.discord_loop._running else 'False'}"
-                + f"\n{'[Tasks]':<10} {self.discord_loop._queue.qsize():,}"
                 + "```",
             inline=True
             )
