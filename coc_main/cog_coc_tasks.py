@@ -60,11 +60,6 @@ class ClashOfClansTasks(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
-        self.clan_loop = ClanLoop()
-        self.war_loop = ClanWarLoop()
-        self.raid_loop = ClanRaidLoop()
-        self.discord_loop = DiscordGuildLoop()
-
         #API CONTROLLER
         self.task_api_slots = int(bot_client.rate_limit * 0.8)
         self.api_semaphore = asyncio.Semaphore(self.task_api_slots)
@@ -360,18 +355,19 @@ class ClashOfClansTasks(commands.Cog):
         
         try:
             async with self.refresh_lock:
-                alliance_tags = await bot_client.run_in_thread(_get_alliance_tags)
-                alliance_clans = AsyncIter(alliance_tags)
-                async for tag in alliance_clans:
-                    self.war_loop.add_to_loop(tag)
-                    self.raid_loop.add_to_loop(tag)
-                    await asyncio.sleep(0)
+                return 
+                # alliance_tags = await bot_client.run_in_thread(_get_alliance_tags)
+                # alliance_clans = AsyncIter(alliance_tags)
+                # async for tag in alliance_clans:
+                #     self.war_loop.add_to_loop(tag)
+                #     self.raid_loop.add_to_loop(tag)
+                #     await asyncio.sleep(0)
                 
-                cwl_tags = await bot_client.run_in_thread(_get_war_league_tags)
-                cwl_clans = AsyncIter(cwl_tags)
-                async for tag in cwl_clans:
-                    self.war_loop.add_to_loop(tag)
-                    await asyncio.sleep(0)
+                # cwl_tags = await bot_client.run_in_thread(_get_war_league_tags)
+                # cwl_clans = AsyncIter(cwl_tags)
+                # async for tag in cwl_clans:
+                #     self.war_loop.add_to_loop(tag)
+                #     await asyncio.sleep(0)
 
                 # try:
                 #     players = await bot_client.coc.get_location_players()
