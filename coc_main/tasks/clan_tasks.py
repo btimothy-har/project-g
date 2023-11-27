@@ -133,14 +133,11 @@ class ClanLoop(TaskLoop):
                     continue
 
                 self._running = True
-                tasks = []
 
                 scope_tags = list(tags)
-                a_iter = AsyncIter(scope_tags,steps=100)
+                a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
-                    tasks.append(asyncio.create_task(self._run_single_loop(tag)))
-
-                await asyncio.gather(*tasks,return_exceptions=True)
+                    await self._launch_single_loop(tag)
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -159,14 +156,16 @@ class ClanLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self._loop_task()
+    
+    async def _launch_single_loop(self,tag:str):
+        lock = self._locks[tag]
+        if lock.locked():
+            return
+        await lock.acquire()
+        asyncio.create_task(self._run_single_loop(tag))
 
     async def _run_single_loop(self,tag:str):
-        lock = self._locks[tag]
         try:
-            if lock.locked():
-                return
-            await lock.acquire()
-
             cached_clan = self._cached.get(tag,None)
             if await self.defer(cached_clan):
                 return self.loop.call_later(10,self.unlock,lock)

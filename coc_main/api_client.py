@@ -96,24 +96,9 @@ class CustomThrottler(coc.BasicThrottler):
         return BotClashClient()
     
     async def __aenter__(self):
-        # if not self.limiter.has_capacity():
-        #     self.client.coc_main_log.debug(f"Throttling request.")
         await self.limiter.acquire()
         await self.client.api_counter.increment_sent()
         return self
-            
-        # async with self.lock:
-        #     self.increment_sent()
-        #     last_run = self.last_run
-        #     if last_run:
-        #         difference = process_time() - last_run
-        #         need_to_sleep = (self.sleep_time * 1) - difference
-        #         if need_to_sleep > 0:
-        #             clashhttp_log.debug("Request throttled. Sleeping for %s", need_to_sleep)
-        #             await asyncio.sleep(need_to_sleep)
-
-        #     self.last_run = process_time()
-        #     return self
     
     async def __aexit__(self, exc_type, exc, tb):
         await self.client.api_counter.increment_rcvd()

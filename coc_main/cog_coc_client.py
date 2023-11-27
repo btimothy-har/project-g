@@ -96,8 +96,8 @@ class ClashOfClansClient(commands.Cog):
 
                 war_tasks = asyncio.create_task(aClanWar.load_all())
                 raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
-                player_tasks = asyncio.create_task(BasicPlayer.load_all())
-                clan_tasks = asyncio.create_task(BasicClan.load_all())
+                asyncio.create_task(BasicPlayer.load_all())
+                asyncio.create_task(BasicClan.load_all())
 
                 wars = await war_tasks
                 self.client.coc_main_log.info(
