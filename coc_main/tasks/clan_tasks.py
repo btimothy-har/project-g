@@ -74,6 +74,7 @@ class ClanLoop(TaskLoop):
             self._is_new = False
     
     async def start(self):
+        return
         bot_client.coc_main_log.info(f"Clan Loop started.")
         await super().start()
             

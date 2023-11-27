@@ -47,7 +47,7 @@ class DataQueue(asyncio.Queue):
     def __init__(self,bot,cache_name):
         self.bot = bot
         self.cache_name = cache_name
-        super().__init__()
+        super().__init__(maxsize=1000)
         self._items_set = set()
     
     def __len__(self):
@@ -305,8 +305,7 @@ class BotClashClient():
             clash_maintenance_complete,
             end_of_trophy_season,
             end_of_clan_games
-            )
-    
+            )    
         
         # loop = asyncio.get_running_loop()
         # loop.set_debug(True)

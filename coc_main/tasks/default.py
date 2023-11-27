@@ -42,7 +42,7 @@ class TaskLoop():
         self._collector = None
         self._last_loop = None
         self._tags = set()
-        self._queue = asyncio.Queue()
+        self._queue = asyncio.Queue(maxsize=100000)
 
         self.run_time = deque(maxlen=100)
     

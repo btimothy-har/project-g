@@ -548,19 +548,16 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 1000000:
-                    while not self._queue.empty():
-                        self._status = "On Hold"
-                        await asyncio.sleep(10)
-                        continue
+                # if self._queue.qsize() > 1000000:
+                #     while not self._queue.empty():
+                #         self._status = "On Hold"
+                #         await asyncio.sleep(10)
+                #         continue
 
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
-
-                # yappi.set_clock_type("wall")
-                # yappi.start()
 
                 st = pendulum.now()
                 self._running = True
@@ -584,11 +581,6 @@ class PlayerLoop(TaskLoop):
                     )               
                 self._status = "Not Running"
 
-                # yappi.start()
-                # yappi.get_func_stats().print_all()
-                # yappi.get_thread_stats().print_all()
-
-
                 await asyncio.sleep(10)
                 continue
         
@@ -605,7 +597,6 @@ class PlayerLoop(TaskLoop):
                 await self._loop_task()
     
     async def _collector_task(self):
-        return
         try:
             while True:
                 task = await self._queue.get()
@@ -667,10 +658,7 @@ class PlayerLoop(TaskLoop):
             if cached_player:        
                 if new_player.timestamp.int_timestamp > getattr(cached_player,'timestamp',pendulum.now()).int_timestamp:
                     self._cached[tag] = new_player
-                    a = pendulum.now()
-                    await self._dispatch_events(cached_player,new_player)
-                    b = pendulum.now()
-                    bot_client.coc_main_log.info(f"{tag}: Dispatch call took {round((b-a).total_seconds(),2)} seconds.")
+                    asyncio.create_task(self._dispatch_events(cached_player,new_player))
             else:
                 self._cached[tag] = new_player
 
@@ -694,10 +682,14 @@ class PlayerLoop(TaskLoop):
                 pass
             
     async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
+        a = pendulum.now()
         tasks = [asyncio.create_task(new_player._sync_cache())]
         tasks.extend([asyncio.create_task(event(old_player,new_player)) for event in PlayerLoop._player_events])
         tasks.extend([asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in PlayerLoop._achievement_events])
 
-        # a_iter = AsyncIter(tasks)
-        # async for task in a_iter:
-        #     await self._queue.put(task)
+        a_iter = AsyncIter(tasks)
+        await asyncio.gather(*(self._queue.put(task) async for task in a_iter))
+
+        b = pendulum.now()
+        runtime = b-a
+        bot_client.coc_main_log.info(f"Dispatched events for {new_player.tag} {new_player.name} in {round(runtime.total_seconds(),2)} seconds.")
