@@ -560,8 +560,6 @@ class PlayerLoop(TaskLoop):
                     continue
 
                 st = pendulum.now()
-                yappi.set_clock_type("wall")
-                yappi.start()
                 self._running = True
                 self._status = "Running"
                 tasks = []
@@ -571,7 +569,7 @@ class PlayerLoop(TaskLoop):
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                async for batch in chunks(scope_tags,1000):
+                async for batch in chunks(scope_tags,100):
                     tasks.extend([asyncio.create_task(self._run_single_loop(tag)) for tag in batch])
 
                 z = pendulum.now()
@@ -584,9 +582,6 @@ class PlayerLoop(TaskLoop):
 
                 self._last_loop = pendulum.now()
                 self._running = False
-
-                yappi.stop()
-                yappi.get_func_stats().print_all()
 
                 runtime = self._last_loop-st
                 bot_client.coc_main_log.info(
