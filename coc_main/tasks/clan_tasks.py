@@ -61,18 +61,18 @@ class ClanLoop(TaskLoop):
     _member_leave_events = [ClanTasks.clan_member_leave]
 
     @classmethod
-    async def _dispatch_events(old_clan:aClan,new_clan:aClan):
-        [asyncio.create_task(event(old_clan,new_clan)) for event in ClanLoop._clan_events]
+    async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
+        [asyncio.create_task(event(old_clan,new_clan)) for event in cls._clan_events]
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
-                [asyncio.create_task(event(member,new_clan)) for event in ClanLoop._member_leave_events]
+                [asyncio.create_task(event(member,new_clan)) for event in cls._member_leave_events]
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
-                [asyncio.create_task(event(member,new_clan)) for event in ClanLoop._member_join_events]
+                [asyncio.create_task(event(member,new_clan)) for event in cls._member_join_events]
 
     def __new__(cls,tag:str):
         if tag not in cls._loops:
