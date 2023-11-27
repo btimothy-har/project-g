@@ -129,11 +129,6 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self._queue.qsize() > 500000:
-                    while not self._queue.empty():
-                        await asyncio.sleep(10)
-                        continue
-
                 tags = copy.copy(self._tags)
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -165,44 +160,9 @@ class ClanLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self._loop_task()
-    
-    async def _collector_task(self):
-        try:
-            while True:
-                task = await self._queue.get()
-                if task.done() or task.cancelled():
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        continue
-                    except Exception as exc:
-                        if self.loop_active:
-                            bot_client.coc_main_log.exception(f"CLAN TASK ERROR: {exc}")
-                            await TaskLoop.report_fatal_error(
-                                message="CLAN TASK ERROR",
-                                error=exc,
-                                )
-                    finally:
-                        self._queue.task_done()
-                else:
-                    await self._queue.put(task)                
-                await asyncio.sleep(0)
-                continue
-
-        except asyncio.CancelledError:
-            while not self._queue.empty():
-                task = await self._queue.get()
-                try:
-                    await task
-                except:
-                    continue
-                finally:
-                    self._queue.task_done()
-                await asyncio.sleep(0)
 
     async def _run_single_loop(self,tag:str):
         lock = self._locks[tag]
-
         try:
             if lock.locked():
                 return
@@ -228,7 +188,7 @@ class ClanLoop(TaskLoop):
             if cached_clan:
                 if new_clan.timestamp.int_timestamp > getattr(cached_clan,'timestamp',pendulum.now()).int_timestamp:
                     self._cached[tag] = new_clan
-                    await self._dispatch_events(cached_clan,new_clan)
+                    asyncio.create_task(self._dispatch_events(cached_clan,new_clan))
             else:
                 self._cached[tag] = new_clan
                     
@@ -253,7 +213,6 @@ class ClanLoop(TaskLoop):
     
     async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):        
         tasks = [asyncio.create_task(new_clan._sync_cache())]
-
         tasks.extend([asyncio.create_task(event(old_clan,new_clan)) for event in ClanLoop._clan_events])
 
         old_member_iter = AsyncIter(old_clan.members)
@@ -265,7 +224,3 @@ class ClanLoop(TaskLoop):
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
                 tasks.extend([asyncio.create_task(event(member,new_clan)) for event in ClanLoop._member_join_events])
-        
-        a_iter = AsyncIter(tasks)
-        async for task in a_iter:
-            await self._queue.put(task)

@@ -145,8 +145,8 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_main(old_player:aPlayer,new_player:aPlayer):
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             update = False
             if old_player.name != new_player.name:
@@ -165,8 +165,8 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_achievement(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             if achievement.name in activity_achievements:
                 old_ach = old_player.get_achievement(achievement.name)
@@ -184,8 +184,8 @@ class PlayerTasks():
     @staticmethod
     async def player_attack_wins(old_player:aPlayer,new_player:aPlayer):       
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             attacks = await current_season.attacks
@@ -210,8 +210,8 @@ class PlayerTasks():
     @staticmethod
     async def player_defense_wins(old_player:aPlayer,new_player:aPlayer):        
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             defenses = await current_season.defenses
@@ -236,8 +236,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_sent(old_player:aPlayer,new_player:aPlayer):
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             donations = await current_season.donations_sent
@@ -262,8 +262,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_received(old_player:aPlayer,new_player:aPlayer):
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             received = await current_season.donations_rcvd
@@ -288,8 +288,8 @@ class PlayerTasks():
     @staticmethod
     async def player_stat_achievements(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
 
@@ -363,8 +363,8 @@ class PlayerTasks():
     @staticmethod
     async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):            
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             
@@ -397,8 +397,8 @@ class PlayerTasks():
     @staticmethod
     async def player_clan_games(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
         try:
-            if not await new_player.is_member:
-                return
+            # if not await new_player.is_member:
+            #     return
             
             current_season = await new_player.get_current_season()
             
@@ -565,11 +565,10 @@ class PlayerLoop(TaskLoop):
                 tasks = []
                 
                 scope_tags = list(tags)
-                sleep = 1 / len(scope_tags)
                 bot_client.coc_main_log.info(
                     f"Started loop for {len(scope_tags)} players."
                     )
-                async for batch in chunks(scope_tags,100):
+                async for batch in chunks(scope_tags,1000):
                     tasks.extend([asyncio.create_task(self._run_single_loop(tag)) for tag in batch])
 
                 z = pendulum.now()
@@ -603,41 +602,6 @@ class PlayerLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self._loop_task()
-    
-    async def _collector_task(self):
-        return
-        try:
-            while True:
-                task = await self._queue.get()
-                if task.done() or task.cancelled():
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        continue
-                    except Exception as exc:
-                        if self.loop_active:
-                            bot_client.coc_main_log.exception(f"PLAYER TASK ERROR: {exc}")
-                            await TaskLoop.report_fatal_error(
-                                message="PLAYER TASK ERROR",
-                                error=exc,
-                                )
-                    finally:
-                        self._queue.task_done()
-                else:
-                    await self._queue.put(task)                
-                await asyncio.sleep(0)
-                continue
-                        
-        except asyncio.CancelledError:
-            while not self._queue.empty():
-                task = await self._queue.get()
-                try:
-                    await task
-                except:
-                    continue
-                finally:
-                    self._queue.task_done()                
-                await asyncio.sleep(0)
     
     async def _run_single_loop(self,tag:str):        
         lock = self._locks[tag]

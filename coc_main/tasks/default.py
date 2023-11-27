@@ -39,12 +39,10 @@ class TaskLoop():
         self._active = False
         self._running = False
         self._status = "Not Running"
-        self._collector = None
         self._last_loop = None
         self._tags = set()
-        self._queue = asyncio.Queue(maxsize=100000)
 
-        self.run_time = deque(maxlen=100)
+        self.run_time = deque(maxlen=1000)
     
     def add_to_loop(self,tag:str):
         n_tag = coc.utils.correct_tag(tag)        
@@ -61,9 +59,6 @@ class TaskLoop():
         return False, n_tag
     
     async def _loop_task(self):
-        pass
-
-    async def _collector_task(self):
         pass
 
     @property
@@ -104,16 +99,10 @@ class TaskLoop():
     ##################################################
     async def start(self):
         self._active = True
-        self._collector = asyncio.create_task(self._collector_task())
         await self._loop_task()
     
     async def stop(self):
-        self._active = False        
-        try:
-            self._collector.cancel()
-            await self._collector
-        except:
-            pass
+        self._active = False
     
     def unlock(self,lock:asyncio.Lock):
         try:
