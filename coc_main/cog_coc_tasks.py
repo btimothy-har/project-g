@@ -462,7 +462,6 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:<10,}"
                 + f"\n{'[API Slots]':<15} " + f"{self.task_api_slots - self.api_semaphore._value:,} / {self.task_api_slots:,} (Wait: {client_waiters:,})"
                 + "```",
             inline=False
@@ -474,6 +473,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Loops]':<10} {len([loop for loop in PlayerLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
+                + f"\n{'[Running]':<10} {len([loop for loop in PlayerLoop.loops() if loop._running]):,}"
                 + f"\n{'[Runtime]':<10} {PlayerLoop.runtime_avg():.2f}s"
                 + "```",
             inline=True
@@ -483,6 +483,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Loops]':<10} {len([loop for loop in ClanLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
+                + f"\n{'[Running]':<10} {len([loop for loop in ClanLoop.loops() if loop._running]):,}"
                 + f"\n{'[Runtime]':<10} {ClanLoop.runtime_avg():.2f}s"
                 + "```",
             inline=True

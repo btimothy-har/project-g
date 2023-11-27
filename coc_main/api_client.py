@@ -483,7 +483,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=20):
+    async def api_login(self,rate_limit:int=10):
         try:
             await self.api_login_keys(rate_limit)
         except:
