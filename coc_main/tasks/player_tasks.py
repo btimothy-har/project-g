@@ -557,9 +557,6 @@ class PlayerLoop(TaskLoop):
                 self._status = "Running"
                 
                 scope_tags = list(tags)
-                bot_client.coc_main_log.info(
-                    f"Started loop for {len(scope_tags)} players."
-                    )
                 a_iter = AsyncIter(scope_tags)
                 async for tag in a_iter:
                     await self._launch_single_loop(tag)
@@ -587,7 +584,7 @@ class PlayerLoop(TaskLoop):
         a = pendulum.now()
         lock = self._locks[tag]
         b = pendulum.now()
-        bot_client.coc_main_log.info(f"Lock: {b-a}")
+        bot_client.coc_main_log.info(f"Lock: {(b-a).total_seconds()}")
         if lock.locked():
             return
         await lock.acquire()
