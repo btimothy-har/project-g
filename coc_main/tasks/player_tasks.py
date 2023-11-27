@@ -564,6 +564,7 @@ class PlayerLoop(TaskLoop):
                 async for chunk in chunks(scope_tags,100):
                     [asyncio.create_task(self._launch_single_loop(tag,index+running_index,sleep)) for index,tag in enumerate(chunk,start=1)]
                     running_index += len(chunk)
+                    await asyncio.sleep(0)
 
                 self._last_loop = pendulum.now()
                 self._running = False
