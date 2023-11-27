@@ -5,6 +5,7 @@ import pendulum
 import random
 
 from typing import *
+from aiolimiter import AsyncLimiter
 
 from collections import deque
 from ..api_client import BotClashClient as client
@@ -63,9 +64,9 @@ class TaskLoop():
         return cog.task_lock
     
     @property
-    def task_semaphore(self) -> asyncio.Semaphore:
+    def task_limiter(self) -> AsyncLimiter:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
+        return cog.task_limiter
     
     @property
     def api_semaphore(self) -> asyncio.Semaphore:

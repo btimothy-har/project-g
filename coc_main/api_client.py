@@ -1,5 +1,4 @@
 import os
-from aiolimiter import AsyncLimiter
 import logging
 import pendulum
 import random
@@ -13,6 +12,7 @@ from coc.ext import discordlinks
 from typing import *
 from mongoengine import *
 
+from aiolimiter import AsyncLimiter
 from art import text2art
 from time import process_time
 from collections import deque

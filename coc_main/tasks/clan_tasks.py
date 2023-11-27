@@ -101,7 +101,7 @@ class ClanLoop(TaskLoop):
         return 10
     
     async def defer(self) -> bool:
-        if self.task_lock.locked():
+        if not self.task_limiter.has_capacity():
             if not self.cached:
                 return False
             if self.cached.is_alliance_clan:
@@ -156,28 +156,31 @@ class ClanLoop(TaskLoop):
             if await self.defer():
                 return self.loop.call_later(10,self.unlock,self.lock)
             
-            st = pendulum.now()
-            self._running = True
+            async with self.task_limiter:
+                st = pendulum.now()
+                self._running = True
 
-            async with self.api_semaphore:                
-                new_clan = None
-                try:
-                    new_clan = await self.coc_client.fetch_clan(self.tag)
-                except InvalidTag:
-                    return self.loop.call_later(3600,self.unlock,self.lock)
-                except ClashAPIError:
-                    return self.loop.call_later(10,self.unlock,self.lock)
-            
-            await new_clan._sync_cache()                
-            wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
-            self.loop.call_later(wait,self.unlock,self.lock)                
-            
-            if self.cached:
-                if new_clan.timestamp.int_timestamp > getattr(self.cached,'timestamp',pendulum.now()).int_timestamp:
-                    asyncio.create_task(ClanLoop._dispatch_events(self.cached,new_clan))
+                async with self.api_semaphore:                
+                    new_clan = None
+                    try:
+                        new_clan = await self.coc_client.fetch_clan(self.tag)
+                    except InvalidTag:
+                        return self.loop.call_later(3600,self.unlock,self.lock)
+                    except ClashAPIError:
+                        return self.loop.call_later(10,self.unlock,self.lock)
+                
+                await new_clan._sync_cache()                
+                wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
+                self.loop.call_later(wait,self.unlock,self.lock)                
+                
+                if self.cached:
+                    if new_clan.timestamp.int_timestamp > getattr(self.cached,'timestamp',pendulum.now()).int_timestamp:
+                        asyncio.create_task(ClanLoop._dispatch_events(self.cached,new_clan))
+                        self.cached = new_clan
+                else:
                     self.cached = new_clan
-            else:
-                self.cached = new_clan
+                
+                self._running = False
                     
         except Exception as exc:
             if self.loop_active:

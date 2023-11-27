@@ -14,6 +14,7 @@ from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 from redbot.core.utils.chat_formatting import humanize_list,box
+from aiolimiter import AsyncLimiter
 
 from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
@@ -69,7 +70,7 @@ class ClashOfClansTasks(commands.Cog):
         self._task_lock = asyncio.Lock()
         self._controller_loop = None
         self.task_lock_timestamp = None
-        self.task_semaphore = asyncio.Semaphore(semaphore_limit)
+        self.task_limiter = AsyncLimiter(300,1)
 
         # DATA QUEUE
         self._clan_queue_task = None
