@@ -687,8 +687,12 @@ class PlayerLoop(TaskLoop):
         tasks.extend([asyncio.create_task(event(old_player,new_player)) for event in PlayerLoop._player_events])
         tasks.extend([asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in PlayerLoop._achievement_events])
 
+        put_in_queue = []
         a_iter = AsyncIter(tasks)
-        await asyncio.gather(*(self._queue.put(task) async for task in a_iter))
+        async for task in a_iter:
+            put_in_queue.append(asyncio.create_task(self._queue.put(task)))
+
+        await asyncio.gather(*put_in_queue,return_exceptions=True)
 
         b = pendulum.now()
         runtime = b-a
