@@ -559,8 +559,8 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                yappi.set_clock_type("wall")
-                yappi.start()
+                # yappi.set_clock_type("wall")
+                # yappi.start()
 
                 st = pendulum.now()
                 self._running = True
@@ -584,9 +584,9 @@ class PlayerLoop(TaskLoop):
                     )               
                 self._status = "Not Running"
 
-                yappi.start()
-                yappi.get_func_stats().print_all()
-                yappi.get_thread_stats().print_all()
+                # yappi.start()
+                # yappi.get_func_stats().print_all()
+                # yappi.get_thread_stats().print_all()
 
 
                 await asyncio.sleep(10)
@@ -605,6 +605,7 @@ class PlayerLoop(TaskLoop):
                 await self._loop_task()
     
     async def _collector_task(self):
+        return
         try:
             while True:
                 task = await self._queue.get()
@@ -697,6 +698,6 @@ class PlayerLoop(TaskLoop):
         tasks.extend([asyncio.create_task(event(old_player,new_player)) for event in PlayerLoop._player_events])
         tasks.extend([asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in PlayerLoop._achievement_events])
 
-        a_iter = AsyncIter(tasks)
-        async for task in a_iter:
-            await self._queue.put(task)
+        # a_iter = AsyncIter(tasks)
+        # async for task in a_iter:
+        #     await self._queue.put(task)
