@@ -553,17 +553,27 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
+                st = pendulum.now()
                 self._running = True
                 self._status = "Running"
+
+                tasks = []
                 
                 scope_tags = list(tags)
-                a_iter = AsyncIter(scope_tags)
+                sleep = 1/len(scope_tags)
+                a_iter = AsyncIter(scope_tags,delay=sleep)
                 async for tag in a_iter:
-                    await self._launch_single_loop(tag)
+                    tasks.append(asyncio.create_task(self._launch_single_loop(tag)))
+
+                await asyncio.gather(*tasks)
                 
                 self._last_loop = pendulum.now()
                 self._running = False
                 self._status = "Not Running"
+
+                d = self.last_loop - st
+
+                bot_client.coc_main_log.info(f"Runtime for {len(scope_tags)} tags: {d.total_seconds()}")
 
                 await asyncio.sleep(10)
                 continue
@@ -585,13 +595,8 @@ class PlayerLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
-        a = pendulum.now()
         asyncio.create_task(self._run_single_loop(tag,lock))
-        b = pendulum.now()
-        bot_client.coc_main_log.info(f"Lock: {(b-a).total_seconds()}")
         
-        
-    
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock):        
         try:
             cached_player = self._cached.get(tag,None)
