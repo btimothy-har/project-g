@@ -4,6 +4,7 @@ import logging
 import pendulum
 import random
 import asyncio
+import yappi
 import motor.motor_asyncio
 
 import coc
@@ -305,6 +306,7 @@ class BotClashClient():
             end_of_trophy_season,
             end_of_clan_games
             )
+    
         
         # loop = asyncio.get_running_loop()
         # loop.set_debug(True)

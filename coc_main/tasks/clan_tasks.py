@@ -250,26 +250,21 @@ class ClanLoop(TaskLoop):
             except:
                 pass
     
-    async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
-        asyncio.create_task(new_clan._sync_cache())
+    async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):        
+        tasks = [asyncio.create_task(new_clan._sync_cache())]
 
-        a_iter = AsyncIter(ClanLoop._clan_events)
-        async for event in a_iter:
-            task = asyncio.create_task(event(old_clan,new_clan))
-            await self._queue.put(task)
+        tasks.extend([asyncio.create_task(event(old_clan,new_clan)) for event in ClanLoop._clan_events])
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
-                a_iter = AsyncIter(ClanLoop._member_leave_events)
-                async for event in a_iter:
-                    task = asyncio.create_task(event(member,new_clan))
-                    await self._queue.put(task)
+                tasks.extend([asyncio.create_task(event(member,new_clan)) for event in ClanLoop._member_leave_events])
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
-                a_iter = AsyncIter(ClanLoop._member_join_events)
-                async for event in a_iter:
-                    task = asyncio.create_task(event(member,new_clan))
-                    await self._queue.put(task)
+                tasks.extend([asyncio.create_task(event(member,new_clan)) for event in ClanLoop._member_join_events])
+        
+        a_iter = AsyncIter(tasks)
+        async for task in a_iter:
+            await self._queue.put(task)

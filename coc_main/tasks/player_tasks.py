@@ -3,6 +3,7 @@ import coc
 import pendulum
 import copy
 import random
+import yappi
 
 from typing import *
 from collections import defaultdict
@@ -558,6 +559,9 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
+                yappi.set_clock_type("wall")
+                yappi.start()
+
                 st = pendulum.now()
                 self._running = True
                 self._status = "Running"
@@ -579,6 +583,11 @@ class PlayerLoop(TaskLoop):
                     f"Loop for {len(scope_tags)} players took {round(runtime.total_seconds(),2)} seconds."
                     )               
                 self._status = "Not Running"
+
+                yappi.start()
+                yappi.get_func_stats().print_all()
+                yappi.get_thread_stats().print_all()
+
 
                 await asyncio.sleep(10)
                 continue
@@ -683,10 +692,8 @@ class PlayerLoop(TaskLoop):
             except:
                 pass
             
-    async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):        
-        await self._queue.put(asyncio.create_task(new_player._sync_cache()))
-
-        tasks = []
+    async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
+        tasks = [asyncio.create_task(new_player._sync_cache())]
         tasks.extend([asyncio.create_task(event(old_player,new_player)) for event in PlayerLoop._player_events])
         tasks.extend([asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in PlayerLoop._achievement_events])
 
