@@ -134,12 +134,9 @@ class ClanLoop(TaskLoop):
 
                 self._running = True
 
-                tasks = []
-
                 scope_tags = list(tags)
-                a_iter = AsyncIter(scope_tags)
-                async for tag in a_iter:
-                    tasks.append(asyncio.create_task(self._launch_single_loop(tag)))
+                sleep = 1 / len(scope_tags)
+                [asyncio.create_task(self._launch_single_loop(tag,index,sleep)) for index,tag in enumerate(scope_tags,1)]
                 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -159,8 +156,9 @@ class ClanLoop(TaskLoop):
                 await asyncio.sleep(60)
                 await self._loop_task()
     
-    async def _launch_single_loop(self,tag:str):
+    async def _launch_single_loop(self,tag:str,index:int,sleep:float):
         lock = self._locks[tag]
+        await asyncio.sleep(sleep * index)
         if lock.locked():
             return
         await lock.acquire()

@@ -556,14 +556,10 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
                 self._status = "Running"
-
-                tasks = []
                 
                 scope_tags = list(tags)
                 sleep = 1/len(scope_tags)
-                a_iter = AsyncIter(scope_tags,delay=sleep)
-                async for tag in a_iter:
-                    tasks.append(asyncio.create_task(self._launch_single_loop(tag)))
+                [asyncio.create_task(self._launch_single_loop(tag,index,sleep)) for index,tag in enumerate(scope_tags,1)]
 
                 self._last_loop = pendulum.now()
                 self._running = False
@@ -588,8 +584,9 @@ class PlayerLoop(TaskLoop):
                 await asyncio.sleep(60)
                 await self._loop_task()
     
-    async def _launch_single_loop(self,tag:str):
+    async def _launch_single_loop(self,tag:str,index:int,sleep:float):
         lock = self._locks[tag]
+        await asyncio.sleep(sleep * index)
         if lock.locked():
             return
         await lock.acquire()
