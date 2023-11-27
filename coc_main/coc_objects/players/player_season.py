@@ -279,8 +279,10 @@ class aPlayerSeason(AwaitLoader):
     
     async def add_last_seen(self,timestamp:pendulum.DateTime):
         async with self._lock:
-            if timestamp.int_timestamp not in await self._last_seen:
-                last_seen = await self._last_seen
+            ls = await self._last_seen
+            last_seen = ls if ls else []
+
+            if timestamp.int_timestamp not in last_seen:
                 last_seen.append(timestamp.int_timestamp)
                 self._last_seen = last_seen
                 
