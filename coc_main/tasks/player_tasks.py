@@ -581,14 +581,16 @@ class PlayerLoop(TaskLoop):
                 await self._loop_task()
     
     async def _launch_single_loop(self,tag:str):
-        a = pendulum.now()
         lock = self._locks[tag]
-        b = pendulum.now()
-        bot_client.coc_main_log.info(f"Lock: {(b-a).total_seconds()}")
         if lock.locked():
             return
         await lock.acquire()
+        a = pendulum.now()
         asyncio.create_task(self._run_single_loop(tag,lock))
+        b = pendulum.now()
+        bot_client.coc_main_log.info(f"Lock: {(b-a).total_seconds()}")
+        
+        
     
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock):        
         try:
