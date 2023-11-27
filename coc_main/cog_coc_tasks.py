@@ -265,7 +265,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def clan_queue_task(self):
-        sleep = (1 / bot_client.rate_limit) * 10
+        sleep = 0
         try:
             while True:
                 try:
@@ -284,7 +284,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def player_queue_task(self):
-        sleep = (1 / bot_client.rate_limit) * 10
+        sleep = 0
         try:
             while True:
                 try:
