@@ -60,7 +60,6 @@ class ClashOfClansTasks(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
-        self.player_loop = PlayerLoop()
         self.clan_loop = ClanLoop()
         self.war_loop = ClanWarLoop()
         self.raid_loop = ClanRaidLoop()
@@ -144,11 +143,10 @@ class ClashOfClansTasks(commands.Cog):
         self.clash_season_check.start()    
         self.refresh_coc_loops.start()
 
-        asyncio.create_task(self.player_loop.start())
-        asyncio.create_task(self.clan_loop.start())
-        asyncio.create_task(self.war_loop.start())
-        asyncio.create_task(self.raid_loop.start())
-        asyncio.create_task(self.discord_loop.start())
+        
+        # asyncio.create_task(self.war_loop.start())
+        # asyncio.create_task(self.raid_loop.start())
+        # asyncio.create_task(self.discord_loop.start())
     
     async def start_recruiting_loop(self):
         posts = await RecruitingReminder.get_all_active()
@@ -185,11 +183,10 @@ class ClashOfClansTasks(commands.Cog):
             bot_client.coc_data_log.removeHandler(handler)
 
         stop_tasks = []
-        stop_tasks.append(asyncio.create_task(self.discord_loop.stop()))
-        stop_tasks.append(asyncio.create_task(self.raid_loop.stop()))
-        stop_tasks.append(asyncio.create_task(self.war_loop.stop()))
-        stop_tasks.append(asyncio.create_task(self.clan_loop.stop()))
-        stop_tasks.append(asyncio.create_task(self.player_loop.stop()))
+        # stop_tasks.append(asyncio.create_task(self.discord_loop.stop()))
+        # stop_tasks.append(asyncio.create_task(self.raid_loop.stop()))
+        # stop_tasks.append(asyncio.create_task(self.war_loop.stop()))
+        # stop_tasks.append(asyncio.create_task(self.clan_loop.stop()))
         
         await asyncio.gather(*stop_tasks,return_exceptions=True)
 
@@ -271,7 +268,8 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     tag = await bot_client.clan_queue.get()
                     clan = await BasicClan(tag)
-                    self.clan_loop.add_to_loop(clan.tag)
+                    loop = ClanLoop(clan.tag)
+                    await loop.start()
                     bot_client.clan_queue.task_done()
                     await asyncio.sleep(sleep)
 
@@ -290,7 +288,8 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     tag = await bot_client.player_queue.get()
                     player = await BasicPlayer(tag)
-                    self.player_loop.add_to_loop(player.tag)
+                    loop = PlayerLoop(player.tag)
+                    await loop.start()
                     bot_client.player_queue.task_done()
                     await asyncio.sleep(sleep)
 
@@ -476,62 +475,58 @@ class ClashOfClansTasks(commands.Cog):
         # embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Player Loops**",
-            value="Last: " + (f"<t:{self.player_loop.last_loop.int_timestamp}:R>" if self.player_loop.last_loop else "None")
-                + "```ini"
-                + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
+            value="```ini"
+                + f"\n{'[Loops]':<10} {len([loop for loop in PlayerLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
-                + f"\n{'[Status]':<10} {self.player_loop._status}"
-                + f"\n{'[Runtime]':<10} {self.player_loop.runtime_avg:.2f}s"
+                + f"\n{'[Runtime]':<10} {PlayerLoop.runtime_avg():.2f}s"
                 + "```",
             inline=True
             )
         embed.add_field(
             name="**Clan Loops**",
-            value="Last: " + (f"<t:{self.clan_loop.last_loop.int_timestamp}:R>" if self.clan_loop.last_loop else "None")
-                + "```ini"
-                + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
+            value="```ini"
+                + f"\n{'[Loops]':<10} {len([loop for loop in ClanLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
-                + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
-                + f"\n{'[Runtime]':<10} {self.clan_loop.runtime_avg:.2f}s"
+                + f"\n{'[Runtime]':<10} {ClanLoop.runtime_avg():.2f}s"
                 + "```",
             inline=True
             )
-        embed.add_field(name="\u200b",value="\u200b",inline=True)
-        embed.add_field(
-            name="**Clan Wars**",
-            value="Last: " + (f"<t:{self.war_loop.last_loop.int_timestamp}:R>" if self.war_loop.last_loop else "None")
-                + "```ini"                
-                + f"\n{'[Tags]':<10} {len(self.war_loop._tags):,}"
-                + f"\n{'[Running]':<10} {'True' if self.war_loop._running else 'False'}"
-                + f"\n{'[Runtime]':<10} {self.war_loop.runtime_avg:.2f}s"
-                + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
-                + "```",
-            inline=True
-            )
-        embed.add_field(
-            name="**Capital Raids**",
-            value="Last: " + (f"<t:{self.raid_loop.last_loop.int_timestamp}:R>" if self.raid_loop.last_loop else "None")
-                + "```ini"                
-                + f"\n{'[Tags]':<10} {len(self.raid_loop._tags):,}"
-                + f"\n{'[Running]':<10} {'True' if self.raid_loop._running else 'False'}"
-                + f"\n{'[Runtime]':<10} {self.raid_loop.runtime_avg:.2f}s"
-                + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
-                + "```",
-            inline=True
-            )
-        embed.add_field(name="\u200b",value="\u200b",inline=True)
-        embed.add_field(
-            name="**Discord**",
-            value="Last: " + (f"<t:{self.discord_loop.last_loop.int_timestamp}:R>" if self.discord_loop.last_loop else "None")
-                + "```ini"
-                + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
-                + f"\n{'[Users]':<10} {len(self.bot.users):,}"
-                + f"\n{'[Running]':<10} {'True' if self.discord_loop._running else 'False'}"
-                + "```",
-            inline=True
-            )
-        embed.add_field(name="\u200b",value="\u200b",inline=True)
-        embed.add_field(name="\u200b",value="\u200b",inline=True)
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
+        # embed.add_field(
+        #     name="**Clan Wars**",
+        #     value="Last: " + (f"<t:{self.war_loop.last_loop.int_timestamp}:R>" if self.war_loop.last_loop else "None")
+        #         + "```ini"                
+        #         + f"\n{'[Tags]':<10} {len(self.war_loop._tags):,}"
+        #         + f"\n{'[Running]':<10} {'True' if self.war_loop._running else 'False'}"
+        #         + f"\n{'[Runtime]':<10} {self.war_loop.runtime_avg:.2f}s"
+        #         + f"\n{'[Cache]':<10} {len(aClanWar._cache):,}"
+        #         + "```",
+        #     inline=True
+        #     )
+        # embed.add_field(
+        #     name="**Capital Raids**",
+        #     value="Last: " + (f"<t:{self.raid_loop.last_loop.int_timestamp}:R>" if self.raid_loop.last_loop else "None")
+        #         + "```ini"                
+        #         + f"\n{'[Tags]':<10} {len(self.raid_loop._tags):,}"
+        #         + f"\n{'[Running]':<10} {'True' if self.raid_loop._running else 'False'}"
+        #         + f"\n{'[Runtime]':<10} {self.raid_loop.runtime_avg:.2f}s"
+        #         + f"\n{'[Cache]':<10} {len(aRaidWeekend._cache):,}"
+        #         + "```",
+        #     inline=True
+        #     )
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
+        # embed.add_field(
+        #     name="**Discord**",
+        #     value="Last: " + (f"<t:{self.discord_loop.last_loop.int_timestamp}:R>" if self.discord_loop.last_loop else "None")
+        #         + "```ini"
+        #         + f"\n{'[Guilds]':<10} {len(self.bot.guilds):,}"
+        #         + f"\n{'[Users]':<10} {len(self.bot.users):,}"
+        #         + f"\n{'[Running]':<10} {'True' if self.discord_loop._running else 'False'}"
+        #         + "```",
+        #     inline=True
+        #     )
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
+        # embed.add_field(name="\u200b",value="\u200b",inline=True)
         return embed
     
     @commands.group(name="cocdata")

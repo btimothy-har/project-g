@@ -38,25 +38,9 @@ class TaskLoop():
     def __init__(self):
         self._active = False
         self._running = False
-        self._status = "Not Running"
-        self._last_loop = None
-        self._tags = set()
+        self._task = None
 
-        self.run_time = deque(maxlen=1000)
-    
-    def add_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)        
-        if n_tag not in self._tags:
-            self._tags.add(n_tag)
-            return True, n_tag
-        return False, n_tag
-    
-    def remove_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag in self._tags:
-            self._tags.discard(n_tag)
-            return True, n_tag
-        return False, n_tag
+        self.run_time = deque(maxlen=100)
     
     async def _loop_task(self):
         pass
@@ -64,12 +48,6 @@ class TaskLoop():
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
-    
-    @property
-    def last_loop(self) -> pendulum.DateTime:
-        if self._last_loop:
-            return self._last_loop
-        return pendulum.now()
 
     @property
     def coc_client(self) -> ClashOfClansClient:
@@ -99,10 +77,19 @@ class TaskLoop():
     ##################################################
     async def start(self):
         self._active = True
-        await self._loop_task()
+        if not self._task or self._task.done():
+            self._task = asyncio.create_task(self._loop_task())
     
     async def stop(self):
         self._active = False
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._task = None
     
     def unlock(self,lock:asyncio.Lock):
         try:
@@ -122,21 +109,27 @@ class TaskLoop():
         except:
             return False
     
-    @property
-    def runtime_min(self) -> int:
+    @classmethod
+    def runtime_min(cls) -> int:
+        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
         try:
-            return min(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
+            return min(run_time) if len(run_time) > 0 else 0
         except:
-            return 0    
-    @property
-    def runtime_max(self) -> int:
+            return 0        
+         
+    @classmethod
+    def runtime_max(cls) -> int:
+        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
         try:
-            return max(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
+            return max(run_time) if len(run_time) > 0 else 0
         except:
-            return 0                
-    @property
-    def runtime_avg(self) -> int:
+            return 0
+           
+    @classmethod
+    def runtime_avg(cls) -> int:
+        #combine all run_time loops and average
+        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
         try:
-            return sum(self.run_time)/len(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
+            return sum(run_time)/len(run_time) if len(run_time) > 0 else 0
         except:
             return 0
