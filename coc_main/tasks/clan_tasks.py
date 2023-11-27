@@ -138,7 +138,7 @@ class ClanLoop(TaskLoop):
                 sleep = 1 / len(scope_tags)
                 running_index = 0
 
-                async for chunk in chunks(scope_tags,100):
+                async for chunk in chunks(scope_tags,10):
                     [asyncio.create_task(self._launch_single_loop(tag,index+running_index,sleep)) for index,tag in enumerate(chunk,start=1)]
                     running_index += len(chunk)
                     await asyncio.sleep(0)
