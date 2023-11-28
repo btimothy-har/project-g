@@ -546,7 +546,7 @@ class CWLRosterMenu(DefaultView):
                 row=4
                 ))
         
-        participants = await self.client.fetch_many_players(*self.clan.participants)
+        participants = await self.client.fetch_many_players(*[p.tag for p in self.clan.participants])
         _add_main_menu(participants)
     
     ##################################################
@@ -755,7 +755,7 @@ class CWLRosterMenu(DefaultView):
             show_author=False,
             )
         
-        participants = await self.client.fetch_many_players(*self.clan.participants[:35])
+        participants = await self.client.fetch_many_players(*[p.tag for p in self.clan.participants][:35])
 
         a_participants = AsyncIter(participants)
         async for i,p in a_participants.enumerate(start=1):

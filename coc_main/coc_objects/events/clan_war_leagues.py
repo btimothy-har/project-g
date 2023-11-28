@@ -708,7 +708,10 @@ class WarLeaguePlayer(BasicPlayer):
         async with self._lock:
             self.is_registered = True
             if self.roster_clan:
-                self.roster_clan._participant_tags.remove(self.tag)
+                try:
+                    self.roster_clan._participant_tags.remove(self.tag)
+                except ValueError:
+                    pass
 
             self.roster_clan_tag = league_clan
             self.roster_clan._participant_tags.append(self.tag)
