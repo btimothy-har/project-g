@@ -126,7 +126,6 @@ class ClanLoop(TaskLoop):
         return 10
     
     def defer(self,clan:Optional[aClan]=None) -> bool:
-        return False
         if self.task_lock.locked():
             if not clan:
                 return False

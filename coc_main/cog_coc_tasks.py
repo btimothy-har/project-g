@@ -245,14 +245,13 @@ class ClashOfClansTasks(commands.Cog):
                     if self.task_semaphore._value == semaphore_limit:
                         continue
 
-                    if self.task_semaphore._value <= semaphore_limit * 0.7:
-                        async with self._task_lock:
-                            self.task_lock_timestamp = pendulum.now()
-                            while maintain_lock():
-                                await asyncio.sleep(0.25)
+                    async with self._task_lock:
+                        self.task_lock_timestamp = pendulum.now()
+                        while maintain_lock():
+                            await asyncio.sleep(0.25)
 
-                            self.task_lock_timestamp = None
-                            await asyncio.sleep(0.5)
+                        self.task_lock_timestamp = None
+                        await asyncio.sleep(0.5)
 
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clash Task Controller")

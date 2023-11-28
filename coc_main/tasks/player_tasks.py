@@ -474,7 +474,6 @@ class PlayerLoop(TaskLoop):
         return 10
     
     def defer(self,player:Optional[aPlayer]=None) -> bool:
-        return False
         if self.task_lock.locked():
             if not player:
                 return False
