@@ -41,7 +41,7 @@ from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
-semaphore_limit = 100000
+semaphore_limit = 10000
 
 ############################################################
 ############################################################
@@ -74,7 +74,7 @@ class ClashOfClansTasks(commands.Cog):
         self._controller_loop = None
         self.task_lock_timestamp = None
         self.task_semaphore = asyncio.Semaphore(semaphore_limit)
-        self.task_limiter = AsyncLimiter(1,1/10000)
+        self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots)*3)
 
         # DATA QUEUE
         self._clan_queue_task = None
@@ -477,8 +477,8 @@ class ClashOfClansTasks(commands.Cog):
                 + "```ini"
                 + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
-                + f"\n{'[Loop Time]':<10} {self.player_loop.dispatch_avg:.2f}s"
-                + f"\n{'[Run Time]':<10} {self.player_loop.runtime_avg:.2f}s"
+                + f"\n{'[LoopTime]':<10} {self.player_loop.dispatch_avg:.2f}s"
+                + f"\n{'[RunTime]':<10} {self.player_loop.runtime_avg:.2f}s"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + "```",
             inline=True
@@ -489,8 +489,8 @@ class ClashOfClansTasks(commands.Cog):
                 + "```ini"
                 + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
-                + f"\n{'[Loop Time]':<10} {self.clan_loop.dispatch_avg:.2f}s"
-                + f"\n{'[Run Time]':<10} {self.clan_loop.runtime_avg:.2f}s"
+                + f"\n{'[LoopTime]':<10} {self.clan_loop.dispatch_avg:.2f}s"
+                + f"\n{'[RunTime]':<10} {self.clan_loop.runtime_avg:.2f}s"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + "```",
             inline=True
