@@ -142,8 +142,10 @@ class ClanLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
 
-                a_iter = AsyncIter(tags)
-                tasks = [asyncio.create_task(self._launch_single_loop(tag)) async for tag in a_iter]
+                tasks = []
+                async for chunk in chunks(tags,1000):
+                    tasks.append(asyncio.create_task(self._bulk_dispatch(chunk)))
+                    
                 await asyncio.gather(*tasks)
 
                 self._last_loop = pendulum.now()
@@ -168,6 +170,11 @@ class ClanLoop(TaskLoop):
                     )                    
                 await asyncio.sleep(60)
                 await self.start()
+    
+    async def _bulk_dispatch(self,tags:List[str]):
+        a_iter = AsyncIter(tags)
+        tasks = [asyncio.create_task(self._launch_single_loop(tag)) async for tag in a_iter]
+        await asyncio.gather(*tasks)
     
     async def _launch_single_loop(self,tag:str):
         lock = self._locks[tag]
