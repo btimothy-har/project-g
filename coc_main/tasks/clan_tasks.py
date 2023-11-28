@@ -64,18 +64,23 @@ class ClanLoop(TaskLoop):
 
     @classmethod
     async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
-        asyncio.create_task(new_clan._sync_cache())
-        [asyncio.create_task(event(old_clan,new_clan)) for event in cls._clan_events]
+        tasks = []
+        tasks.append(asyncio.create_task(new_clan._sync_cache()))
+        tasks.extend([asyncio.create_task(event(old_clan,new_clan)) for event in cls._clan_events])
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
-                [asyncio.create_task(event(member,new_clan)) for event in cls._member_leave_events]
+                e_iter = AsyncIter(cls._member_leave_events)
+                tasks.extend([asyncio.create_task(event(member,new_clan)) async for event in e_iter])
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
-                [asyncio.create_task(event(member,new_clan)) for event in cls._member_join_events]
+                e_iter = AsyncIter(cls._member_join_events)
+                tasks.extend([asyncio.create_task(event(member,new_clan)) async for event in e_iter])
+
+        await asyncio.gather(*tasks)
 
     def __new__(cls):
         if cls._instance is None:
@@ -215,7 +220,7 @@ class ClanLoop(TaskLoop):
 
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        await ClanLoop._dispatch_events(cached,new_clan)
+                        asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
                 
                 finished = True
         
