@@ -187,10 +187,10 @@ class ClanLoop(TaskLoop):
         cached = self._cached.get(tag)
         if self.defer(cached):
             return self.loop.call_later(10,self.unlock,lock)
-        
-        asyncio.create_task(self._run_single_loop(tag,lock))
+                
+        asyncio.create_task(self._run_single_loop(tag,lock,cached))
 
-    async def _run_single_loop(self,tag:str,cached:aClan,lock:asyncio.Lock):
+    async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aClan]=None):
         try:            
             finished = False            
             async with self.task_semaphore, self.task_limiter:

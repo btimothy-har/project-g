@@ -487,12 +487,14 @@ class PlayerLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+
         cached = self._cached.get(tag,None)
         if await self.defer(cached):
             return self.loop.call_later(10,self.unlock,lock)
-        asyncio.create_task(self._run_single_loop(tag,lock))
         
-    async def _run_single_loop(self,tag:str,lock:asyncio.Lock):
+        asyncio.create_task(self._run_single_loop(tag,lock,cached))
+        
+    async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aPlayer]=None):
         try:            
             finished = False            
             async with self.task_semaphore, self.task_limiter:
