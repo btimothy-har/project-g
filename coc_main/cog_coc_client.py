@@ -208,8 +208,6 @@ class ClashOfClansClient(commands.Cog):
             tasks.append(asyncio.create_task(self.fetch_player(tag)))
 
         ret = await asyncio.gather(*tasks,return_exceptions=True)
-        if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
-            raise ClashAPIError([e for e in ret if isinstance(e,ClashAPIError)][0])
         
         ret_players = [p for p in ret if isinstance(p,aPlayer)]
         return ret_players
