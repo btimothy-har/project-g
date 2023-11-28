@@ -97,15 +97,14 @@ class PlayerTasks():
             #     return
             
             current_season = await new_player.get_current_season()
-            attacks = await current_season.attacks
 
-            if attacks._prior_seen:
-                increment = new_player.attack_wins - attacks.last_update
+            if current_season.attacks._prior_seen:
+                increment = new_player.attack_wins - current_season.attacks.last_update
             else:
                 increment = new_player.attack_wins - old_player.attack_wins
             
-            if increment > 0 or new_player.attack_wins != attacks.last_update:
-                stat = await attacks.increment_stat(
+            if increment > 0 or new_player.attack_wins != current_season.attacks.last_update:
+                stat = await current_season.attacks.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.attack_wins
                     )
@@ -122,15 +121,14 @@ class PlayerTasks():
             #     return
             
             current_season = await new_player.get_current_season()
-            defenses = await current_season.defenses
 
-            if defenses._prior_seen:
-                increment = new_player.defense_wins - defenses.last_update
+            if current_season.defenses._prior_seen:
+                increment = new_player.defense_wins - current_season.defenses.last_update
             else:
                 increment = new_player.defense_wins - old_player.defense_wins
 
-            if increment > 0 or new_player.defense_wins != defenses.last_update:
-                stat = await defenses.increment_stat(
+            if increment > 0 or new_player.defense_wins != current_season.defenses.last_update:
+                stat = await current_season.defenses.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.defense_wins
                     )
@@ -147,15 +145,14 @@ class PlayerTasks():
             #     return
             
             current_season = await new_player.get_current_season()
-            donations = await current_season.donations_sent
 
-            if donations._prior_seen:
-                increment = new_player.donations - donations.last_update
+            if current_season.donations._prior_seen:
+                increment = new_player.donations - current_season.donations.last_update
             else:
                 increment = new_player.donations - old_player.donations            
             
-            if increment > 0 or new_player.donations != donations.last_update:
-                stat = await donations.increment_stat(
+            if increment > 0 or new_player.donations != current_season.donations.last_update:
+                stat = await current_season.donations.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.donations
                     )
@@ -172,15 +169,14 @@ class PlayerTasks():
             #     return
             
             current_season = await new_player.get_current_season()
-            received = await current_season.donations_rcvd
            
-            if received._prior_seen:
-                increment = new_player.received - received.last_update
+            if current_season.received._prior_seen:
+                increment = new_player.received - current_season.received.last_update
             else:
                 increment = new_player.received - old_player.received
 
-            if increment > 0 or new_player.received != received.last_update:
-                stat = await received.increment_stat(
+            if increment > 0 or new_player.received != current_season.received.last_update:
+                stat = await current_season.received.increment_stat(
                     increment=max(increment,0),
                     latest_value=new_player.received
                     )
@@ -202,15 +198,13 @@ class PlayerTasks():
             if achievement.name == "Gold Grab":
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
-                loot_gold = await current_season.loot_gold
-
-                if loot_gold._prior_seen:
-                    increment = new_ach.value - loot_gold.last_update
+                if current_season.loot_gold._prior_seen:
+                    increment = new_ach.value - current_season.loot_gold.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != loot_gold.last_update:
-                    stat = await loot_gold.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_gold.last_update:
+                    stat = await current_season.loot_gold.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value
                         )                
@@ -222,15 +216,13 @@ class PlayerTasks():
             if achievement.name == "Elixir Escapade":
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
-                loot_elixir = await current_season.loot_elixir
-
-                if loot_elixir._prior_seen:
-                    increment = new_ach.value - loot_elixir.last_update
+                if current_season.loot_elixir._prior_seen:
+                    increment = new_ach.value - current_season.loot_elixir.last_update
                 else:
                     increment = new_ach.value - old_ach.value
 
-                if increment > 0 or new_ach.value != loot_elixir.last_update:
-                    stat = await loot_elixir.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_elixir.last_update:
+                    stat = await current_season.loot_elixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value
                         )
@@ -243,15 +235,13 @@ class PlayerTasks():
             if achievement.name == "Heroic Heist":
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
-                loot_darkelixir = await current_season.loot_darkelixir
-
-                if loot_darkelixir._prior_seen:
-                    increment = new_ach.value - loot_darkelixir.last_update
+                if current_season.loot_darkelixir._prior_seen:
+                    increment = new_ach.value - current_season.loot_darkelixir.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != loot_darkelixir.last_update:
-                    stat = await loot_darkelixir.increment_stat(
+                if increment > 0 or new_ach.value != current_season.loot_darkelixir.last_update:
+                    stat = await current_season.loot_darkelixir.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value
                         )
@@ -273,15 +263,14 @@ class PlayerTasks():
             #Capital Contribution
             if achievement.name == "Most Valuable Clanmate":
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
-                capitalcontribution = await current_season.capitalcontribution
 
-                if capitalcontribution._prior_seen:
-                    increment = new_ach.value - capitalcontribution.last_update
+                if current_season.capitalcontribution._prior_seen:
+                    increment = new_ach.value - current_season.capitalcontribution.last_update
                 else:
                     increment = new_ach.value - old_ach.value
                 
-                if increment > 0 or new_ach.value != capitalcontribution.last_update:
-                    stat = await capitalcontribution.increment_stat(
+                if increment > 0 or new_ach.value != current_season.capitalcontribution.last_update:
+                    stat = await current_season.capitalcontribution.increment_stat(
                         increment=max(increment,0),
                         latest_value=new_ach.value
                         )
@@ -301,20 +290,21 @@ class PlayerTasks():
             # if not await new_player.is_member:
             #     return
             
-            current_season = await new_player.get_current_season()
-            
+            current_season = await new_player.get_current_season()            
             if achievement.name == "Games Champion":
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
-                clangames = await current_season.clangames
-                if compare:
+                if current_season.clangames._prior_seen:
+                    increment = new_ach.value - current_season.clangames.last_update
+                else:
                     increment = new_ach.value - old_ach.value
-
-                    await clangames.update(
+                
+                if increment > 0 or new_ach.value != current_season.clangames.last_update:
+                    await current_season.clangames.update(
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         timestamp=new_player.timestamp,
-                        clan=new_player.clan.tag if new_player.clan else old_player.clan.tag
+                        clan_tag=new_player.clan.tag if new_player.clan else old_player.clan.tag
                         )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Clan Games task.")

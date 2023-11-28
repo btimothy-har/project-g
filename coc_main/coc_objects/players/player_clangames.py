@@ -18,7 +18,7 @@ class aPlayerClanGames():
         'season',
         'clan_tag',
         'score',
-        'last_update',
+        'last_updated',
         'starting_time',
         'ending_time'
         ]
@@ -32,7 +32,7 @@ class aPlayerClanGames():
 
         self.clan_tag = dict_value.get('clan',None)
         self.score = dict_value.get('score',0)
-        self.last_updated = dict_value.get('last_updated')
+        self.last_updated = dict_value.get('last_updated',0)
 
         if isinstance(dict_value.get('starting_time'),datetime.datetime):
             if dict_value['starting_time'].timestamp() > 0:
