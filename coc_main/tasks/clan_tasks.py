@@ -109,8 +109,8 @@ class ClanLoop(TaskLoop):
             return 1
         return 10
     
-    async def defer(self,clan:Optional[aClan]=None) -> bool:
-        if not self.task_limiter.has_capacity():
+    def defer(self,clan:Optional[aClan]=None) -> bool:
+        if self.task_lock.locked():
             if not clan:
                 return False
             if clan.is_alliance_clan:
@@ -136,7 +136,7 @@ class ClanLoop(TaskLoop):
 
                 c_tags = copy.copy(self._tags)
                 tags = list(c_tags)
-                
+
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
@@ -183,16 +183,17 @@ class ClanLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+
+        cached = self._cached.get(tag)
+        if self.defer(cached):
+            return self.loop.call_later(10,self.unlock,lock)
+        
         asyncio.create_task(self._run_single_loop(tag,lock))
 
-    async def _run_single_loop(self,tag:str,lock:asyncio.Lock):
-        try:
-            cached = self._cached.get(tag)
-            finished = False
-            if await self.defer(cached):
-                return self.loop.call_later(10,self.unlock,lock)
-            
-            async with self.task_limiter:
+    async def _run_single_loop(self,tag:str,cached:aClan,lock:asyncio.Lock):
+        try:            
+            finished = False            
+            async with self.task_semaphore, self.task_limiter:
                 st = pendulum.now()
 
                 async with self.api_semaphore:

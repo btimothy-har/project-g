@@ -73,7 +73,8 @@ class ClashOfClansTasks(commands.Cog):
         self._task_lock = asyncio.Lock()
         self._controller_loop = None
         self.task_lock_timestamp = None
-        self.task_limiter = AsyncLimiter(min(1000,bot_client.rate_limit*0.8),1)
+        self.task_semaphore = asyncio.Semaphore(semaphore_limit)
+        self.task_limiter = AsyncLimiter(1,1/min(1000,bot_client.rate_limit*0.8))
 
         # DATA QUEUE
         self._clan_queue_task = None
@@ -238,13 +239,10 @@ class ClashOfClansTasks(commands.Cog):
         try:
             while True:
                 await asyncio.sleep(0.5)
-
                 if self.task_lock.locked():
                     continue
-
                 if self.task_semaphore._value == semaphore_limit:
                     continue
-
                 try:
                     async with self._task_lock:
                         self.task_lock_timestamp = pendulum.now()
@@ -259,6 +257,7 @@ class ClashOfClansTasks(commands.Cog):
 
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clash Task Controller")
+                    continue
         
         except asyncio.CancelledError:
             return

@@ -65,6 +65,11 @@ class TaskLoop():
     def task_lock(self) -> asyncio.Lock:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.task_lock
+
+    @property
+    def task_semaphore(self) -> AsyncLimiter:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.task_semaphore
     
     @property
     def task_limiter(self) -> AsyncLimiter:

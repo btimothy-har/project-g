@@ -407,8 +407,8 @@ class PlayerLoop(TaskLoop):
             return 2
         return 10
     
-    async def defer(self,player:Optional[aPlayer]=None) -> bool:
-        if not self.task_limiter.has_capacity():
+    def defer(self,player:Optional[aPlayer]=None) -> bool:
+        if self.task_lock.locked():
             if not player:
                 return False
             if player.is_member:
@@ -487,16 +487,15 @@ class PlayerLoop(TaskLoop):
         if lock.locked():
             return
         await lock.acquire()
+        cached = self._cached.get(tag,None)
+        if await self.defer(cached):
+            return self.loop.call_later(10,self.unlock,lock)
         asyncio.create_task(self._run_single_loop(tag,lock))
         
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock):
-        try:
-            cached = self._cached.get(tag,None)
-            finished = False
-            if await self.defer(cached):
-                return self.loop.call_later(10,self.unlock,lock)
-            
-            async with self.task_limiter:
+        try:            
+            finished = False            
+            async with self.task_semaphore, self.task_limiter:
                 st = pendulum.now()
 
                 async with self.api_semaphore:
