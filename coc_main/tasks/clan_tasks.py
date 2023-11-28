@@ -150,7 +150,7 @@ class ClanLoop(TaskLoop):
                     
                 await asyncio.gather(*tasks)
 
-                self._last_loop = pendulum.now()
+                self.last_loop = pendulum.now()
                 self._running = False
                 try:
                     runtime = self._last_loop - st

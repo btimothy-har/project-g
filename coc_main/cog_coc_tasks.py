@@ -41,7 +41,7 @@ from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
-semaphore_limit = 1000000
+semaphore_limit = 100000
 
 ############################################################
 ############################################################
@@ -238,22 +238,21 @@ class ClashOfClansTasks(commands.Cog):
         
         try:
             while True:
-                await asyncio.sleep(0.5)
-                if self.task_lock.locked():
-                    continue
-                if self.task_semaphore._value == semaphore_limit:
-                    continue
                 try:
-                    async with self._task_lock:
-                        self.task_lock_timestamp = pendulum.now()
-                        while maintain_lock():
-                            await asyncio.sleep(0.25)
+                    await asyncio.sleep(0.5)
+                    if self.task_lock.locked():
+                        continue
+                    if self.task_semaphore._value == semaphore_limit:
+                        continue
 
-                        self.task_lock_timestamp = None
-                        await asyncio.sleep(0.5)
-                
-                except asyncio.CancelledError:
-                    raise
+                    if self.task_semaphore._value <= semaphore_limit * 0.7:
+                        async with self._task_lock:
+                            self.task_lock_timestamp = pendulum.now()
+                            while maintain_lock():
+                                await asyncio.sleep(0.25)
+
+                            self.task_lock_timestamp = None
+                            await asyncio.sleep(0.5)
 
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clash Task Controller")
