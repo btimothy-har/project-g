@@ -210,7 +210,7 @@ class ClanLoop(TaskLoop):
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aClan]=None):
         try:            
             finished = False            
-            async with self.task_semaphore, self.task_limiter:
+            async with self.task_limiter:
                 st = pendulum.now()
 
                 async with self.api_limiter:
