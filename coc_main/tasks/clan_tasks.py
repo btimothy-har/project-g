@@ -34,17 +34,26 @@ default_sleep = 60
 ############################################################
 ############################################################
 class ClanTasks():
+
+    @staticmethod
+    def task_semaphore() -> asyncio.Semaphore:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.task_semaphore
+    
     @staticmethod
     async def clan_member_join(member:aPlayer,clan:aClan):
-        await ClanMemberFeed.member_join(clan,member)
+        async with ClanTasks.task_semaphore():
+            await ClanMemberFeed.member_join(clan,member)
 
     @staticmethod
     async def clan_member_leave(member:aPlayer,clan:aClan):
-        await ClanMemberFeed.member_leave(clan,member)
+        async with ClanTasks.task_semaphore():
+            await ClanMemberFeed.member_leave(clan,member)
     
     @staticmethod
     async def clan_donation_change(old_clan:aClan,new_clan:aClan):
-        await ClanDonationFeed.start_feed(new_clan,old_clan)
+        async with ClanTasks.task_semaphore():
+            await ClanDonationFeed.start_feed(new_clan,old_clan)
 
 ############################################################
 ############################################################
