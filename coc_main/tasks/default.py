@@ -77,7 +77,7 @@ class TaskLoop():
         return cog.task_limiter
     
     @property
-    def api_semaphore(self) -> asyncio.Semaphore:
+    def api_limiter(self) -> AsyncLimiter:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.api_semaphore
     

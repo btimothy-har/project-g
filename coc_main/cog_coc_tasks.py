@@ -66,7 +66,7 @@ class ClashOfClansTasks(commands.Cog):
 
         #API CONTROLLER
         self.task_api_slots = int(bot_client.rate_limit * 0.8)
-        self.api_semaphore = asyncio.Semaphore(self.task_api_slots)
+        self.api_semaphore = AsyncLimiter(1,1/self.task_api_slots)
         
         # TASK CONTROLLER
         self._master_lock = asyncio.Lock()
