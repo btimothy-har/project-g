@@ -456,7 +456,7 @@ class PlayerLoop(TaskLoop):
                 self.last_loop = pendulum.now()
                 self._running = False
                 try:
-                    runtime = self._last_loop - st
+                    runtime = self.last_loop - st
                     self.dispatch_time.append(runtime.total_seconds())
                     bot_client.coc_main_log.info(f"Player Loop Dispatch Time for {len(tags)} tags: {runtime.total_seconds():.2f} seconds.")
                 except:

@@ -153,7 +153,7 @@ class ClanLoop(TaskLoop):
                 self.last_loop = pendulum.now()
                 self._running = False
                 try:
-                    runtime = self._last_loop - st
+                    runtime = self.last_loop - st
                     self.dispatch_time.append(runtime.total_seconds())
                 except:
                     pass
