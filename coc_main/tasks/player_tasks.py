@@ -389,16 +389,6 @@ class PlayerLoop(TaskLoop):
             pass
         await super().stop()
     
-    def add_to_loop(self,tag:str):
-        add, n_tag = super().add_to_loop(tag)
-        if add:
-            bot_client.coc_main_log.debug(f"Added {n_tag} to Player Loop.")
-    
-    def remove_to_loop(self,tag:str):
-        remove, n_tag = super().remove_to_loop(tag)
-        if remove:
-            bot_client.coc_main_log.debug(f"Removed {n_tag} from Player Loop.")
-    
     async def delay_multiplier(self,player:aPlayer) -> int:
         if not player:
             return 1
@@ -461,7 +451,7 @@ class PlayerLoop(TaskLoop):
                 try:
                     runtime = self._last_loop - st
                     self.dispatch_time.append(runtime.total_seconds())
-                    bot_client.coc_main_log.info(f"Player Loop Dispatch Time: {runtime.total_seconds():.2f} seconds.")
+                    bot_client.coc_main_log.info(f"Player Loop Dispatch Time for {len(tags)} tags: {runtime.total_seconds():.2f} seconds.")
                 except:
                     pass
             
