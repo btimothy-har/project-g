@@ -5,7 +5,7 @@ import random
 import copy
 import aiohttp
 
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from typing import *
 from collections import defaultdict
@@ -34,26 +34,18 @@ default_sleep = 60
 ############################################################
 ############################################################
 class ClanTasks():
-
-    @staticmethod
-    def task_semaphore() -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
     
     @staticmethod
     async def clan_member_join(member:aPlayer,clan:aClan):
-        async with ClanTasks.task_semaphore():
-            await ClanMemberFeed.member_join(clan,member)
+        await ClanMemberFeed.member_join(clan,member)
 
     @staticmethod
     async def clan_member_leave(member:aPlayer,clan:aClan):
-        async with ClanTasks.task_semaphore():
-            await ClanMemberFeed.member_leave(clan,member)
+        await ClanMemberFeed.member_leave(clan,member)
     
     @staticmethod
     async def clan_donation_change(old_clan:aClan,new_clan:aClan):
-        async with ClanTasks.task_semaphore():
-            await ClanDonationFeed.start_feed(new_clan,old_clan)
+        await ClanDonationFeed.start_feed(new_clan,old_clan)
 
 ############################################################
 ############################################################
@@ -71,25 +63,30 @@ class ClanLoop(TaskLoop):
     _member_join_events = [ClanTasks.clan_member_join]
     _member_leave_events = [ClanTasks.clan_member_leave]
 
+    @staticmethod
+    def task_semaphore() -> asyncio.Semaphore:
+        cog = bot_client.bot.get_cog('ClashOfClansTasks')
+        return cog.task_semaphore
+
     @classmethod
     async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
         tasks = []
-        tasks.append(asyncio.create_task(new_clan._sync_cache()))
-        tasks.extend([asyncio.create_task(event(old_clan,new_clan)) for event in cls._clan_events])
+        tasks.append(new_clan._sync_cache())
+        tasks.extend([event(old_clan,new_clan) for event in cls._clan_events])
 
         old_member_iter = AsyncIter(old_clan.members)
         async for member in old_member_iter:
             if member.tag not in [m.tag for m in new_clan.members]:
                 e_iter = AsyncIter(cls._member_leave_events)
-                tasks.extend([asyncio.create_task(event(member,new_clan)) async for event in e_iter])
+                tasks.extend([event(member,new_clan) async for event in e_iter])
 
         new_member_iter = AsyncIter(new_clan.members)
         async for member in new_member_iter:
             if member.tag not in [m.tag for m in old_clan.members]:
                 e_iter = AsyncIter(cls._member_join_events)
-                tasks.extend([asyncio.create_task(event(member,new_clan)) async for event in e_iter])
+                tasks.extend([event(member,new_clan) async for event in e_iter])
 
-        await asyncio.gather(*tasks)
+        await bounded_gather(*tasks,semaphore=ClanLoop.task_semaphore())
 
     def __new__(cls):
         if cls._instance is None:
@@ -152,6 +149,7 @@ class ClanLoop(TaskLoop):
 
                 c_tags = copy.copy(self._tags)
                 tags = list(c_tags)
+                random.shuffle(tags)
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
