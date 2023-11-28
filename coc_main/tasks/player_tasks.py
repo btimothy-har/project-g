@@ -37,7 +37,7 @@ class PlayerTasks():
         old_ach = old_player.get_achievement(achievement.name)
         new_ach = new_player.get_achievement(achievement.name)
         compare = old_ach.value != new_ach.value
-        return compare, old_ach, new_ac
+        return compare, old_ach, new_ach
     
     ############################################################
     ### PLAYER LAST SEEN

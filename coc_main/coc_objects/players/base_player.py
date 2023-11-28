@@ -143,18 +143,26 @@ class BasicPlayer(AwaitLoader):
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
+        if not self._attributes._loaded:
+            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.first_seen
     
     @property
     def last_joined(self) -> Optional[pendulum.DateTime]:
+        if not self._attributes._loaded:
+            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_joined
 
     @property
     def last_removed(self) -> Optional[pendulum.DateTime]:
+        if not self._attributes._loaded:
+            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_removed
     
     @property
     def is_new(self) -> bool:
+        if not self._attributes._loaded:
+            raise CacheNotReady(f"{self} has not been loaded.")
         return False if self.first_seen else True
     
     ##################################################
@@ -171,7 +179,7 @@ class BasicPlayer(AwaitLoader):
 
             await bot_client.coc_db.db__player.update_one(
                 {'_id':player.tag},
-                {'$set':{'first_seen':getattr(await player.first_seen,'int_timestamp',pendulum.now().int_timestamp)}},
+                {'$set':{'first_seen':getattr(player.first_seen,'int_timestamp',pendulum.now().int_timestamp)}},
                 upsert=True
                 )
             bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}. Is new: {player.is_new}")
@@ -330,10 +338,6 @@ class _PlayerAttributes():
     @property
     def _lock(self) -> asyncio.Lock:
         return self._locks[self.tag]
-    
-    @property
-    def _sync_lock(self) -> asyncio.Lock:
-        return self._locks['sync']
     
     async def load(self):
         if not self._loaded:            
