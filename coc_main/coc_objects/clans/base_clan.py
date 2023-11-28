@@ -465,6 +465,7 @@ class _ClanAttributes():
     """
     _cache = {}
     _locks = defaultdict(asyncio.Lock)
+    _sync_locks = defaultdict(asyncio.Lock)
 
     __slots__ = [
         '_new',
@@ -532,6 +533,10 @@ class _ClanAttributes():
     @property
     def _lock(self):
         return self._locks[self.tag]
+    
+    @property
+    def _sync_lock(self):
+        return self._sync_locks[self.tag]
 
     async def load(self):
         if not self._loaded:

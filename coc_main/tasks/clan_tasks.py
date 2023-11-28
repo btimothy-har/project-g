@@ -64,6 +64,7 @@ class ClanLoop(TaskLoop):
 
     @classmethod
     async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
+        asyncio.create_task(new_clan._sync_cache())
         [asyncio.create_task(event(old_clan,new_clan)) for event in cls._clan_events]
 
         old_member_iter = AsyncIter(old_clan.members)
@@ -206,13 +207,12 @@ class ClanLoop(TaskLoop):
                         return self.loop.call_later(3600,self.unlock,lock)
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
-                
-                await new_clan._sync_cache()                
+                             
                 wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
                 self.loop.call_later(wait,self.unlock,lock)                
                 
                 self._cached[tag] = new_clan
-                
+
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
                         await ClanLoop._dispatch_events(cached,new_clan)

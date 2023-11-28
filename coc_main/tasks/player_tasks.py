@@ -367,6 +367,7 @@ class PlayerLoop(TaskLoop):
 
     @classmethod
     async def _dispatch_events(cls,old_player:aPlayer,new_player:aPlayer):
+        asyncio.create_task(new_player._sync_cache())
         [asyncio.create_task(event(old_player,new_player)) for event in cls._player_events]
         [asyncio.create_task(event(old_player,new_player,achievement)) for achievement in new_player.achievements for event in cls._achievement_events]
 
@@ -509,9 +510,8 @@ class PlayerLoop(TaskLoop):
                     except InvalidTag:
                         return self.loop.call_later(3600,self.unlock,lock)
                     except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)     
-
-                await new_player._sync_cache()           
+                        return self.loop.call_later(10,self.unlock,lock)
+                    
                 wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
                 self.loop.call_later(wait,self.unlock,lock)
                 

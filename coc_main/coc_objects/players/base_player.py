@@ -291,6 +291,7 @@ class _PlayerAttributes():
     """
     _cache = {}
     _locks = defaultdict(asyncio.Lock)
+    _sync_locks = defaultdict(asyncio.Lock)
 
     __slots__ = [
         '_new',
@@ -338,6 +339,10 @@ class _PlayerAttributes():
     @property
     def _lock(self) -> asyncio.Lock:
         return self._locks[self.tag]
+    
+    @property
+    def _sync_lock(self) -> asyncio.Lock:
+        return self._sync_locks[self.tag]
     
     async def load(self):
         if not self._loaded:            
