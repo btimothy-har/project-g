@@ -65,7 +65,7 @@ class ClashOfClansTasks(commands.Cog):
         self.clan_loop = ClanLoop()
 
         #API CONTROLLER
-        self.task_api_slots = int(bot_client.rate_limit * 0.8)
+        self.task_api_slots = int(bot_client.rate_limit * 0.6)
         self.api_semaphore = AsyncLimiter(1,1/self.task_api_slots)
         
         # TASK CONTROLLER
@@ -466,7 +466,6 @@ class ClashOfClansTasks(commands.Cog):
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
                 + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,}"
-                + f"\n{'[API Slots]':<15} " + f"{self.task_api_slots - self.api_semaphore._value:,} / {self.task_api_slots:,} (Wait: {client_waiters:,})"
                 + "```",
             inline=False
             )
@@ -476,11 +475,11 @@ class ClashOfClansTasks(commands.Cog):
             name="**Player Loops**",
             value=f"Last: <t:{self.player_loop.last_loop.int_timestamp}:R>"
                 + "```ini"
-                + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
-                + f"\n{'[Dispatch]':<10} {self.player_loop.dispatch_avg:.2f}s"
+                + f"\n{'[Loop Time]':<10} {self.player_loop.dispatch_avg:.2f}s"
                 + f"\n{'[Run Time]':<10} {self.player_loop.runtime_avg:.2f}s"
+                + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + "```",
             inline=True
             )
@@ -488,11 +487,11 @@ class ClashOfClansTasks(commands.Cog):
             name="**Clan Loops**",
             value=f"Last: <t:{self.clan_loop.last_loop.int_timestamp}:R>"
                 + "```ini"
-                + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
-                + f"\n{'[Dispatch]':<10} {self.clan_loop.dispatch_avg:.2f}s"
+                + f"\n{'[Loop Time]':<10} {self.clan_loop.dispatch_avg:.2f}s"
                 + f"\n{'[Run Time]':<10} {self.clan_loop.runtime_avg:.2f}s"
+                + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + "```",
             inline=True
             )
