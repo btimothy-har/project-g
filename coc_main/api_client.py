@@ -483,7 +483,7 @@ class BotClashClient():
         except asyncio.CancelledError:
             pass
 
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=30):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -779,7 +779,7 @@ async def end_of_trophy_season():
         await cog.member_legend_rewards()
 
 @coc.ClientEvents.clan_games_end()
-async def end_of_clan_games(self):
+async def end_of_clan_games():
     await asyncio.sleep(900)
     client = BotClashClient()
     cog = client.bot.get_cog("Bank")

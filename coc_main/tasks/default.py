@@ -40,7 +40,7 @@ class TaskLoop():
     def __init__(self):
         self._active = False
         self._running = False
-        self._last_loop = pendulum.now()
+        self.last_loop = pendulum.now()
         self._tags = set()
         
         self.dispatch_time = deque(maxlen=1000)

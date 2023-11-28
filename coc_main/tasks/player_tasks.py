@@ -290,8 +290,11 @@ class PlayerTasks():
             # if not await new_player.is_member:
             #     return
             
-            current_season = await new_player.get_current_season()            
+            current_season = await new_player.get_current_season()
             if achievement.name == "Games Champion":
+                if not new_player.clan and not old_player.clan:
+                    return
+                
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 if current_season.clangames._prior_seen:
@@ -439,6 +442,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
+                bot_client.coc_main_log.info(f"Dispatching Player Loop for {len(tags)} tags.")
                 st = pendulum.now()
                 self._running = True
 

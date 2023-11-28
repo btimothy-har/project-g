@@ -73,7 +73,7 @@ class ClashOfClansTasks(commands.Cog):
         self._task_lock = asyncio.Lock()
         self._controller_loop = None
         self.task_lock_timestamp = None
-        self.task_limiter = AsyncLimiter(1,1/min(1000,bot_client.rate_limit*0.8))
+        self.task_limiter = AsyncLimiter(min(1000,bot_client.rate_limit*0.8),1)
 
         # DATA QUEUE
         self._clan_queue_task = None
@@ -475,7 +475,8 @@ class ClashOfClansTasks(commands.Cog):
         # embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Player Loops**",
-            value="```ini"
+            value=f"Last: <t:{self.player_loop.last_loop.int_timestamp}:R>"
+                + "```ini"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
                 + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
@@ -486,7 +487,8 @@ class ClashOfClansTasks(commands.Cog):
             )
         embed.add_field(
             name="**Clan Loops**",
-            value="```ini"
+            value=f"Last: <t:{self.clan_loop.last_loop.int_timestamp}:R>"
+                + "```ini"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
                 + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
