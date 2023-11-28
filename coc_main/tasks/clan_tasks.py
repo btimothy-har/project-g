@@ -111,7 +111,6 @@ class ClanLoop(TaskLoop):
         await super().stop()
     
     async def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
-        return 1
         if not clan:
             return 1
         if clan.is_alliance_clan:

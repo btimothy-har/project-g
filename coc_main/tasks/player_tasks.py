@@ -445,7 +445,6 @@ class PlayerLoop(TaskLoop):
         await super().stop()
     
     async def delay_multiplier(self,player:aPlayer) -> int:
-        return 1
         if not player:
             return 1
         if player.is_member:
@@ -478,6 +477,34 @@ class PlayerLoop(TaskLoop):
                 return False
             return True
         return False
+    
+    # async def update_db_tags(self):
+    #     bot_users = [u.id for u in bot_client.bot.users]
+    #     registered_clan_tags = bot_client.coc_db.db__clan.find({
+    #         "emoji":{"$exists":True,"$ne":""},
+    #         },
+    #         {'_id':1}
+    #         )
+    #     alliance_clan_tags = bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
+    #     war_league_clan_tags = bot_client.coc_db.db__war_league_clan_setup.find({
+    #         "is_active":True,
+    #         },
+    #         {'_id':1}
+    #         )
+    #     clans = []
+    #     clans.extend([c['_id'] async for c in registered_clan_tags])
+    #     clans.extend([c['_id'] async for c in alliance_clan_tags])
+    #     clans.extend([c['_id'] async for c in war_league_clan_tags])
+    #     clans = list(set(clans)) if clans else []
+
+    #     db_tags = bot_client.coc_db.db__player.find({
+    #         'discord_user':{'$exists},
+    #         'clan_tag':{'$in':clans},
+    #         },
+    #         {'_id':1}
+    #         )
+    #     }
+    
 
     ##################################################
     ### PRIMARY TASK LOOP
@@ -488,6 +515,10 @@ class PlayerLoop(TaskLoop):
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
+
+                # if self._last_db_update.diff().total_seconds() >= 3600:
+
+                # query_alliance_clans = bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
 
                 c_tags = copy.copy(self._tags)
                 tags = list(c_tags)
