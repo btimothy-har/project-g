@@ -489,7 +489,7 @@ class PlayerLoop(TaskLoop):
         await lock.acquire()
 
         cached = self._cached.get(tag,None)
-        if await self.defer(cached):
+        if self.defer(cached):
             return self.loop.call_later(10,self.unlock,lock)
         
         asyncio.create_task(self._run_single_loop(tag,lock,cached))
