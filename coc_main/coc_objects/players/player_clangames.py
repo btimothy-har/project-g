@@ -123,7 +123,7 @@ class aPlayerClanGames():
 
     async def update(self,increment:int,latest_value:int,timestamp:pendulum.DateTime,clan_tag:str):        
         async with self._lock:
-            if self.score == 0 and clan_tag:
+            if pendulum.now() >= self.games_start and aself.score == 0 and clan_tag:
                 self.clan_tag = clan_tag
                 self.starting_time = timestamp
                 bot_client.coc_data_log.debug(
