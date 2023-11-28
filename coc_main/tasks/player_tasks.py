@@ -455,7 +455,6 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                bot_client.coc_main_log.info(f"Dispatching Player Loop for {len(tags)} tags.")
                 st = pendulum.now()
                 self._running = True
 
@@ -470,7 +469,6 @@ class PlayerLoop(TaskLoop):
                 try:
                     runtime = self.last_loop - st
                     self.dispatch_time.append(runtime.total_seconds())
-                    bot_client.coc_main_log.info(f"Player Loop Dispatch Time for {len(tags)} tags: {runtime.total_seconds():.2f} seconds.")
                 except:
                     pass
             
@@ -551,5 +549,6 @@ class PlayerLoop(TaskLoop):
                 try:
                     runtime = et - st
                     self.run_time.append(runtime.total_seconds())
+                    bot_client.coc_main_log.info(f"Player Loop {tag} took {runtime.total_seconds():.2f} seconds.")
                 except:
                     pass
