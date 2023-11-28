@@ -9,6 +9,7 @@ from async_property import AwaitLoader
 from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
 
+from .mongo_player import db_PlayerStats
 from .player_stat import aPlayerStat
 from .player_clangames import aPlayerClanGames
 
