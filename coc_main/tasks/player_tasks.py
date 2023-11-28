@@ -378,7 +378,7 @@ class PlayerLoop(TaskLoop):
             a_iter = AsyncIter(cls._achievement_events)
             tasks.extend([asyncio.create_task(event(old_player,new_player,ach)) async for event in a_iter])
         
-        await asyncio.gather(*tasks)
+        #await asyncio.gather(*tasks)
 
     def __new__(cls):
         if cls._instance is None:
@@ -524,7 +524,7 @@ class PlayerLoop(TaskLoop):
                 
                 if cached:        
                     if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(PlayerLoop._dispatch_events(cached,new_player))
+                        await PlayerLoop._dispatch_events(cached,new_player)
                 self._cached[tag] = new_player
                 
                 finished = True
