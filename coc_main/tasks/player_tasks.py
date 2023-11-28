@@ -37,98 +37,7 @@ class PlayerTasks():
         old_ach = old_player.get_achievement(achievement.name)
         new_ach = new_player.get_achievement(achievement.name)
         compare = old_ach.value != new_ach.value
-        return compare, old_ach, new_ach
-
-    async def _update_attack_wins_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'attacks':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_defense_wins_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'defenses':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_donations_sent_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'donations_sent':stat_json
-                }
-            },
-            upsert=True)    
-    async def _update_donations_rcvd_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'donations_rcvd':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_gold_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'loot_gold':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_elixir_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'loot_elixir':stat_json
-                }
-            },
-            upsert=True)        
-    async def _update_darkelixir_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'loot_darkelixir':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_capitalcontribution_db(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'capitalcontribution':stat_json
-                }
-            },
-            upsert=True)
-    async def _update_clangames(db_id,stat_json):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':db_id},
-            {'$set': {
-                'season':db_id['season'],
-                'tag':db_id['tag'],
-                'clangames':stat_json
-                }
-            },
-            upsert=True)
+        return compare, old_ach, new_ac
     
     ############################################################
     ### PLAYER LAST SEEN
@@ -198,8 +107,7 @@ class PlayerTasks():
             if increment > 0 or new_player.attack_wins != attacks.last_update:
                 stat = await attacks.increment_stat(
                     increment=max(increment,0),
-                    latest_value=new_player.attack_wins,
-                    db_update=PlayerTasks._update_attack_wins_db
+                    latest_value=new_player.attack_wins
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
@@ -224,8 +132,7 @@ class PlayerTasks():
             if increment > 0 or new_player.defense_wins != defenses.last_update:
                 stat = await defenses.increment_stat(
                     increment=max(increment,0),
-                    latest_value=new_player.defense_wins,
-                    db_update=PlayerTasks._update_defense_wins_db
+                    latest_value=new_player.defense_wins
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
@@ -250,8 +157,7 @@ class PlayerTasks():
             if increment > 0 or new_player.donations != donations.last_update:
                 stat = await donations.increment_stat(
                     increment=max(increment,0),
-                    latest_value=new_player.donations,
-                    db_update=PlayerTasks._update_donations_sent_db
+                    latest_value=new_player.donations
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
@@ -276,8 +182,7 @@ class PlayerTasks():
             if increment > 0 or new_player.received != received.last_update:
                 stat = await received.increment_stat(
                     increment=max(increment,0),
-                    latest_value=new_player.received,
-                    db_update=PlayerTasks._update_donations_rcvd_db
+                    latest_value=new_player.received
                     )
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
@@ -307,8 +212,7 @@ class PlayerTasks():
                 if increment > 0 or new_ach.value != loot_gold.last_update:
                     stat = await loot_gold.increment_stat(
                         increment=max(increment,0),
-                        latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_gold_db
+                        latest_value=new_ach.value
                         )                
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
@@ -328,8 +232,7 @@ class PlayerTasks():
                 if increment > 0 or new_ach.value != loot_elixir.last_update:
                     stat = await loot_elixir.increment_stat(
                         increment=max(increment,0),
-                        latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_elixir_db
+                        latest_value=new_ach.value
                         )
                     
                     bot_client.coc_data_log.debug(
@@ -350,8 +253,7 @@ class PlayerTasks():
                 if increment > 0 or new_ach.value != loot_darkelixir.last_update:
                     stat = await loot_darkelixir.increment_stat(
                         increment=max(increment,0),
-                        latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_darkelixir_db
+                        latest_value=new_ach.value
                         )
                     
                     bot_client.coc_data_log.debug(
@@ -381,8 +283,7 @@ class PlayerTasks():
                 if increment > 0 or new_ach.value != capitalcontribution.last_update:
                     stat = await capitalcontribution.increment_stat(
                         increment=max(increment,0),
-                        latest_value=new_ach.value,
-                        db_update=PlayerTasks._update_capitalcontribution_db
+                        latest_value=new_ach.value
                         )
                 
                     if increment > 0:
