@@ -54,7 +54,9 @@ class ClanTasks():
 ############################################################
 ############################################################
 class ClanLoop(TaskLoop):
-    _loops = {}
+    _instance = None
+    _cached = {}
+    _locks = defaultdict(asyncio.Lock)
 
     _clan_events = [ClanTasks.clan_donation_change]
     _member_join_events = [ClanTasks.clan_member_join]
@@ -74,20 +76,37 @@ class ClanLoop(TaskLoop):
             if member.tag not in [m.tag for m in old_clan.members]:
                 [asyncio.create_task(event(member,new_clan)) for event in cls._member_join_events]
 
-    def __new__(cls,tag:str):
-        if tag not in cls._loops:
-            instance = super().__new__(cls)
-            instance._is_new = True
-            cls._loops[tag] = instance
-        return cls._loops[tag]
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._is_new = True
+        return cls._instance
 
-    def __init__(self,tag:str):
+    def __init__(self):
         if self._is_new:
-            self.tag = tag
-            self.lock = asyncio.Lock()
-            self.cached = None
             super().__init__()
             self._is_new = False
+    
+    async def start(self):
+        bot_client.coc_main_log.info(f"Clan Loop started.")
+        await super().start()
+    
+    async def stop(self):
+        try:
+            bot_client.coc_main_log.info(f"Clan Loop stopped.")
+        except:
+            pass
+        await super().stop()
+    
+    def add_to_loop(self,tag:str):
+        add, n_tag = super().add_to_loop(tag)
+        if add:
+            bot_client.coc_main_log.debug(f"Added {n_tag} to Clan Loop.")
+    
+    def remove_to_loop(self,tag:str):
+        remove, n_tag = super().remove_to_loop(tag)
+        if remove:
+            bot_client.coc_main_log.debug(f"Removed {n_tag} from Clan Loop.")
     
     async def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
         if not clan:
@@ -100,17 +119,17 @@ class ClanLoop(TaskLoop):
             return 1
         return 10
     
-    async def defer(self) -> bool:
+    async def defer(self,clan:Optional[aClan]=None) -> bool:
         if not self.task_limiter.has_capacity():
-            if not self.cached:
+            if not clan:
                 return False
-            if self.cached.is_alliance_clan:
+            if clan.is_alliance_clan:
                 return False
-            if self.cached.is_active_league_clan:
+            if clan.is_active_league_clan:
                 return False
-            if self.cached.is_registered_clan:
+            if clan.is_registered_clan:
                 return False
-            if pendulum.now().int_timestamp - self.cached.timestamp.int_timestamp >= 3600:
+            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= 3600:
                 return False
             return True
         return False
@@ -125,75 +144,91 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if self.lock.locked():
+                tags = copy.copy(self._tags)
+                if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
 
-                await self.lock.acquire()
-                asyncio.create_task(self._run_single_loop())
+                st = pendulum.now()
+                self._running = True
+
+                a_iter = AsyncIter(tags)
+                tasks = [asyncio.create_task(self._launch_single_loop(tag)) async for tag in a_iter]
+                await asyncio.gather(*tasks)
+
+                self._last_loop = pendulum.now()
+                self._running = False
+                try:
+                    runtime = self._last_loop - st
+                    self.dispatch_time.append(runtime.total_seconds())
+                except:
+                    pass
 
                 await asyncio.sleep(30)
                 continue
-        
-        except asyncio.CancelledError:
-            return
-        
+
         except Exception as exc:
             if self.loop_active:
-                await self.stop()
                 bot_client.coc_main_log.exception(
-                    f"{self.tag}: FATAL CLAN LOOP ERROR. Attempting restart. {exc}"
+                    f"FATAL CLAN LOOP ERROR. Attempting restart. {exc}"
                     )
                 await TaskLoop.report_fatal_error(
-                    message=f"{self.tag}: FATAL CLAN LOOP ERROR",
+                    message=f"FATAL CLAN LOOP ERROR",
                     error=exc,
                     )                    
                 await asyncio.sleep(60)
                 await self.start()
+    
+    async def _launch_single_loop(self,tag:str):
+        lock = self._locks[tag]
+        if lock.locked():
+            return
+        await lock.acquire()
+        asyncio.create_task(self._run_single_loop(tag,lock))
 
-    async def _run_single_loop(self):
+    async def _run_single_loop(self,tag:str,lock:asyncio.Lock):
         try:
+            cached = self._cached.get(tag)
             finished = False
-            if await self.defer():
-                return self.loop.call_later(10,self.unlock,self.lock)
+            if await self.defer(cached):
+                return self.loop.call_later(10,self.unlock,lock)
             
             async with self.task_limiter:
-                st = pendulum.now()                
-                self._running = True
+                st = pendulum.now()
 
-                async with self.api_semaphore:                
+                async with self.api_semaphore:
                     new_clan = None
                     try:
-                        new_clan = await self.coc_client.fetch_clan(self.tag)
+                        new_clan = await self.coc_client.fetch_clan(tag)
                     except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,self.lock)
+                        return self.loop.call_later(3600,self.unlock,lock)
                     except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,self.lock)
+                        return self.loop.call_later(10,self.unlock,lock)
                 
                 await new_clan._sync_cache()                
                 wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
-                self.loop.call_later(wait,self.unlock,self.lock)                
+                self.loop.call_later(wait,self.unlock,lock)                
                 
-                if self.cached:
-                    if new_clan.timestamp.int_timestamp > getattr(self.cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(ClanLoop._dispatch_events(self.cached,new_clan))
-                        self.cached = new_clan
-                else:
-                    self.cached = new_clan
+                if cached:
+                    if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
+                        asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
+                self.cached[tag] = new_clan
                 
                 finished = True
-                self._running = False
+        
+        except asyncio.CancelledError:
+            return
                     
         except Exception as exc:
             if self.loop_active:
                 bot_client.coc_main_log.exception(
-                    f"CLAN LOOP ERROR: {self.tag}"
+                    f"CLAN LOOP ERROR: {tag}"
                     )
                 await TaskLoop.report_fatal_error(
-                    message=f"CLAN LOOP ERROR: {self.tag}",
+                    message=f"CLAN LOOP ERROR: {tag}",
                     error=exc,
                     )
-            return self.unlock(self.lock)
+            return self.unlock(lock)
 
         finally:
             if finished:

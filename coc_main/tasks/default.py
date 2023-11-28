@@ -3,6 +3,7 @@ import asyncio
 import math
 import pendulum
 import random
+import copy
 
 from typing import *
 from aiolimiter import AsyncLimiter
@@ -39,9 +40,11 @@ class TaskLoop():
     def __init__(self):
         self._active = False
         self._running = False
-        self._task = None
-
-        self.run_time = deque(maxlen=100)
+        self._last_loop = pendulum.now()
+        self._tags = set()
+        
+        self.dispatch_time = deque(maxlen=1000)
+        self.run_time = deque(maxlen=1000)
     
     async def _loop_task(self):
         pass
@@ -78,19 +81,24 @@ class TaskLoop():
     ##################################################
     async def start(self):
         self._active = True
-        if not self._task or self._task.done():
-            self._task = asyncio.create_task(self._loop_task())
+        await self._loop_task()
     
     async def stop(self):
         self._active = False
-        if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-            finally:
-                self._task = None
+    
+    def add_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)        
+        if n_tag not in self._tags:
+            self._tags.add(n_tag)
+            return True, n_tag
+        return False, n_tag
+    
+    def remove_to_loop(self,tag:str):
+        n_tag = coc.utils.correct_tag(tag)
+        if n_tag in self._tags:
+            self._tags.discard(n_tag)
+            return True, n_tag
+        return False, n_tag
     
     def unlock(self,lock:asyncio.Lock):
         try:
@@ -109,28 +117,19 @@ class TaskLoop():
             return False
         except:
             return False
-    
-    @classmethod
-    def runtime_min(cls) -> int:
-        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
+           
+    @property
+    def runtime_avg(self) -> int:
+        runtime = copy.copy(self.run_time)
         try:
-            return min(run_time) if len(run_time) > 0 else 0
-        except:
-            return 0        
-         
-    @classmethod
-    def runtime_max(cls) -> int:
-        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
-        try:
-            return max(run_time) if len(run_time) > 0 else 0
+            return sum(runtime)/len(runtime) if len(runtime) > 0 else 0
         except:
             return 0
-           
-    @classmethod
-    def runtime_avg(cls) -> int:
-        #combine all run_time loops and average
-        run_time = [r for loop in cls.loops() for r in loop.run_time if loop.loop_active]
+    
+    @property
+    def dispatch_avg(self) -> int:
+        runtime = copy.copy(self.dispatch_time)
         try:
-            return sum(run_time)/len(run_time) if len(run_time) > 0 else 0
+            return sum(runtime)/len(runtime) if len(runtime) > 0 else 0
         except:
             return 0

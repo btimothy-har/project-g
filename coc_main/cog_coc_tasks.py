@@ -61,6 +61,9 @@ class ClashOfClansTasks(commands.Cog):
     def __init__(self,bot:Red):
         self.bot = bot
 
+        self.player_loop = PlayerLoop()
+        self.clan_loop = ClanLoop()
+
         #API CONTROLLER
         self.task_api_slots = int(bot_client.rate_limit * 0.8)
         self.api_semaphore = asyncio.Semaphore(self.task_api_slots)
@@ -139,6 +142,8 @@ class ClashOfClansTasks(commands.Cog):
         self.clash_season_check.start()    
         self.refresh_coc_loops.start()
 
+        asyncio.create_task(self.player_loop.start())
+        asyncio.create_task(self.clan_loop.start())
         
         # asyncio.create_task(self.war_loop.start())
         # asyncio.create_task(self.raid_loop.start())
@@ -182,7 +187,8 @@ class ClashOfClansTasks(commands.Cog):
         # stop_tasks.append(asyncio.create_task(self.discord_loop.stop()))
         # stop_tasks.append(asyncio.create_task(self.raid_loop.stop()))
         # stop_tasks.append(asyncio.create_task(self.war_loop.stop()))
-        # stop_tasks.append(asyncio.create_task(self.clan_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.clan_loop.stop()))
+        stop_tasks.append(asyncio.create_task(self.player_loop.stop()))
         
         await asyncio.gather(*stop_tasks,return_exceptions=True)
 
@@ -264,8 +270,7 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     tag = await bot_client.clan_queue.get()
                     clan = await BasicClan(tag)
-                    loop = ClanLoop(clan.tag)
-                    await loop.start()
+                    self.clan_loop.add_to_loop(clan.tag)
                     bot_client.clan_queue.task_done()
                     await asyncio.sleep(sleep)
 
@@ -284,8 +289,7 @@ class ClashOfClansTasks(commands.Cog):
                 try:
                     tag = await bot_client.player_queue.get()
                     player = await BasicPlayer(tag)
-                    loop = PlayerLoop(player.tag)
-                    await loop.start()
+                    self.player_loop.add_to_loop(player.tag)
                     bot_client.player_queue.task_done()
                     await asyncio.sleep(sleep)
 
@@ -472,20 +476,22 @@ class ClashOfClansTasks(commands.Cog):
         embed.add_field(
             name="**Player Loops**",
             value="```ini"
-                + f"\n{'[Loops]':<10} {len([loop for loop in PlayerLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.player_queue):,}"
-                + f"\n{'[Running]':<10} {len([loop for loop in PlayerLoop.loops() if loop._running]):,}"
-                + f"\n{'[Runtime]':<10} {PlayerLoop.runtime_avg():.2f}s"
+                + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
+                + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
+                + f"\n{'[Dispatch]':<10} {self.player_loop.dispatch_avg:.2f}s"
+                + f"\n{'[Run Time]':<10} {self.player_loop.runtime_avg:.2f}s"
                 + "```",
             inline=True
             )
         embed.add_field(
             name="**Clan Loops**",
             value="```ini"
-                + f"\n{'[Loops]':<10} {len([loop for loop in ClanLoop.loops() if loop.loop_active]):,}"
                 + f"\n{'[Queue]':<10} {len(bot_client.clan_queue):,}"
-                + f"\n{'[Running]':<10} {len([loop for loop in ClanLoop.loops() if loop._running]):,}"
-                + f"\n{'[Runtime]':<10} {ClanLoop.runtime_avg():.2f}s"
+                + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
+                + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
+                + f"\n{'[Dispatch]':<10} {self.clan_loop.dispatch_avg:.2f}s"
+                + f"\n{'[Run Time]':<10} {self.clan_loop.runtime_avg:.2f}s"
                 + "```",
             inline=True
             )

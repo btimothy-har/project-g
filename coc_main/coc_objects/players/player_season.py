@@ -96,7 +96,8 @@ class aPlayerSeason(AwaitLoader):
             self.home_clan = await aPlayerClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
             self.time_in_home_clan = database.get('time_in_home_clan',0) if database else 0
-            self.last_seen = [pendulum.from_timestamp(x) for x in list(set(database.get('last_seen',[])))] if database else []
+            last_seen_db = list(set(database.get('last_seen',[]))) if database else []
+            self.last_seen = [pendulum.from_timestamp(x) for x in last_seen_db] if last_seen_db else []
 
             self.attacks = aPlayerStat(
                 tag=self.tag,
