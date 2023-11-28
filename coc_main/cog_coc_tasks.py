@@ -41,7 +41,7 @@ from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
-semaphore_limit = 10
+semaphore_limit = 100
 
 ############################################################
 ############################################################
@@ -245,13 +245,14 @@ class ClashOfClansTasks(commands.Cog):
                     if self.task_semaphore._value == semaphore_limit:
                         continue
 
-                    async with self._task_lock:
-                        self.task_lock_timestamp = pendulum.now()
-                        while maintain_lock():
-                            await asyncio.sleep(0.25)
+                    if self.task_semaphore._waiters and len(self.task_semaphore._waiters) > 1000:
+                        async with self._task_lock:
+                            self.task_lock_timestamp = pendulum.now()
+                            while maintain_lock():
+                                await asyncio.sleep(0.25)
 
-                        self.task_lock_timestamp = None
-                        await asyncio.sleep(0.5)
+                            self.task_lock_timestamp = None
+                            await asyncio.sleep(0.5)
 
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clash Task Controller")
@@ -458,13 +459,13 @@ class ClashOfClansTasks(commands.Cog):
             )
         embed.add_field(name="\u200b",value="\u200b",inline=True)
 
-        client_waiters = len(self.api_semaphore._waiters) if self.api_semaphore._waiters else 0
+        client_waiters = len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0
         embed.add_field(
             name="**Tasks Client**",
             value="```ini"
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,}"
+                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,} (Waiting: {client_waiters:,})"
                 + "```",
             inline=False
             )
