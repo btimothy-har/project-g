@@ -122,7 +122,7 @@ class ClanLoop(TaskLoop):
             return 1
         return 10
     
-    def defer(self,clan:Optional[aClan]=None) -> bool:
+    async def defer(self,clan:Optional[aClan]=None) -> bool:
         if self.task_lock.locked():
             if not clan:
                 return False
@@ -199,7 +199,7 @@ class ClanLoop(TaskLoop):
         await lock.acquire()
 
         cached = self._cached.get(tag)
-        if self.defer(cached):
+        if await self.defer(cached):
             return self.loop.call_later(10,self.unlock,lock)
                 
         await self._run_single_loop(tag,lock,cached)

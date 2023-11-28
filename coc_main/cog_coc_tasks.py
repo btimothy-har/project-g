@@ -74,7 +74,7 @@ class ClashOfClansTasks(commands.Cog):
         self._controller_loop = None
         self.task_lock_timestamp = None
         self.task_semaphore = asyncio.Semaphore(semaphore_limit)
-        self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots*3))
+        self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots*2))
 
         # DATA QUEUE
         self._clan_queue_task = None
