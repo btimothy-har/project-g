@@ -111,6 +111,8 @@ class PlayerTasks():
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: attack_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.attack_wins} vs {old_player.attack_wins}."
                     )
+        except asyncio.CancelledError:
+            return
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Attack Wins task.")
 
@@ -135,6 +137,8 @@ class PlayerTasks():
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: defense_wins {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.defense_wins} vs {old_player.defense_wins}."
                     )
+        except asyncio.CancelledError:
+            return
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Defense Wins task.")
 
@@ -159,6 +163,8 @@ class PlayerTasks():
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_sent {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.donations} vs {old_player.donations}."
                     )
+        except asyncio.CancelledError:
+            return
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Donations Sent task.")
 
@@ -183,19 +189,21 @@ class PlayerTasks():
                 bot_client.coc_data_log.debug(
                     f"{new_player.tag} {new_player.name}: donations_rcvd {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_player.received} vs {old_player.received}."
                     )
+        except asyncio.CancelledError:
+            return
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Donations Rcvd task.")
     
     @staticmethod
-    async def player_stat_achievements(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
+    async def player_loot_gold(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
             # if not await new_player.is_member:
             #     return
             
-            current_season = await new_player.get_current_season()
-
             #Loot Gold
             if achievement.name == "Gold Grab":
+                current_season = await new_player.get_current_season()
+
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 if current_season.loot_gold._prior_seen:
@@ -211,9 +219,21 @@ class PlayerTasks():
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_gold {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
-            
+        except asyncio.CancelledError:
+            return
+        except:
+            bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Gold task.")
+    
+    @staticmethod
+    async def player_loot_elixir(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
+        try:
+            # if not await new_player.is_member:
+            #     return
+
             #Loot Elixir
             if achievement.name == "Elixir Escapade":
+                current_season = await new_player.get_current_season()
+
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 if current_season.loot_elixir._prior_seen:
@@ -230,9 +250,20 @@ class PlayerTasks():
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_elixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
-            
+        except asyncio.CancelledError:
+            return
+        except:
+            bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Elixir task.")
+    
+    @staticmethod
+    async def player_loot_darkelixir(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
+        try:
+            # if not await new_player.is_member:
+            #    return
+                        
             #Loot Dark Elixir
             if achievement.name == "Heroic Heist":
+                current_season = await new_player.get_current_season()
                 compare, old_ach, new_ach = await PlayerTasks.compare_achievement(old_player,new_player,achievement)
 
                 if current_season.loot_darkelixir._prior_seen:
@@ -249,8 +280,10 @@ class PlayerTasks():
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: loot_darkelixir {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
+        except asyncio.CancelledError:
+            return
         except:
-            bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Achievements task.")
+            bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Loot Dark Elixir task.")
 
     @staticmethod
     async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):            
@@ -281,6 +314,8 @@ class PlayerTasks():
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
                         )
+        except asyncio.CancelledError:
+            return
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Capital Contributions task.")
 
@@ -334,7 +369,9 @@ class PlayerLoop(TaskLoop):
         ]
     _achievement_events = [
         PlayerTasks.player_last_seen_achievement,
-        PlayerTasks.player_stat_achievements,
+        PlayerTasks.player_loot_gold,
+        PlayerTasks.player_loot_elixir,
+        PlayerTasks.player_loot_darkelixir,
         PlayerTasks.player_capital_contribution,
         PlayerTasks.player_clan_games,
         ]
