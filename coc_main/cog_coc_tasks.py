@@ -466,6 +466,7 @@ class ClashOfClansTasks(commands.Cog):
             value="```ini"
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
+                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,}"
                 + f"\n{'[API Slots]':<15} " + f"{self.task_api_slots - self.api_semaphore._value:,} / {self.task_api_slots:,} (Wait: {client_waiters:,})"
                 + "```",
             inline=False

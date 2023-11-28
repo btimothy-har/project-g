@@ -462,7 +462,7 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
             
-                await asyncio.sleep(30)
+                await asyncio.sleep(10)
                 continue
 
         except Exception as exc:
