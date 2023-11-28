@@ -4,15 +4,15 @@ from typing import *
 from numerize import numerize
 
 from .mongo_player import db_PlayerStats
+from .season_lock import PlayerSeason
 
 from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
 
 bot_client = client()
 
-class aPlayerStat():
+class aPlayerStat(PlayerSeason):
     __slots__ = [
-        '_lock',
         '_prior_seen',
         'tag',
         'season',
@@ -22,7 +22,7 @@ class aPlayerStat():
         ]
     
     def __init__(self,tag:str,season:aClashSeason,description:str,dict_value:dict):        
-        self._lock = asyncio.Lock()
+        super().__init__(tag,season)
         self._prior_seen = dict_value.get('priorSeen',False)
 
         self.tag = tag
@@ -39,10 +39,6 @@ class aPlayerStat():
             return f"{numerize.numerize(self.season_total,2)}"
         else:
             return f"{self.season_total:,}"
-    
-    @property
-    def _db_id(self) -> Dict[str,str]:
-        return {'season': self.season.id,'tag': self.tag}
     
     @property
     def json(self):

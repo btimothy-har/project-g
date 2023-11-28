@@ -12,19 +12,19 @@ from ..season.season import aClashSeason
 from .mongo_player import db_PlayerStats
 from .player_stat import aPlayerStat
 from .player_clangames import aPlayerClanGames
+from .season_lock import PlayerSeason
 
 from ..clans.player_clan import aPlayerClan
 from ...utils.utils import check_rtl
 
 bot_client = client()
 
-class aPlayerSeason(AwaitLoader):
+class aPlayerSeason(AwaitLoader,PlayerSeason):
     _cache = {}
 
     __slots__ = [
         '_new',
         '_loaded',
-        '_lock',
         'tag',
         'season',
         'name',
@@ -55,7 +55,8 @@ class aPlayerSeason(AwaitLoader):
     
     def __init__(self,tag:str,season:aClashSeason):        
         if self._new:
-            self._lock = asyncio.Lock()
+
+            PlayerSeason.__init__(self,tag,season)
 
             self.tag = tag
             self.season = season
@@ -157,10 +158,6 @@ class aPlayerSeason(AwaitLoader):
     @property
     def is_current_season(self) -> bool:
         return self.season.is_current
-    
-    @property
-    def _db_id(self) -> Dict[str,str]:
-        return {'season': self.season.id,'tag': self.tag}
     
     @property
     def clean_name(self) -> str:
