@@ -60,12 +60,7 @@ class DataQueue(asyncio.Queue):
             self._items_set.add(n_tag)
     
     async def get(self):
-        tag = await super().get()
-        try:
-            self._items_set.discard(tag)
-        except:
-            pass
-        return tag
+        return await super().get()
 
     def add(self,key:str):
         def schedule_coroutine():

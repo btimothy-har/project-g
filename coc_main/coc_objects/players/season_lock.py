@@ -12,4 +12,4 @@ class PlayerSeason():
     
     @property
     def _lock(self) -> asyncio.Lock:
-        return self._locks[self.id]
+        return self._locks[self._id]
