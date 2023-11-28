@@ -211,10 +211,11 @@ class ClanLoop(TaskLoop):
                 wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
                 self.loop.call_later(wait,self.unlock,lock)                
                 
+                self._cached[tag] = new_clan
+                
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
-                self._cached[tag] = new_clan
+                        await ClanLoop._dispatch_events(cached,new_clan)
                 
                 finished = True
         
