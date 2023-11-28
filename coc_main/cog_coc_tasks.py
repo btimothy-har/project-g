@@ -263,7 +263,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def clan_queue_task(self):
-        sleep = 0
+        sleep = 0.01
         try:
             while True:
                 try:
@@ -282,7 +282,7 @@ class ClashOfClansTasks(commands.Cog):
             return
     
     async def player_queue_task(self):
-        sleep = 0
+        sleep = 0.01
         try:
             while True:
                 try:
