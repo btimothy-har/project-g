@@ -18,7 +18,7 @@ class aPlayerClanGames():
         'season',
         'clan_tag',
         'score',
-        'last_updated',
+        'last_update',
         'starting_time',
         'ending_time'
         ]
@@ -32,7 +32,7 @@ class aPlayerClanGames():
 
         self.clan_tag = dict_value.get('clan',None)
         self.score = dict_value.get('score',0)
-        self.last_updated = dict_value.get('last_updated',0)
+        self.last_update = dict_value.get('last_updated',0)
 
         if isinstance(dict_value.get('starting_time'),datetime.datetime):
             if dict_value['starting_time'].timestamp() > 0:
@@ -65,7 +65,7 @@ class aPlayerClanGames():
         return {
             'clan': self.clan_tag,
             'score': self.score,
-            'last_updated': self.last_updated,
+            'last_updated': self.last_update,
             'starting_time': getattr(self.starting_time,'int_timestamp',None),
             'ending_time': getattr(self.ending_time,'int_timestamp',None),
             'priorSeen': self._prior_seen
@@ -131,7 +131,7 @@ class aPlayerClanGames():
                     )
 
             self.score += increment
-            self.last_updated = latest_value
+            self.last_update = latest_value
             bot_client.coc_data_log.debug(
                 f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
                 )
