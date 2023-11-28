@@ -10,14 +10,25 @@ from ..season.season import aClashSeason
 bot_client = client()
 
 class aPlayerClanGames():
-    def __init__(self,
-        tag:str,
-        season:aClashSeason,
-        dict_value:dict):
+
+    __slots__ = [
+        '_lock',
+        '_prior_seen',
+        'tag',
+        'season',
+        'clan_tag',
+        'score',
+        'last_update',
+        'starting_time',
+        'ending_time'
+        ]
+    
+    def __init__(self,tag:str,season:aClashSeason,dict_value:dict):
+        self._lock = asyncio.Lock()
+        self._prior_seen = dict_value.get('priorSeen',False)
         
         self.tag = tag
-        self.season = season
-        self._lock = asyncio.Lock()
+        self.season = season        
 
         self.clan_tag = dict_value.get('clan',None)
         self.score = dict_value.get('score',0)
@@ -56,7 +67,8 @@ class aPlayerClanGames():
             'score': self.score,
             'last_updated': self.last_updated,
             'starting_time': getattr(self.starting_time,'int_timestamp',None),
-            'ending_time': getattr(self.ending_time,'int_timestamp',None)
+            'ending_time': getattr(self.ending_time,'int_timestamp',None),
+            'priorSeen': self._prior_seen
             }
     
     @property
@@ -97,18 +109,22 @@ class aPlayerClanGames():
             return completion_str
         else:
             return ""
-
-    async def update(self,    
-        increment:int,
-        latest_value:int,
-        timestamp:pendulum.DateTime,
-        clan,
-        db_update:Callable,
-        ):
         
+    async def update_in_database(self):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':self._db_id},
+            {'$set': {
+                'season':self.season.id,
+                'tag':self.tag,
+                'clangames':self.json
+                }
+            },
+            upsert=True)
+
+    async def update(self,increment:int,latest_value:int,timestamp:pendulum.DateTime,clan_tag:str):        
         async with self._lock:
-            if self.score == 0 and clan:
-                self.clan_tag = clan.tag
+            if self.score == 0 and clan_tag:
+                self.clan_tag = clan_tag
                 self.starting_time = timestamp
                 bot_client.coc_data_log.debug(
                     f"Player {self.tag} {self.season.id}: Started Clan Games at {timestamp}."
@@ -127,6 +143,6 @@ class aPlayerClanGames():
                     f"Player {self.tag} {self.season.id}: Finished Clan Games at {timestamp}."
                     )
             
-            await db_update(self._db_id,self.json)
-        
+            self._prior_seen = True            
+            await self.update_in_database()        
         return self

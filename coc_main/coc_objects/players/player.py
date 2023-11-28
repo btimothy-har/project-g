@@ -70,6 +70,7 @@ class aPlayer(coc.Player,BasicPlayer):
     async def load(self):
         if self.clan:
             await self.clan
+        await BasicPlayer.load(self)
     
     @property
     def name(self) -> str:
@@ -371,43 +372,40 @@ class aPlayer(coc.Player,BasicPlayer):
     ##################################################    
     async def _sync_cache(self):
         if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
-            return        
-        if self._attributes._sync_lock.locked():
             return
+    
+        basic_player = await BasicPlayer(self.tag)
+        basic_player._attributes._last_sync = self.timestamp
+
+        if basic_player.is_new:
+            await BasicPlayer.player_first_seen(self.tag)
         
-        async with self._attributes._sync_lock:
-            basic_player = BasicPlayer(self.tag)
+        tasks = [] 
 
-            if await basic_player.is_new:
-                await BasicPlayer.player_first_seen(self.tag)
-            
-            tasks = []
+        if basic_player.name != self.name:
+            tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
+        if basic_player.exp_level != self.exp_level:
+            tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
+        if basic_player.town_hall_level != self.town_hall_level:
+            tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
 
-            if await basic_player.name != self.name:
-                tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
-            if await basic_player.exp_level != self.exp_level:
-                tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
-            if await basic_player.town_hall_level != self.town_hall_level:
-                tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
+        if self.is_member:
+            current_season = await self.get_current_season()
 
-            if self.is_member:
-                current_season = await self.get_current_season()
+            if self.name != current_season.name:
+                tasks.append(asyncio.create_task(current_season.update_name(self.name)))
 
-                if self.name != await current_season.name:
-                    tasks.append(asyncio.create_task(current_season.update_name(self.name)))
+            if self.town_hall_level != current_season.town_hall:
+                tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
 
-                if self.town_hall_level != await current_season.town_hall:
-                    tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
+            if getattr(self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
+                tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(self.home_clan,'tag',None))))
 
-                if getattr(await self.home_clan,'tag',None) != getattr(await current_season.home_clan,'tag',None):
-                    tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(await self.home_clan,'tag',None))))
-
-                if await self.is_member != await current_season.is_member:
-                    tasks.append(asyncio.create_task(current_season.update_member(await self.is_member)))
-            
-            if tasks:
-                await asyncio.gather(*tasks)
-                basic_player._attributes._last_sync = pendulum.now()
+            if self.is_member != current_season.is_member:
+                tasks.append(asyncio.create_task(current_season.update_member(self.is_member)))
+        
+        if tasks:
+            await asyncio.gather(*tasks)            
 
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)

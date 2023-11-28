@@ -11,13 +11,24 @@ from ..season.season import aClashSeason
 bot_client = client()
 
 class aPlayerStat():
+    __slots__ = [
+        '_lock',
+        '_prior_seen',
+        'tag',
+        'season',
+        'description',
+        'season_total',
+        'last_update'
+        ]
+    
     def __init__(self,tag:str,season:aClashSeason,description:str,dict_value:dict):        
-        self.tag = tag
-        self.season = season
-        self.description = description
         self._lock = asyncio.Lock()
         self._prior_seen = dict_value.get('priorSeen',False)
 
+        self.tag = tag
+        self.season = season
+        
+        self.description = description
         self.season_total = dict_value.get('season_total',0)
         self.last_update = dict_value.get('lastUpdate',0)
 
@@ -41,17 +52,24 @@ class aPlayerStat():
             'priorSeen': self._prior_seen
             }
     
-    async def increment_stat(self,
-        increment:int,
-        latest_value:int,
-        db_update:Callable) -> 'aPlayerStat':
-
+    async def update_in_database(self):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':self._db_id},
+            {'$set': {
+                'season':self.season.id,
+                'tag':self.tag,
+                self.description:self.json
+                }
+            },
+            upsert=True)
+    
+    async def increment_stat(self,increment:int,latest_value:int) -> 'aPlayerStat':
         async with self._lock:
             self.last_update = latest_value
             self.season_total += increment
             
             self._prior_seen = True
-            await db_update(self._db_id,self.json)
+            await self.update_in_database()
         
         #bot_client.coc_data_log.debug(f"{self.season.short_description} {self.tag}: Incremented {self.description} by {increment} to {self.season_total}")
         return self

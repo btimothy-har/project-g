@@ -413,8 +413,7 @@ class PlayerTasks():
                         increment=max(increment,0),
                         latest_value=new_ach.value,
                         timestamp=new_player.timestamp,
-                        clan=new_player.clan,
-                        db_update=PlayerTasks._update_clangames
+                        clan=new_player.clan.tag if new_player.clan else old_player.clan.tag
                         )
         except:
             bot_client.coc_main_log.exception(f"{new_player.tag}: Error in Player Clan Games task.")

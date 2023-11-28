@@ -108,33 +108,29 @@ class aClan(coc.Clan,BasicClan):
         asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
 
         if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
-            return        
-        if self._attributes._sync_lock.locked():
             return
+          
+        basic_clan = await BasicClan(self.tag)
+
+        tasks = []
+        if basic_clan.name != self.name:
+            tasks.append(basic_clan.set_name(self.name))
+
+        if basic_clan.badge != self.badge:
+            tasks.append(basic_clan.set_badge(self.badge))
+
+        if basic_clan.level != self.level:
+            tasks.append(basic_clan.set_level(self.level))
+
+        if basic_clan.capital_hall != self.capital_hall:
+            tasks.append(basic_clan.set_capital_hall(self.capital_hall))
+
+        if basic_clan.war_league_name != self.war_league_name:
+            tasks.append(basic_clan.set_war_league(self.war_league_name))
         
-        async with self._attributes._sync_lock:            
-            basic_clan = BasicClan(self.tag)
-
-            tasks = []
-
-            if await basic_clan.name != self.name:
-                tasks.append(basic_clan.set_name(self.name))
-
-            if await basic_clan.badge != self.badge:
-                tasks.append(basic_clan.set_badge(self.badge))
-
-            if await basic_clan.level != self.level:
-                tasks.append(basic_clan.set_level(self.level))
-
-            if await basic_clan.capital_hall != self.capital_hall:
-                tasks.append(basic_clan.set_capital_hall(self.capital_hall))
-
-            if await basic_clan.war_league_name != self.war_league_name:
-                tasks.append(basic_clan.set_war_league(self.war_league_name))
-            
-            if tasks:
-                await asyncio.gather(*tasks)
-                basic_clan._attributes._last_sync = pendulum.now()
+        if tasks:
+            await asyncio.gather(*tasks)
+            basic_clan._attributes._last_sync = self.timestamp
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
         return WarLeagueClan(self.tag,season)

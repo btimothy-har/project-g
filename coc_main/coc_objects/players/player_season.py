@@ -4,13 +4,11 @@ import pendulum
 from typing import *
 from mongoengine import *
 
-from functools import cached_property
-from async_property import AwaitLoader, async_property, async_cached_property
+from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
 
-from .mongo_player import db_PlayerStats
 from .player_stat import aPlayerStat
 from .player_clangames import aPlayerClanGames
 
@@ -22,23 +20,62 @@ bot_client = client()
 class aPlayerSeason(AwaitLoader):
     _cache = {}
 
+    __slots__ = [
+        '_new',
+        '_loaded',
+        '_lock',
+        'tag',
+        'season',
+        'name',
+        'town_hall',
+        'is_member',
+        'home_clan_tag',
+        'home_clan',
+        'time_in_home_clan',
+        'last_seen',
+        'attacks',
+        'defenses',
+        'donations_sent',
+        'donations_rcvd',
+        'loot_gold',
+        'loot_elixir',
+        'loot_darkelixir',
+        'capitalcontribution',
+        'clangames'
+        ]
+
     def __new__(cls,tag:str,season:aClashSeason):
         if (tag,season.id) not in cls._cache:
             instance = super().__new__(cls)
-            instance._is_new = True                
+            instance._new = True
+            instance._loaded = False
             cls._cache[(tag,season.id)] = instance
         return cls._cache[(tag,season.id)]
     
     def __init__(self,tag:str,season:aClashSeason):        
-        if self._is_new:
+        if self._new:
+            self._lock = asyncio.Lock()
+
             self.tag = tag
             self.season = season
-            
-            self._lock = asyncio.Lock()
-            self._cached_db = None
-            self._last_db_query = None
 
-        self._is_new = False
+            self.name = None
+            self.town_hall = None
+            self.is_member = None
+            self.home_clan_tag = None
+            self.time_in_home_clan = 0
+            self.last_seen = []
+            self.attacks = None
+            self.defenses = None
+            self.donations_sent = None
+            self.donations_rcvd = None
+            self.loot_gold = None
+            self.loot_elixir = None
+            self.loot_darkelixir = None
+            self.capitalcontribution = None
+            self.clangames = None
+
+            self._new = False
     
     def __str__(self):
         return f"Player Stats {self.season.id}: {self.name} ({self.tag})"
@@ -46,6 +83,75 @@ class aPlayerSeason(AwaitLoader):
     def __eq__(self,other):
         return isinstance(other,aPlayerSeason) and self.tag == other.tag and self.season == other.season
 
+    async def load(self):
+        if not self._loaded:
+            database = await bot_client.coc_db.db__player_stats.find_one({'_id':self._db_id})
+            
+            self.name = database.get('name','') if database else ''
+            self.town_hall = database.get('town_hall',0) if database else 0
+            self.is_member = database.get('is_member',False) if database else False
+            
+            self.home_clan_tag = database.get('home_clan',None) if database else None
+            self.home_clan = await aPlayerClan(tag=self.home_clan_tag) if self.home_clan_tag else None
+
+            self.time_in_home_clan = database.get('time_in_home_clan',0) if database else 0
+            self.last_seen = [pendulum.from_timestamp(x) for x in list(set(database.get('last_seen',[])))] if database else []
+
+            self.attacks = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='attacks',
+                dict_value=database.get('attacks',{}) if database else {}
+                )
+            self.defenses = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='defenses',
+                dict_value=database.get('defenses',{}) if database else {}
+                )
+            self.donations_sent = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='donations_sent',
+                dict_value=database.get('donations_sent',{}) if database else {}
+                )
+            self.donations_rcvd = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='donations_rcvd',
+                dict_value=database.get('donations_rcvd',{}) if database else {}
+                )
+            self.loot_gold = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='loot_gold',
+                dict_value=database.get('loot_gold',{}) if database else {}
+                )
+            self.loot_elixir = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='loot_elixir',
+                dict_value=database.get('loot_elixir',{}) if database else {}
+                )
+            self.loot_darkelixir = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='loot_darkelixir',
+                dict_value=database.get('loot_darkelixir',{}) if database else {}
+                )
+            self.capitalcontribution = aPlayerStat(
+                tag=self.tag,
+                season=self.season,
+                description='capitalcontribution',
+                dict_value=database.get('capitalcontribution',{}) if database else {}
+                )
+            self.clangames = aPlayerClanGames(
+                tag=self.tag,
+                season=self.season,
+                dict_value=database.get('clangames',{}) if database else {}
+                )
+            self._loaded = True
+        
     @property
     def is_current_season(self) -> bool:
         return self.season.is_current
@@ -54,162 +160,19 @@ class aPlayerSeason(AwaitLoader):
     def _db_id(self) -> Dict[str,str]:
         return {'season': self.season.id,'tag': self.tag}
     
-    @async_property
-    async def _database(self) -> Optional[db_PlayerStats]:
-        if not self._cached_db or (pendulum.now() - self._last_db_query).total_seconds() > 60:
-            self._cached_db = await bot_client.coc_db.db__player_stats.find_one({'_id':self._db_id})
-            self._last_db_query = pendulum.now()
-        return self._cached_db
-    
-    @async_cached_property
-    async def name(self) -> str:
-        db = await self._database
-        return db.get('name','') if db else ''
-    
     @property
     def clean_name(self) -> str:
         if check_rtl(self.name):
             return '\u200F' + self.name + '\u200E'
-        return self.name    
+        return self.name 
     
-    @async_cached_property
-    async def town_hall(self) -> int:
-        db = await self._database
-        return db.get('town_hall',0) if db else 0
-    
-    @async_cached_property
-    async def is_member(self) -> bool:
-        db = await self._database
-        return db.get('is_member',False) if db else False
-    
-    @async_cached_property
-    async def home_clan_tag(self) -> Optional[str]:
-        db = await self._database
-        return db.get('home_clan',None) if db else None
-    
-    @async_property
-    async def home_clan(self) -> Optional[aPlayerClan]:
-        if await self.home_clan_tag:
-            return await aPlayerClan(tag=self.home_clan_tag)
-        return None
-    
-    @async_cached_property
-    async def other_clan_tags(self) -> List[str]:
-        db = await self._database
-        return db.get('other_clans',[]) if db else []
-    
-    @async_cached_property
-    async def time_in_home_clan(self) -> int:
-        db = await self._database
-        return db.get('time_in_home_clan',0) if db else 0
-    
-    @async_cached_property
-    async def _last_seen(self) -> List[int]:
-        db = await self._database
-        return db.get('last_seen',[]) if db else []
-        
-    @async_property
-    async def last_seen(self) -> List[pendulum.DateTime]:
-        return [pendulum.from_timestamp(x) for x in list(set(await self._last_seen))]
-    
-    @async_cached_property
-    async def attacks(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='attack_wins',
-            dict_value=db.get('attacks',{}) if db else {}
-            )
-
-    @async_cached_property
-    async def defenses(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='defense_wins',
-            dict_value=db.get('defenses',{}) if db else {}
-            )
-    
-    @async_cached_property
-    async def donations_sent(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='donations_sent',
-            dict_value=db.get('donations_sent',{}) if db else {}
-            )    
     @property
     def donations(self) -> aPlayerStat:
-        if not isinstance(self.donations_sent,aPlayerStat):
-            raise AttributeError("Donations not loaded")
         return self.donations_sent
 
-    @async_cached_property
-    async def donations_rcvd(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='donations_rcvd',
-            dict_value=db.get('donations_rcvd',{}) if db else {}
-            )
     @property
     def received(self) -> aPlayerStat:
-        if not isinstance(self.donations_rcvd,aPlayerStat):
-            raise AttributeError("Donations not loaded")
         return self.donations_rcvd
-
-    @async_cached_property
-    async def loot_gold(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='loot_gold',
-            dict_value=db.get('loot_gold',{}) if db else {}
-            )
-
-    @async_cached_property
-    async def loot_elixir(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='loot_elixir',
-            dict_value=db.get('loot_elixir',{}) if db else {}
-            )
-    
-    @async_cached_property
-    async def loot_darkelixir(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='loot_darkelixir',
-            dict_value=db.get('loot_darkelixir',{}) if db else {}
-            )
-    
-    @async_cached_property
-    async def capitalcontribution(self) -> aPlayerStat:
-        db = await self._database
-        return aPlayerStat(
-            tag=self.tag,
-            season=self.season,
-            description='capitalcontribution',
-            dict_value=db.get('capitalcontribution',{}) if db else {}
-            )
-    
-    @async_cached_property
-    async def clangames(self) -> aPlayerClanGames:
-        db = await self._database
-        return aPlayerClanGames(
-            tag=self.tag,
-            season=self.season,
-            dict_value=db.get('clangames',{}) if db else {}
-            )
 
     async def update_name(self,new_name:str):
         async with self._lock:            
@@ -219,7 +182,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'name':await self.name
+                    'name':self.name
                     }
                 },
                 upsert=True)
@@ -232,7 +195,7 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'town_hall':await self.town_hall
+                    'town_hall':self.town_hall
                     }
                 },
                 upsert=True)
@@ -240,12 +203,13 @@ class aPlayerSeason(AwaitLoader):
     async def update_home_clan(self,new_tag:Optional[str]=None):
         async with self._lock:
             self.home_clan_tag = new_tag
+            self.home_clan = await aPlayerClan(tag=self.home_clan_tag) if self.home_clan_tag else None
             await bot_client.coc_db.db__player_stats.update_one(
                 {'_id':self._db_id},
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'home_clan':await self.home_clan_tag
+                    'home_clan':self.home_clan_tag
                     }
                 },
                 upsert=True)
@@ -258,20 +222,20 @@ class aPlayerSeason(AwaitLoader):
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'is_member':await self.is_member
+                    'is_member':self.is_member
                     }
                 },
                 upsert=True)
     
     async def add_time_in_home_clan(self,duration:int):
         async with self._lock:
-            self.time_in_home_clan = await self.time_in_home_clan + duration
+            self.time_in_home_clan += duration
             await bot_client.coc_db.db__player_stats.update_one(
                 {'_id':self._db_id},
                 {'$set': {
                     'season':self.season.id,
                     'tag':self.tag,
-                    'time_in_home_clan':await self.time_in_home_clan
+                    'time_in_home_clan':self.time_in_home_clan
                     }
                 },
                 upsert=True)
@@ -279,19 +243,15 @@ class aPlayerSeason(AwaitLoader):
     
     async def add_last_seen(self,timestamp:pendulum.DateTime):
         async with self._lock:
-            ls = await self._last_seen
-            last_seen = ls if ls else []
-
-            if timestamp.int_timestamp not in last_seen:
-                last_seen.append(timestamp.int_timestamp)
-                self._last_seen = last_seen
+            if timestamp.int_timestamp not in [ts.int_timestamp for ts in self.last_seen]:
+                self.last_seen.append(timestamp)
                 
                 await bot_client.coc_db.db__player_stats.update_one(
                     {'_id':self._db_id},
                     {'$set': {
                         'season':self.season.id,
                         'tag':self.tag,
-                        'last_seen':await self._last_seen
+                        'last_seen':[ts.int_timestamp for ts in self.last_seen]
                         }
                     },
                     upsert=True)
