@@ -513,7 +513,7 @@ class PlayerLoop(TaskLoop):
                 if cached:        
                     if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
                         asyncio.create_task(PlayerLoop._dispatch_events(cached,new_player))
-                self.cached[tag] = new_player
+                self._cached[tag] = new_player
                 
                 finished = True
         

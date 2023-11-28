@@ -212,7 +212,7 @@ class ClanLoop(TaskLoop):
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
                         asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
-                self.cached[tag] = new_clan
+                self._cached[tag] = new_clan
                 
                 finished = True
         
