@@ -530,7 +530,7 @@ class _ClanAttributes():
         self._new = False
     
     @property
-    def lock(self):
+    def _lock(self):
         return self._locks[self.tag]
 
     async def load(self):
