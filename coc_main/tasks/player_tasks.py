@@ -436,7 +436,8 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = copy.copy(self._tags)
+                c_tags = copy.copy(self._tags)
+                tags = list(c_tags)
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -449,7 +450,7 @@ class PlayerLoop(TaskLoop):
                 tasks = []
                 async for chunk in chunks(tags,1000):
                     tasks.append(asyncio.create_task(self._bulk_dispatch(chunk)))
-                    
+
                 await asyncio.gather(*tasks)
 
                 self._last_loop = pendulum.now()

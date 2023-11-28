@@ -134,7 +134,9 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = copy.copy(self._tags)
+                c_tags = copy.copy(self._tags)
+                tags = list(c_tags)
+                
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
