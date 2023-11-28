@@ -591,6 +591,5 @@ class PlayerLoop(TaskLoop):
                 try:
                     runtime = et - st
                     self.run_time.append(runtime.total_seconds())
-                    bot_client.coc_main_log.info(f"Player Loop {tag} took {runtime.total_seconds():.2f} seconds.")
                 except:
                     pass
