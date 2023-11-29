@@ -1,14 +1,13 @@
-import coc
 import asyncio
 import pendulum
 import random
 import copy
-import aiohttp
-
-from redbot.core.utils import AsyncIter, bounded_gather
 
 from typing import *
+
 from collections import defaultdict
+from redbot.core.utils import AsyncIter, bounded_gather
+
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
@@ -16,12 +15,8 @@ from .default import TaskLoop
 
 from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
-
 from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
-from ..exceptions import CacheNotReady
-
-from ..utils.utils import chunks
 
 bot_client = client()
 default_sleep = 60

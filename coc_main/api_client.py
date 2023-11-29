@@ -50,9 +50,6 @@ class DataQueue(asyncio.Queue):
         super().__init__(maxsize=1000)
         self._items_set = set()
     
-    def __len__(self):
-        return len(self._items_set)
-    
     async def put(self,tag):
         n_tag = coc.utils.correct_tag(tag)
         if n_tag not in self._items_set:

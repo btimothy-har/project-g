@@ -3,22 +3,19 @@ import coc
 import pendulum
 import copy
 import random
-import yappi
 
 from typing import *
 from collections import defaultdict
+from redbot.core.utils import AsyncIter, bounded_gather
+
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 
-from redbot.core.utils import AsyncIter, bounded_gather
-
 from .default import TaskLoop
 
+from ..coc_objects.players.player import aPlayer
 from ..discord.feeds.capital_contribution import CapitalContributionFeed
-
-from ..coc_objects.players.player import db_Player, aPlayer, db_PlayerStats
 from ..utils.constants.coc_constants import activity_achievements
-from ..utils.utils import chunks
 
 bot_client = client()
 default_sleep = 60
