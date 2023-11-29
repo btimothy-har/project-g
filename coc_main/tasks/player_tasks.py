@@ -358,6 +358,8 @@ class PlayerLoop(TaskLoop):
     _instance = None
     _cached = {}
     _locks = defaultdict(asyncio.Lock)
+    _task_lock = asyncio.Lock()
+    _task_semaphore = asyncio.Semaphore(10)
     
     _player_events = [
         PlayerTasks.player_time_in_home_clan,
@@ -375,11 +377,6 @@ class PlayerLoop(TaskLoop):
         PlayerTasks.player_capital_contribution,
         PlayerTasks.player_clan_games,
         ]
-    
-    @staticmethod
-    def task_semaphore() -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.player_semaphore
     
     @classmethod
     def add_player_event(cls,event):
@@ -419,15 +416,16 @@ class PlayerLoop(TaskLoop):
         async for ach in ach_iter:
             a_iter = AsyncIter(cls._achievement_events)
             tasks.extend([event(old_player,new_player,ach) async for event in a_iter])
-
-        while True:
-            sem = PlayerLoop.task_semaphore()
-            if not sem._waiters: 
-                break
-            if sem._waiters and len(sem._waiters) < random.randint(0,500):
-                break
-            await asyncio.sleep(random.uniform(0.1,1.0))
-            continue
+        
+        async with cls._task_lock:
+            while True:
+                sem = cls._task_semaphore
+                if not sem._waiters: 
+                    break
+                if sem._waiters and len(sem._waiters) < 500:
+                    break
+                await asyncio.sleep(0.1)
+                continue
         await bounded_gather(*tasks,semaphore=sem)
 
     def __new__(cls):

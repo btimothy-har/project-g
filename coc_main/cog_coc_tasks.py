@@ -74,8 +74,6 @@ class ClashOfClansTasks(commands.Cog):
         self._controller_loop = None
         self.task_lock_timestamp = None
         self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots*2))
-        self.player_semaphore = asyncio.Semaphore(semaphore_limit)
-        self.clan_semaphore = asyncio.Semaphore(semaphore_limit)
 
         # DATA QUEUE
         self._clan_queue_task = None
@@ -457,8 +455,8 @@ class ClashOfClansTasks(commands.Cog):
             )
         embed.add_field(name="\u200b",value="\u200b",inline=True)
 
-        clan_running = (semaphore_limit - self.clan_semaphore._value) + (len(self.clan_semaphore._waiters) if self.clan_semaphore._waiters else 0)
-        player_running = (semaphore_limit - self.player_semaphore._value) + (len(self.player_semaphore._waiters) if self.player_semaphore._waiters else 0)
+        clan_running = (semaphore_limit - self.clan_loop._task_semaphore._value) + (len(self.clan_loop._task_semaphore._waiters) if self.clan_loop._task_semaphore._waiters else 0)
+        player_running = (semaphore_limit - self.player_loop._task_semaphore._value) + (len(self.player_loop._task_semaphore._waiters) if self.player_loop._task_semaphore._waiters else 0)
         embed.add_field(
             name="**Tasks Client**",
             value="```ini"

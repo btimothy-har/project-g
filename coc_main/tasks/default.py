@@ -41,7 +41,7 @@ class TaskLoop():
         self._active = False
         self._running = False
         self._tags = set()
-        self._task_semaphore = asyncio.Semaphore(100)
+        self._loop_semaphore = asyncio.Semaphore(50)
         
         self._priority_tags = set()
         self._last_db_update = pendulum.now().subtract(minutes=30)
@@ -69,11 +69,6 @@ class TaskLoop():
     def task_lock(self) -> asyncio.Lock:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.task_lock
-
-    @property
-    def task_semaphore(self) -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
     
     @property
     def task_limiter(self) -> AsyncLimiter:

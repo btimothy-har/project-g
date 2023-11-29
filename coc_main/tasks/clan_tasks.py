@@ -58,15 +58,12 @@ class ClanLoop(TaskLoop):
     _instance = None
     _cached = {}
     _locks = defaultdict(asyncio.Lock)
+    _task_lock = asyncio.Lock()
+    _task_semaphore = asyncio.Semaphore(10)
 
     _clan_events = [ClanTasks.clan_donation_change]
     _member_join_events = [ClanTasks.clan_member_join]
     _member_leave_events = [ClanTasks.clan_member_leave]
-
-    @staticmethod
-    def task_semaphore() -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.clan_semaphore
 
     @classmethod
     async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
@@ -86,14 +83,15 @@ class ClanLoop(TaskLoop):
                 e_iter = AsyncIter(cls._member_join_events)
                 tasks.extend([event(member,new_clan) async for event in e_iter])
 
-        while True:
-            sem = ClanLoop.task_semaphore()
-            if not sem._waiters: 
-                break
-            if sem._waiters and len(sem._waiters) < random.randint(0,500):
-                break
-            await asyncio.sleep(random.uniform(0.1,1.0))
-            continue
+        async with cls._task_lock:
+            while True:
+                sem = cls._task_semaphore
+                if not sem._waiters: 
+                    break
+                if sem._waiters and len(sem._waiters) < 500:
+                    break
+                await asyncio.sleep(0.1)
+                continue
         await bounded_gather(*tasks,semaphore=sem)
 
     def __new__(cls):
