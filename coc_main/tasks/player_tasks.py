@@ -379,7 +379,7 @@ class PlayerLoop(TaskLoop):
     @staticmethod
     def task_semaphore() -> asyncio.Semaphore:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
+        return cog.player_semaphore
     
     @classmethod
     def add_player_event(cls,event):
@@ -419,8 +419,16 @@ class PlayerLoop(TaskLoop):
         async for ach in ach_iter:
             a_iter = AsyncIter(cls._achievement_events)
             tasks.extend([event(old_player,new_player,ach) async for event in a_iter])
-        
-        await bounded_gather(*tasks,semaphore=PlayerLoop.task_semaphore())
+
+        while True:
+            sem = PlayerLoop.task_semaphore()
+            if not sem._waiters: 
+                break
+            if sem._waiters and len(sem._waiters) < random.randint(0,1000):
+                break
+            await asyncio.sleep(0.1)
+            continue
+        await bounded_gather(*tasks,semaphore=sem)
 
     def __new__(cls):
         if cls._instance is None:

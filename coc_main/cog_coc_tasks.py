@@ -41,7 +41,7 @@ from .utils.components import DefaultView, DiscordButton, clash_embed
 from .utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
-semaphore_limit = 30
+semaphore_limit = 10
 
 ############################################################
 ############################################################
@@ -73,8 +73,9 @@ class ClashOfClansTasks(commands.Cog):
         self._task_lock = asyncio.Lock()
         self._controller_loop = None
         self.task_lock_timestamp = None
-        self.task_semaphore = asyncio.Semaphore(semaphore_limit)
         self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots*2))
+        self.player_semaphore = asyncio.Semaphore(semaphore_limit)
+        self.clan_semaphore = asyncio.Semaphore(semaphore_limit)
 
         # DATA QUEUE
         self._clan_queue_task = None
@@ -111,10 +112,6 @@ class ClashOfClansTasks(commands.Cog):
         if self._master_lock.locked():
             return self._master_lock
         return self._task_lock
-    
-    @property
-    def task_waiters(self) -> int:
-        return len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0
 
     async def report_error(self,message,error):
         if not self.last_task_error or pendulum.now().int_timestamp - self.last_task_error.int_timestamp > 60:
@@ -229,6 +226,7 @@ class ClashOfClansTasks(commands.Cog):
     #####
     ############################################################
     async def coc_task_controller(self):
+        return
         def maintain_lock():
             if self.task_semaphore._value < semaphore_limit:
                 return True
@@ -459,13 +457,14 @@ class ClashOfClansTasks(commands.Cog):
             )
         embed.add_field(name="\u200b",value="\u200b",inline=True)
 
-        client_waiters = len(self.task_semaphore._waiters) if self.task_semaphore._waiters else 0
+        clan_running = (semaphore_limit - self.clan_semaphore._value) + (len(self.clan_semaphore._waiters) if self.clan_semaphore._waiters else 0)
+        player_running = (semaphore_limit - self.player_semaphore._value) + (len(self.player_semaphore._waiters) if self.player_semaphore._waiters else 0)
         embed.add_field(
             name="**Tasks Client**",
             value="```ini"
                 + f"\n{'[Master Lock]':<15} " + (f"{'Locked':<10}" if self._master_lock.locked() else f"{'Unlocked':<10}")
                 + f"\n{'[Control Lock]':<15} " + (f"{'Locked'}" if self._task_lock.locked() else f"{'Unlocked'}") + (f" ({self.task_lock_timestamp.format('HH:mm:ss')})" if self.task_lock_timestamp else '')
-                + f"\n{'[Running]':<15} " + f"{semaphore_limit - self.task_semaphore._value:,} (Waiting: {client_waiters:,})"
+                + f"\n{'[Running]':<15} " + f"{clan_running + player_running:,}"
                 + "```",
             inline=False
             )
