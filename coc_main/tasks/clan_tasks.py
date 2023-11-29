@@ -156,18 +156,17 @@ class ClanLoop(TaskLoop):
                     continue
 
                 tags = await bot_client.run_in_thread(self._get_sample_tags)
-
                 if len(tags) == 0:
                     await asyncio.sleep(10)
                     continue
 
                 st = pendulum.now()
                 self._running = True
+                a_iter = AsyncIter(tags)
 
                 semaphore = asyncio.Semaphore(10)
-                async for chunk in chunks(tags,100):
-                    tasks = [self._launch_single_loop(tag) for tag in chunk]
-                    await bounded_gather(*tasks,semaphore=semaphore)
+                tasks = [self._launch_single_loop(tag) async for tag in a_iter]
+                await bounded_gather(*tasks,semaphore=semaphore)                    
 
                 self.last_loop = pendulum.now()
                 self._running = False
