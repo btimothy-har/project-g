@@ -10,7 +10,7 @@ from collections import deque
 from discord.ext import tasks
 from redbot.core import commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter,bounded_gather
 from .api_client import BotClashClient, aClashSeason
 
 from .coc_objects.clans.clan import BasicClan, aClan, db_Clan, db_AllianceClan, db_WarLeagueClanSetup
@@ -173,28 +173,17 @@ class ClashOfClansClient(commands.Cog):
     ############################################################
     async def fetch_player(self,tag:str) -> aPlayer:
         player = None
-        count_try = 0
-        while True:
-            try:
-                count_try += 1
-                player = await self.client.coc.get_player(tag,cls=aPlayer)
-                break
 
-            except coc.NotFound as exc:
-                raise InvalidTag(tag) from exc
-            
-            except coc.ClashOfClansException as exc:
-                cached = await self.get_player_from_loop(tag)
-                if cached:
-                    player = cached
-                else:
-                    raise ClashAPIError(exc) from exc
-            
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
+        try:
+            player = await self.client.coc.get_player(tag,cls=aPlayer)
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        except coc.ClashOfClansException as exc:
+            cached = await self.get_player_from_loop(tag)
+            if cached:
+                player = cached
+            else:
+                raise ClashAPIError(exc) from exc
                     
         await player
         return player
@@ -203,11 +192,9 @@ class ClashOfClansClient(commands.Cog):
         tasks = []
 
         a_iter = AsyncIter(tags)
-        async for tag in a_iter:
-            task = asyncio.create_task(self.fetch_player(tag))
-            tasks.append(task)
+        tasks = [self.fetch_player(tag) async for tag in a_iter]
+        ret = await bounded_gather(*tasks,limit=1,return_exceptions=True)
 
-        ret = await asyncio.gather(*tasks,return_exceptions=True)
         if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
             raise ClashAPIError([e for e in ret if isinstance(e,ClashAPIError)][0])
         
@@ -215,27 +202,33 @@ class ClashOfClansClient(commands.Cog):
         return ret_players
 
     async def fetch_members_by_season(self,clan:aClan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
-        def _db_query(q_clan,q_season):
-            if q_season.is_current:
-                query = db_Player.objects(
-                    home_clan=q_clan.tag,
-                    is_member=True
-                    ).only('tag')
-            else:
-                query = db_PlayerStats.objects(
-                    home_clan=q_clan.tag,
-                    is_member=True,
-                    season=q_season.id
-                    ).only('tag') 
-            return [p.tag for p in query]
-
         if not season or season.id not in [s.id for s in bot_client.tracked_seasons]:
             season = bot_client.current_season
         
-        query = await bot_client.run_in_thread(_db_query,clan,season)     
-        
-        ret_players = await self.fetch_many_players(*query)
-        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)     
+        if season.is_current:
+            query = bot_client.coc_db.db__player.find(
+                {
+                    'home_clan':clan.tag,
+                    'is_member':True
+                    },
+                {'_id':1}
+                )
+        else:
+            query = bot_client.coc_db.db__player_stats.find(
+                {
+                    '_id.season':season.id,
+                    'home_clan':clan.tag,
+                    'is_member':True,
+                    },
+                {'_id':1,'tag':1}
+                )
+        tags = [p['_id'] async for p in query]
+        ret_players = await self.fetch_many_players(*tags)
+        return sorted(
+            ret_players,
+            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
+            reverse=True
+            )
     
     ############################################################
     #####
@@ -244,75 +237,90 @@ class ClashOfClansClient(commands.Cog):
     ############################################################
     async def fetch_clan(self,tag:str) -> aClan:
         clan = None       
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                clan = await self.client.coc.get_clan(tag,cls=aClan)
-                break
+        try:
+            clan = await self.client.coc.get_clan(tag,cls=aClan)
 
-            except coc.NotFound as exc:
-                raise InvalidTag(tag) from exc
+        except coc.NotFound as exc:
+            raise InvalidTag(tag) from exc
+        
+        except coc.ClashOfClansException as exc:
+            cached = await self.get_clan_from_loop(tag)
+            if cached:
+                clan = cached
+            else:
+                raise ClashAPIError(exc) from exc
             
-            except coc.ClashOfClansException as exc:
-                cached = await self.get_clan_from_loop(tag)
-                if cached:
-                    clan = cached
-                else:
-                    raise ClashAPIError(exc) from exc
-            
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
         await clan
         return clan
 
-    async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
-        def _db_query():
-            try:
-                get_clan = db_Clan.objects.get(abbreviation=abbreviation.upper())
-            except:
-                return None
-            return get_clan.tag
+    async def fetch_many_clans(self,*tags) -> List[aClan]:
+        tasks = []
+
+        a_iter = AsyncIter(tags)
+        tasks = [self.fetch_clan(tag) async for tag in a_iter]
+        ret = await bounded_gather(*tasks,limit=1,return_exceptions=True)
+
+        if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
+            raise ClashAPIError([e for e in ret if isinstance(e,ClashAPIError)][0])
         
-        search = await bot_client.run_in_thread(_db_query)
-        if not search:
+        ret_clans = [p for p in ret if isinstance(p,aClan)]
+        return ret_clans
+
+    async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
+        query = await bot_client.coc_db.db__clan.find_one(
+            {
+                'abbreviation':abbreviation.upper()
+                },
+            {'_id':1}
+            )
+        if not query:
             raise InvalidAbbreviation(abbreviation)
         
-        clan = await self.fetch_clan(search)
+        clan = await self.fetch_clan(query['_id'])
         return clan
     
     async def get_registered_clans(self) -> List[aClan]:
-        def _db_query():
-            query = db_Clan.objects(
-                Q(emoji__ne=None) & 
-                Q(emoji__ne='')).only('tag')
-            return [c.tag for c in query]
-        
-        c_tags = await bot_client.run_in_thread(_db_query)
-        ret_clans = await asyncio.gather(*(self.fetch_clan(tag) for tag in c_tags))
-        return sorted(ret_clans, key=lambda x:(x.level,x.capital_hall),reverse=True)
+        query = bot_client.coc_db.db__clan.find(
+            {
+                "emoji": {
+                    "$exists": True,
+                    "$ne": ""
+                    }
+                },
+                {'_id':1}
+                )
+        tags = [c['_id'] async for c in query]
+        ret_clans = await self.fetch_many_clans(*tags)
+        return sorted(
+            ret_clans,
+            key=lambda x:(x.level,x.capital_hall),
+            reverse=True
+            )
 
     async def get_alliance_clans(self) -> List[aClan]:
-        def _db_query():
-            query = db_AllianceClan.objects()
-            return [c.tag for c in query]
-        
-        c_tags = await bot_client.run_in_thread(_db_query)
-        ret_clans = await asyncio.gather(*(self.fetch_clan(tag) for tag in c_tags))
-        return sorted(ret_clans, key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
+        query = bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
+        tags = [c['_id'] async for c in query]
+        ret_clans = await self.fetch_many_clans(*tags)
+        return sorted(
+            ret_clans,
+            key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),
+            reverse=True
+            )
 
     async def get_war_league_clans(self) -> List[aClan]:
-        def _db_query():
-            query = db_WarLeagueClanSetup.objects(is_active=True).only('tag')
-            return [c.tag for c in query]
-        
-        c_tags = await bot_client.run_in_thread(_db_query)
-        ret_clans = await asyncio.gather(*(self.fetch_clan(tag) for tag in c_tags))
-        return sorted(ret_clans, key=lambda x:(MultiplayerLeagues.get_index(x.war_league_name),x.level,x.capital_hall),reverse=True)
+        query = bot_client.coc_db.db__war_league_clan_setup.find(
+            {
+                'is_active':True
+                },
+            {'_id':1}
+            )
+        tags = [c['_id'] async for c in query]
+        ret_clans = await self.fetch_many_clans(*tags)
+        return sorted(
+            ret_clans,
+            key=lambda x:(MultiplayerLeagues.get_index(x.war_league_name),x.level,x.capital_hall),
+            reverse=True
+            )
 
     ############################################################
     #####
@@ -321,27 +329,16 @@ class ClashOfClansClient(commands.Cog):
     ############################################################    
     async def get_clan_war(self,clan:aClan) -> aClanWar:
         api_war = None
+        try:
+            api_war = await self.client.coc.get_clan_war(clan.tag)
+        except coc.PrivateWarLog:
+            return None
+        except coc.NotFound as exc:
+            raise InvalidTag(clan.tag) from exc
+        except coc.ClashOfClansException as exc:
+            raise ClashAPIError(exc) from exc
         
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                api_war = await self.client.coc.get_clan_war(clan.tag)
-                break
-            except coc.PrivateWarLog:
-                break
-            except coc.NotFound as exc:
-                raise InvalidTag(clan.tag) from exc
-            except coc.ClashOfClansException as exc:
-                raise ClashAPIError(exc) from exc
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
-        
-        if api_war:                
+        if api_war:
             if getattr(api_war,'state','notInWar') != 'notInWar':
                 clan_war = await aClanWar.create_from_api(api_war)
                 return clan_war
@@ -349,28 +346,16 @@ class ClashOfClansClient(commands.Cog):
             
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
         api_group = None
-        
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                api_group = await self.client.coc.get_league_group(clan.tag)
-                break
-            except coc.NotFound:
-                break
-            except coc.ClashOfClansException as exc:
-                raise ClashAPIError(exc)
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
+        try:
+            api_group = await self.client.coc.get_league_group(clan.tag)
+        except coc.NotFound:
+            raise InvalidTag(clan.tag)
+        except coc.ClashOfClansException as exc:
+            raise ClashAPIError(exc)
                 
-        if api_group:
-            if api_group.state in ['preparation','inWar','ended','warEnded']:
-                league_group = await WarLeagueGroup.from_api(clan,api_group)
-                return league_group
+        if api_group and getattr(api_group,'state','notInWar') in ['preparation','inWar','ended','warEnded']:
+            league_group = await WarLeagueGroup.from_api(clan,api_group)
+            return league_group
         return None
                 
     ############################################################
@@ -382,32 +367,20 @@ class ClashOfClansClient(commands.Cog):
         raidloggen = None
         api_raid = None
         
-        count_try = 0
-        while True:
-            await asyncio.sleep(0)
-            try:
-                count_try += 1
-                raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
-                break
-
-            except coc.PrivateWarLog:
-                break
-            except coc.NotFound as exc:
-                raise InvalidTag(self.tag) from exc
-            except coc.ClashOfClansException as exc:
-                raise ClashAPIError(exc) from exc
-            except:
-                if count_try > 5:
-                    raise ClashAPIError()
-                await asyncio.sleep(0.5)
-                continue
+        try:
+            raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+        except coc.PrivateWarLog:
+            return None
+        except coc.NotFound as exc:
+            raise InvalidTag(self.tag) from exc
+        except coc.ClashOfClansException as exc:
+            raise ClashAPIError(exc) from exc
                 
-        if raidloggen:
-            if len(raidloggen) > 0:
-                api_raid = raidloggen[0]
-                if api_raid:
-                    raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
-                    return raid_weekend
+        if raidloggen and len(raidloggen) > 0:
+            api_raid = raidloggen[0]
+            if api_raid:
+                raid_weekend = await aRaidWeekend.create_from_api(clan,api_raid)
+                return raid_weekend
         return None
             
     ############################################################

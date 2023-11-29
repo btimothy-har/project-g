@@ -419,7 +419,7 @@ class PlayerLoop(TaskLoop):
                 sem = cls._task_semaphore
                 if not sem._waiters: 
                     break
-                if sem._waiters and len(sem._waiters) < len(tasks):
+                if sem._waiters and len(sem._waiters) < (len(tasks) * 3):
                     break
                 await asyncio.sleep(0.1)
                 continue
