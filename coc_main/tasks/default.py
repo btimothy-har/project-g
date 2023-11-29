@@ -46,8 +46,8 @@ class TaskLoop():
         self._last_db_update = pendulum.now().subtract(minutes=30)
         
         self.last_loop = pendulum.now()
-        self.dispatch_time = deque(maxlen=1000)
-        self.run_time = deque(maxlen=1000)
+        self.dispatch_time = deque(maxlen=100)
+        self.run_time = deque(maxlen=10000)
     
     async def _loop_task(self):
         pass

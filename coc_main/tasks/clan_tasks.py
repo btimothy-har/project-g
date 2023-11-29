@@ -92,7 +92,7 @@ class ClanLoop(TaskLoop):
                 break
             if sem._waiters and len(sem._waiters) < random.randint(0,500):
                 break
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(random.uniform(0.1,1.0))
             continue
         await bounded_gather(*tasks,semaphore=sem)
 
