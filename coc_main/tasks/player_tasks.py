@@ -483,6 +483,13 @@ class PlayerLoop(TaskLoop):
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
+    def _get_sample_tags(self) -> list:
+        c_tags = copy.copy(self._tags)
+        tags = random.sample(list(c_tags),min(len(c_tags),10000))
+        if len(self._priority_tags) > 0:
+            tags.extend(list(self._priority_tags))
+        return tags
+
     async def _loop_task(self):        
         try:
             while self.loop_active:
@@ -490,11 +497,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                c_tags = copy.copy(self._tags)
-                tags = random.sample(list(c_tags),min(len(c_tags),10000))
-
-                if len(self._priority_tags) > 0:
-                    tags.extend(list(self._priority_tags))
+                tags = await bot_client.run_in_thread(self._get_sample_tags)
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -504,7 +507,7 @@ class PlayerLoop(TaskLoop):
                 self._running = True
 
                 semaphore = asyncio.Semaphore(10)
-                async for chunk in chunks(tags,1000):
+                async for chunk in chunks(tags,100):
                     tasks = [self._launch_single_loop(tag) for tag in chunk]
                     await bounded_gather(*tasks,semaphore=semaphore)
 
