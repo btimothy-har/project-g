@@ -176,19 +176,26 @@ class ClashOfClansClient(commands.Cog):
         if not coc.utils.is_valid_tag(n_tag):
             raise InvalidTag(n_tag)
         
-        player = None
-        try:
-            player = await self.client.coc.get_player(n_tag,cls=aPlayer)
-        except coc.NotFound as exc:
-            raise InvalidTag(n_tag) from exc
-        except (coc.Maintenance,coc.GatewayError) as exc:
-            cached = await self.get_player_from_loop(n_tag)
-            if cached:
-                player = cached
-            else:
-                raise ClashAPIError()
-        except:
-            raise ClashAPIError()
+        count = 0
+        player = None        
+        while True:
+            try:
+                count += 1
+                player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+                break
+            except coc.NotFound as exc:
+                raise InvalidTag(n_tag) from exc
+            except (coc.Maintenance,coc.GatewayError) as exc:
+                cached = await self.get_player_from_loop(n_tag)
+                if cached:
+                    player = cached
+                else:
+                    raise ClashAPIError(exc)
+                break
+            except:
+                if count > 3:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
                     
         await player
         return player
@@ -244,17 +251,27 @@ class ClashOfClansClient(commands.Cog):
         n_tag = coc.utils.correct_tag(tag)
         if not coc.utils.is_valid_tag(n_tag):
             raise InvalidTag(n_tag)
+        
+        count = 0
         clan = None       
-        try:
-            clan = await self.client.coc.get_clan(n_tag,cls=aClan)
-        except coc.NotFound as exc:
-            raise InvalidTag(n_tag) from exc
-        except (coc.GatewayError,coc.Maintenance) as exc:
-            cached = await self.get_clan_from_loop(n_tag)
-            if cached:
-                clan = cached
-            else:
-                raise ClashAPIError(exc) from exc
+        while True:
+            try:
+                count += 1
+                clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+                break
+            except coc.NotFound as exc:
+                raise InvalidTag(n_tag) from exc
+            except (coc.GatewayError,coc.Maintenance) as exc:
+                cached = await self.get_clan_from_loop(n_tag)
+                if cached:
+                    clan = cached
+                else:
+                    raise ClashAPIError(exc) from exc
+                break
+            except:
+                if count > 3:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
             
         await clan
         return clan
@@ -334,15 +351,24 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################    
     async def get_clan_war(self,clan:aClan) -> aClanWar:
+        count = 0
         api_war = None
-        try:
-            api_war = await self.client.coc.get_clan_war(clan.tag)
-        except coc.PrivateWarLog:
-            return None
-        except coc.NotFound as exc:
-            raise InvalidTag(clan.tag) from exc
-        except coc.ClashOfClansException as exc:
-            raise ClashAPIError(exc) from exc
+        
+        while True:
+            try:
+                count += 1
+                api_war = await self.client.coc.get_clan_war(clan.tag)
+                break
+            except coc.PrivateWarLog:
+                return None
+            except coc.NotFound as exc:
+                raise InvalidTag(clan.tag) from exc
+            except (coc.Maintenance,coc.GatewayError) as exc:
+                raise ClashAPIError(exc) from exc
+            except:
+                if count > 3:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
         
         if api_war:
             if getattr(api_war,'state','notInWar') != 'notInWar':
@@ -351,13 +377,22 @@ class ClashOfClansClient(commands.Cog):
         return None
             
     async def get_league_group(self,clan:aClan) -> WarLeagueGroup:
+        count = 0
         api_group = None
-        try:
-            api_group = await self.client.coc.get_league_group(clan.tag)
-        except coc.NotFound:
-            raise InvalidTag(clan.tag)
-        except coc.ClashOfClansException as exc:
-            raise ClashAPIError(exc)
+
+        while True:
+            try:
+                count += 1
+                api_group = await self.client.coc.get_league_group(clan.tag)
+                break
+            except coc.NotFound:
+                raise InvalidTag(clan.tag)
+            except (coc.Maintenance,coc.GatewayError) as exc:
+                raise ClashAPIError(exc)
+            except:
+                if count > 3:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
                 
         if api_group and getattr(api_group,'state','notInWar') in ['preparation','inWar','ended','warEnded']:
             league_group = await WarLeagueGroup.from_api(clan,api_group)
@@ -370,17 +405,25 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################ 
     async def get_raid_weekend(self,clan:aClan) -> aRaidWeekend:
+        count = 0
         raidloggen = None
         api_raid = None
         
-        try:
-            raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
-        except coc.PrivateWarLog:
-            return None
-        except coc.NotFound as exc:
-            raise InvalidTag(self.tag) from exc
-        except coc.ClashOfClansException as exc:
-            raise ClashAPIError(exc) from exc
+        while True:
+            try:
+                count += 1
+                raidloggen = await self.client.coc.get_raid_log(clan_tag=clan.tag,page=False,limit=1)
+                break
+            except coc.PrivateWarLog:
+                return None
+            except coc.NotFound as exc:
+                raise InvalidTag(self.tag) from exc
+            except (coc.Maintenance,coc.GatewayError) as exc:
+                raise ClashAPIError(exc) from exc
+            except:
+                if count > 3:
+                    raise ClashAPIError()
+                await asyncio.sleep(1)
                 
         if raidloggen and len(raidloggen) > 0:
             api_raid = raidloggen[0]
