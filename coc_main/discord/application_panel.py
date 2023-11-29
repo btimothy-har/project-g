@@ -68,7 +68,6 @@ class GuildApplicationPanel():
         self._tickettool_channel = database_entry.listener_channel
 
         self.text_q1 = database_entry.text_q1
-        self.placeholder_q1 = database_entry.placeholder_q1
         self.text_q2 = database_entry.text_q2
         self.placeholder_q2 = database_entry.placeholder_q2
         self.text_q3 = database_entry.text_q3

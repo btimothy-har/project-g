@@ -49,6 +49,9 @@ class DataQueue(asyncio.Queue):
         self.cache_name = cache_name
         super().__init__(maxsize=1000)
         self._items_set = set()
+
+    def __len__(self):
+        return self.qsize()
     
     async def put(self,tag):
         n_tag = coc.utils.correct_tag(tag)
