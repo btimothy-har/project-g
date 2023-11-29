@@ -41,6 +41,7 @@ class TaskLoop():
         self._active = False
         self._running = False
         self._tags = set()
+        self._task_semaphore = asyncio.Semaphore(100)
         
         self._priority_tags = set()
         self._last_db_update = pendulum.now().subtract(minutes=30)
