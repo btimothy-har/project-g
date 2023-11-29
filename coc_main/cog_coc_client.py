@@ -172,18 +172,23 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_player(self,tag:str) -> aPlayer:
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
+        
         player = None
-
         try:
-            player = await self.client.coc.get_player(tag,cls=aPlayer)
+            player = await self.client.coc.get_player(n_tag,cls=aPlayer)
         except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
+            raise InvalidTag(n_tag) from exc
         except (coc.Maintenance,coc.GatewayError) as exc:
-            cached = await self.get_player_from_loop(tag)
+            cached = await self.get_player_from_loop(n_tag)
             if cached:
                 player = cached
             else:
                 raise ClashAPIError()
+        except:
+            raise ClashAPIError()
                     
         await player
         return player
@@ -236,13 +241,16 @@ class ClashOfClansClient(commands.Cog):
     #####
     ############################################################
     async def fetch_clan(self,tag:str) -> aClan:
+        n_tag = coc.utils.correct_tag(tag)
+        if not coc.utils.is_valid_tag(n_tag):
+            raise InvalidTag(n_tag)
         clan = None       
         try:
-            clan = await self.client.coc.get_clan(tag,cls=aClan)
+            clan = await self.client.coc.get_clan(n_tag,cls=aClan)
         except coc.NotFound as exc:
-            raise InvalidTag(tag) from exc
+            raise InvalidTag(n_tag) from exc
         except (coc.GatewayError,coc.Maintenance) as exc:
-            cached = await self.get_clan_from_loop(tag)
+            cached = await self.get_clan_from_loop(n_tag)
             if cached:
                 clan = cached
             else:
