@@ -515,7 +515,7 @@ class CWLPlayerMenu(DefaultView):
                         name=f"**{a.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
                             + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
-                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != a.clan.tag else "")
+                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != getattr(a.clan,'tag',None) else "")
                             + f"\n{a.hero_description}"
                             + "\n\u200b",
                         inline=False
@@ -817,7 +817,7 @@ class CWLPlayerMenu(DefaultView):
             e.add_field(
                 name=f"**{cwl_player.title}**",
                 value=f"CWL Clan: **{EmojisLeagues.get(cwl_player.league_or_roster_clan.league)} [{cwl_player.league_or_roster_clan.name} {cwl_player.league_or_roster_clan.tag}]({cwl_player.league_or_roster_clan.share_link})**"
-                    + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if cwl_player.league_or_roster_clan.tag != player.clan.tag else "")
+                    + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if cwl_player.league_or_roster_clan.tag != getattr(player.clan,'tag',None) else "")
                     + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
                     + (f"\n\u200b" if not cwl_player.league_clan else ""),
                 inline=False
