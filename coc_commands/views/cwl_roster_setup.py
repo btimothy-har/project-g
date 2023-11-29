@@ -491,9 +491,9 @@ class CWLRosterMenu(DefaultView):
                         label=str(player),
                         value=player.tag,
                         emoji=player.town_hall.emoji,
-                        description=f"{round((player.hero_strength/player.max_hero_strength)*100)}% "
-                            + f"| {round((player.troop_strength/player.max_troop_strength)*100)}% "
-                            + f"| {round((player.spell_strength/player.max_spell_strength)*100)}% "
+                        description=(f"{round((player.hero_strength/player.max_hero_strength)*100)}% " if player.max_hero_strength > 0 else "0% ")
+                            + (f"| {round((player.troop_strength/player.max_troop_strength)*100)}% " if player.max_troop_strength > 0 else "0% ")
+                            + (f"| {round((player.spell_strength/player.max_spell_strength)*100)}% " if player.max_spell_strength > 0 else "0% ")
                             + (f"| Current Roster: {player.war_league_season(self.season).roster_clan.name[:12]}" if player.war_league_season(self.season).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(player.war_league_season(self.season).league_group)}"),
                         default=False)
                         for player in clan_participants

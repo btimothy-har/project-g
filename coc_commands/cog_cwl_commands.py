@@ -653,6 +653,21 @@ class ClanWarLeagues(commands.Cog):
             success=True
             )
         return embed
+
+    @subcommand_group_cwl_roster.command(name="open")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcommand_cwl_roster_add(self,ctx,clan_tag:str):
+        """
+        Force open a CWL Clan's Roster.
+        """
+        season = self.active_war_league_season
+
+        clan = await self.client.fetch_clan(clan_tag)
+        cwl_clan = clan.war_league_season(season)
+
+        await cwl_clan.open_roster()
+        await ctx.tick()
     
     @subcommand_group_cwl_roster.command(name="add")
     @commands.admin()

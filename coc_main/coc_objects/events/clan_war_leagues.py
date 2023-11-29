@@ -790,7 +790,7 @@ class WarLeaguePlayer(BasicPlayer):
                 except discord.NotFound:
                     pass
                 else:
-                    await member.add_roles(cwl_role,'CWL Roster Finalized')
+                    await member.add_roles(*[cwl_role.id],reason='CWL Roster Finalized')
     
     ##################################################
     ### CLASS / STATIC METHODS
