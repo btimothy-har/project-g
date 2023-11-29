@@ -88,7 +88,7 @@ class ClanLoop(TaskLoop):
                 sem = cls._task_semaphore
                 if not sem._waiters: 
                     break
-                if sem._waiters and len(sem._waiters) < 500:
+                if sem._waiters and len(sem._waiters) < len(tasks):
                     break
                 await asyncio.sleep(0.1)
                 continue

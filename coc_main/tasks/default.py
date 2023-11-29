@@ -92,6 +92,8 @@ class TaskLoop():
     
     def add_to_loop(self,tag:str):
         n_tag = coc.utils.correct_tag(tag)        
+        if len(self._tags) >= 100000:
+            return False, n_tag
         if n_tag not in self._tags:
             self._tags.add(n_tag)
             return True, n_tag
