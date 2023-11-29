@@ -657,7 +657,7 @@ class ClanWarLeagues(commands.Cog):
     @subcommand_group_cwl_roster.command(name="open")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_cwl_roster_add(self,ctx,clan_tag:str):
+    async def subcommand_cwl_roster_open(self,ctx,clan_tag:str):
         """
         Force open a CWL Clan's Roster.
         """
