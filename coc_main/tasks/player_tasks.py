@@ -497,7 +497,13 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
+                bot_client.coc_main_log.info(f"Player Loop: Starting new loop.")
+                a = pendulum.now()
+
                 tags = await bot_client.run_in_thread(self._get_sample_tags)
+
+                b = pendulum.now()
+                bot_client.coc_main_log.info(f"Player Loop: Sampled tags in {(b-a).total_seconds()}s.")
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
