@@ -539,9 +539,10 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
 
-                semaphore = asyncio.Semaphore(100)
-                tasks = [self._launch_single_loop(tag) for tag in tags]
-                await bounded_gather(*tasks,semaphore=semaphore)
+                semaphore = asyncio.Semaphore(50)
+                async for chunk in chunks(tags,1000):
+                    tasks = [self._launch_single_loop(tag) for tag in chunk]
+                    await bounded_gather(*tasks,semaphore=semaphore)
 
                 self.last_loop = pendulum.now()
                 self._running = False
