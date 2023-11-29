@@ -178,12 +178,12 @@ class ClashOfClansClient(commands.Cog):
             player = await self.client.coc.get_player(tag,cls=aPlayer)
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
-        except coc.ClashOfClansException as exc:
+        except (coc.Maintenance,coc.GatewayError) as exc:
             cached = await self.get_player_from_loop(tag)
             if cached:
                 player = cached
             else:
-                raise ClashAPIError(exc) from exc
+                raise ClashAPIError()
                     
         await player
         return player
@@ -239,11 +239,9 @@ class ClashOfClansClient(commands.Cog):
         clan = None       
         try:
             clan = await self.client.coc.get_clan(tag,cls=aClan)
-
         except coc.NotFound as exc:
             raise InvalidTag(tag) from exc
-        
-        except coc.ClashOfClansException as exc:
+        except (coc.GatewayError,coc.Maintenance) as exc:
             cached = await self.get_clan_from_loop(tag)
             if cached:
                 clan = cached
