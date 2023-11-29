@@ -424,7 +424,7 @@ class PlayerLoop(TaskLoop):
             sem = PlayerLoop.task_semaphore()
             if not sem._waiters: 
                 break
-            if sem._waiters and len(sem._waiters) < random.randint(0,1000):
+            if sem._waiters and len(sem._waiters) < random.randint(0,500):
                 break
             await asyncio.sleep(0.1)
             continue
@@ -465,7 +465,7 @@ class PlayerLoop(TaskLoop):
             return 2
         if bot_client.bot.get_user(player.discord_user):
             return 2
-        return 10
+        return random.randint(3,10)
     
     def is_priority(self,player:aPlayer) -> bool:
         if player.is_member:

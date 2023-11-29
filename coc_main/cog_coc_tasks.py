@@ -474,7 +474,7 @@ class ClashOfClansTasks(commands.Cog):
             name="**Player Loops**",
             value=f"Last: <t:{self.player_loop.last_loop.int_timestamp}:R>"
                 + "```ini"
-                + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,}"
+                + f"\n{'[Tags]':<10} {len(self.player_loop._tags):,} (Pr: {len(self.player_loop._priority_tags)})"
                 + f"\n{'[Running]':<10} {'True' if self.player_loop._running else 'False'}"
                 + f"\n{'[LoopTime]':<10} {self.player_loop.dispatch_avg:.2f}s"
                 + f"\n{'[RunTime]':<10} {self.player_loop.runtime_avg:.2f}s"
@@ -486,7 +486,7 @@ class ClashOfClansTasks(commands.Cog):
             name="**Clan Loops**",
             value=f"Last: <t:{self.clan_loop.last_loop.int_timestamp}:R>"
                 + "```ini"
-                + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,}"
+                + f"\n{'[Tags]':<10} {len(self.clan_loop._tags):,} (Pr: {len(self.clan_loop._priority_tags)})"
                 + f"\n{'[Running]':<10} {'True' if self.clan_loop._running else 'False'}"
                 + f"\n{'[LoopTime]':<10} {self.clan_loop.dispatch_avg:.2f}s"
                 + f"\n{'[RunTime]':<10} {self.clan_loop.runtime_avg:.2f}s"
