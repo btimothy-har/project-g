@@ -42,7 +42,7 @@ class TaskLoop():
         self._running = False
         self._tags = set()
         
-        self._db_tags = set()
+        self._priority_tags = set()
         self._last_db_update = pendulum.now().subtract(minutes=30)
         
         self.last_loop = pendulum.now()

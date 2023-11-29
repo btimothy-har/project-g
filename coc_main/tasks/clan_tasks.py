@@ -129,18 +129,12 @@ class ClanLoop(TaskLoop):
             return 1
         return 10
     
-    async def defer(self,clan:Optional[aClan]=None) -> bool:
-        if self.task_lock.locked():
-            if not clan:
-                return False
-            if clan.is_alliance_clan:
-                return False
-            if clan.is_active_league_clan:
-                return False
-            if clan.is_registered_clan:
-                return False
-            if pendulum.now().int_timestamp - clan.timestamp.int_timestamp >= 3600:
-                return False
+    def is_priority(self,clan:aClan) -> bool:
+        if clan.is_alliance_clan:
+            return True
+        if clan.is_active_league_clan:
+            return True
+        if clan.is_registered_clan:
             return True
         return False
     
@@ -155,8 +149,10 @@ class ClanLoop(TaskLoop):
                     continue
 
                 c_tags = copy.copy(self._tags)
-                tags = list(c_tags)
-                random.shuffle(tags)
+                tags = random.sample(list(c_tags),min(len(c_tags),10000))
+
+                if len(self._priority_tags) > 0:
+                    tags.extend(list(self._priority_tags))
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -165,7 +161,7 @@ class ClanLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
 
-                semaphore = asyncio.Semaphore(50)
+                semaphore = asyncio.Semaphore(10)
                 async for chunk in chunks(tags,1000):
                     tasks = [self._launch_single_loop(tag) for tag in chunk]
                     await bounded_gather(*tasks,semaphore=semaphore)
@@ -178,7 +174,7 @@ class ClanLoop(TaskLoop):
                 except:
                     pass
 
-                await asyncio.sleep(20)
+                await asyncio.sleep(10)
                 continue
 
         except Exception as exc:
@@ -199,10 +195,7 @@ class ClanLoop(TaskLoop):
             return
         await lock.acquire()
 
-        cached = self._cached.get(tag)
-        if await self.defer(cached):
-            return self.loop.call_later(10,self.unlock,lock)
-                
+        cached = self._cached.get(tag)                
         await self._run_single_loop(tag,lock,cached)
 
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aClan]=None):
@@ -228,6 +221,11 @@ class ClanLoop(TaskLoop):
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
                         asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
+                
+                if self.is_priority(new_clan):
+                    self._priority_tags.add(tag)
+                else:
+                    self._priority_tags.discard(tag)
                 
                 finished = True
         

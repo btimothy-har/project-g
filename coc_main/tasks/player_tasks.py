@@ -467,52 +467,18 @@ class PlayerLoop(TaskLoop):
             return 2
         return 10
     
-    def defer(self,player:Optional[aPlayer]=None) -> bool:
-        if self.task_lock.locked():
-            if not player:
-                return False
-            if player.is_member:
-                return False
-            if getattr(player.clan,'is_alliance_clan',False):
-                return False
-            if getattr(player.clan,'is_active_league_clan',False):
-                return False
-            if getattr(player.clan,'is_registered_clan',False):
-                return False
-            if bot_client.bot.get_user(player.discord_user):
-                return False
-            if pendulum.now().int_timestamp - player.timestamp.int_timestamp >= 1800:
-                return False
+    def is_priority(self,player:aPlayer) -> bool:
+        if player.is_member:
+            return True
+        if getattr(player.clan,'is_alliance_clan',False):
+            return True
+        if getattr(player.clan,'is_active_league_clan',False):
+            return True
+        if getattr(player.clan,'is_registered_clan',False):
+            return True
+        if bot_client.bot.get_user(player.discord_user):
             return True
         return False
-    
-    # async def update_db_tags(self):
-    #     bot_users = [u.id for u in bot_client.bot.users]
-    #     registered_clan_tags = bot_client.coc_db.db__clan.find({
-    #         "emoji":{"$exists":True,"$ne":""},
-    #         },
-    #         {'_id':1}
-    #         )
-    #     alliance_clan_tags = bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
-    #     war_league_clan_tags = bot_client.coc_db.db__war_league_clan_setup.find({
-    #         "is_active":True,
-    #         },
-    #         {'_id':1}
-    #         )
-    #     clans = []
-    #     clans.extend([c['_id'] async for c in registered_clan_tags])
-    #     clans.extend([c['_id'] async for c in alliance_clan_tags])
-    #     clans.extend([c['_id'] async for c in war_league_clan_tags])
-    #     clans = list(set(clans)) if clans else []
-
-    #     db_tags = bot_client.coc_db.db__player.find({
-    #         'discord_user':{'$exists},
-    #         'clan_tag':{'$in':clans},
-    #         },
-    #         {'_id':1}
-    #         )
-    #     }
-    
 
     ##################################################
     ### PRIMARY TASK LOOP
@@ -524,13 +490,11 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                # if self._last_db_update.diff().total_seconds() >= 3600:
-
-                # query_alliance_clans = bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
-
                 c_tags = copy.copy(self._tags)
-                tags = list(c_tags)
-                random.shuffle(tags)
+                tags = random.sample(list(c_tags),min(len(c_tags),10000))
+
+                if len(self._priority_tags) > 0:
+                    tags.extend(list(self._priority_tags))
 
                 if len(tags) == 0:
                     await asyncio.sleep(10)
@@ -539,7 +503,7 @@ class PlayerLoop(TaskLoop):
                 st = pendulum.now()
                 self._running = True
 
-                semaphore = asyncio.Semaphore(50)
+                semaphore = asyncio.Semaphore(10)
                 async for chunk in chunks(tags,1000):
                     tasks = [self._launch_single_loop(tag) for tag in chunk]
                     await bounded_gather(*tasks,semaphore=semaphore)
@@ -552,7 +516,7 @@ class PlayerLoop(TaskLoop):
                 except:
                     pass
             
-                await asyncio.sleep(20)
+                await asyncio.sleep(10)
                 continue
 
         except Exception as exc:
@@ -573,10 +537,7 @@ class PlayerLoop(TaskLoop):
             return
         await lock.acquire()
 
-        cached = self._cached.get(tag,None)
-        if self.defer(cached):
-            return self.loop.call_later(10,self.unlock,lock)
-        
+        cached = self._cached.get(tag,None)        
         await self._run_single_loop(tag,lock,cached)
         
     async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aPlayer]=None):
@@ -601,6 +562,11 @@ class PlayerLoop(TaskLoop):
                     if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
                         asyncio.create_task(PlayerLoop._dispatch_events(cached,new_player))
                 self._cached[tag] = new_player
+
+                if self.is_priority(new_player):
+                    self._priority_tags.add(tag)
+                else:
+                    self._priority_tags.discard(tag)
                 
                 finished = True
         
