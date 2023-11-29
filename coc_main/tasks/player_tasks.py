@@ -480,7 +480,7 @@ class PlayerLoop(TaskLoop):
     ##################################################
     def _get_sample_tags(self) -> list:
         c_tags = copy.copy(self._tags)
-        tags = random.sample(list(c_tags),min(len(c_tags),5000))
+        tags = random.sample(list(c_tags),min(len(c_tags),1000))
         if len(self._priority_tags) > 0:
             tags.extend(list(self._priority_tags))
         return list(set(tags)) if len(tags) > 0 else []
