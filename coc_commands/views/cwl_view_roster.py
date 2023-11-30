@@ -186,11 +186,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
                 roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
+                header_text += f"\n**Participants:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
                 roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-                header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
+                header_text += f"\n**Rostered:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += (f"{EmojisUI.YES}: a Rostered CWL Player\n" if self.league_clan.status in ["Roster Finalized","Roster Pending"] else "")
@@ -200,7 +200,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
             
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
-                + (f"{EmojisUI.LOGOUT}" if player.clan.tag != self.league_clan.tag else f"{EmojisUI.SPACER}")
+                + (f"{EmojisUI.LOGOUT}" if getattr(player.clan,'tag',None) != self.league_clan.tag else f"{EmojisUI.SPACER}")
                 + f"{EmojisTownHall.get(player.town_hall.level)}"
                 + f"`{re.sub('[_*/]','',player.clean_name)[:13]:<13}`\u3000" + f"`{'':^1}{player.tag:<11}`\u3000"
                 + (f"`{'':^1}{getattr(self.ctx.guild.get_member(player.discord_user),'display_name','Not Found')[:12]:<12}`" if player.discord_user else f"`{'':<13}`")
@@ -242,11 +242,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
                 roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-                header_text += f"\n**Participants:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
+                header_text += f"\n**Participants:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
                 roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-                header_text += f"\n**Rostered:** {len([p for p in roster_players if p.clan.tag == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
+                header_text += f"\n**Rostered:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += f"{EmojisUI.YES}: This player is rostered to play in CWL."
