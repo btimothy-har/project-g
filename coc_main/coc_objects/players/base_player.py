@@ -25,14 +25,10 @@ class BasicPlayer(AwaitLoader):
 
     @classmethod
     async def load_all(cls) -> List['BasicPlayer']:
-        count = 0     
-        query = bot_client.coc_db.db__player.find({},{'_id':1})        
+        query = bot_client.coc_db.db__player.find({},{'_id':1}).limit(50000)
         async for p in query:
             await bot_client.player_queue.put(p['_id'])
             await asyncio.sleep(0.1)
-            count += 1
-            if count >= 100000:
-                break
     
     @classmethod
     def clear_cache(cls):
