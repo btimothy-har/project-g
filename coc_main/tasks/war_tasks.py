@@ -240,66 +240,65 @@ class ClanWarLoop(TaskLoop):
             except KeyError:
                 self._cached[tag] = cached_events = {}
             
-            async with self.task_limiter:
-                st = pendulum.now()
+            st = pendulum.now()
 
-                cached_war = cached_events.get('current_war',None)
+            cached_war = cached_events.get('current_war',None)
+            async with self.api_limiter:
+                try:
+                    clan = await self.coc_client.fetch_clan(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
+                    return self.loop.call_later(10,self.unlock,lock)
+            
+            if not getattr(clan,'public_war_log',False):
+                return self.loop.call_later(10,self.unlock,lock)
+            
+            current_war = None
+            count = 0
+            async with self.api_limiter:
+                while True:
+                    try:
+                        count += 1
+                        current_war = await bot_client.coc.get_current_war(tag)
+                        break
+                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                        return self.loop.call_later(10,self.unlock,lock)
+                    except:
+                        if count > 5:
+                            return self.loop.call_later(10,self.unlock,lock)
+                        await asyncio.sleep(0.5)
+            
+            wait = getattr(current_war,'_response_retry',default_sleep)
+            self.loop.call_later(wait,self.unlock,lock)
+
+            self._cached[tag]['current_war'] = current_war
+                    
+            if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
+                await self._update_league_group(clan)
+                previous_round = None
                 async with self.api_limiter:
                     try:
-                        clan = await self.coc_client.fetch_clan(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                
-                if not getattr(clan,'public_war_log',False):
-                    return self.loop.call_later(10,self.unlock,lock)
-                
-                current_war = None
-                count = 0
-                async with self.api_limiter:
-                    while True:
-                        try:
-                            count += 1
-                            current_war = await bot_client.coc.get_current_war(tag)
-                            break
-                        except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
-                            return self.loop.call_later(10,self.unlock,lock)
-                        except:
-                            if count > 5:
-                                return self.loop.call_later(10,self.unlock,lock)
-                            await asyncio.sleep(0.5)
-                
-                wait = getattr(current_war,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)
+                        previous_round = await bot_client.coc.get_current_war(
+                            clan_tag=clan.tag,
+                            cwl_round=coc.WarRound.previous_war
+                            )
+                    except coc.ClashOfClansException:
+                        pass
 
-                self._cached[tag]['current_war'] = current_war
-                        
-                if getattr(current_war,'is_cwl',False) and pendulum.now().day in range(1,16):
-                    await self._update_league_group(clan)
-                    previous_round = None
-                    async with self.api_limiter:
-                        try:
-                            previous_round = await bot_client.coc.get_current_war(
-                                clan_tag=clan.tag,
-                                cwl_round=coc.WarRound.previous_war
-                                )
-                        except coc.ClashOfClansException:
-                            pass
-
-                    if previous_round:
-                        cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
-                        if cached_round:
-                            asyncio.create_task(
-                                self._dispatch_events(clan,cached_round,previous_round,is_current=False)
-                                )
-                        self._cached[tag][previous_round.preparation_start_time.raw_time] = previous_round
-                
-                if cached_war and current_war:
-                    asyncio.create_task(
-                        self._dispatch_events(clan,cached_war,current_war,is_current=True)
-                        )
-                finished = True
+                if previous_round:
+                    cached_round = cached_events.get(previous_round.preparation_start_time.raw_time,None)
+                    if cached_round:
+                        asyncio.create_task(
+                            self._dispatch_events(clan,cached_round,previous_round,is_current=False)
+                            )
+                    self._cached[tag][previous_round.preparation_start_time.raw_time] = previous_round
+            
+            if cached_war and current_war:
+                asyncio.create_task(
+                    self._dispatch_events(clan,cached_war,current_war,is_current=True)
+                    )
+            finished = True
 
         except asyncio.CancelledError:
             return

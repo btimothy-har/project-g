@@ -180,36 +180,35 @@ class ClanRaidLoop(TaskLoop):
             await lock.acquire()
             cached = self._cached.get(tag,None)
             
-            async with self.task_limiter:
-                st = pendulum.now()
-                
-                async with self.api_limiter:
-                    try:
-                        clan = await self.coc_client.fetch_clan(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                
-                raid_log = None
-                new_raid = None
-                async with self.api_limiter:
-                    try:
-                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
-                        return self.loop.call_later(10,self.unlock,lock)
+            st = pendulum.now()
+            
+            async with self.api_limiter:
+                try:
+                    clan = await self.coc_client.fetch_clan(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
+                    return self.loop.call_later(10,self.unlock,lock)
+            
+            raid_log = None
+            new_raid = None
+            async with self.api_limiter:
+                try:
+                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                    return self.loop.call_later(10,self.unlock,lock)
 
-                wait = getattr(raid_log,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)
-                    
-                if raid_log and len(raid_log) > 0:
-                    new_raid = raid_log[0]
-                    self._cached[tag] = new_raid
+            wait = getattr(raid_log,'_response_retry',default_sleep)
+            self.loop.call_later(wait,self.unlock,lock)
                 
-                if cached and new_raid:
-                    asyncio.create_task(self._dispatch_events(clan,cached,new_raid))
-                
-                finished = True
+            if raid_log and len(raid_log) > 0:
+                new_raid = raid_log[0]
+                self._cached[tag] = new_raid
+            
+            if cached and new_raid:
+                asyncio.create_task(self._dispatch_events(clan,cached,new_raid))
+            
+            finished = True
         
         except asyncio.CancelledError:
             return
