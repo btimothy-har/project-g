@@ -120,7 +120,7 @@ class aMember(AwaitLoader):
             {'_id':self.db_id},
             {'_id':1,'guild_id':1,'last_payday':1,'last_role_sync':1}
             ).to_list(length=None)
-        db_lastpayday = [db['last_payday'] for db in query]
+        db_lastpayday = [db.get('last_payday',0) for db in query]
         self.last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
     
     ##################################################

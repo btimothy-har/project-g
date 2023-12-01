@@ -18,7 +18,7 @@ bot_client = client()
 class RecruitingReminder():
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
-        '_id',
+        'id',
         'is_active',
         'ad_name',
         'ad_link',

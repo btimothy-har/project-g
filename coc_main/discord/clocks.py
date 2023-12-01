@@ -24,17 +24,19 @@ class aGuildClocks():
 
     @classmethod
     async def get_for_guild(cls,guild_id:int):        
-        database = await bot_client.coc_db.db__clock_config.find_one({'s_id':guild_id})        
+        database = await bot_client.coc_db.db__clock_config.find_one({'s_id':guild_id})      
+        if not database:
+            return cls(guild_id,{})  
         return cls(guild_id,database)
         
     def __init__(self,guild_id:int,config:Optional[dict]=None):
         self.id = guild_id
-        self.use_channels = config.get('use_channels',False)
-        self.use_events = config.get('use_events',False)
-        self._season_channel = config.get('season_channel',0)
-        self._raids_channel = config.get('raids_channel',0)
-        self._clangames_channel = config.get('clangames_channel',0)
-        self._warleague_channel = config.get('warleague_channel',0)
+        self.use_channels = config.get('use_channels',False) if config else False
+        self.use_events = config.get('use_events',False) if config else False
+        self._season_channel = config.get('season_channel',0) if config else 0
+        self._raids_channel = config.get('raids_channel',0) if config else 0
+        self._clangames_channel = config.get('clangames_channel',0) if config else 0
+        self._warleague_channel = config.get('warleague_channel',0) if config else 0
 
     @property
     def guild(self):
