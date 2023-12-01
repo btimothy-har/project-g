@@ -480,13 +480,13 @@ class PlayerLoop(TaskLoop):
         
     async def _run_single_loop(self,tag:str):
         try:
+            finished = False
             lock = self._locks[tag]
             if lock.locked():
                 return
             await lock.acquire()
             cached = self._cached.get(tag,None)
-        
-            finished = False            
+    
             async with self.task_limiter:
                 st = pendulum.now()
 

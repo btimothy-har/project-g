@@ -229,6 +229,7 @@ class ClanWarLoop(TaskLoop):
     
     async def _run_single_loop(self,tag:str):
         try:
+            finished = False
             lock = self._locks[tag]
             if lock.locked():
                 return
@@ -238,8 +239,7 @@ class ClanWarLoop(TaskLoop):
                 cached_events = self._cached[tag]
             except KeyError:
                 self._cached[tag] = cached_events = {}
-
-            finished = False
+            
             async with self.task_limiter:
                 st = pendulum.now()
 

@@ -144,14 +144,14 @@ class ClanLoop(TaskLoop):
                 await self.start()
     
     async def _run_single_loop(self,tag:str):
-        try:        
+        try:
+            finished = False
+            
             lock = self._locks[tag]
             if lock.locked():
                 return
             await lock.acquire()
-            cached = self._cached.get(tag)    
-
-            finished = False            
+            cached = self._cached.get(tag)       
             async with self.task_limiter:
                 st = pendulum.now()
 
