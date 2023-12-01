@@ -159,12 +159,7 @@ class aClashSeason(AwaitLoader):
     
     async def set_as_current(self):
         async with self._lock:
-            self.is_current = True
-            existing = [s for s in list(aClashSeason._cache.values()) if s.is_current and s != self]
-            for season in existing:
-                season.is_current = False
-
-            await self._bot.coc_db.db__seasons.update_one(
+            await self._bot.coc_db.d_season.update_one(
                 {'_id':self.id},
                 {'$set': {
                     's_is_current':True
@@ -172,7 +167,7 @@ class aClashSeason(AwaitLoader):
                 },
                 upsert=True
                 )
-            await self._bot.coc_db.db__seasons.update_many(
+            await self._bot.coc_db.d_season.update_many(
                 {'_id':{'$ne':self.id}},
                 {'$set': {
                     's_is_current':False
