@@ -115,7 +115,6 @@ class ClanRaidLoop(TaskLoop):
 
         tags.extend([clan.tag for clan in await client.get_registered_clans()])
         tags.extend([clan.tag for clan in await client.get_alliance_clans()])
-        tags.extend([clan.tag for clan in await client.get_war_league_clans()])
         self._tags = set(tags)
         self._last_db_update = pendulum.now()
     
