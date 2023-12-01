@@ -415,7 +415,7 @@ class PlayerLoop(TaskLoop):
     
     async def _reload_tags(self):
         query = {"$or": [
-            {"discord_user": {"$exists":True,"$ne":0}},
+            {"discord_user": {"$exists":True,"$gt":0}},
             {"is_member": True}
             ]
         }        

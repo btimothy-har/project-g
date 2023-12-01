@@ -15,12 +15,10 @@ from aiolimiter import AsyncLimiter
 from art import text2art
 from time import process_time
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter
 from redbot.core.utils.chat_formatting import humanize_list
 
-from .coc_objects.season.mongo_season import dSeason
 from .coc_objects.season.season import aClashSeason
 from .exceptions import *
 
@@ -159,8 +157,6 @@ class BotClashClient():
         
         if not self._is_initialized:
             self.thread_pool = ThreadPoolExecutor(max_workers=2)
-            self.read_thread_pool = ThreadPoolExecutor(max_workers=2)
-            self.write_thread_pool = ThreadPoolExecutor(max_workers=2)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger
@@ -230,24 +226,6 @@ class BotClashClient():
                 self.coc_main_log.exception(f"Error in thread: {exc}")
         loop = asyncio.get_running_loop()
         return loop.run_in_executor(self.thread_pool, _run_func, func, *args)
-    
-    def run_in_read_thread(self, func, *args):
-        def _run_func(func, *args):
-            try:
-                return func(*args)
-            except Exception as exc:
-                self.coc_main_log.exception(f"Error in read thread: {exc}")
-        loop = asyncio.get_running_loop()
-        return loop.run_in_executor(self.read_thread_pool, _run_func, func, *args)
-    
-    def run_in_write_thread(self, func, *args):
-        def _run_func(func, *args):
-            try:
-                return func(*args)
-            except Exception as exc:
-                self.coc_main_log.exception(f"Error in write thread: {exc}")
-        loop = asyncio.get_running_loop()
-        return loop.run_in_executor(self.write_thread_pool, _run_func, func, *args)
     
     @classmethod
     async def initialize(cls,

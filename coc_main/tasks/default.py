@@ -62,11 +62,6 @@ class TaskLoop():
         return self.coc_client.api_maintenance
     
     @property
-    def task_limiter(self) -> AsyncLimiter:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_limiter
-    
-    @property
     def api_limiter(self) -> AsyncLimiter:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.api_semaphore

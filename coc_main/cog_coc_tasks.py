@@ -70,9 +70,6 @@ class ClashOfClansTasks(commands.Cog):
         #API CONTROLLER
         self.task_api_slots = int(bot_client.rate_limit * 0.6)
         self.api_semaphore = AsyncLimiter(1,1/self.task_api_slots)
-        
-        # TASK CONTROLLER
-        self.task_limiter = AsyncLimiter(1,1/(self.task_api_slots*2))
 
         # DATA QUEUE
         self._clan_queue_task = None

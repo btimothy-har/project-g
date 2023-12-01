@@ -387,7 +387,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             tasks = []
 
             if bot_client.bot.get_user(basic_player.discord_user) not in bot_client.bot.users:
-                await basic_player.set_discord_user(0)
+                await BasicPlayer.set_discord_link(self.tag,0)
 
             if basic_player.name != self.name:
                 tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
