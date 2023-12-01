@@ -414,8 +414,11 @@ class PlayerLoop(TaskLoop):
             pass
     
     async def _reload_tags(self):
+        a_iter = AsyncIter(bot_client.bot.users)
+        users = [u.id async for u in a_iter]
+
         query = {"$or": [
-            {"discord_user": {"$exists":True,"$gt":0}},
+            {"discord_user": {"$exists":True,"$in":users}},
             {"is_member": True}
             ]
         }        

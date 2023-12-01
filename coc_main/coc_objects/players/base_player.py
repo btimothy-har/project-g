@@ -169,7 +169,7 @@ class BasicPlayer(AwaitLoader):
     ##################################################
     @classmethod
     async def player_first_seen(cls,tag:str):
-        player = cls(tag=coc.utils.correct_tag(tag))
+        player = await cls(tag=coc.utils.correct_tag(tag))
 
         async with player._attributes._lock:
             player._attributes.first_seen = pendulum.now()
@@ -183,7 +183,7 @@ class BasicPlayer(AwaitLoader):
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
-        player = cls(tag=coc.utils.correct_tag(tag))
+        player = await cls(tag=coc.utils.correct_tag(tag))
         async with player._attributes._lock:
             player._attributes.discord_user = discord_user
 
