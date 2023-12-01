@@ -483,27 +483,26 @@ class PlayerLoop(TaskLoop):
             await lock.acquire()
             cached = self._cached.get(tag,None)
     
-            async with self.task_limiter:
-                st = pendulum.now()
+            st = pendulum.now()
 
-                async with self.api_limiter:
-                    new_player = None
-                    try:
-                        new_player = await self.coc_client.fetch_player(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                    
-                wait = getattr(new_player,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)
+            async with self.api_limiter:
+                new_player = None
+                try:
+                    new_player = await self.coc_client.fetch_player(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
+                    return self.loop.call_later(10,self.unlock,lock)
                 
-                if cached:        
-                    if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(self._dispatch_events(cached,new_player))
-                self._cached[tag] = new_player
-                
-                finished = True
+            wait = getattr(new_player,'_response_retry',default_sleep)
+            self.loop.call_later(wait,self.unlock,lock)
+            
+            if cached:        
+                if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
+                    asyncio.create_task(self._dispatch_events(cached,new_player))
+            self._cached[tag] = new_player
+            
+            finished = True
         
         except asyncio.CancelledError:
             return

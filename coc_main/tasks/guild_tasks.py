@@ -62,11 +62,11 @@ class DiscordGuildLoop(TaskLoop):
                 tasks = [self._run_single_loop(guild) async for guild in a_iter]
                 await asyncio.gather(*tasks)
                                      
-                self._last_loop = pendulum.now()
+                self.last_loop = pendulum.now()
                 self._running = False
                 
                 try:
-                    runtime = self._last_loop-st
+                    runtime = self.last_loop-st
                     self.dispatch_time.append(runtime.total_seconds())
                 except:
                     pass

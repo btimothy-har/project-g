@@ -117,7 +117,7 @@ class ClashOfClansTasks(commands.Cog):
                 break
             await asyncio.sleep(1)
 
-        await bot_client.bot.wait_until_red_ready()
+        await bot_client.bot.wait_until_ready()
         
         asyncio.create_task(self.start_recruiting_loop())
         self._player_queue_task = asyncio.create_task(self.player_queue_task())

@@ -152,28 +152,28 @@ class ClanLoop(TaskLoop):
                 return
             await lock.acquire()
             cached = self._cached.get(tag)       
-            async with self.task_limiter:
-                st = pendulum.now()
+            
+            st = pendulum.now()
 
-                async with self.api_limiter:
-                    new_clan = None
-                    try:
-                        new_clan = await self.coc_client.fetch_clan(tag)
-                    except InvalidTag:
-                        return self.loop.call_later(3600,self.unlock,lock)
-                    except ClashAPIError:
-                        return self.loop.call_later(10,self.unlock,lock)
-                             
-                wait = getattr(new_clan,'_response_retry',default_sleep)
-                self.loop.call_later(wait,self.unlock,lock)                
-                
-                self._cached[tag] = new_clan
+            async with self.api_limiter:
+                new_clan = None
+                try:
+                    new_clan = await self.coc_client.fetch_clan(tag)
+                except InvalidTag:
+                    return self.loop.call_later(3600,self.unlock,lock)
+                except ClashAPIError:
+                    return self.loop.call_later(10,self.unlock,lock)
+                            
+            wait = getattr(new_clan,'_response_retry',default_sleep)
+            self.loop.call_later(wait,self.unlock,lock)                
+            
+            self._cached[tag] = new_clan
 
-                if cached:
-                    if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(self._dispatch_events(cached,new_clan))
-              
-                finished = True
+            if cached:
+                if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
+                    asyncio.create_task(self._dispatch_events(cached,new_clan))
+            
+            finished = True
         
         except asyncio.CancelledError:
             return
