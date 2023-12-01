@@ -207,7 +207,7 @@ class WarLeagueClan(BasicClan):
 
         master_roster_tags = db.get('master_roster',[]) if db else []
         self.master_roster = sorted(
-            [await WarLeaguePlayer(tag,self.season) async for tag in AsyncIter(master_roster_tags)],
+            [await WarLeaguePlayer(tag,self.season,self) async for tag in AsyncIter(master_roster_tags)],
             key=lambda x:(x.town_hall_level),
             reverse=True
             )
@@ -399,9 +399,11 @@ class WarLeagueClan(BasicClan):
 class WarLeaguePlayer(BasicPlayer):
     _locks = defaultdict(asyncio.Lock)
 
-    def __init__(self,player_tag:str,season:aClashSeason):
+    def __init__(self,player_tag:str,season:aClashSeason,league_clan:Optional[WarLeagueClan]=None):
         self.tag = player_tag
-        self.season = season        
+        self.season = season
+        self.__league_clan = league_clan
+
         super().__init__(tag=self.tag)
     
     def __str__(self):
@@ -428,8 +430,9 @@ class WarLeaguePlayer(BasicPlayer):
         roster_clan_tag = db.get('roster_clan',None) if db else None
         self.roster_clan = await WarLeagueClan(roster_clan_tag,self.season) if roster_clan_tag else None
 
-        league_clan_tag = db.get('league_clan',None) if db else None
-        self.league_clan = await WarLeagueClan(league_clan_tag,self.season) if league_clan_tag else None
+        if not self.__league_clan:
+            league_clan_tag = db.get('league_clan',None) if db else None
+            self.league_clan = await WarLeagueClan(league_clan_tag,self.season) if league_clan_tag else None
         
         #This is the league group that the player has registered to participate in.
         self.league_group = db.get('league_group',0) if db else 0
