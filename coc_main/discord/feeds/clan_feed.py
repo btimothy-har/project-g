@@ -59,10 +59,12 @@ class ClanDataFeed():
         return feed_description.get(self.type,'Unknown Feed Type')
     
     @cached_property
-    def guild(self) -> discord.Guild:
+    def guild(self) -> Optional[discord.Guild]:
         return bot_client.bot.get_guild(self.guild_id)
     
     @cached_property
-    def channel(self) -> discord.TextChannel:
+    def channel(self) -> Optional[discord.TextChannel]:
+        if not self.guild:
+            return None
         return self.guild.get_channel(self.channel_id)
     
