@@ -78,20 +78,7 @@ class aRaidWeekend(AwaitLoader):
         return sorted(ret_raids, key=lambda w:(w.start_time),reverse=True)
 
     @classmethod
-    async def for_clan(cls,clan_tag:str,season:aClashSeason):
-        def _db_query():
-            if season:
-                query = db_RaidWeekend.objects(
-                    Q(clan_tag=clan_tag) &
-                    Q(start_time__gte=season.season_start.int_timestamp) &
-                    Q(start_time__lte=season.season_end.int_timestamp)
-                    ).only('raid_id')
-            else:
-                query = db_RaidWeekend.objects(
-                    Q(clan_tag=clan_tag)
-                    ).only('raid_id')
-            return [q.raid_id for q in query]
-    
+    async def for_clan(cls,clan_tag:str,season:aClashSeason):    
         if season:
             query_doc = {
                 'clan_tag': clan_tag,

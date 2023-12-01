@@ -7,7 +7,7 @@ from mongoengine import *
 
 from functools import cached_property
 from collections import defaultdict
-from async_property import AwaitLoader, AwaitableOnly, async_property, async_cached_property
+from async_property import AwaitLoader
 from redbot.core.utils import AsyncIter
 from ...api_client import BotClashClient as client
 from .mongo_player import db_Player
