@@ -31,7 +31,6 @@ bot_client = client()
 
 class WarLeagueGroup(AwaitLoader):
     __slots__ = [
-        '_is_new',
         'id',
         'season',
         'league',
@@ -42,15 +41,12 @@ class WarLeagueGroup(AwaitLoader):
         ]
     
     def __init__(self,group_id:str):
-        if self._is_new:
-            self.id = group_id
-            self.season = None
-            self.league = None
-            self.number_of_rounds = 0
-            self.rounds = []
-            self.clans = []
-        
-        self._is_new = False
+        self.id = group_id
+        self.season = None
+        self.league = None
+        self.number_of_rounds = 0
+        self.rounds = []
+        self.clans = []
     
     async def load(self):
         query = await bot_client.coc_db.db__war_league_group.find_one({'_id':self.id})
@@ -169,12 +165,9 @@ class WarLeagueClan(BasicClan):
     _locks = defaultdict(asyncio.Lock)
 
     def __init__(self,clan_tag:str,season:aClashSeason):
-        if self._is_new:
-            self.tag = clan_tag
-            self.season = season            
-            super().__init__(tag=self.tag)
-    
-        self._is_new = False
+        self.tag = clan_tag
+        self.season = season            
+        super().__init__(tag=self.tag)
     
     def __str__(self):
         return f"CWL Clan {self.name} {self.tag} ({self.season.id})"
@@ -414,12 +407,9 @@ class WarLeaguePlayer(BasicPlayer):
     _locks = defaultdict(asyncio.Lock)
 
     def __init__(self,player_tag:str,season:aClashSeason):
-        if self._is_new:
-            self.tag = player_tag
-            self.season = season        
-            super().__init__(tag=self.tag)
-
-        self._is_new = False
+        self.tag = player_tag
+        self.season = season        
+        super().__init__(tag=self.tag)
     
     def __str__(self):
         return f"CWL Player {self.name} {self.tag} ({self.season.id})"
