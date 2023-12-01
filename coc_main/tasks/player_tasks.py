@@ -419,8 +419,7 @@ class PlayerLoop(TaskLoop):
 
         query = {"$or": [
             {"user": {"$in": user_ids}},
-            {"is_member": True},
-            {"home_clan": {"$ne": ""}}
+            {"is_member": True}
             ]
         }        
         db_query = bot_client.coc_db.db__player.find(query,{'_id':1})

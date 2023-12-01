@@ -192,7 +192,7 @@ class WarLeagueClan(BasicClan):
 
         self.war_league = None
         if self.league_group_id:
-            group_query = await bot_client.coc_db.db__war_league_group.find_one({'_id':self.self.league_group_id})
+            group_query = await bot_client.coc_db.db__war_league_group.find_one({'_id':self.league_group_id})
 
             if group_query:
                 self.war_league = group_query.get('league',None)
