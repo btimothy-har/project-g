@@ -63,7 +63,7 @@ class aClashSeason(AwaitLoader):
         return hash(self.season_start)
 
     async def load(self):
-        season = self._bot.coc_db.db__seasons.find_one({'_id':self.id})
+        season = await self._bot.coc_db.db__seasons.find_one({'_id':self.id})
 
         self.is_current = season.get('s_is_current',False) if season else False
         self.clangames_max = season.get('clangames_max',4000) if season else 4000
