@@ -188,8 +188,22 @@ class WarLeagueClan(BasicClan):
         self.is_participating = db.get('is_participating',False) if db else False
         self.roster_open = db.get('roster_open',False) if db else False
 
-        league_group_id = db.get('league_group',None) if db else None
-        self.league_group = await WarLeagueGroup(league_group_id) if league_group_id else None
+        self.league_group_id = db.get('league_group',None) if db else None
+
+        self.war_league = None
+        if self.league_group_id:
+            group_query = await bot_client.coc_db.db__war_league_group.find_one({'_id':self.self.league_group_id})
+
+            if group_query:
+                self.war_league = group_query.get('league',None)
+
+                war_ids = [war for round in group_query['rounds'] for war in round]
+                war_query_doc = {
+                    '_id':{'$in':war_ids},
+                    'clans.tag':self.tag
+                    }
+                war_query = bot_client.coc_db.db__clan_war.find(war_query_doc,{'_id':1})
+                self.league_wars = [await aClanWar(war['_id']) async for war in war_query]
 
         master_roster_tags = db.get('master_roster',[]) if db else []
         self.master_roster = sorted(
@@ -203,7 +217,7 @@ class WarLeagueClan(BasicClan):
     ##################################################
     @cached_property
     def status(self) -> str:
-        if self.league_group:
+        if self.league_group_id:
             return "CWL Started"
         if not self.roster_open:
             return "Roster Finalized"
@@ -212,7 +226,7 @@ class WarLeagueClan(BasicClan):
         return "Not Participating"    
     @property
     def league(self) -> str:
-        return self.league_group.league if self.league_group else self.war_league_name
+        return self.war_league if self.war_league else self.war_league_name
     @property
     def name(self) -> str:
         return self._name
@@ -233,16 +247,6 @@ class WarLeagueClan(BasicClan):
         return round(sum([p.town_hall for p in self.master_roster])/len(self.master_roster),1)
     
     @cached_property
-    def league_wars(self) -> List[aClanWar]:
-        def pred_clan_wars(war):
-            return war.clan_1.tag == self.tag or war.clan_2.tag == self.tag
-        if self.league_group:
-            clan_wars = [war for war in self.league_group.wars if pred_clan_wars(war)]
-            if len(clan_wars) > 0:
-                return clan_wars
-        return None
-    
-    @cached_property
     def current_war(self) -> Optional[aClanWar]:
         if self.league_wars:
             active_war = [war for war in self.league_wars if war.state == 'inWar']
@@ -255,22 +259,14 @@ class WarLeagueClan(BasicClan):
         return None
     
     @cached_property
-    def current_round(self) -> Optional[int]:
-        if self.current_war:
-            for i,round in enumerate(self.league_group.rounds):
-                if self.current_war._id in round:
-                    return i+1
-        return None
-    
-    @cached_property
     def total_score(self) -> int:
-        if self.league_group:
+        if self.league_group_id:
             return sum(war.get_clan(self.tag).stars + (10 if war.get_clan(self.tag).result in ['won'] else 0) for war in self.league_wars)
         return 0
     
     @cached_property
     def total_destruction(self) -> int:
-        if self.league_group:
+        if self.league_group_id:
             return round(sum(getattr(member.best_opponent_attack,'destruction',0) for war in self.league_wars for member in war.get_opponent(self.tag).members))
         return 0
     
