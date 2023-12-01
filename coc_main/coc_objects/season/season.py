@@ -3,18 +3,33 @@ import logging
 import asyncio
 
 from typing import *
-from concurrent.futures import ThreadPoolExecutor
 from mongoengine import *
 
-from functools import cached_property
+from collections import defaultdict
 
-from .mongo_season import dSeason
+from redbot.core.bot import Red
+from async_property import AwaitLoader
 
 coc_main_logger = logging.getLogger("coc.main")
 
-class aClashSeason():
+class aClashSeason(AwaitLoader):
+    _bot = None
     _cache = {}
-    _thread_pool = ThreadPoolExecutor(max_workers=1)
+    _locks = defaultdict(asyncio.Lock)
+
+    __slots__ = [
+        '_is_new',
+        'id',
+        'season_month',
+        'season_year'
+        'is_current',
+        'clangames_max',
+        'cwl_signup'
+        ]
+
+    @classmethod
+    def initialize_bot(cls,bot:Red):
+        cls._bot = bot
 
     def __new__(cls,id:str):
         if id not in cls._cache:
@@ -33,9 +48,11 @@ class aClashSeason():
         
         if self.season_year < 2021 or self.season_year > pendulum.now().add(years=1).year:
             raise ValueError(f"Season year must be between 2021 and 1 year in the future. {self.season_year} is invalid.")
-
+  
         if self._is_new:
-            self._lock = asyncio.Lock()
+            self.is_current = False
+            self.clangames_max = 4000
+            self.cwl_signup = False
         
         self._is_new = False
     
@@ -44,39 +61,35 @@ class aClashSeason():
     
     def __hash__(self) -> int:
         return hash(self.season_start)
+
+    async def load(self):
+        season = self._bot.coc_db.db__seasons.find_one({'_id':self.id})
+
+        self.is_current = season.get('s_is_current',False) if season else False
+        self.clangames_max = season.get('clangames_max',4000) if season else 4000
+        self.cwl_signup = season.get('cwl_signup',False) if season else False
     
     ##################################################
     ### DATABASE ATTRIBUTES
     ##################################################    
     @classmethod
-    def get_current_season(cls) -> 'aClashSeason':
+    async def get_current_season(cls) -> 'aClashSeason':
         now = pendulum.now()
-        season = aClashSeason(now.format('M-YYYY'))
+        season = await aClashSeason(now.format('M-YYYY'))
         if now < season.season_start:
-            season = aClashSeason(now.subtract(months=1).format('M-YYYY'))
+            season = await aClashSeason(now.subtract(months=1).format('M-YYYY'))
         return season
+    
+    @property
+    def _lock(self):
+        return self._locks[self.id]
     
     ##################################################
     ### DATABASE ATTRIBUTES
-    ##################################################
-    @property
-    def _attributes(self) -> Optional[dSeason]:
-        try:
-            return dSeason.objects.get(s_id=self.id)
-        except DoesNotExist:
-            return None
-    
-    @cached_property
-    def is_current(self) -> bool:
-        return getattr(self._attributes,'s_is_current',False)
-        
+    ##################################################        
     @property
     def is_current_season(self) -> bool:
         return self.is_current
-
-    @cached_property
-    def clangames_max(self) -> int:
-        return getattr(self._attributes,'clangames_max',4000)
  
     @property
     def cwl_signup_lock(self) -> bool:
@@ -84,15 +97,11 @@ class aClashSeason():
             return False
         return True
     
-    @cached_property
-    def _cwl_signup(self) -> bool:
-        return getattr(self._attributes,'cwl_signup',False)
-    
     @property
     def cwl_signup_status(self) -> bool:
         if self.cwl_signup_lock:
             return False
-        return self._cwl_signup
+        return self.cwl_signup
 
     ##################################################
     ### PROPERTIES
@@ -149,39 +158,51 @@ class aClashSeason():
             return pendulum.now().diff(self.season_end,False)
     
     async def set_as_current(self):
-        def _update_in_db():
-            dSeason.objects(s_id=self.id).update_one(set__s_is_current=True,upsert=True)
-            dSeason.objects(s_id__ne=self.id).update_one(set__s_is_current=False)
-            coc_main_logger.info(f"Season {self.id} {self.description} set as current season.")
-
         async with self._lock:
             self.is_current = True
-            existing = [s for s in aClashSeason._cache.values() if s.is_current and s != self]
+            existing = [s for s in list(aClashSeason._cache.values()) if s.is_current and s != self]
             for season in existing:
                 season.is_current = False
-            
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(aClashSeason._thread_pool,_update_in_db)
+
+            await self._bot.coc_db.db__seasons.update_one(
+                {'_id':self.id},
+                {'$set': {
+                    's_is_current':True
+                    }
+                },
+                upsert=True
+                )
+            await self._bot.coc_db.db__seasons.update_many(
+                {'_id':{'$ne':self.id}},
+                {'$set': {
+                    's_is_current':False
+                    }
+                }
+                )
+            coc_main_logger.info(f"Season {self.id} {self.description} set as current season.")
     
-    async def open_cwl_signups(self):
-        def _update_in_db():
-            dSeason.objects(s_id=self.id).update_one(set__cwl_signup=True,upsert=True)
+    async def open_cwl_signups(self):            
+        async with self._lock:
+            self.cwl_signup = True
+            await self._bot.coc_db.db__seasons.update_one(
+                {'_id':self.id},
+                {'$set': 
+                    {'cwl_signup':True}
+                },
+                upsert=True
+                )
             coc_main_logger.info(f"Season {self.id} {self.description} CWL signups opened.")
 
-        async with self._lock:
-            self._cwl_signup = True
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(aClashSeason._thread_pool,_update_in_db)
-
     async def close_cwl_signups(self):
-        def _update_in_db():
-            dSeason.objects(s_id=self.id).update_one(set__cwl_signup=False,upsert=True)
-            coc_main_logger.info(f"Season {self.id} {self.description} CWL signups closed.")
-
         async with self._lock:
-            self._cwl_signup = False
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(aClashSeason._thread_pool,_update_in_db)
+            self.cwl_signup = False
+            await self._bot.coc_db.db__seasons.update_one(
+                {'_id':self.id},
+                {'$set': 
+                    {'cwl_signup':False}
+                },
+                upsert=True
+                )
     
     ##################################################
     ### STATIC METHODS

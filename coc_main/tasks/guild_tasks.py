@@ -15,8 +15,6 @@ bot_client = client()
 
 class DiscordGuildLoop(TaskLoop):
     _instance = None
-    _locks = {}
-    _task_semaphore = asyncio.Semaphore(10)
 
     def __new__(cls):
         if cls._instance is None:
@@ -28,17 +26,18 @@ class DiscordGuildLoop(TaskLoop):
         if self._is_new:
             super().__init__()
             self._is_new = False
+            self._locks = {}
     
     async def start(self):
-        bot_client.coc_main_log.info(f"Guild Loop started.")
         await super().start()
+        bot_client.coc_main_log.info(f"Guild Loop started.")
     
     async def stop(self):
+        await super().stop()
         try:
             bot_client.coc_main_log.info(f"Guild Loop stopped.")
         except:
             pass
-        await super().stop()
 
     @property
     def start_recruiting(self) -> bool:
@@ -93,7 +92,6 @@ class DiscordGuildLoop(TaskLoop):
             self._locks[guild.id] = locks = {}
         
         tasks = [
-            self._refresh_member_cache(guild,locks),
             self._save_member_roles(guild,locks),
             self._update_clocks(guild,locks),
             self._update_clan_panels(guild,locks),
@@ -101,27 +99,6 @@ class DiscordGuildLoop(TaskLoop):
             self._update_recruiting_reminder(guild,locks)
             ]
         await bounded_gather(*tasks,semaphore=self._loop_semaphore)
-    
-    async def _refresh_member_cache(self,guild:discord.Guild,locks:dict):
-        try:
-            lock = locks['member_cache']
-        except KeyError:
-            self._locks[guild.id]['member_cache'] = lock = asyncio.Lock()
-        
-        if lock.locked():
-            return
-        await lock.acquire()
-        self.loop.call_later(30,self.unlock,lock)
-
-        try:
-            a_iter = AsyncIter(guild.members)
-            tasks = [aMember(member.id,guild.id).refresh_clash_link() async for member in a_iter if not member.bot]
-            await bounded_gather(*tasks,semaphore=self._task_semaphore) 
-                
-        except Exception:
-            bot_client.coc_main_log.exception(
-                f"{guild.id} {guild.name}: Error refreshing Member Cache."
-                )
     
     async def _save_member_roles(self,guild:discord.Guild,locks:dict):
         try:
@@ -220,7 +197,10 @@ class DiscordGuildLoop(TaskLoop):
         
         try:
             posts = await RecruitingReminder.get_for_guild(guild.id)
-            await asyncio.gather(*(post.send_reminder() for post in posts))
+            
+            a_iter = AsyncIter(posts)
+            tasks = [post.send_reminder() async for post in a_iter]
+            await bounded_gather(*tasks,semaphore=self._task_semaphore) 
 
         except Exception:
             bot_client.coc_main_log.exception(

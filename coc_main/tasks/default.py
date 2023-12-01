@@ -8,7 +8,7 @@ import copy
 from typing import *
 from aiolimiter import AsyncLimiter
 
-from collections import deque
+from collections import deque, defaultdict
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
 from ..cog_coc_client import ClashOfClansClient
@@ -28,28 +28,24 @@ class TaskLoop():
     async def report_fatal_error(message,error):
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         await cog.report_error(message,error)
-    
-    @classmethod
-    def loops(cls) -> List['TaskLoop']:
-        return list(cls._loops.values())
-
-    @classmethod
-    def keys(cls) -> List[str]:
-        return list(cls._loops.keys())
 
     def __init__(self):
-        self._active = False
-        self._running = False
-        self._tags = set()
-        self._loop_semaphore = asyncio.Semaphore(50)
-        
-        self._priority_tags = set()
-        self._last_db_update = pendulum.now().subtract(minutes=30)
-        
         self.last_loop = pendulum.now()
         self.dispatch_time = deque(maxlen=100)
         self.run_time = deque(maxlen=10000)
-    
+
+        self._active = False
+        self._running = False
+
+        self._tags = set()
+        self._last_db_update = pendulum.now().subtract(minutes=30)
+        
+        self._loop_semaphore = asyncio.Semaphore(50)
+        self._task_semaphore = asyncio.Semaphore(10)
+
+        self._cached = {}
+        self._locks = defaultdict(asyncio.Lock)
+        
     async def _loop_task(self):
         pass
 
@@ -64,11 +60,6 @@ class TaskLoop():
     @property
     def api_maintenance(self) -> bool:
         return self.coc_client.api_maintenance
-    
-    @property
-    def task_lock(self) -> asyncio.Lock:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_lock
     
     @property
     def task_limiter(self) -> AsyncLimiter:
@@ -89,22 +80,6 @@ class TaskLoop():
     
     async def stop(self):
         self._active = False
-    
-    def add_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)        
-        if len(self._tags) >= 100000:
-            return False, n_tag
-        if n_tag not in self._tags:
-            self._tags.add(n_tag)
-            return True, n_tag
-        return False, n_tag
-    
-    def remove_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag in self._tags:
-            self._tags.discard(n_tag)
-            return True, n_tag
-        return False, n_tag
     
     def unlock(self,lock:asyncio.Lock):
         try:

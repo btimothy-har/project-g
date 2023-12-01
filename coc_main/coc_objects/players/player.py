@@ -5,7 +5,7 @@ import pendulum
 from typing import *
 
 from functools import cached_property
-from async_property import async_property, async_cached_property
+from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
 
@@ -33,7 +33,7 @@ bot_client = client()
 ##### DATABASE
 #####
 ##################################################
-class aPlayer(coc.Player,BasicPlayer):
+class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def __init__(self,**kwargs):
 
         self._name = None
@@ -371,7 +371,7 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
-        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
             return
         
         if self._attributes._sync_lock.locked():

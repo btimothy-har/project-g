@@ -9,6 +9,7 @@ from collections import defaultdict
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from ..api_client import BotClashClient as client
+from ..cog_coc_client import ClashOfClansClient
 from ..exceptions import InvalidTag, ClashAPIError
 
 from .default import TaskLoop
@@ -29,6 +30,10 @@ default_sleep = 60
 ############################################################
 ############################################################
 class ClanTasks():
+
+    @staticmethod
+    def _get_client() -> ClashOfClansClient:
+        return bot_client.bot.get_cog('ClashOfClansClient')
     
     @staticmethod
     async def clan_member_join(member:aPlayer,clan:aClan):
@@ -51,43 +56,10 @@ class ClanTasks():
 ############################################################
 class ClanLoop(TaskLoop):
     _instance = None
-    _cached = {}
-    _locks = defaultdict(asyncio.Lock)
-    _task_lock = asyncio.Lock()
-    _task_semaphore = asyncio.Semaphore(10)
 
     _clan_events = [ClanTasks.clan_donation_change]
     _member_join_events = [ClanTasks.clan_member_join]
     _member_leave_events = [ClanTasks.clan_member_leave]
-
-    @classmethod
-    async def _dispatch_events(cls,old_clan:aClan,new_clan:aClan):
-        tasks = []
-        tasks.append(new_clan._sync_cache())
-        tasks.extend([event(old_clan,new_clan) for event in cls._clan_events])
-
-        old_member_iter = AsyncIter(old_clan.members)
-        async for member in old_member_iter:
-            if member.tag not in [m.tag for m in new_clan.members]:
-                e_iter = AsyncIter(cls._member_leave_events)
-                tasks.extend([event(member,new_clan) async for event in e_iter])
-
-        new_member_iter = AsyncIter(new_clan.members)
-        async for member in new_member_iter:
-            if member.tag not in [m.tag for m in old_clan.members]:
-                e_iter = AsyncIter(cls._member_join_events)
-                tasks.extend([event(member,new_clan) async for event in e_iter])
-
-        async with cls._task_lock:
-            while True:
-                sem = cls._task_semaphore
-                if not sem._waiters: 
-                    break
-                if sem._waiters and len(sem._waiters) < len(tasks):
-                    break
-                await asyncio.sleep(0.1)
-                continue
-        await bounded_gather(*tasks,semaphore=sem)
 
     def __new__(cls):
         if cls._instance is None:
@@ -101,46 +73,29 @@ class ClanLoop(TaskLoop):
             self._is_new = False
     
     async def start(self):
-        bot_client.coc_main_log.info(f"Clan Loop started.")
         await super().start()
-    
+        bot_client.coc_main_log.info(f"Clan Loop started.")
+        
     async def stop(self):
+        await super().stop()
         try:
             bot_client.coc_main_log.info(f"Clan Loop stopped.")
         except:
             pass
-        await super().stop()
     
-    async def delay_multiplier(self,clan:Optional[aClan]=None) -> int:
-        if not clan:
-            return 1
-        if clan.is_alliance_clan:
-            return 1
-        if clan.is_active_league_clan:
-            return 1
-        if clan.is_registered_clan:
-            return 1
-        return random.randint(3,10)
-    
-    def is_priority(self,clan:aClan) -> bool:
-        if clan.is_alliance_clan:
-            return True
-        if clan.is_active_league_clan:
-            return True
-        if clan.is_registered_clan:
-            return True
-        return False
+    async def _reload_tags(self):
+        tags = []
+        client = ClanTasks._get_client()
+
+        tags.extend([clan.tag for clan in await client.get_registered_clans()])
+        tags.extend([clan.tag for clan in await client.get_alliance_clans()])
+        tags.extend([clan.tag for clan in await client.get_war_league_clans()])
+        self._tags = set(tags)
+        self._last_db_update = pendulum.now()
     
     ############################################################
     ### PRIMARY TASK LOOP
-    ############################################################
-    def _get_sample_tags(self) -> list:
-        c_tags = copy.copy(self._tags)
-        tags = random.sample(list(c_tags),min(len(c_tags),1000))
-        if len(self._priority_tags) > 0:
-            tags.extend(list(self._priority_tags))
-        return list(set(tags)) if len(tags) > 0 else []
-    
+    ############################################################    
     async def _loop_task(self):        
         try:
             while self.loop_active:
@@ -148,16 +103,21 @@ class ClanLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                tags = await bot_client.run_in_thread(self._get_sample_tags)
-                if len(tags) == 0:
+                if (pendulum.now() - self._last_db_update).total_seconds() > 300:
+                    await self._reload_tags()
+
+                if len(self._tags) == 0:
                     await asyncio.sleep(10)
                     continue
+
+                c_tags = copy.copy(self._tags)
+                tags = list(set(c_tags))
 
                 st = pendulum.now()
                 self._running = True
                 a_iter = AsyncIter(tags)
 
-                tasks = [self._launch_single_loop(tag) async for tag in a_iter]
+                tasks = [self._run_single_loop(tag) async for tag in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
 
                 self.last_loop = pendulum.now()
@@ -183,17 +143,14 @@ class ClanLoop(TaskLoop):
                 await asyncio.sleep(60)
                 await self.start()
     
-    async def _launch_single_loop(self,tag:str):
-        lock = self._locks[tag]
-        if lock.locked():
-            return
-        await lock.acquire()
+    async def _run_single_loop(self,tag:str):
+        try:        
+            lock = self._locks[tag]
+            if lock.locked():
+                return
+            await lock.acquire()
+            cached = self._cached.get(tag)    
 
-        cached = self._cached.get(tag)                
-        await self._run_single_loop(tag,lock,cached)
-
-    async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aClan]=None):
-        try:            
             finished = False            
             async with self.task_limiter:
                 st = pendulum.now()
@@ -207,20 +164,15 @@ class ClanLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                              
-                wait = int(min(getattr(new_clan,'_response_retry',default_sleep) * await self.delay_multiplier(new_clan),600))
+                wait = getattr(new_clan,'_response_retry',default_sleep)
                 self.loop.call_later(wait,self.unlock,lock)                
                 
                 self._cached[tag] = new_clan
 
                 if cached:
                     if new_clan.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(ClanLoop._dispatch_events(cached,new_clan))
-                
-                if self.is_priority(new_clan):
-                    self._priority_tags.add(tag)
-                else:
-                    self._priority_tags.discard(tag)
-                
+                        asyncio.create_task(self._dispatch_events(cached,new_clan))
+              
                 finished = True
         
         except asyncio.CancelledError:
@@ -246,4 +198,29 @@ class ClanLoop(TaskLoop):
                 except:
                     pass
     
-    
+    async def _dispatch_events(self,old_clan:aClan,new_clan:aClan):
+        tasks = []
+        tasks.extend([event(old_clan,new_clan) for event in ClanLoop._clan_events])
+
+        old_member_iter = AsyncIter(old_clan.members)
+        async for member in old_member_iter:
+            if member.tag not in [m.tag for m in new_clan.members]:
+                e_iter = AsyncIter(ClanLoop._member_leave_events)
+                tasks.extend([event(member,new_clan) async for event in e_iter])
+
+        new_member_iter = AsyncIter(new_clan.members)
+        async for member in new_member_iter:
+            if member.tag not in [m.tag for m in old_clan.members]:
+                e_iter = AsyncIter(ClanLoop._member_join_events)
+                tasks.extend([event(member,new_clan) async for event in e_iter])
+
+        lock = self._locks['dispatch']
+        async with lock:
+            sem = self._task_semaphore
+            while True:
+                if not sem._waiters: 
+                    break
+                if sem._waiters and len(sem._waiters) < len(tasks):
+                    break
+                await asyncio.sleep(0.1)
+        await bounded_gather(*tasks,semaphore=sem)

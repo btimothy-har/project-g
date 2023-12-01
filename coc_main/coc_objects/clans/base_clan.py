@@ -7,7 +7,7 @@ from typing import *
 from mongoengine import *
 
 from collections import defaultdict
-from async_property import AwaitLoader, AwaitableOnly, async_property, async_cached_property
+from async_property import AwaitLoader
 from redbot.core.utils import AsyncIter
 from ...api_client import BotClashClient as client
 from .mongo_clan import db_Clan, db_AllianceClan, db_WarLeagueClanSetup
@@ -51,6 +51,7 @@ class BasicClan(AwaitLoader):
     
     async def load(self):
         await self._attributes.load()
+        await bot_client.clan_queue.put(self.tag)
     
     ##################################################
     #####
@@ -456,6 +457,16 @@ class BasicClan(AwaitLoader):
                 },
                 upsert=True)
             bot_client.coc_data_log.info(f"{self}: recruitment info changed to {self.recruitment_info}.")
+    
+    async def update_last_sync(self,timestamp:pendulum.DateTime):
+        async with self._attributes._lock:
+            self._attributes._last_sync = timestamp
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'last_sync':timestamp.int_timestamp}},
+                upsert=True
+                )
+            bot_client.coc_data_log.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")
 
 class _ClanAttributes():
     """
@@ -526,7 +537,6 @@ class _ClanAttributes():
             self.league_clan_role_id = None
 
             self._last_sync = None
-            bot_client.clan_queue.add(self.tag)
             
         self._new = False
     
@@ -549,6 +559,9 @@ class _ClanAttributes():
             self.abbreviation = clan_db.get('abbreviation','') if clan_db else ''
             self.emoji = clan_db.get('emoji','') if clan_db else ''
             self.unicode_emoji = clan_db.get('unicode_emoji','') if clan_db else ''
+
+            ls = clan_db.get('last_sync',0) if clan_db else 0
+            self._last_sync = pendulum.from_timestamp(ls) if ls else None
 
             alliance_db = await bot_client.coc_db.db__alliance_clan.find_one({'_id':self.tag})
             self.is_alliance_clan = True if alliance_db else False

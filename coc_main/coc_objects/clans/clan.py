@@ -3,6 +3,7 @@ import pendulum
 
 from typing import *
 from mongoengine import *
+from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
 
@@ -18,7 +19,7 @@ from ...utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
 
-class aClan(coc.Clan,BasicClan):
+class aClan(coc.Clan,BasicClan,AwaitLoader):
     def __init__(self,**kwargs):
 
         self._name = None
@@ -30,7 +31,10 @@ class aClan(coc.Clan,BasicClan):
         BasicClan.__init__(self,tag=self.tag)
 
         self.timestamp = pendulum.now()
-        self._badge = getattr(self.badge,'url',"")   
+        self._badge = getattr(self.badge,'url',"")
+    
+    async def load(self):
+        await BasicClan.load(self)
 
     ##################################################
     ### DATA FORMATTERS
@@ -105,9 +109,7 @@ class aClan(coc.Clan,BasicClan):
         return description
     
     async def _sync_cache(self):
-        asyncio.create_task(bot_client.player_queue.add_many([m.tag for m in self.members]))
-
-        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 600:
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
             return
         
         if self._attributes._sync_lock.locked():
@@ -115,27 +117,20 @@ class aClan(coc.Clan,BasicClan):
         
         async with self._attributes._sync_lock:          
             basic_clan = await BasicClan(self.tag)
-            basic_clan._attributes._last_sync = self.timestamp
-
+            await basic_clan.update_last_sync(pendulum.now())
             tasks = []
             if basic_clan.name != self.name:
                 tasks.append(basic_clan.set_name(self.name))
-
             if basic_clan.badge != self.badge:
                 tasks.append(basic_clan.set_badge(self.badge))
-
             if basic_clan.level != self.level:
                 tasks.append(basic_clan.set_level(self.level))
-
             if basic_clan.capital_hall != self.capital_hall:
                 tasks.append(basic_clan.set_capital_hall(self.capital_hall))
-
             if basic_clan.war_league_name != self.war_league_name:
-                tasks.append(basic_clan.set_war_league(self.war_league_name))
-            
+                tasks.append(basic_clan.set_war_league(self.war_league_name))            
             if tasks:
-                await asyncio.gather(*tasks)
-            
+                await asyncio.gather(*tasks)            
 
     def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
         return WarLeagueClan(self.tag,season)

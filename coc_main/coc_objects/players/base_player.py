@@ -51,7 +51,8 @@ class BasicPlayer(AwaitLoader):
     
     async def load(self):
         await self._attributes.load()
-        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None            
+        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
+        await bot_client.player_queue.put(self.tag)
     
     ##################################################
     #####
@@ -327,8 +328,7 @@ class _PlayerAttributes():
             self.last_joined = None
             self.last_removed = None
 
-            self._last_sync = None            
-            bot_client.player_queue.add(self.tag)
+            self._last_sync = None
         
         self._new = False
     
@@ -359,12 +359,27 @@ class _PlayerAttributes():
             lr = database.get('last_removed',0) if database else 0
             self.last_removed = pendulum.from_timestamp(lr) if lr > 0 else None
 
+            ls = database.get('last_sync',0) if database else 0
+            self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
+
             self._loaded = True
     
     async def eval_membership(self,database_entry:bool):
-        if database_entry and not getattr(await self.home_clan,'is_alliance_clan',False):
-            player = BasicPlayer(tag=self.tag)
-            await player.remove_member()
-            bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
-            return False
+        if database_entry and self.home_clan_tag:
+            clan = await BasicClan(tag=self.home_clan_tag)
+            if not clan.is_alliance_clan:
+                player = BasicPlayer(tag=self.tag)
+                await player.remove_member()
+                bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
+                return False
         return database_entry
+    
+    async def update_last_sync(self,timestamp:pendulum.DateTime):
+        async with self._attributes._lock:
+            self._attributes._last_sync = timestamp
+            await bot_client.coc_db.db__player.update_one(
+                {'_id':self.tag},
+                {'$set':{'last_sync':timestamp.int_timestamp}},
+                upsert=True
+                )
+            bot_client.coc_data_log.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")

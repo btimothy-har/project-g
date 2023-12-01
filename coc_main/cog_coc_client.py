@@ -87,49 +87,11 @@ class ClashOfClansClient(commands.Cog):
     ### COG LOAD
     ##################################################
     async def cog_load(self):
-        async def start_client_cog():
-            try:
-                while True:
-                    if getattr(bot_client,'_api_logged_in',False):
-                        break
-                    await asyncio.sleep(1)
-
-                war_tasks = asyncio.create_task(aClanWar.load_all())
-                raid_tasks = asyncio.create_task(aRaidWeekend.load_all())
-                asyncio.create_task(BasicPlayer.load_all())
-                asyncio.create_task(BasicClan.load_all())
-
-                wars = await war_tasks
-                self.client.coc_main_log.info(
-                    f"Loaded {len(wars):,} Clan Wars from database."
-                    )
-                raids = await raid_tasks
-                self.client.coc_main_log.info(
-                    f"Loaded {len(raids):,} Capital Raids from database."
-                    )
-                
-                # players = await player_tasks
-                # self.client.coc_main_log.info(
-                #     f"Found {len(players):,} Players in database."
-                #     )
-                
-                # clans = await clan_tasks
-                # self.client.coc_main_log.info(
-                #     f"Found {len(clans):,} Clans in database."
-                #     )
-                
-            except asyncio.CancelledError:
-                return
-
-        self.bot_status_update_loop.start()
-        self.start_task = asyncio.create_task(start_client_cog())    
+        self.bot_status_update_loop.start() 
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
 
-        self.start_task.cancel()
-        await self.start_task
-        
         BasicPlayer.clear_cache()
         BasicClan.clear_cache()
         

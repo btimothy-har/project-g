@@ -2,10 +2,8 @@ import asyncio
 import coc
 import pendulum
 import copy
-import random
 
 from typing import *
-from collections import defaultdict
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from ..api_client import BotClashClient as client
@@ -14,7 +12,6 @@ from ..exceptions import InvalidTag, ClashAPIError
 from .default import TaskLoop
 
 from ..coc_objects.players.player import aPlayer
-from ..discord.feeds.capital_contribution import CapitalContributionFeed
 from ..utils.constants.coc_constants import activity_achievements
 
 bot_client = client()
@@ -51,8 +48,8 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_main(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             update = False
             if old_player.name != new_player.name:
@@ -71,8 +68,8 @@ class PlayerTasks():
     @staticmethod
     async def player_last_seen_achievement(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             if achievement.name in activity_achievements:
                 old_ach = old_player.get_achievement(achievement.name)
@@ -90,8 +87,8 @@ class PlayerTasks():
     @staticmethod
     async def player_attack_wins(old_player:aPlayer,new_player:aPlayer):       
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
 
@@ -116,8 +113,8 @@ class PlayerTasks():
     @staticmethod
     async def player_defense_wins(old_player:aPlayer,new_player:aPlayer):        
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
 
@@ -142,8 +139,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_sent(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
 
@@ -168,8 +165,8 @@ class PlayerTasks():
     @staticmethod
     async def player_donations_received(old_player:aPlayer,new_player:aPlayer):
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
         
@@ -194,8 +191,8 @@ class PlayerTasks():
     @staticmethod
     async def player_loot_gold(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             #Loot Gold
             if achievement.name == "Gold Grab":
@@ -224,8 +221,8 @@ class PlayerTasks():
     @staticmethod
     async def player_loot_elixir(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
 
             #Loot Elixir
             if achievement.name == "Elixir Escapade":
@@ -255,8 +252,8 @@ class PlayerTasks():
     @staticmethod
     async def player_loot_darkelixir(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
         try:
-            # if not await new_player.is_member:
-            #    return
+            if not await new_player.is_member:
+               return
                         
             #Loot Dark Elixir
             if achievement.name == "Heroic Heist":
@@ -285,8 +282,8 @@ class PlayerTasks():
     @staticmethod
     async def player_capital_contribution(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):            
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             
@@ -304,9 +301,6 @@ class PlayerTasks():
                         increment=max(increment,0),
                         latest_value=new_ach.value
                         )
-                
-                    if increment > 0:
-                        await CapitalContributionFeed.send_feed_update(new_player,increment)
                     
                     bot_client.coc_data_log.debug(
                         f"{new_player.tag} {new_player.name}: capital_contribution {'+' if increment >= 0 else ''}{increment:,} (new: {stat.season_total:,}). Received: {new_ach.value:,} vs {old_ach.value:,}."
@@ -319,8 +313,8 @@ class PlayerTasks():
     @staticmethod
     async def player_clan_games(old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):        
         try:
-            # if not await new_player.is_member:
-            #     return
+            if not await new_player.is_member:
+                return
             
             current_season = await new_player.get_current_season()
             if achievement.name == "Games Champion":
@@ -353,10 +347,6 @@ class PlayerTasks():
 ############################################################
 class PlayerLoop(TaskLoop):
     _instance = None
-    _cached = {}
-    _locks = defaultdict(asyncio.Lock)
-    _task_lock = asyncio.Lock()
-    _task_semaphore = asyncio.Semaphore(10)
     
     _player_events = [
         PlayerTasks.player_time_in_home_clan,
@@ -401,30 +391,6 @@ class PlayerLoop(TaskLoop):
             cls._achievement_events.remove(event)
             bot_client.coc_main_log.info(f"Removed {event.__name__} {event} from Player Achievement Events.")
 
-    @classmethod
-    async def _dispatch_events(cls,old_player:aPlayer,new_player:aPlayer):
-        tasks = []
-        tasks.append(new_player._sync_cache())
-        
-        a_iter = AsyncIter(cls._player_events)
-        tasks.extend([event(old_player,new_player) async for event in a_iter])
-
-        ach_iter = AsyncIter(new_player.achievements)
-        async for ach in ach_iter:
-            a_iter = AsyncIter(cls._achievement_events)
-            tasks.extend([event(old_player,new_player,ach) async for event in a_iter])
-        
-        async with cls._task_lock:
-            while True:
-                sem = cls._task_semaphore
-                if not sem._waiters: 
-                    break
-                if sem._waiters and len(sem._waiters) < len(tasks):
-                    break
-                await asyncio.sleep(0.1)
-                continue
-        await bounded_gather(*tasks,semaphore=sem)
-
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -437,54 +403,34 @@ class PlayerLoop(TaskLoop):
             self._is_new = False
         
     async def start(self):
-        bot_client.coc_main_log.info(f"Player Loop started.")
         await super().start()
+        bot_client.coc_main_log.info(f"Player Loop started.")
     
     async def stop(self):
+        await super().stop()
         try:
             bot_client.coc_main_log.info(f"Player Loop stopped.")
         except:
             pass
-        await super().stop()
     
-    async def delay_multiplier(self,player:aPlayer) -> int:
-        if not player:
-            return 1
-        if player.is_member:
-            return 1
-        if getattr(player.clan,'is_alliance_clan',False):
-            return 1
-        if getattr(player.clan,'is_active_league_clan',False):
-            return 1.5
-        if getattr(player.clan,'is_registered_clan',False):
-            return 2
-        if bot_client.bot.get_user(player.discord_user):
-            return 2
-        return random.randint(3,10)
-    
-    def is_priority(self,player:aPlayer) -> bool:
-        if player.is_member:
-            return True
-        if getattr(player.clan,'is_alliance_clan',False):
-            return True
-        if getattr(player.clan,'is_active_league_clan',False):
-            return True
-        if getattr(player.clan,'is_registered_clan',False):
-            return True
-        if bot_client.bot.get_user(player.discord_user):
-            return True
-        return False
+    async def _reload_tags(self):
+        u_iter = AsyncIter(bot_client.bot.users)
+        user_ids = [u.id async for u in u_iter if not u.bot]
+
+        query = {"$or": [
+            {"user": {"$in": user_ids}},
+            {"is_member": True},
+            {"home_clan": {"$ne": ""}}
+            ]
+        }        
+        db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
+        tags = [p['_id'] async for p in db_query]
+        self._tags = set(tags)
+        self._last_db_update = pendulum.now()
 
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
-    def _get_sample_tags(self) -> list:
-        c_tags = copy.copy(self._tags)
-        tags = random.sample(list(c_tags),min(len(c_tags),1000))
-        if len(self._priority_tags) > 0:
-            tags.extend(list(self._priority_tags))
-        return list(set(tags)) if len(tags) > 0 else []
-
     async def _loop_task(self):        
         try:
             while self.loop_active:
@@ -492,16 +438,21 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue       
 
-                tags = await bot_client.run_in_thread(self._get_sample_tags)
-                if len(tags) == 0:
+                if (pendulum.now() - self._last_db_update).total_seconds() > 300:
+                    await self._reload_tags()
+
+                if len(self._tags) == 0:
                     await asyncio.sleep(10)
                     continue
+
+                c_tags = copy.copy(self._tags)
+                tags = list(set(c_tags))
 
                 st = pendulum.now()
                 self._running = True
                 a_iter = AsyncIter(tags)
 
-                tasks = [self._launch_single_loop(tag) async for tag in a_iter]
+                tasks = [self._run_single_loop(tag) async for tag in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
 
                 self.last_loop = pendulum.now()
@@ -526,18 +477,15 @@ class PlayerLoop(TaskLoop):
                     )
                 await asyncio.sleep(60)
                 await self.start()
-    
-    async def _launch_single_loop(self,tag:str):
-        lock = self._locks[tag]
-        if lock.locked():
-            return
-        await lock.acquire()
-
-        cached = self._cached.get(tag,None)        
-        await self._run_single_loop(tag,lock,cached)
         
-    async def _run_single_loop(self,tag:str,lock:asyncio.Lock,cached:Optional[aPlayer]=None):
-        try:            
+    async def _run_single_loop(self,tag:str):
+        try:
+            lock = self._locks[tag]
+            if lock.locked():
+                return
+            await lock.acquire()
+            cached = self._cached.get(tag,None)
+        
             finished = False            
             async with self.task_limiter:
                 st = pendulum.now()
@@ -551,18 +499,13 @@ class PlayerLoop(TaskLoop):
                     except ClashAPIError:
                         return self.loop.call_later(10,self.unlock,lock)
                     
-                wait = int(min(getattr(new_player,'_response_retry',default_sleep) * await self.delay_multiplier(new_player),600))
+                wait = getattr(new_player,'_response_retry',default_sleep)
                 self.loop.call_later(wait,self.unlock,lock)
                 
                 if cached:        
                     if new_player.timestamp.int_timestamp > getattr(cached,'timestamp',pendulum.now()).int_timestamp:
-                        asyncio.create_task(PlayerLoop._dispatch_events(cached,new_player))
+                        asyncio.create_task(self._dispatch_events(cached,new_player))
                 self._cached[tag] = new_player
-
-                if self.is_priority(new_player):
-                    self._priority_tags.add(tag)
-                else:
-                    self._priority_tags.discard(tag)
                 
                 finished = True
         
@@ -588,3 +531,24 @@ class PlayerLoop(TaskLoop):
                     self.run_time.append(runtime.total_seconds())
                 except:
                     pass
+    
+    async def _dispatch_events(self,old_player:aPlayer,new_player:aPlayer):
+        tasks = []        
+        a_iter = AsyncIter(PlayerLoop._player_events)
+        tasks.extend([event(old_player,new_player) async for event in a_iter])
+
+        ach_iter = AsyncIter(new_player.achievements)
+        async for ach in ach_iter:
+            a_iter = AsyncIter(PlayerLoop._achievement_events)
+            tasks.extend([event(old_player,new_player,ach) async for event in a_iter])
+        
+        lock = self._locks['dispatch']
+        async with lock:
+            sem = self._task_semaphore
+            while True:
+                if not sem._waiters: 
+                    break
+                if sem._waiters and len(sem._waiters) < len(tasks):
+                    break
+                await asyncio.sleep(0.1)
+        await bounded_gather(*tasks,semaphore=sem)

@@ -21,25 +21,20 @@ from .mongo_discord import db_ClockConfig
 bot_client = client()
 
 class aGuildClocks():
+
     @classmethod
-    async def get_for_guild(cls,guild_id:int):
-        def query_db():
-            try:
-                return db_ClockConfig.objects.get(s_id=guild_id)
-            except DoesNotExist:
-                return None
+    async def get_for_guild(cls,guild_id:int):        
+        database = await bot_client.coc_db.db__clock_config.find_one({'s_id':guild_id})        
+        return cls(guild_id,database)
         
-        db_config = await bot_client.run_in_thread(query_db)
-        return cls(guild_id,db_config)
-        
-    def __init__(self,guild_id:int,db_config:Optional[db_ClockConfig]=None):        
+    def __init__(self,guild_id:int,config:Optional[dict]=None):
         self.id = guild_id
-        self.use_channels = getattr(db_config,'use_channels',False)
-        self.use_events = getattr(db_config,'use_events',False)
-        self._season_channel = getattr(db_config,'season_channel',0)
-        self._raids_channel = getattr(db_config,'raids_channel',0)
-        self._clangames_channel = getattr(db_config,'clangames_channel',0)
-        self._warleague_channel = getattr(db_config,'warleague_channel',0)
+        self.use_channels = config.get('use_channels',False)
+        self.use_events = config.get('use_events',False)
+        self._season_channel = config.get('season_channel',0)
+        self._raids_channel = config.get('raids_channel',0)
+        self._clangames_channel = config.get('clangames_channel',0)
+        self._warleague_channel = config.get('warleague_channel',0)
 
     @property
     def guild(self):
@@ -82,8 +77,7 @@ class aGuildClocks():
         if not create_event:
             return event
         
-        loop = asyncio.get_running_loop()
-        image_bytes = await loop.run_in_executor(None,convert_image_to_bytes,image)
+        image_bytes = await bot_client.run_in_thread(convert_image_to_bytes,image)
         
         event = await self.guild.create_scheduled_event(
             name=name,
@@ -101,28 +95,30 @@ class aGuildClocks():
     ### CONFIGURATION
     ##################################################
     async def toggle_channels(self):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__use_channels=self.use_channels,
-                upsert=True
-                )
         if self.use_channels:
             self.use_channels = False
         else:
-            self.use_channels = True        
-        await bot_client.run_in_thread(_update_in_db)
+            self.use_channels = True
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'use_channels':self.use_channels
+                }
+            },
+            upsert=True)
     
     async def toggle_events(self):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__use_events=self.use_events,
-                upsert=True
-                )
         if self.use_events:
             self.use_events = False
         else:
-            self.use_events = True        
-        await bot_client.run_in_thread(_update_in_db)
+            self.use_events = True
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'use_events':self.use_events
+                }
+            },
+            upsert=True)
     
     ##################################################
     ### SEASON CLOCKS
@@ -135,13 +131,14 @@ class aGuildClocks():
         return None
     
     async def new_season_channel(self,channel_id:int):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__season_channel=channel_id,
-                upsert=True
-                )
-        self._season_channel = channel_id
-        await bot_client.run_in_thread(_update_in_db)
+        self._season_channel = channel_id        
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'season_channel':self._season_channel
+                }
+            },
+            upsert=True)
 
     async def update_season_channel(self):
         now = pendulum.now('UTC')
@@ -176,13 +173,14 @@ class aGuildClocks():
         return None
     
     async def new_raids_channel(self,channel_id:int):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__raids_channel=channel_id,
-                upsert=True
-                )
         self._raids_channel = channel_id
-        await bot_client.run_in_thread(_update_in_db)
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'raids_channel':self._raids_channel
+                }
+            },
+            upsert=True)
     
     async def update_raidweekend_channel(self):
         now = pendulum.now('UTC')
@@ -249,13 +247,14 @@ class aGuildClocks():
         return None
 
     async def new_clangames_channel(self,channel_id:int):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__clangames_channel=channel_id,
-                upsert=True
-                )
         self._clangames_channel = channel_id
-        await bot_client.run_in_thread(_update_in_db)
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'clangames_channel':self._clangames_channel
+                }
+            },
+            upsert=True)
     
     async def update_clangames_channel(self):
         now = pendulum.now('UTC')
@@ -331,13 +330,14 @@ class aGuildClocks():
         return None    
     
     async def new_league_channel(self,channel_id:int):
-        def _update_in_db():
-            db_ClockConfig.objects(s_id=self.id).update_one(
-                set__warleague_channel=channel_id,
-                upsert=True
-                )
         self._warleague_channel = channel_id
-        await bot_client.run_in_thread(_update_in_db)
+        await bot_client.coc_db.db__clock_config.update_one(
+            {'s_id':self.id},
+            {'$set':{
+                'warleague_channel':self._warleague_channel
+                }
+            },
+            upsert=True)
     
     async def update_warleagues_channel(self):
         now = pendulum.now('UTC')
