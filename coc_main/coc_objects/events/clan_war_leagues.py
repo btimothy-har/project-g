@@ -430,9 +430,12 @@ class WarLeaguePlayer(BasicPlayer):
         roster_clan_tag = db.get('roster_clan',None) if db else None
         self.roster_clan = await WarLeagueClan(roster_clan_tag,self.season) if roster_clan_tag else None
 
-        if not self.__league_clan:
+        if self.__league_clan:
+            self.league_clan = self.__league_clan
+        else:
             league_clan_tag = db.get('league_clan',None) if db else None
             self.league_clan = await WarLeagueClan(league_clan_tag,self.season) if league_clan_tag else None
+        del self.__league_clan
         
         #This is the league group that the player has registered to participate in.
         self.league_group = db.get('league_group',0) if db else 0
