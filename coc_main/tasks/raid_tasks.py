@@ -197,7 +197,7 @@ class ClanRaidLoop(TaskLoop):
                 async with self.api_limiter:
                     try:
                         raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                    except coc.ClashOfClansException:
+                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
                         return self.loop.call_later(10,self.unlock,lock)
 
                 wait = getattr(raid_log,'_response_retry',default_sleep)

@@ -256,11 +256,19 @@ class ClanWarLoop(TaskLoop):
                     return self.loop.call_later(10,self.unlock,lock)
                 
                 current_war = None
+                count = 0
                 async with self.api_limiter:
-                    try:
-                        current_war = await bot_client.coc.get_current_war(tag)
-                    except coc.ClashOfClansException:
-                        return self.loop.call_later(10,self.unlock,lock)
+                    while True:
+                        try:
+                            count += 1
+                            current_war = await bot_client.coc.get_current_war(tag)
+                            break
+                        except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                            return self.loop.call_later(10,self.unlock,lock)
+                        except:
+                            if count > 5:
+                                return self.loop.call_later(10,self.unlock,lock)
+                            await asyncio.sleep(0.5)
                 
                 wait = getattr(current_war,'_response_retry',default_sleep)
                 self.loop.call_later(wait,self.unlock,lock)

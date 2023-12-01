@@ -100,12 +100,12 @@ class aMember(AwaitLoader):
         #sort by TH, exp level, alliance rank
         self.accounts = sorted(
             [await BasicPlayer(db['_id']) async for db in query],
-            key=lambda x: (x.town_hall,x.exp_level,x.clean_name),
+            key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
         self.member_accounts = sorted(
             [a for a in self.accounts if a.is_member and a.home_clan and a.home_clan.tag in scope],
-            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall,x.exp_level,x.clean_name),
+            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
         hc = [a.home_clan for a in self.accounts if a.home_clan and a.home_clan.tag in scope]
