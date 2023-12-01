@@ -45,7 +45,7 @@ class EventReminder():
         'channel_id',
         'reminder_interval',
         'interval_tracker',
-        'reminders'
+        'active_reminders'
         ]
     
     @staticmethod
@@ -111,7 +111,6 @@ class EventReminder():
     async def refresh_intervals(self,time_reference):
         async with self._lock:
             self.interval_tracker = [i for i in self.reminder_interval if i < (time_reference.total_seconds() / 3600)]
-
             await bot_client.coc_db.db__clan_event_reminder.update_one(
                 {'_id':self._id},
                 {'$set': {
@@ -129,9 +128,7 @@ class EventReminder():
         if self._lock.locked():
             return
         
-        async with self._lock:
-            
-
+        async with self._lock:            
             if self.next_reminder < (time_remaining.total_seconds() / 3600):
                 return
 
