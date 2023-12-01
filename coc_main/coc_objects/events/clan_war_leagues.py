@@ -205,12 +205,7 @@ class WarLeagueClan(BasicClan):
                 war_query = bot_client.coc_db.db__clan_war.find(war_query_doc,{'_id':1})
                 self.league_wars = [await aClanWar(war['_id']) async for war in war_query]
 
-        master_roster_tags = db.get('master_roster',[]) if db else []
-        self.master_roster = sorted(
-            [await WarLeaguePlayer(tag,self.season,self) async for tag in AsyncIter(master_roster_tags)],
-            key=lambda x:(x.town_hall_level),
-            reverse=True
-            )
+        self.master_roster_tags = db.get('master_roster',[]) if db else []
     
     ##################################################
     ### GLOBAL ATTRIBUTES
@@ -234,17 +229,18 @@ class WarLeagueClan(BasicClan):
     ##################################################
     ### CWL ATTRIBUTES
     ### These are usable only during CWL
-    ##################################################    
-    @cached_property
-    def master_lineup(self) -> Dict[int,int]:
-        th_levels = defaultdict(int)
+    ##################################################
+    async def compute_lineup_stats(self):
+        self.master_roster = sorted(
+            [await WarLeaguePlayer(tag,self.season) async for tag in AsyncIter(self.master_roster_tags)],
+            key=lambda x:(x.town_hall_level),
+            reverse=True
+            )
+        self.master_lineup = defaultdict(int)
         for player in self.master_roster:
-            th_levels[player.town_hall] += 1
-        return th_levels
-    
-    @cached_property
-    def master_average_th(self) -> float:
-        return round(sum([p.town_hall for p in self.master_roster])/len(self.master_roster),1)
+            self.master_lineup[player.town_hall] += 1
+
+        self.master_average_th = round(sum([p.town_hall for p in self.master_roster])/len(self.master_roster),1)
     
     @cached_property
     def current_war(self) -> Optional[aClanWar]:
@@ -399,10 +395,9 @@ class WarLeagueClan(BasicClan):
 class WarLeaguePlayer(BasicPlayer):
     _locks = defaultdict(asyncio.Lock)
 
-    def __init__(self,player_tag:str,season:aClashSeason,league_clan:Optional[WarLeagueClan]=None):
+    def __init__(self,player_tag:str,season:aClashSeason):
         self.tag = player_tag
         self.season = season
-        self.__league_clan = league_clan
 
         super().__init__(tag=self.tag)
     
@@ -430,12 +425,8 @@ class WarLeaguePlayer(BasicPlayer):
         roster_clan_tag = db.get('roster_clan',None) if db else None
         self.roster_clan = await WarLeagueClan(roster_clan_tag,self.season) if roster_clan_tag else None
 
-        if self.__league_clan:
-            self.league_clan = self.__league_clan
-        else:
-            league_clan_tag = db.get('league_clan',None) if db else None
-            self.league_clan = await WarLeagueClan(league_clan_tag,self.season) if league_clan_tag else None
-        del self.__league_clan
+        league_clan_tag = db.get('league_clan',None) if db else None
+        self.league_clan = await WarLeagueClan(league_clan_tag,self.season) if league_clan_tag else None
         
         #This is the league group that the player has registered to participate in.
         self.league_group = db.get('league_group',0) if db else 0

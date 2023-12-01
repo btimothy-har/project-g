@@ -276,7 +276,7 @@ class ClashOfClansTasks(commands.Cog):
                 await bot_client.bot.change_presence(
                     activity=discord.Activity(
                         type=discord.ActivityType.playing,
-                        name=f"start of the {self.current_season.short_description} Season! Clash on!")
+                        name=f"start of the {bot_client.current_season.short_description} Season! Clash on!")
                         )
 
                 bank_cog = bot_client.bot.get_cog('Bank')
