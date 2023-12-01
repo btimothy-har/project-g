@@ -169,7 +169,7 @@ class aClanWar(AwaitLoader):
         else:
             clan_war.type = data.type
 
-        if data._state != clan_war.state:
+        if data.state != clan_war._state:
             clan_war._found_in_db = False
 
         clan_war._state = data.state
