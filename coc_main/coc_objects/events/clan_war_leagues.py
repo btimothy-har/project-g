@@ -378,9 +378,6 @@ class WarLeagueClan(BasicClan):
         a_iter = AsyncIter(api_data.members)
         tasks = [WarLeaguePlayer.from_api(season_id,api_data.tag,member) async for member in a_iter]
         await bounded_gather(*tasks,limit=1)
-        
-        clan = await cls(api_data.tag,await aClashSeason(season_id))
-        return clan
 
     ##################################################
     ### CLASS QUERIES
@@ -636,8 +633,6 @@ class WarLeaguePlayer(BasicPlayer):
                 }},
             upsert=True
             )
-        player = await cls(api_data.tag,await aClashSeason(season_id))
-        return player
 
     ##################################################
     ### CLASS QUERIES
