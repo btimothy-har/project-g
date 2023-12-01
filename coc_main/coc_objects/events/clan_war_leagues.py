@@ -101,7 +101,7 @@ class WarLeagueGroup(AwaitLoader):
         return next((clan for clan in self.clans if clan.tag == tag),None)
     
     def get_round_from_war(self,war) -> Optional[int]:
-        return next((i for i,round in enumerate(self.rounds,start=1) if war.war_id in round),None)
+        return next((i for i,round in enumerate(self.rounds,start=1) if war._id in round),None)
     
     def get_round(self,round:int) -> List[aClanWar]:
         r = self.rounds[round-1]
@@ -136,7 +136,7 @@ class WarLeagueGroup(AwaitLoader):
             a_iter = AsyncIter(round)
             tasks = [cls.get_league_war(group_id,tag) async for tag in a_iter]
             wars_in_round = await bounded_gather(*tasks,limit=1)
-            war_ids_by_rounds.append([war.war_id for war in wars_in_round if war is not None])
+            war_ids_by_rounds.append([war._id for war in wars_in_round if war is not None])
         
         await bot_client.coc_db.db__war_league_group.update_one(
             {'_id':group_id},
