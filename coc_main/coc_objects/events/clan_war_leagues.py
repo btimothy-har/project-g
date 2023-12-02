@@ -178,7 +178,7 @@ class WarLeagueClan(BasicClan):
         return {'season':self.season.id,'tag':self.tag}    
     @property
     def _lock(self) -> asyncio.Lock:
-        return self._locks[self.db_id]
+        return self._locks[(self.season.id,self.tag)]
     
     async def load(self):
         await BasicClan.load(self)
@@ -419,7 +419,7 @@ class WarLeaguePlayer(BasicPlayer):
     
     @property
     def _lock(self) -> asyncio.Lock:
-        return self._locks[self.db_id]
+        return self._locks[(self.season.id,self.tag)]
     
     async def load(self):
         await BasicPlayer.load(self)
