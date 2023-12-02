@@ -197,7 +197,7 @@ class MemberRankMenu():
         target_clan = self.eligible_clans[0]
         embed = await clash_embed(
             context=self.ctx,
-            message=f"**Please confirm you want to __{self.rank_action_text}__ {self.member.mention} in {target_clan}.**"
+            message=f"**Please confirm you want to __{self.rank_action_text}__ {self.member.mention} in {target_clan.title}.**"
                 + f"\n\nCurrent Rank: {self.get_current_rank(target_clan)}"
                 + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.member_accounts if a.home_clan.tag == target_clan.tag]),
             thumbnail=self.member.display_avatar,

@@ -189,7 +189,7 @@ class BasicPlayer(AwaitLoader):
 
             await bot_client.coc_db.db__player.update_one(
                 {'_id':player.tag},
-                {'$set':{'discord_user':await player.discord_user}},
+                {'$set':{'discord_user':player.discord_user}},
                 upsert=True
                 )
             bot_client.coc_data_log.info(f"{player}: discord_user changed to {player.discord_user}.")            
@@ -208,9 +208,9 @@ class BasicPlayer(AwaitLoader):
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'is_member':await self.is_member,
-                    'home_clan':getattr(await self.home_clan,'tag',None),
-                    'last_joined':getattr(await self.last_joined,'int_timestamp',pendulum.now().int_timestamp)
+                    'is_member':self.is_member,
+                    'home_clan':getattr(self.home_clan,'tag',None),
+                    'last_joined':getattr(self.last_joined,'int_timestamp',pendulum.now().int_timestamp)
                     }
                 },
                 upsert=True)
@@ -233,9 +233,9 @@ class BasicPlayer(AwaitLoader):
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'is_member':await self.is_member,
+                    'is_member':self.is_member,
                     'home_clan':None,
-                    'last_removed':getattr(await self.last_removed,'int_timestamp',pendulum.now().int_timestamp)
+                    'last_removed':getattr(self.last_removed,'int_timestamp',pendulum.now().int_timestamp)
                     }
                 },
                 upsert=True
