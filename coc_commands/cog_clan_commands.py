@@ -427,7 +427,7 @@ class Clans(commands.Cog):
         ingame_members = await self.client.fetch_many_players(*[member.tag for member in clan.members])
 
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            clan_members = await self.client.fetch_many_players(*[member for member in clan.alliance_members])
+            clan_members = await self.client.fetch_many_players(*clan.alliance_members)
             townhall_levels = [member.town_hall.level for member in clan_members]
             townhall_levels.sort(reverse=True)
 
@@ -509,7 +509,7 @@ class Clans(commands.Cog):
         
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
             showing_registered = True
-            clan_members = await self.client.fetch_many_players(*[member for member in clan.alliance_members])
+            clan_members = await self.client.fetch_many_players(*clan.alliance_members)
         else:
             showing_registered = False
             clan_members = await self.client.fetch_many_players(*[member.tag for member in clan.members])
