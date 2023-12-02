@@ -503,20 +503,20 @@ class ClanWarLeagues(commands.Cog):
     async def sub_appcommand_cwl_clan_viewgroup(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-        
-        get_clan = await self.client.fetch_clan(clan)
-        cwl_clan = get_clan.war_league_season(self.bot_client.current_season)
 
-        if not cwl_clan.league_group:
+        league_clan = await WarLeagueClan(clan,self.bot_client.current_season)
+
+        if not league_clan.league_group_id:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{get_clan.title}** has not started CWL for {self.bot_client.current_season.description}."
+                message=f"**{league_clan.title}** has not started CWL for {self.bot_client.current_season.description}."
                     + "\n\nIf you're looking for the Clan Roster, use [p]`cwl clan roster` instead.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
         
-        menu = CWLClanGroupMenu(interaction,cwl_clan)
+        league_group = await league_clan.get_league_group()        
+        menu = CWLClanGroupMenu(interaction,league_group)
         await menu.start()
     
     ##################################################
