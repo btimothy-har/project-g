@@ -54,6 +54,9 @@ class CWLPlayerMenu(DefaultView):
     @property
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    def get_live_account(self,tag:str) -> WarLeaguePlayer:
+        return next((p for p in self.live_cwl_accounts if p.tag == tag),None)
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -728,8 +731,7 @@ class CWLPlayerMenu(DefaultView):
     async def _callback_view_account_stats(self,interaction:discord.Interaction,select:DiscordSelectMenu):
         await interaction.response.defer()
 
-        player_tag = select.values[0]
-        self.show_account_stats = WarLeaguePlayer(player_tag,self.season)
+        self.show_account_stats = self.get_live_account(select.values[0])
         embed = await self.player_cwl_stats_warlog()
         
         self.stats_menu(current_page=9)
@@ -771,7 +773,7 @@ class CWLPlayerMenu(DefaultView):
             label=f"{cwl_player.name} ({cwl_player.tag})",
             value=cwl_player.tag,
             emoji=EmojisTownHall.get(cwl_player.town_hall),
-            description=f"{cwl_player.league_clan.name} {cwl_player.league_clan.tag}" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}",
+            description=f"CWL in: " + f"{cwl_player.league_clan.name} ({cwl_player.league_clan.tag})" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} ({cwl_player.roster_clan.tag})",
             default=cwl_player.tag == getattr(self.show_account_stats,'tag',None))
             for cwl_player in self.live_cwl_accounts
             ]
