@@ -388,7 +388,7 @@ class WarLeagueClan(BasicClan):
             'is_participating':True
             }        
         query = bot_client.coc_db.db__war_league_clan.find(q_doc,{'_id':1,'tag':1})
-        ret_clans = [await cls(t,season) async for t in query]
+        ret_clans = [await cls(t['tag'],season) async for t in query]
 
         return sorted(list(set(ret_clans)),
             key=lambda x:(x.level,MultiplayerLeagues.get_index(x.war_league_name)),
