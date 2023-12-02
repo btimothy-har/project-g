@@ -110,7 +110,7 @@ class aMember(AwaitLoader):
         if len(hc) > 0:
             self.home_clans = sorted(
                 list(set([a.home_clan for a in self.accounts if a.home_clan and a.home_clan.tag in scope])),
-                key=lambda x:(x.level, MultiplayerLeagues.get_number(x.war_league_name), x.capital_hall),
+                key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
                 reverse=True
                 )
 
