@@ -86,7 +86,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
         m_data.append(f"{round(player.spell_strength_pct)}%")
         
         m_data.append(CWLLeagueGroups.get_description_no_emoji(league_player.league_group))
-        m_data.append(f"{league_player.roster_clan.name} {league_player.roster_clan.tag}" if league_player.roster_clan else "")
+        m_data.append(f"{league_player.roster_clan.name} ({league_player.roster_clan.tag})" if league_player.roster_clan else "")
         m_data.append('Yes' if not getattr(league_player.roster_clan,'roster_open',True) else '')
 
         for d in m_data:
@@ -133,7 +133,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
             m_data.append(f"{round(player.spell_strength_pct)}%")
 
             m_data.append(CWLLeagueGroups.get_description_no_emoji(league_player.league_group))
-            m_data.append(f"{league_player.roster_clan.name} {league_player.roster_clan.tag}" if league_player.roster_clan else "")
+            m_data.append(f"{league_player.roster_clan.name} ({league_player.roster_clan.tag})" if league_player.roster_clan else "")
             m_data.append('Yes' if not getattr(league_player.roster_clan,'roster_open',True) else '')
 
             for d in m_data:

@@ -192,11 +192,19 @@ class ClanRaidLoop(TaskLoop):
             
             raid_log = None
             new_raid = None
+            count = 0
             async with self.api_limiter:
-                try:
-                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
-                    return self.loop.call_later(10,self.unlock,lock)
+                while True:
+                    try:
+                        count += 1
+                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                        break
+                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                        return self.loop.call_later(10,self.unlock,lock)
+                    except:
+                        if count > 5:
+                            return self.loop.call_later(10,self.unlock,lock)
+                        await asyncio.sleep(0.5)
 
             wait = getattr(raid_log,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)

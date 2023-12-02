@@ -347,17 +347,23 @@ class WarLeagueClan(BasicClan):
                 upsert=True)
             bot_client.coc_data_log.info(f"{str(self)} opened roster for CWL.")
 
-    async def finalize_roster(self):
+    async def finalize_roster(self) -> bool:
         async with self._lock:
             await self.close_roster()
-            role = self.league_clan_role
-            async for m in AsyncIter(role.members):
-                await m.remove_roles(role,reason='CWL Roster Finalized')
-
             participants = await self.get_participants()
+            if len(participants) < 15:
+                await self.open_roster()
+                return False
+
+            role = self.league_clan_role
+            r_members = AsyncIter(role.members)
+            tasks = [m.remove_roles(role,reason='CWL Roster Finalized') async for m in r_members]
+            await bounded_gather(*tasks,limit=1)
+            
             a_iter = AsyncIter(participants)
             tasks = [m.finalize() async for m in a_iter]
             await bounded_gather(*tasks,limit=1)
+            return True
     
     ##################################################
     ### CREATE FROM API
@@ -578,7 +584,14 @@ class WarLeaguePlayer(BasicPlayer):
             bot_client.coc_data_log.info(f"{str(self)} was removed by an admin from CWL.")
     
     async def save_roster_clan(self):
-        async with self._lock: 
+        async with self._lock:
+            db = await bot_client.coc_db.db__war_league_player.find_one({'_id':self.db_id},{'roster_clan':1})
+            roster_clan = await WarLeagueClan(db['roster_clan'],self.season) if db and db.get('roster_clan',None) else None
+
+            if getattr(roster_clan,'tag',None) != getattr(self.roster_clan,'tag',None):
+                if not roster_clan.roster_open:
+                    return
+            
             await bot_client.coc_db.db__war_league_player.update_one(
                 {'_id':self.db_id},
                 {'$set':{

@@ -135,6 +135,7 @@ class CWLRosterMenu(DefaultView):
         await bounded_gather(*tasks)
         self.modified_to_save = []
 
+        self.all_participants = await WarLeaguePlayer.signups_by_season(self.season)
         await self.add_main_menu()
 
         self._ph_save_button.label = "Saved!"
@@ -157,7 +158,11 @@ class CWLRosterMenu(DefaultView):
         tasks = [player.save_roster_clan() for player in self.modified_to_save]
         await bounded_gather(*tasks)
 
-        await self.clan.finalize_roster()
+        finalized = await self.clan.finalize_roster()
+        if not finalized:
+            await interaction.followup.send("I couldn't finalize this roster. This might be due to conflicting rosters. Double check the roster players again.",ephemeral=True)
+            return await self._callback_home(interaction,button)
+        
         await self.add_main_menu()
 
         embeds = await self.clan_embed()

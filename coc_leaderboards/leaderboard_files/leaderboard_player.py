@@ -11,6 +11,20 @@ from coc_main.utils.constants.coc_constants import ClanWarType
 from coc_main.utils.utils import check_rtl
 
 class ClanWarLeaderboardPlayer():
+    __slots__ = [
+        'stats',
+        'tag',
+        'name',
+        'for_th',
+        'wars_participated',
+        'total_attacks',
+        'total_triples',
+        'total_stars',
+        'total_destruction',
+        'hit_rate',
+        'avg_stars'
+        ]
+    
     def __init__(self,player_season:aPlayerSeason,leaderboard_th:int):
         self.stats = player_season
         self.tag = player_season.tag
@@ -59,7 +73,6 @@ class ClanWarLeaderboardPlayer():
 
         participated_wars = AsyncIter(war_stats.war_log)
         async for war in participated_wars.filter(predicate_war):
-
             war_member = war.get_member(lb_player.tag)
 
             if war_member.town_hall == lb_player.for_th:
@@ -92,17 +105,14 @@ class ResourceLootLeaderboardPlayer():
     def clean_name(self) -> str:
         if check_rtl(self.name):
             return '\u200F' + self.name + '\u200E'
-        return self.name
-    
+        return self.name    
     @classmethod
     async def calculate(cls,player_season:aPlayerSeason,leaderboard_th:int):        
         lb_player = cls(player_season,leaderboard_th)
-        return lb_player
-  
+        return lb_player  
     @property
     def loot_elixir(self):
-        return str(self._loot_elixir)
-    
+        return str(self._loot_elixir)    
     @property
     def loot_gold(self):
         return str(self._loot_gold)
