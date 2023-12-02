@@ -425,10 +425,11 @@ class ClanApplyMenuUser(DefaultView):
                 'api_error':False
                 }
             )
+            application_id = application.inserted_id
 
         l_channel = modal.panel.listener_channel
         if l_channel:
-            await l_channel.send(f"{getattr(modal.panel,'tickettool_prefix','')}ticket {application.inserted_id} {self.member.id}")
+            await l_channel.send(f"{getattr(modal.panel,'tickettool_prefix','')}ticket {application_id} {self.member.id}")
 
         if interaction.guild.id == 680798075685699691:
             await modal.panel.listener_channel.send(
@@ -442,7 +443,7 @@ class ClanApplyMenuUser(DefaultView):
             if rt.int_timestamp - now.int_timestamp > 60:
                 break
 
-            application = await bot_client.coc_db.db__clan_application.find_one({'_id':application.inserted_id})
+            application = await bot_client.coc_db.db__clan_application.find_one({'_id':application_id})
             channel = interaction.guild.get_channel(application.get('ticket_channel',0))
             if channel:
                 await channel.set_permissions(interaction.user,read_messages=True)

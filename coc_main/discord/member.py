@@ -106,13 +106,14 @@ class aMember(AwaitLoader):
             key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
-        hc = [a.home_clan for a in self.accounts if a.home_clan and a.home_clan.tag in scope]
-        if len(hc) > 0:
-            self.home_clans = sorted(
-                list(set([a.home_clan for a in self.accounts if a.home_clan and a.home_clan.tag in scope])),
-                key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
-                reverse=True
-                )
+        
+        for a in self.member_accounts:
+            if a.home_clan.tag not in [c.tag for c in self.home_clans]:
+                self.home_clans.append(a.home_clan)
+        self.home_clans.sort(
+            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
+            reverse=True
+            )
 
         query = await bot_client.coc_db.db__discord_member.find(
             {'_id':self.db_id},
