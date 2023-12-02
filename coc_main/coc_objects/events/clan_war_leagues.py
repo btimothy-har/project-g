@@ -283,7 +283,7 @@ class WarLeagueClan(BasicClan):
             'roster_clan':self.tag
             }
         query = bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
-        self.participants = await WarLeaguePlayer(db_player.tag,self.season) async for db_player in AsyncIter(query)
+        self.participants = [await WarLeaguePlayer(db_player.tag,self.season) async for db_player in AsyncIter(query)]
         return self.participants
     
     ##################################################
