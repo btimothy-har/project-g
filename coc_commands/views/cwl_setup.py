@@ -163,7 +163,7 @@ class CWLSeasonSetup(DefaultView):
             league_group = await cwl_clan.get_league_group()
             embed.add_field(
                 name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.name} ({cwl_clan.tag})",
-                value=f"# in Roster: {len(cwl_clan.participants)} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
+                value=f"# in Roster: {len(await cwl_clan.get_participants())} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
                     + (f"\nIn War: Round {len(league_group.rounds)-1} / {league_group.number_of_rounds}\nPreparation: Round {len(league_group.rounds)} / {league_group.number_of_rounds}" if league_group else "\nCWL Not Started" if self.season.cwl_signup_lock else "")
                     + (f"\nMaster Roster: {len(cwl_clan.master_roster_tags)}" if league_group else "")
                     + "\n\u200b",
