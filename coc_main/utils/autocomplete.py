@@ -50,9 +50,9 @@ async def autocomplete_clans(interaction:discord.Interaction,current:str):
             q_doc = {'_id':{'$in':clan_tags}}
         else:
             q_doc = {'$or':[
-                {'tag':{'$regex':f'^{current}'}},
-                {'name':{'$regex':f'^{current}'}},
-                {'abbreviation':{'$regex':f'^{current.upper()}'}}
+                {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                {'name':{'$regex':f'^{current}',"$options":"i"}},
+                {'abbreviation':{'$regex':f'^{current}',"$options":"i"}}
                 ]
                 }
         pipeline = [
@@ -126,8 +126,8 @@ async def autocomplete_players(interaction:discord.Interaction,current:str):
     try:
         if current:
             q_doc = {'$or':[
-                {'tag':{'$regex':f'^{current}'}},
-                {'name':{'$regex':f'^{current}'}}
+                {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                {'name':{'$regex':f'^{current}',"$options":"i"}}
                 ]
                 }
         else:
@@ -154,8 +154,8 @@ async def autocomplete_players_members_only(interaction:discord.Interaction,curr
             q_doc = {
                 'is_member':True,
                 '$or':[
-                    {'tag':{'$regex':f'^{current}'}},
-                    {'name':{'$regex':f'^{current}'}}
+                    {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                    {'name':{'$regex':f'^{current}',"$options":"i"}}
                     ]
                 }
         else:

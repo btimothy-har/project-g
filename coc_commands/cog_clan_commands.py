@@ -847,13 +847,13 @@ class Clans(commands.Cog):
                 )            
             complete_embed = await clash_embed(
                 context=ctx,
-                title=f"Clan Linked: **{link.clan.title}**",
+                title=f"Clan Linked: **{clan.title}**",
                 message=f"**Co-Leader Role:** {link.coleader_role.mention}"
                     + f"\n**Elder Role:** {link.elder_role.mention}"
                     + f"\n**Member Role:** {link.member_role.mention}",
-                url=link.clan.share_link,
+                url=clan.share_link,
                 success=True,
-                thumbnail=link.clan.badge)
+                thumbnail=clan.badge)
             return await message.edit(content=None,embed=complete_embed,view=None)
 
     @app_command_group_clanset.command(
@@ -914,13 +914,13 @@ class Clans(commands.Cog):
                 )            
             complete_embed = await clash_embed(
                 context=interaction,
-                title=f"Link Clan: **{link.clan.title}**",
+                title=f"Link Clan: **{select_clan.title}**",
                 message=f"**Co-Leader Role:** {link.coleader_role.mention}"
                     + f"\n**Elder Role:** {link.elder_role.mention}"
                     + f"\n**Member Role:** {link.member_role.mention}",
-                url=link.clan.share_link,
+                url=select_clan.share_link,
                 success=True,
-                thumbnail=link.clan.badge)
+                thumbnail=select_clan.badge)
             return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
     ##################################################

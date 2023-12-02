@@ -664,12 +664,12 @@ class WarLeaguePlayer(BasicPlayer):
                     ]}
                 ]
             }
-        query = await bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
+        query = bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
         ret_players = [await cls(q['tag'],season) async for q in query]
         return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)
 
     @classmethod
     async def signups_by_season(cls,season:aClashSeason):        
-        query = await bot_client.coc_db.db__war_league_player.find({'season':season.id,'registered':True},{'_id':1,'tag':1})
+        query = bot_client.coc_db.db__war_league_player.find({'season':season.id,'registered':True},{'_id':1,'tag':1})
         ret_players = [await cls(q['tag'],season) async for q in query]
         return sorted(ret_players, key=lambda x:(x.town_hall_level,x.exp_level),reverse=True)

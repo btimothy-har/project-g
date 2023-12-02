@@ -39,7 +39,7 @@ class GuildApplicationPanel():
 
     @classmethod
     async def get_panel(cls,guild_id:int,channel_id:int):
-        db = bot_client.coc_db.db__guild_apply_panel.find_one({'server_id':guild_id,'channel_id':channel_id})
+        db = await bot_client.coc_db.db__guild_apply_panel.find_one({'server_id':guild_id,'channel_id':channel_id})
         if db:
             return cls(db)
         return None
