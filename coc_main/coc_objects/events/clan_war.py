@@ -63,7 +63,7 @@ class aClanWar(AwaitLoader):
                 'members.tag': player_tag,
                 'type': ClanWarType.RANDOM
                 }        
-        query = await bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})   
+        query = bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})   
         ret_wars = [await cls(war_id=d['_id']) async for d in query]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
@@ -83,7 +83,7 @@ class aClanWar(AwaitLoader):
                 'clans.tag': clan_tag,
                 'type': ClanWarType.RANDOM
                 }
-        query = await bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})
+        query = bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})
         ret_wars = [await cls(war_id=d['_id']) async for d in query]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
