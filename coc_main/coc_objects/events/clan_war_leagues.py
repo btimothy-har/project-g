@@ -537,10 +537,10 @@ class WarLeaguePlayer(BasicPlayer):
                 )
             bot_client.coc_data_log.info(f"{str(self)} unregistered for CWL.")
     
-    async def admin_add(self,league_clan:str):
+    async def admin_add(self,league_clan:WarLeagueClan):
         async with self._lock:
             self.is_registered = True
-            self.roster_clan = await WarLeagueClan(league_clan,self.season)
+            self.roster_clan = league_clan
 
             await bot_client.coc_db.db__war_league_player.update_one(
                 {'_id':self.db_id},

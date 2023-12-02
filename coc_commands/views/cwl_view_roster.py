@@ -181,10 +181,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
             return f"{EmojisUI.SPACER}"
 
         embeds = []
-        chunked_members = list(chunks(self.reference_list,25))
-        iter_chunks = AsyncIter(chunked_members)
+        chunked_members = chunks(self.reference_list,25)
+        i = 0
 
-        async for i, members_chunk in iter_chunks.enumerate():
+        async for members_chunk in chunked_members:
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.reference_list)})"
 
             header_text = f"**Season:** {self.league_clan.season.description}"
@@ -219,6 +219,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 thumbnail=self.league_clan.badge,
                 )
             embeds.append(embed)
+            i += 1
 
         self.paginate_options = embeds
         self.page_index = 0
@@ -237,10 +238,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
     
     async def _set_roster_strength_content(self):
         embeds = []
-        chunked_members = list(chunks(self.reference_list,25))
-        iter_chunks = AsyncIter(chunked_members)
+        i = 0
+        chunked_members = chunks(self.reference_list,25)
 
-        async for i, members_chunk in iter_chunks.enumerate():
+        async for members_chunk in chunked_members:
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.reference_list)})"
 
             header_text = f"**Season:** {self.league_clan.season.description}"
@@ -276,6 +277,8 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 thumbnail=self.clan.badge,
                 )
             embeds.append(embed)
+            i += 1
+            
         self.paginate_options = embeds
         self.page_index = 0
 

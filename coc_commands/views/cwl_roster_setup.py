@@ -158,7 +158,6 @@ class CWLRosterMenu(DefaultView):
         await bounded_gather(*tasks)
 
         await self.clan.finalize_roster()
-        await self.clan.reset_roster()
         await self.add_main_menu()
 
         embeds = await self.clan_embed()
@@ -936,9 +935,10 @@ class CWLRosterMenu(DefaultView):
                 if mem.tag not in [p.tag for p in ref_members]:
                     ref_members.append(mem)
 
-        chunked_members = list(chunks(ref_members,25))
-        iter_chunks = AsyncIter(chunked_members)
-        async for i, members_chunk in iter_chunks.enumerate(start=1):
+        chunked_members = chunks(ref_members,25)
+        i = 0
+        async for members_chunk in chunked_members:
+            i += 1
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
                 + (f"{EmojisUI.LOGOUT}" if player.clan.tag != clan.tag else f"{EmojisUI.SPACER}")

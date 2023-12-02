@@ -137,11 +137,10 @@ class ClanMembersMenu(MenuPaginator):
             return text
 
         embeds = []
-        chunked_members = list(chunks(self.all_clan_members,25))
+        chunked_members = chunks(self.all_clan_members,25)
+        i = 0
 
-        a_iter = AsyncIter(chunked_members)
-
-        async for i, members_chunk in a_iter.enumerate():
+        async for members_chunk in chunked_members:
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member Discord Links**\nIn Clan: {self.clan.member_count}\u3000"
@@ -157,6 +156,7 @@ class ClanMembersMenu(MenuPaginator):
                 thumbnail=self.clan.badge,
                 )
             embeds.append(embed)
+            i += 1
         self.paginate_options = embeds
         self.page_index = 0
 
@@ -185,10 +185,9 @@ class ClanMembersMenu(MenuPaginator):
             return text
 
         embeds = []
-        chunked_members = list(chunks(self.all_clan_members,25))
-
-        a_iter = AsyncIter(chunked_members)
-        async for i, members_chunk in a_iter.enumerate():
+        i = 0
+        chunked_members = chunks(self.all_clan_members,25)
+        async for members_chunk in chunked_members:            
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member Ranks**\nIn Clan: {self.clan.member_count}\u3000"
@@ -203,6 +202,7 @@ class ClanMembersMenu(MenuPaginator):
                 thumbnail=self.clan.badge,
                 )
             embeds.append(embed)
+            i += 1
         self.paginate_options = embeds
         self.page_index = 0
 
@@ -243,10 +243,9 @@ class ClanMembersMenu(MenuPaginator):
 
         embeds = []
         #sort self.all_clan_members by war opt status and town hall level and hero levels        
-        chunked_members = list(chunks(sorted(self.all_clan_members,key=lambda x: (war_status_num[x.war_opt_status],x.town_hall.level,x.hero_strength),reverse=True),25))
-        iter_chunks = AsyncIter(chunked_members)
-
-        async for i, members_chunk in iter_chunks.enumerate():
+        i = 0
+        chunked_members = chunks(sorted(self.all_clan_members,key=lambda x: (war_status_num[x.war_opt_status],x.town_hall.level,x.hero_strength),reverse=True),25)
+        async for members_chunk in chunked_members:
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member War Status**\nIn Clan: {self.clan.member_count}\u3000"
@@ -264,6 +263,7 @@ class ClanMembersMenu(MenuPaginator):
                 thumbnail=self.clan.badge,
                 )
             embeds.append(embed)
+            i += 1
         self.paginate_options = embeds
         self.page_index = 0
 
