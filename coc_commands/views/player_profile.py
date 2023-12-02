@@ -226,13 +226,15 @@ class PlayerProfileMenu(DefaultView):
     async def _summary_embed(self):
         player = self.current_account
 
+        current_season = await player.get_current_season()
+
         discord_user = self.guild.get_member(player.discord_user)
         embed = await clash_embed(
             context=self.ctx,
             title=f"**{player}**",
             message=(f"{player.member_description}\n" if player.is_member else "")
                 + f"{EmojisClash.EXP} {player.exp_level}\u3000{EmojisClash.CLAN} {player.clan_description}\n"
-                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(player.current_season._last_seen))}:R>\n" if len(player.current_season._last_seen) > 0 else "")
+                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(current_season._last_seen))}:R>\n" if len(current_season._last_seen) > 0 else "")
                 + (f"{player.discord_user_str}\n" if player.discord_user else ""),
             thumbnail=getattr(discord_user,'display_avatar',None),
             )
@@ -250,8 +252,6 @@ class PlayerProfileMenu(DefaultView):
             )
         
         if player.is_member:
-            current_season = await player.get_current_season()
-
             td, th, tm, ts = s_convert_seconds_to_str(current_season.time_in_home_clan)
             embed.add_field(
                 name="**Current Season Stats with The Guild**",

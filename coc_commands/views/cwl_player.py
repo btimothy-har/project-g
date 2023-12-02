@@ -916,6 +916,13 @@ class CWLPlayerMenu(DefaultView):
         return [embed]
 
     async def player_cwl_stats_warlog(self):
+        if not self.show_account_stats.league_clan:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"CWL has not yet started for **{self.show_account_stats.name}**.",
+                success=False
+                )
+            return [embed]
         war_stats = aClanWarSummary.for_player(self.show_account_stats.tag,self.show_account_stats.league_clan.league_wars)
         league_group = await self.show_account_stats.league_clan.get_league_group()
 
