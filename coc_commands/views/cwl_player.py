@@ -768,7 +768,7 @@ class CWLPlayerMenu(DefaultView):
         
         #dropdown stats per account
         cwl_accounts = [discord.SelectOption(
-            label=str(cwl_player.player_str),
+            label=f"{cwl_player.name} ({cwl_player.tag})",
             value=cwl_player.tag,
             emoji=EmojisTownHall.get(cwl_player.town_hall),
             description=f"{cwl_player.league_clan.name} {cwl_player.league_clan.tag}" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}",
