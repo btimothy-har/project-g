@@ -856,7 +856,7 @@ class CWLPlayerMenu(DefaultView):
     
     async def player_cwl_stats_overall(self):
         def _get_overall_stats():
-            overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts]
+            overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts if a.league_clan]
             return overall_stats
 
         overall_stats = await bot_client.run_in_thread(_get_overall_stats)

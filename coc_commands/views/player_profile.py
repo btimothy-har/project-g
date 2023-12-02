@@ -234,7 +234,7 @@ class PlayerProfileMenu(DefaultView):
             title=f"**{player}**",
             message=(f"{player.member_description}\n" if player.is_member else "")
                 + f"{EmojisClash.EXP} {player.exp_level}\u3000{EmojisClash.CLAN} {player.clan_description}\n"
-                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(current_season._last_seen))}:R>\n" if len(current_season._last_seen) > 0 else "")
+                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(current_season.last_seen))}:R>\n" if len(current_season.last_seen) > 0 else "")
                 + (f"{player.discord_user_str}\n" if player.discord_user else ""),
             thumbnail=getattr(discord_user,'display_avatar',None),
             )
