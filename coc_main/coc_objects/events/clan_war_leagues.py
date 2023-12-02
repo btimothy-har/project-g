@@ -21,8 +21,6 @@ from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
 from ..players.base_player import BasicPlayer
 
-from .mongo_events import db_WarLeagueGroup, db_WarLeagueClan, db_WarLeaguePlayer
-
 from ...utils.constants.coc_constants import ClanWarType, WarResult, MultiplayerLeagues, WarState, CWLLeagueGroups
 
 from ...exceptions import InvalidTag, ClashAPIError
@@ -95,6 +93,9 @@ class WarLeagueGroup(AwaitLoader):
   
     def get_clan(self,tag:str) -> Optional['WarLeagueClan']:
         return next((clan for clan in self.clans if clan.tag == tag),None)
+    
+    def get_war(self,war_id:str) -> Optional[aClanWar]:
+        return next((war for war in self.wars if war._id == war_id),None)
     
     def get_round_from_war(self,war) -> Optional[int]:
         return next((i for i,round in enumerate(self.rounds,start=1) if war._id in round),None)
@@ -230,6 +231,10 @@ class WarLeagueClan(BasicClan):
     ### CWL ATTRIBUTES
     ### These are usable only during CWL
     ##################################################
+    async def get_league_group(self):
+        self.league_group = await WarLeagueGroup(self.league_group_id)
+        return self.league_group
+    
     async def compute_lineup_stats(self):
         self.master_roster = sorted(
             [await WarLeaguePlayer(tag,self.season) async for tag in AsyncIter(self.master_roster_tags)],
@@ -241,6 +246,7 @@ class WarLeagueClan(BasicClan):
             self.master_lineup[player.town_hall] += 1
 
         self.master_average_th = round(sum([p.town_hall for p in self.master_roster])/len(self.master_roster),1)
+        return self.master_roster
     
     @cached_property
     def current_war(self) -> Optional[aClanWar]:
@@ -277,7 +283,8 @@ class WarLeagueClan(BasicClan):
             'roster_clan':self.tag
             }
         query = bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
-        return [await WarLeaguePlayer(db_player.tag,self.season) async for db_player in AsyncIter(query)]
+        self.participants = await WarLeaguePlayer(db_player.tag,self.season) async for db_player in AsyncIter(query)
+        return self.participants
     
     ##################################################
     ### CLAN METHODS

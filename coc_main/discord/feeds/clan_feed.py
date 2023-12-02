@@ -17,7 +17,7 @@ feed_description = {
 class ClanDataFeed():
 
     @classmethod
-    async def get_by_id(cls,id:str) -> List[db_ClanDataFeed]:        
+    async def get_by_id(cls,id:str) -> 'ClanDataFeed':
         query = await bot_client.coc_db.db__clan_data_feed.find_one({'_id':id})
         return cls(query) if query else None
 

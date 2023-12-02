@@ -64,6 +64,8 @@ class GuildClanPanel():
     
     @property
     def channel(self):
+        if not self.guild:
+            return None
         return self.guild.get_channel(self.channel_id)
     
     async def fetch_message(self):

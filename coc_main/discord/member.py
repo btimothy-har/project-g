@@ -17,8 +17,6 @@ from .guild import aGuild, ClanGuildLink
 from ..coc_objects.players.player import BasicPlayer, db_Player
 from ..coc_objects.clans.player_clan import db_AllianceClan, aPlayerClan
 
-from .mongo_discord import db_DiscordMember
-
 from ..exceptions import InvalidUser, InvalidGuild, InvalidTag, CacheNotReady
 from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
 
@@ -276,7 +274,10 @@ class aMember(AwaitLoader):
                     added_roles.append(role)
         return added_roles, failed_roles
 
-    async def sync_clan_roles(self,context:Optional[Union[discord.Interaction,commands.Context]]=None) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
+    async def sync_clan_roles(self,
+        context:Optional[Union[discord.Interaction,commands.Context]]=None,
+        force:bool=False) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
+
         roles_added = []
         roles_removed = []
  
@@ -285,11 +286,12 @@ class aMember(AwaitLoader):
         if not self.guild:
             return roles_added, roles_removed
         
-        db_last_sync = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
-        ls = db_last_sync.get('last_role_sync',None) if db_last_sync else None
-        
-        if ls and pendulum.now().int_timestamp - ls < 600:
-            return roles_added, roles_removed                
+        if not force:
+            db_last_sync = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
+            ls = db_last_sync.get('last_role_sync',None) if db_last_sync else None
+            
+            if ls and pendulum.now().int_timestamp - ls < 600:
+                return roles_added, roles_removed                
     
         async with self._lock:
             #Assassins guild Member Role
@@ -429,48 +431,50 @@ class aMember(AwaitLoader):
         if tag not in await self.account_tags:
             raise InvalidTag(tag)
 
-        self.default_account_tag = tag
         await bot_client.coc_db.db__discord_member.update_one(
-                {'_id':self.db_id},
-                {'$set':{
-                    'user_id':self.user_id,
-                    'guild_id':self.guild_id,
-                    'default_account':await self.default_account_tag
-                    }
-                },
-                upsert=True)
+            {'_id':self.db_id},
+            {'$set':{
+                'user_id':self.user_id,
+                'guild_id':self.guild_id,
+                'default_account':tag
+                }
+            },
+            upsert=True)
 
     async def get_nickname(self) -> str:
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
-        await self.refresh_clash_link(force=True)
+        default_tag = await self._get_default_account_tag()
+        default_account = await BasicPlayer(default_tag) if default_tag else None
 
-        default_account = await self.default_account
-        
-        new_nickname = default_account.name.replace('[AriX]','')
-        new_nickname = new_nickname.strip()
+        if not default_account:
+            new_nickname = self.discord_member.name
+        else:
+            new_nickname = default_account.name.replace('[AriX]','')
+            new_nickname = new_nickname.strip()
 
         if self.guild_id == 688449973553201335:
             abb_clans = []
+
             guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
             linked_clans = [link.tag for link in guild_links]
-            if len(await self.leader_clans) > 0:
-                a_iter = AsyncIter(await self.leader_clans)
+
+            if len(self.leader_clans) > 0:
+                a_iter = AsyncIter(self.leader_clans)
                 async for c in a_iter:
-                    if await c.abbreviation not in abb_clans and len(await c.abbreviation) > 0 and c.tag in linked_clans:
-                        abb_clans.append(await c.abbreviation)
+                    if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in linked_clans:
+                        abb_clans.append(c.abbreviation)
             
             else:
-                home_clan = await default_account.home_clan
-                if home_clan and home_clan.tag in linked_clans:
-                    abb_clans.append(await home_clan.abbreviation)
+                if default_account.home_clan and default_account.home_clan.tag in linked_clans:
+                    abb_clans.append(default_account.home_clan.abbreviation)
                 
-                if len(await self.home_clans) > 0:
-                    a_iter = AsyncIter(await self.home_clans)
+                if len(self.home_clans) > 0:
+                    a_iter = AsyncIter(self.home_clans)
                     async for c in a_iter:
-                        if await c.abbreviation not in abb_clans and len(await c.abbreviation) > 0 and c.tag in linked_clans:
-                            abb_clans.append(await c.abbreviation)
+                        if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in linked_clans:
+                            abb_clans.append(c.abbreviation)
 
             if len(abb_clans) > 0:
                 new_nickname += f" | {' + '.join(abb_clans)}"

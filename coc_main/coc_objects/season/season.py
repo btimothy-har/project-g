@@ -222,6 +222,6 @@ class aClashSeason(AwaitLoader):
         return raid_start, raid_end
     
     @staticmethod
-    def last_completed_clangames():
-        current_season = aClashSeason.get_current_season()
+    async def last_completed_clangames():
+        current_season = await aClashSeason.get_current_season()
         return current_season if pendulum.now() >= current_season.clangames_start else current_season.previous_season()

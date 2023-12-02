@@ -139,7 +139,9 @@ class ClanMembersMenu(MenuPaginator):
         embeds = []
         chunked_members = list(chunks(self.all_clan_members,25))
 
-        for i, members_chunk in enumerate(chunked_members):
+        a_iter = AsyncIter(chunked_members)
+
+        async for i, members_chunk in a_iter.enumerate():
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member Discord Links**\nIn Clan: {self.clan.member_count}\u3000"
@@ -185,7 +187,8 @@ class ClanMembersMenu(MenuPaginator):
         embeds = []
         chunked_members = list(chunks(self.all_clan_members,25))
 
-        for i, members_chunk in enumerate(chunked_members):
+        a_iter = AsyncIter(chunked_members)
+        async for i, members_chunk in a_iter.enumerate():
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.all_clan_members)})"
 
             header_text = f"**Member Ranks**\nIn Clan: {self.clan.member_count}\u3000"

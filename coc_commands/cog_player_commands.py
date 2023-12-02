@@ -53,12 +53,10 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
         coc = bot_client.bot.get_cog("ClashOfClansClient")
 
         member = aMember(member.id,member.guild.id)
-        view_accounts = await coc.fetch_many_players(*member.account_tags)
-        
-        accounts = [a for a in view_accounts if isinstance(a,aPlayer)]
-
+        accounts = await coc.fetch_many_players(*member.account_tags)
         menu = PlayerProfileMenu(interaction,accounts)
         await menu.start()
+
     except Exception as exc:
         await handle_command_error(exc,interaction,getattr(menu,'message',None))
 
@@ -92,7 +90,7 @@ async def context_menu_restore_roles(interaction:discord.Interaction,member:disc
             )
     
     try:
-        amember = aMember(member.id,member.guild.id)
+        amember = await aMember(member.id,member.guild.id)
         added, failed = await amember.restore_user_roles()
 
         embed = await clash_embed(
@@ -130,7 +128,7 @@ async def context_menu_sync_roles(interaction:discord.Interaction,member:discord
                 content="You must have the Manage Roles permission to use this.",
                 ephemeral=True
                 )    
-        m_member = aMember(member.id,member.guild.id)
+        m_member = await aMember(member.id,member.guild.id)
         added, removed = await m_member.sync_clan_roles(context=interaction)
         
         embed = await clash_embed(
@@ -197,17 +195,8 @@ class Players(commands.Cog):
         after_roles = sorted([r.id for r in after.roles])
 
         if before_roles != after_roles:
-            member = aMember(after.id,after.guild.id)
-            last_sync = await member.get_last_role_sync()
-            if not last_sync or pendulum.now().int_timestamp - getattr(last_sync,'int_timestamp',0) >= 60:
-                while True:
-                    try:
-                        await member.sync_clan_roles()
-                    except CacheNotReady:
-                        await asyncio.sleep(10)
-                        continue
-                    break
-            
+            member = await aMember(after.id,after.guild.id)
+            await member.sync_clan_roles()
             await aMember.save_user_roles(after.id,after.guild.id)
     
     async def cog_command_error(self,ctx,error):
@@ -493,7 +482,7 @@ class Players(commands.Cog):
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         else:
-            member = aMember(ctx.author.id,ctx.guild.id)
+            member = await aMember(ctx.author.id,ctx.guild.id)
             accounts = await self.client.fetch_many_players(*member.account_tags)
             view_accounts.extend(accounts)
         
@@ -523,17 +512,17 @@ class Players(commands.Cog):
                 view_accounts.append(get_player)
 
         if member:
-            get_member = aMember(member.id,interaction.guild.id)
+            get_member = await aMember(member.id,interaction.guild.id)
             accounts = await self.client.fetch_many_players(*get_member.account_tags)
             view_accounts.extend(accounts)
 
         if user_id:
-            get_member = aMember(user_id,interaction.guild.id)
+            get_member = await aMember(user_id,interaction.guild.id)
             accounts = await self.client.fetch_many_players(*get_member.account_tags)
             view_accounts.extend(accounts)
 
         if not (player or member or user_id):
-            get_member = aMember(interaction.user.id,interaction.guild.id)
+            get_member = await aMember(interaction.user.id,interaction.guild.id)
             accounts = await self.client.fetch_many_players(*get_member.account_tags)
             view_accounts.extend(accounts)
         

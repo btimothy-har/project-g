@@ -235,6 +235,12 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def min_hero_strength(self) -> int:
         return sum([hero.min_level for hero in self.heroes])
     @cached_property
+    def hero_strength_pct(self) -> float:
+        try:
+            return round((self.hero_strength / self.max_hero_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
+    @cached_property
     def hero_rushed_pct(self) -> float:
         try:
             rushed_levels = sum([(h.min_level - h.level) for h in self.heroes if h.is_rushed])
@@ -265,6 +271,12 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def min_troop_strength(self) -> int:
         return (sum([troop.min_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.min_level for pet in self.pets]))
     @cached_property
+    def troop_strength_pct(self) -> float:
+        try:
+            return round((self.troop_strength / self.max_troop_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
+    @cached_property
     def troop_rushed_pct(self) -> float:
         try:
             rushed_troops = sum([(t.min_level - t.level) for t in self.troops if t.is_rushed and not t.is_super_troop]) + sum([(p.min_level - p.level) for p in self.pets if p.is_rushed])
@@ -281,6 +293,12 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     @cached_property
     def min_spell_strength(self) -> int:
         return sum([spell.min_level for spell in self.spells])
+    @cached_property
+    def spell_strength_pct(self) -> float:
+        try:
+            return round((self.spell_strength / self.max_spell_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
     @cached_property
     def spell_rushed_pct(self) -> float:
         try:
@@ -414,15 +432,11 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     async def get_current_season(self) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,bot_client.current_season)
     
-    @property
-    def season_data(self):
-        return {season.id:aPlayerSeason(self.tag,season) for season in bot_client.tracked_seasons}
-    
-    def get_season_stats(self,season:aClashSeason):
-        return aPlayerSeason(self.tag,season)
+    async def get_season_stats(self,season:aClashSeason):
+        return await aPlayerSeason(self.tag,season)
             
-    def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
-        return WarLeaguePlayer(self.tag,season)
+    async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
+        return await WarLeaguePlayer(self.tag,season)
 
     def get_hero(self,hero_name:str):
         return next((hero for hero in self._heroes if hero.name == hero_name),None)

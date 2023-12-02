@@ -16,7 +16,6 @@ from coc_main.utils.checks import is_admin, has_manage_server
 
 from .views.create_application_panel import CreateApplicationMenu
 from .views.create_recruiting_reminder import CreateRecruitingReminder, RecruitingReminder
-from coc_main.discord.mongo_discord import db_RecruitingPost
 
 bot_client = BotClashClient()
 

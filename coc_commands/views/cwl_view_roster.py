@@ -83,8 +83,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.clan = await self.client.fetch_clan(self.league_clan.tag)
 
         if self.league_clan.status == 'CWL Started':
-            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-            self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+            await self.league_clan.compute_lineup_stats()
+            self.reference_list = await self.client.fetch_many_players(*self.league_clan.master_roster_tags)
+            self.reference_list.sort(
+                key=lambda x:(x.town_hall.level,x.hero_strength),
+                reverse=True)
 
         else:
             if self.league_clan.roster_open:
@@ -100,9 +103,12 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 else:
                     await self.ctx.reply(embed=embed,view=None)
                 return
-
-            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-            self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+            
+            await self.league_clan.get_participants()
+            self.reference_list = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
+            self.reference_list.sort(
+                key=lambda x:(x.town_hall.level,x.hero_strength),
+                reverse=True)
             
             mem_in_clan = await self.client.fetch_many_players(*[p.tag for p in self.clan.members])
             async for mem in AsyncIter(mem_in_clan):

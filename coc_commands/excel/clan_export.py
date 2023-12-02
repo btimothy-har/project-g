@@ -116,7 +116,7 @@ class ClanExcelExport():
             if self.season.is_current:
                 stats = m.current_season
             else:
-                stats = m.get_season_stats(self.season)
+                stats = await m.get_season_stats(self.season)
 
             war_log = await aClanWar.for_player(m.tag,season=self.season)
             war_stats = aClanWarSummary.for_player(m.tag,war_log)

@@ -9,6 +9,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
+from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
 from coc_main.discord.member import aMember
 
@@ -148,7 +149,7 @@ class ClanWarLeagues(commands.Cog):
         """
         
         season = self.active_war_league_season
-        cwlmenu = CWLPlayerMenu(ctx,season,aMember(ctx.author.id))
+        cwlmenu = CWLPlayerMenu(ctx,season,await aMember(ctx.author.id))
 
         if pendulum.now() < season.cwl_start:
             await cwlmenu.start_signup()
@@ -478,19 +479,19 @@ class ClanWarLeagues(commands.Cog):
         View the League Group for a CWL Clan.
         """
         
-        clan = await self.client.fetch_clan(clan_tag)
-        cwl_clan = clan.war_league_season(self.bot_client.current_season)
+        league_clan = await WarLeagueClan(clan_tag,self.bot_client.current_season)
 
-        if not cwl_clan.league_group:
+        if not league_clan.league_group_id:
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{clan.title}** has not started CWL for {self.bot_client.current_season.description}."
+                message=f"**{league_clan.title}** has not started CWL for {self.bot_client.current_season.description}."
                     + "\n\nIf you're looking for the Clan Roster, use [p]`cwl clan roster` instead.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
-        
-        menu = CWLClanGroupMenu(ctx,cwl_clan)
+
+        league_group = await league_clan.get_league_group()        
+        menu = CWLClanGroupMenu(ctx,league_group)
         await menu.start()
     
     @app_subcommand_group_cwl_clan.command(name="group",
