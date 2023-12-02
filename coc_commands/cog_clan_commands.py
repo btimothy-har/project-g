@@ -532,10 +532,11 @@ class Clans(commands.Cog):
         async for th in AsyncIter(townhall_levels):
             th_members = [member for member in clan_members if member.town_hall.level == th]
             th_members.sort(key=lambda member:(member.hero_strength,member.troop_strength,member.spell_strength),reverse=True)
-            chunked_members = chunks(th_members,10)
+            
+            chunked_members = [c async for c in chunks(th_members,10)]
+            a_iter = AsyncIter(chunked_members)
 
-            i = 0
-            async for members_chunk in chunked_members:
+            async for i, members_chunk in a_iter.enumerate():
                 embed.add_field(
                     name=f"{EmojisTownHall.get(th)} **TH{th}**"
                         + (f" - ({i+1}/{len(chunked_members)})" if len(chunked_members) > 1 else ""),
@@ -554,7 +555,6 @@ class Clans(commands.Cog):
                         ]),
                     inline=False,
                     )
-                i += 1
         return embed
 
     @command_group_clan.command(name="strength")

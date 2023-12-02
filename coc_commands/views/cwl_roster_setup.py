@@ -935,10 +935,10 @@ class CWLRosterMenu(DefaultView):
                 if mem.tag not in [p.tag for p in ref_members]:
                     ref_members.append(mem)
 
-        chunked_members = chunks(ref_members,25)
-        i = 0
-        async for members_chunk in chunked_members:
-            i += 1
+        chunked_members = [a async for a in chunks(ref_members,25)]
+        a_iter = AsyncIter(chunked_members)
+
+        async for i,members_chunk in a_iter.enumerate(start=1):
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
                 + (f"{EmojisUI.LOGOUT}" if player.clan.tag != clan.tag else f"{EmojisUI.SPACER}")
@@ -953,5 +953,5 @@ class CWLRosterMenu(DefaultView):
                 message=header_text+member_text,
                 thumbnail=clan.badge,
                 )
-            collect_embeds[i] = embed        
+            collect_embeds[i] = embed
         return list(collect_embeds.values())
