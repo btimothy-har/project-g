@@ -231,9 +231,11 @@ class WarLeagueClan(BasicClan):
     ### CWL ATTRIBUTES
     ### These are usable only during CWL
     ##################################################
-    async def get_league_group(self):
-        self.league_group = await WarLeagueGroup(self.league_group_id)
-        return self.league_group
+    async def get_league_group(self) -> Optional[WarLeagueGroup]:
+        if self.league_group_id:
+            self.league_group = await WarLeagueGroup(self.league_group_id)
+            return self.league_group
+        return None
     
     async def compute_lineup_stats(self):
         self.master_roster = sorted(
