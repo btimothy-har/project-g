@@ -119,7 +119,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
             m_data.append(player.tag)
             m_data.append(player.name)
             m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
-            m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'display_name',' ') if m.discord_user else " ")
+            m_data.append(getattr(bot_client.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
             m_data.append(str(player.discord_user) if player.discord_user else " ")
             m_data.append(player.town_hall.level)
             
