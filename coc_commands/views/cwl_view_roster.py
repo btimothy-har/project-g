@@ -261,7 +261,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"{EmojisUI.SPACER}{EmojisUI.SPACER}`{'':<1}{'BK':>2}{'':<2}{'AQ':>2}{'':<2}{'GW':>2}{'':<2}{'RC':>2}{'':<2}{'':<15}`\n"
             member_text = "\n".join([
                 f"{EmojisTownHall.get(player.town_hall.level)}"
-                + (f"{EmojisUI.YES}" if player in self.league_clan.participants else f"{EmojisUI.SPACER}")
+                + (f"{EmojisUI.YES}" if player.tag in [p.tag for p in self.league_clan.participants] else f"{EmojisUI.SPACER}")
                 + f"`{'':<1}{getattr(player.barbarian_king,'level',''):>2}"
                 + f"{'':<2}{getattr(player.archer_queen,'level',''):>2}"
                 + f"{'':<2}{getattr(player.grand_warden,'level',''):>2}"
