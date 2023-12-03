@@ -1405,7 +1405,7 @@ class Bank(commands.Cog):
         
         get_item = await ShopItem.get_by_id(item)
 
-        inventory = await UserInventory.get_by_user_id(user.id)
+        inventory = await UserInventory(user)
         await inventory.add_item_to_inventory(get_item)
 
         return await interaction.followup.send(f"1x **{get_item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)

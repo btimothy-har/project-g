@@ -45,6 +45,7 @@ class ShopItem():
     _locks = defaultdict(asyncio.Lock)
 
     __slots__ = [
+        '_id',
         'id',
         'guild_id',
         'type',
@@ -82,6 +83,7 @@ class ShopItem():
 
     def __init__(self,database_entry:dict):      
         
+        self._id = database_entry['_id']
         self.id = str(database_entry['_id'])
         self.guild_id = database_entry.get('guild_id',None)
         
@@ -155,7 +157,7 @@ class ShopItem():
 
             if self._stock > 0:
                 item = bot_client.coc_db.db__shop_item.find_one_and_update(
-                    {'_id':self.id},
+                    {'_id':self._id},
                     {'$inc': {'stock':-quantity}}
                     )
                 self._stock = item['stock']
@@ -164,7 +166,7 @@ class ShopItem():
         async with self.lock:
             if self._stock >= 0:
                 item = bot_client.coc_db.db__shop_item.find_one_and_update(
-                    {'_id':self.id},
+                    {'_id':self._id},
                     {'$inc': {'stock':quantity}}
                     )
                 self._stock = item['stock']
@@ -173,7 +175,7 @@ class ShopItem():
         async with self.lock:
             self.disabled = True
             await bot_client.coc_db.db__shop_item.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': {'disabled':True}}
                 )
     
@@ -181,7 +183,7 @@ class ShopItem():
         async with self.lock:
             self.show_in_store = True
             await bot_client.coc_db.db__shop_item.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': {'show_in_store':True}}
                 )
                 
@@ -189,7 +191,7 @@ class ShopItem():
         async with self.lock:
             self.show_in_store = False
             await bot_client.coc_db.db__shop_item.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': {'show_in_store':False}}
                 )
     
@@ -224,7 +226,7 @@ class ShopItem():
                 'random_items':kwargs.get('random_items') if kwargs.get('random_items') else []
                 }
             )
-        item = await cls.get_by_id(new_item.inserted_id)
+        item = await cls.get_by_id(str(new_item.inserted_id))
         bot_client.coc_main_log.info(f"Created new shop item: {item} {item.guild_id} {item.id}")
         return item
 
