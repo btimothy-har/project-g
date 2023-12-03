@@ -178,6 +178,16 @@ class Leaderboards(commands.Cog):
                 )            
         return embed
 
+    @command_group_clash_leaderboards.command(name="hdel")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_delete_history_leaderboard(self,ctx):
+        """
+        Delete all historical leaderboards.
+        """        
+        await bot_client.coc_db.db__leaderboard_archive.delete_many({})
+        await ctx.reply("Historical Leaderboards Deleted.")
+
     @command_group_clash_leaderboards.command(name="list")
     @commands.guild_only()
     @commands.admin()
