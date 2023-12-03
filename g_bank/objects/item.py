@@ -1,6 +1,7 @@
 import discord
 import random
 import asyncio
+import bson
 
 from redbot.core import bank
 from collections import defaultdict
@@ -64,7 +65,7 @@ class ShopItem():
 
     @classmethod
     async def get_by_id(cls,item_id:str) -> Optional['ShopItem']:        
-        query = await bot_client.coc_db.db__shop_item.find_one({'_id':item_id})
+        query = await bot_client.coc_db.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
         if query:
             return cls(query)
         return None
