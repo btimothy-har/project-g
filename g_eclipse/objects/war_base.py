@@ -49,7 +49,7 @@ class eWarBase(AwaitLoader):
 
     @classmethod
     async def by_user_claim(cls,user_id:int):
-        query = bot_client.coc_db.db__war_base.find({'claims':user_id})
+        query = bot_client.coc_db.db_war_base.find({'claims':user_id})
         return [await cls(q['_id']) async for q in query]
 
     @classmethod
@@ -59,7 +59,7 @@ class eWarBase(AwaitLoader):
         else:
             cutoff = pendulum.now().subtract(months=12).int_timestamp
 
-        query = bot_client.coc_db.db__war_base.find({
+        query = bot_client.coc_db.db_war_base.find({
             'townhall':townhall,
             'added_on':{'$gte':cutoff}
             })
@@ -81,7 +81,7 @@ class eWarBase(AwaitLoader):
         self.claims = []
     
     async def load(self):
-        query = await bot_client.coc_db.db__war_base.find_one({'_id':self.id})
+        query = await bot_client.coc_db.db_war_base.find_one({'_id':self.id})
         if query:
             self.town_hall = query['townhall']
             self.defensive_cc = query['defensive_cc']
@@ -110,7 +110,7 @@ class eWarBase(AwaitLoader):
         image_filepath = bot_client.bot.base_image_path + "/" + image_filename
         await image_attachment.save(image_filepath)
 
-        await bot_client.coc_db.db__war_base.update_one(
+        await bot_client.coc_db.db_war_base.update_one(
             {'_id':base_id},
             {
                 '$set': {
@@ -148,7 +148,7 @@ class eWarBase(AwaitLoader):
 
     async def add_claim(self,user_id:int):
         async with self.lock:
-            await bot_client.coc_db.db__war_base.update_one(
+            await bot_client.coc_db.db_war_base.update_one(
                 {'_id':self.id},
                 {'$addToSet': {
                     'claims': user_id
@@ -159,7 +159,7 @@ class eWarBase(AwaitLoader):
 
     async def remove_claim(self,user_id:int):
         async with self.lock:
-            await bot_client.coc_db.db__war_base.update_one(
+            await bot_client.coc_db.db_war_base.update_one(
                 {'_id':self.id},
                 {'$pull': {
                     'claims': user_id
