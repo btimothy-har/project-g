@@ -67,16 +67,7 @@ class ECLIPSE(commands.Cog):
     def dump_channel(self) -> discord.TextChannel:
         return self.bot.get_channel(self._dump_channel)
 
-    async def cog_load(self):
-        async def start_eclipse_cog():
-            while True:
-                if getattr(bot_client,'_api_logged_in',False):
-                    break
-                await asyncio.sleep(1)
-            await bot_client.bot.wait_until_red_ready()
-            await eWarBase.load_all()
-
-        asyncio.create_task(start_eclipse_cog())
+    async def cog_load(self):        
         self.delete_dump_messages.start()
     
     async def cog_unload(self):
