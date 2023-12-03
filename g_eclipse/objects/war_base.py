@@ -6,7 +6,11 @@ import asyncio
 from typing import *
 from mongoengine import *
 
+from functools import cached_property
+from collections import defaultdict
+
 from redbot.core.utils import AsyncIter
+from async_property import AwaitLoader
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.constants.coc_emojis import EmojisTroops, EmojisTownHall
@@ -27,166 +31,134 @@ class dbWarBase(Document):
     builder_notes = StringField(default="")
     claims = ListField(IntField(),default=[])
 
-class eWarBase():
-    _locks = {}
-    _cache = {}
-
-    @classmethod
-    async def load_all(cls):
-        def _db_query():
-            return dbWarBase.objects()
-        bases = []
-        query = await bot_client.run_in_thread(_db_query)
-        async for base in AsyncIter(query):
-            bases.append(await cls.from_base_id(base.base_id))
-        return sorted(bases,key=lambda x: (x.town_hall,x.added_on),reverse=True)
+class eWarBase(AwaitLoader):
+    _locks = defaultdict(asyncio.Lock)    
+    __slots__ = [
+        'id',
+        'base_link',
+        'town_hall',        
+        'defensive_cc',
+        'source',
+        'builder',
+        'added_on',
+        'base_type',
+        'base_image',
+        'notes',
+        'claims'
+        ]
 
     @classmethod
     async def by_user_claim(cls,user_id:int):
-        return sorted([b for b in eWarBase._cache.values() if user_id in b.claims],key=lambda x:(x.town_hall,x.added_on),reverse=True)
+        query = bot_client.coc_db.db__war_base.find({'claims':user_id})
+        return [await cls(q['_id']) async for q in query]
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
-        return sorted([b for b in eWarBase._cache.values() if townhall == b.town_hall],key=lambda x:(x.added_on),reverse=True)
+        query = bot_client.coc_db.db__war_base.find({'townhall':townhall})
+        bases = [await cls(q['_id']) async for q in query]
+        return sorted(bases,key=lambda x:(x.added_on),reverse=True)
     
-    def __new__(cls,base_link,defensive_cc_link):
-        link_parse = urllib.parse.urlparse(base_link)
-        base_id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
+    def __init__(self,base_id:str):            
+        self.id = base_id
+        self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={self.id}"
 
-        if base_id not in cls._cache:
-            instance = super().__new__(cls)
-            cls._cache[base_id] = instance
-            instance._is_new = True
-        return cls._cache[base_id]
+        self.town_hall = 0
+        self.defensive_cc = ""
+        self.source = ""
+        self.builder = None
+        self.added_on = 0
+        self.base_type = ""
+        self.base_image = ""
+        self.notes = ""
+        self.claims = []
     
-    def __init__(self,base_link,defensive_cc_link):
-        if self._is_new:
-            link_parse = urllib.parse.urlparse(base_link)
-            cc_parse = urllib.parse.urlparse(defensive_cc_link)
-            self.id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
-
-            try:
-                self.town_hall = int(self.id.split('TH',1)[1][:2])
-            except:
-                self.town_hall = int(self.id.split('TH',1)[1][:1])
-
-            self.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={urllib.parse.quote_plus(self.id)}"
-
-            self.defensive_cc_id = urllib.parse.quote(urllib.parse.parse_qs(cc_parse.query)['army'][0])
-            self.defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={urllib.parse.quote_plus(self.defensive_cc_id)}"
-
-            parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
-            self.defensive_cc_str = ""
-            for troop in parsed_cc[0]:
-                if self.defensive_cc_str != "":
-                    self.defensive_cc_str += "\u3000"
-                self.defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
-
-            self.source = ""
-            self.builder = None
-            self.added_on = 0
-            self.base_type = ""
-            self.base_image = ""
-            self.notes = ""
-            self.claims = []
-
-    @classmethod
-    async def from_base_id(cls,b_id):
-        try:
-            base_data = dbWarBase.objects.get(base_id=b_id).to_mongo().to_dict()
-        except DoesNotExist:
-            return None
-
-        base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={b_id}"
-        defensive_cc_link = f"https://link.clashofclans.com/en?action=CopyArmy&army={base_data['defensive_cc']}"
-
-        base = eWarBase(base_link,defensive_cc_link)
-
-        base.base_link = base_link
-        base.defensive_cc_link = defensive_cc_link
-
-        base.source = base_data['source']
-        base.builder = base_data['builder']
-
-        base.added_on = base_data['added_on']
-        base.base_type = base_data['base_type']
-
-        base.base_image = base_data['base_image']
-        base.notes = base_data['builder_notes']
-        base.claims = base_data['claims']
-        return base
-
+    async def load(self):
+        query = await bot_client.coc_db.db__war_base.find_one({'_id':self.id})
+        if query:
+            self.town_hall = query['townhall']
+            self.defensive_cc = query['defensive_cc']
+            self.source = query['source']
+            self.builder = query['builder']
+            self.added_on = query['added_on']
+            self.base_type = query['base_type']
+            self.base_image = query['base_image']
+            self.notes = query['builder_notes']
+            self.claims = query.get('claims',[])
+    
     @classmethod
     async def new_base(cls,base_link,source,base_builder,base_type,defensive_cc,notes,image_attachment):
+        link_parse = urllib.parse.urlparse(base_link)
+        cc_parse = urllib.parse.urlparse(defensive_cc)
+
+        base_id = urllib.parse.quote_plus(urllib.parse.parse_qs(link_parse.query)['id'][0])
+        try:
+            base_town_hall = int(base_id.split('TH',1)[1][:2])
+        except:
+            base_town_hall = int(base_id.split('TH',1)[1][:1])
         
-        base = eWarBase(base_link,defensive_cc)
-        base.base_link = f"https://link.clashofclans.com/en?action=OpenLayout&id={base.id}"
+        defensive_troops = urllib.parse.quote_plus(urllib.parse.parse_qs(cc_parse.query)['army'][0])
 
-        base.source = source
-        if base_builder == "*":
-            base.builder = "Not Specified"
-        else:
-            base.builder = base_builder
-
-        if notes == "*":
-            base.notes = None
-        else:
-            base.notes = notes
-
-        base.added_on = pendulum.now().int_timestamp
-        base.base_type = base_type
-
-        image_filename = base.id + '.' + image_attachment.filename.split('.')[-1]
+        image_filename = base_id + '.' + image_attachment.filename.split('.')[-1]
         image_filepath = bot_client.bot.base_image_path + "/" + image_filename
-
         await image_attachment.save(image_filepath)
-        base.base_image = image_filename
 
-        await base.save_base()
+        await bot_client.coc_db.db__war_base.update_one(
+            {'_id':base_id},
+            {
+                '$set': {
+                    'townhall': base_town_hall,
+                    'source': source,
+                    'builder': base_builder if base_builder != "*" else "Not Specified",
+                    'added_on': pendulum.now().int_timestamp,
+                    'base_type': base_type,
+                    'defensive_cc': defensive_troops,
+                    'base_image': image_filename,
+                    'builder_notes': notes if notes != "*" else None
+                    }
+                },
+            upsert=True
+            )        
+        base = await cls(base_id)
         return base
+    
+    @cached_property
+    def defensive_cc_link(self):
+        return f"https://link.clashofclans.com/en?action=CopyArmy&army={self.defensive_cc}"    
+    @cached_property
+    def defensive_cc_str(self):
+        parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
+        defensive_cc_str = ""
+        for troop in parsed_cc[0]:
+            if defensive_cc_str != "":
+                defensive_cc_str += "\u3000"
+            defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
+        return defensive_cc_str
 
     @property
     def lock(self):
-        try:
-            lock = eWarBase._locks[self.id]
-        except KeyError:
-            eWarBase._locks[self.id] = lock = asyncio.Lock()
-        return lock
-
-    async def save_base(self):
-        def _save_to_db():
-            db_base = dbWarBase(
-                base_id = self.id,
-                townhall = self.town_hall,
-                source = self.source,
-                builder = self.builder,
-                added_on = self.added_on,
-                base_type = self.base_type,
-                defensive_cc = self.defensive_cc_id,
-                base_image = self.base_image,
-                builder_notes = self.notes,
-                claims = self.claims
-                )
-            db_base.save()
-        await bot_client.run_in_thread(_save_to_db)
+        return self._locks[self.id]
 
     async def add_claim(self,user_id:int):
-        def _update_db():
-            dbWarBase.objects(base_id=self.id).update_one(push__claims=user_id)
-        
         async with self.lock:
-            if user_id not in self.claims:
-                self.claims.append(user_id)
-                await bot_client.run_in_thread(_update_db)
+            await bot_client.coc_db.db__war_base.update_one(
+                {'_id':self.id},
+                {'$addToSet': {
+                    'claims': user_id
+                    }
+                }
+            )
+            await self.load()
 
     async def remove_claim(self,user_id:int):
-        def _update_db():
-            dbWarBase.objects(base_id=self.id).update_one(pull__claims=user_id)
-        
         async with self.lock:
-            if user_id in self.claims:
-                self.claims.remove(user_id)
-                await bot_client.run_in_thread(_update_db)
+            await bot_client.coc_db.db__war_base.update_one(
+                {'_id':self.id},
+                {'$pull': {
+                    'claims': user_id
+                    }
+                }
+            )
+            await self.load()
 
     async def base_embed(self):
         image_file_path = bot_client.bot.base_image_path + '/' + self.base_image
