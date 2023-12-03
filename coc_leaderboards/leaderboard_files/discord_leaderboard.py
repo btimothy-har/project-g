@@ -254,6 +254,8 @@ class DiscordLeaderboard():
             return None
 
     async def update_leaderboard(self):
+        if not self.channel:
+            return 
         seasons = DiscordLeaderboard.get_leaderboard_seasons()
         a_iter = AsyncIter(seasons)
 
