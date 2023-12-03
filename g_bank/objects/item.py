@@ -86,7 +86,7 @@ class ShopItem():
         
         self.type = database_entry.get('type','')
 
-        self.name = database_entry.get('name',None)
+        self.name = database_entry.get('name','')
         self.price = database_entry.get('price',0)
         self._stock = database_entry.get('stock',0)
         self.category = database_entry.get('category','') if len(database_entry.get('category','')) > 0 else "Uncategorized"
