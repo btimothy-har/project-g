@@ -158,15 +158,15 @@ class ClanWarLoop(TaskLoop):
             self._is_new = False            
     
     async def start(self):
-        await super().start()
         bot_client.coc_main_log.info(f"War Loop started.")
+        await super().start()
     
     async def stop(self):
-        await super().stop()
         try:
             bot_client.coc_main_log.info(f"War Loop stopped.")
         except:
             pass
+        await super().stop()
 
     async def reload_tags(self):
         tags = []
@@ -229,7 +229,7 @@ class ClanWarLoop(TaskLoop):
     
     async def fetch_current_war(self,clan_tag:str):
         current_war = await bot_client.coc.get_current_war(clan_tag)
-        if not current_war and pendulum.now().day in range(1,3):
+        if not current_war and pendulum.now().day in range(1,7):
             current_war = await bot_client.coc.get_current_war(
                 clan_tag=clan_tag,
                 cwl_round=coc.WarRound.current_preparation

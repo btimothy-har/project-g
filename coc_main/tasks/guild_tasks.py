@@ -29,15 +29,15 @@ class DiscordGuildLoop(TaskLoop):
             self._locks = {}
     
     async def start(self):
-        await super().start()
         bot_client.coc_main_log.info(f"Guild Loop started.")
+        await super().start()
     
     async def stop(self):
-        await super().stop()
         try:
             bot_client.coc_main_log.info(f"Guild Loop stopped.")
         except:
             pass
+        await super().stop()
 
     @property
     def start_recruiting(self) -> bool:

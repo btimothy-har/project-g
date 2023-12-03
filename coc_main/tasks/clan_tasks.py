@@ -73,15 +73,15 @@ class ClanLoop(TaskLoop):
             self._is_new = False
     
     async def start(self):
-        await super().start()
         bot_client.coc_main_log.info(f"Clan Loop started.")
+        await super().start()
         
     async def stop(self):
-        await super().stop()
         try:
             bot_client.coc_main_log.info(f"Clan Loop stopped.")
         except:
             pass
+        await super().stop()
     
     async def _reload_tags(self):
         tags = []
