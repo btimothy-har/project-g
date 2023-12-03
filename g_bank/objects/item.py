@@ -156,7 +156,7 @@ class ShopItem():
                 raise CannotPurchase(self)
 
             if self._stock > 0:
-                item = bot_client.coc_db.db__shop_item.find_one_and_update(
+                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
                     {'_id':self._id},
                     {'$inc': {'stock':-quantity}}
                     )
@@ -165,7 +165,7 @@ class ShopItem():
     async def restock(self,quantity:int=1):
         async with self.lock:
             if self._stock >= 0:
-                item = bot_client.coc_db.db__shop_item.find_one_and_update(
+                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
                     {'_id':self._id},
                     {'$inc': {'stock':quantity}}
                     )
