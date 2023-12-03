@@ -54,7 +54,15 @@ class eWarBase(AwaitLoader):
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
-        query = bot_client.coc_db.db__war_base.find({'townhall':townhall})
+        if townhall == 15:
+            cutoff = pendulum.now().subtract(months=4).int_timestamp
+        else:
+            cutoff = pendulum.now().subtract(months=12).int_timestamp
+
+        query = bot_client.coc_db.db__war_base.find({
+            'townhall':townhall,
+            'added_on':{'$gte':cutoff}
+            })
         bases = [await cls(q['_id']) async for q in query]
         return sorted(bases,key=lambda x:(x.added_on),reverse=True)
     
