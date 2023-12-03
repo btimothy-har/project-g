@@ -4,7 +4,7 @@ import asyncio
 import bson
 
 from redbot.core import bank
-from motor.motor_asyncio import ReturnDocument
+from pymongo import ReturnDocument
 from collections import defaultdict
 
 from mongoengine import *
