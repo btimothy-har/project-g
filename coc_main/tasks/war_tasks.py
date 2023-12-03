@@ -227,6 +227,15 @@ class ClanWarLoop(TaskLoop):
                     )
                 await self.start()
     
+    async def fetch_current_war(self,clan_tag:str):
+        current_war = await bot_client.coc.get_current_war(clan_tag)
+        if not current_war and pendulum.now().day in range(1,3):
+            current_war = await bot_client.coc.get_current_war(
+                clan_tag=clan_tag,
+                cwl_round=coc.WarRound.current_preparation
+                )
+        return current_war
+    
     async def _run_single_loop(self,tag:str):
         try:
             finished = False
@@ -256,18 +265,17 @@ class ClanWarLoop(TaskLoop):
             
             current_war = None
             count = 0
-            async with self.api_limiter:
-                while True:
-                    try:
-                        count += 1
-                        current_war = await bot_client.coc.get_current_war(tag)
-                        break
-                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+            while True:
+                try:
+                    count += 1
+                    current_war = await self.fetch_current_war(tag)
+                    break
+                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                    return self.loop.call_later(10,self.unlock,lock)
+                except:
+                    if count > 5:
                         return self.loop.call_later(10,self.unlock,lock)
-                    except:
-                        if count > 5:
-                            return self.loop.call_later(10,self.unlock,lock)
-                        await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.5)
             
             wait = getattr(current_war,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)
