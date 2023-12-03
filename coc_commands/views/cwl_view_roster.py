@@ -83,7 +83,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.clan = await self.client.fetch_clan(self.league_clan.tag)
 
         if self.league_clan.status == 'CWL Started':
-            await self.league_clan.compute_lineup_stats()
+            await asyncio.gather(*(self.league_clan.compute_lineup_stats(),self.league_clan.get_participants()))
             self.reference_list = await self.client.fetch_many_players(*self.league_clan.master_roster_tags)
             self.reference_list.sort(
                 key=lambda x:(x.town_hall.level,x.hero_strength),
