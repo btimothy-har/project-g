@@ -35,7 +35,7 @@ class InventoryItem(ShopItem):
             return cls(query,quantity)
         return None
     
-class UserInventory():
+class UserInventory(AwaitLoader):
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         'user',
