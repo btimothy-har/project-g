@@ -19,7 +19,7 @@ from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
 from .checks import is_bank_admin, is_payday_server, is_bank_server, is_coleader_or_bank_admin
-from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items
 
 from mee6rank.mee6rank import Mee6Rank
 
@@ -1328,7 +1328,6 @@ class Bank(commands.Cog):
     async def app_command_redeem_user(self,interaction:discord.Interaction):        
         
         await interaction.response.defer()
-
         member = interaction.guild.get_member(interaction.user.id)
 
         inv = await UserInventory(member)
@@ -1704,7 +1703,7 @@ class Bank(commands.Cog):
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_store_items)
+    @app_commands.autocomplete(item=autocomplete_show_store_items)
     @app_commands.describe(
         item="Select a Shop Item to display."
         )        
@@ -1736,12 +1735,12 @@ class Bank(commands.Cog):
         await ctx.tick()
     
     @app_command_group_shopitem.command(
-        name="hides",
+        name="hide",
         description="Hides a Shop Item in the Store."
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_store_items)
+    @app_commands.autocomplete(item=autocomplete_hide_store_items)
     @app_commands.describe(
         item="Select a Shop Item to hide."
         )        
@@ -1752,7 +1751,7 @@ class Bank(commands.Cog):
         if not item:
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
         await get_item.hide()
-        await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
+        await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
     
     ##################################################
     ### SHOP ITEM / RESTOCK
