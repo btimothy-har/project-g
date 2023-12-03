@@ -229,7 +229,7 @@ class UserStore(DefaultView):
             await interaction.response.defer()
         
         if menu:
-            self.current_item = await ShopItem.get_by_id(menu.values[0])
+            self.current_item = [i for i in self.store_items if i.id == menu.values[0]][0]
 
         item_embed = await self.get_item_embed()
 
