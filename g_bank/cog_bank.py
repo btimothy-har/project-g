@@ -1222,7 +1222,7 @@ class Bank(commands.Cog):
         else:
             target = interaction.guild.get_member(interaction.user.id)
 
-        inventory = await UserInventory.get_by_user_id(target.id)
+        inventory = await UserInventory(target)
         embed = await inventory.get_embed(interaction)
         await interaction.followup.send(embed=embed)
     
@@ -1286,7 +1286,7 @@ class Bank(commands.Cog):
         
         item = await ShopItem.get_by_id(item)
 
-        inventory = await UserInventory.get_by_user_id(interaction.user.id)
+        inventory = await UserInventory(interaction.user)
         gift = await inventory.gift_item(item,user)
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
@@ -1302,7 +1302,7 @@ class Bank(commands.Cog):
         Redeems an item from your inventory!
         """
 
-        inv = await UserInventory.get_by_user_id(ctx.author.id)
+        inv = await UserInventory(ctx.author)
         inv_check = len([i for i in inv.inventory if i.guild_id == ctx.guild.id]) > 0
 
         if not inv_check:
@@ -1333,7 +1333,7 @@ class Bank(commands.Cog):
 
         member = interaction.guild.get_member(interaction.user.id)
 
-        inv = await UserInventory.get_by_user_id(member.id)
+        inv = await UserInventory(member)
         inv_check = len([i for i in inv.inventory if i.guild_id == interaction.guild.id]) > 0
 
         if not inv_check:
