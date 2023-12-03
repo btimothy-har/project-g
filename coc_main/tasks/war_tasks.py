@@ -268,7 +268,7 @@ class ClanWarLoop(TaskLoop):
             while True:
                 try:
                     count += 1
-                    current_war = await self.fetch%_current_war(tag)
+                    current_war = await self.fetch_current_war(tag)
                     break
                 except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
                     return self.loop.call_later(10,self.unlock,lock)
