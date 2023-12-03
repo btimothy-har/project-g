@@ -81,7 +81,7 @@ class ShopItem():
 
     def __init__(self,database_entry:dict):      
         
-        self.id = str(database_entry.get['_id'])
+        self.id = str(database_entry['_id'])
         self.guild_id = database_entry.get('guild_id',None)
         
         self.type = database_entry.get('type','')
