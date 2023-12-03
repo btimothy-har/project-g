@@ -693,7 +693,7 @@ class ClanGamesLeaderboard(Leaderboard):
             async for i,p in a_iter.enumerate(start=1):
                 clan = await self.client.fetch_clan(p.clangames_clan_tag)
                 leaderboard_text += f"\n`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{clan.emoji}{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.clean_name)}"
-            embed.description += leaderboard_text
+            # embed.description += leaderboard_text
         
         else:
             leaderboard_clans = await self.parent.get_leaderboard_clans()
