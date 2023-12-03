@@ -128,9 +128,9 @@ class ClanRaidLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                if pendulum.now().day_of_week not in [5,6,7,1]:
-                    await asyncio.sleep(10)
-                    continue
+                # if pendulum.now().day_of_week not in [5,6,7,1]:
+                #     await asyncio.sleep(10)
+                #     continue
 
                 if (pendulum.now() - self._last_db_update).total_seconds() > 600:
                     await self._reload_tags()
