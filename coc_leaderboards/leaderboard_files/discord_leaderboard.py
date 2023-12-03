@@ -689,7 +689,7 @@ class ClanGamesLeaderboard(Leaderboard):
 
             leaderboard_text = f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`"
 
-            a_iter = AsyncIter(wl_players[:20])
+            a_iter = AsyncIter(wl_players[:10])
             async for i,p in a_iter.enumerate(start=1):
                 clan = await self.client.fetch_clan(p.clangames_clan_tag)
                 leaderboard_text += f"\n`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{clan.emoji}{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.clean_name)}"
@@ -708,7 +708,7 @@ class ClanGamesLeaderboard(Leaderboard):
                         value=f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
                             + "\n".join([
                             f"`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.name)}"
-                            for i,p in enumerate(wl_players[:5],start=1)]),
+                            for i,p in enumerate(wl_players[:3],start=1)]),
                         inline=False
                         )
                 else:
