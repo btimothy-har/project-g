@@ -236,7 +236,7 @@ class UserStore(DefaultView):
         user = self.guild.get_member(interaction.user.id)
 
         purchase_button = self.purchase_button
-        inventory = await UserInventory.get_by_user_id(interaction.user.id)
+        inventory = await UserInventory(interaction.user)
 
         if self.current_item.type in ['cash'] and inventory.has_item(self.current_item):
             purchase_button.disabled = True
@@ -282,7 +282,7 @@ class UserStore(DefaultView):
                 )
             return await interaction.followup.send(embed=embed,ephemeral=True)
         
-        user_inv = await UserInventory.get_by_user_id(interaction.user.id)
+        user_inv = await UserInventory(interaction.user)
         buy_item = await user_inv.purchase_item(self.current_item)
 
         purchase_msg = f"Congratulations! You spent {self.current_item.price} {currency} to purchase 1x **{self.current_item.name}**."
