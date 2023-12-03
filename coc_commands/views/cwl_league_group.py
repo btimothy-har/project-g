@@ -340,7 +340,7 @@ class CWLClanGroupMenu(DefaultView):
                 + "\n\n"
                 + f"{EmojisClash.ATTACK} `{war_stats.attack_count:>3}`\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} `{war_stats.unused_attacks:>3}`\u3000"
-                + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} ({str(round((war_stats.triples/war_stats.attack_count)*100))+'%'})`\n"
+                + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} (" + (f"{str(round((war_stats.triples/war_stats.attack_count)*100))}%" if war_stats.attack_count > 0 else '0%') + f")`\n"
                 + f"{EmojisClash.STAR} `{self.clan.total_score:>4}`\u3000"
                 + f"{EmojisClash.DESTRUCTION} `{str(self.clan.total_destruction)+'%':>7}`"
                 + f"\n*Only hit rates with 4 or more attacks are shown below.*\u200b",

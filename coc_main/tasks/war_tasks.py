@@ -47,7 +47,7 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_start(clan:aClan,war:aClanWar):
         try:
-            await bot_client.player_queue.add_many([m.tag for m in war.members])
+            await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
             if clan.is_registered_clan and len(clan.abbreviation) > 0:
                 await bot_client.update_bot_status(
                     cooldown=60,
