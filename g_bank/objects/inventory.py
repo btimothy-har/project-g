@@ -2,6 +2,7 @@ import discord
 import copy
 import pendulum
 import asyncio
+import bson
 
 from typing import *
 from mongoengine import *
@@ -13,7 +14,6 @@ from async_property import AwaitLoader
 from collections import defaultdict
 
 from .item import ShopItem
-from bson.int64 import Int64
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.components import clash_embed
@@ -31,7 +31,7 @@ class InventoryItem(ShopItem):
     
     @classmethod
     async def get(cls,item_id:str,quantity:int):
-        query = await bot_client.coc_db.db__shop_item.find_one({'_id':item_id})
+        query = await bot_client.coc_db.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
         if query:
             return cls(query,quantity)
         return None
