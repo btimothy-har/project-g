@@ -19,8 +19,11 @@ from coc_main.coc_objects.clans.mongo_clan import db_Clan, db_AllianceClan
 bot_client = BotClashClient()
 global_accounts = ["current","sweep","reserve"]
 
+def get_client() -> ClashOfClansClient:
+    return bot_client.bot.get_cog('ClashOfClansClient')
+
 async def autocomplete_eligible_accounts(interaction:discord.Interaction,current:str):
-    cog = bot_client.bot.get_cog("ClashOfClansClient")
+    client = get_client()
     try:
         sel_accounts = []
         if is_bank_admin(interaction):
@@ -30,10 +33,10 @@ async def autocomplete_eligible_accounts(interaction:discord.Interaction,current
                 sel_accounts.extend(global_accounts)
 
         if is_bank_admin(interaction):
-            clans = await cog.get_alliance_clans()
+            clans = await client.get_alliance_clans()
         else:
-            user = aMember(interaction.user.id)
-            clans = await asyncio.gather(*(cog.fetch_clan(c.tag) for c in user.coleader_clans))
+            user = await aMember(interaction.user.id)
+            clans = user.coleader_clans
 
         if current:
             eligible_clans = [c for c in clans if current.lower() in c.name.lower() or current.lower() in c.tag.lower() or current.lower() in c.abbreviation.lower()]
@@ -126,7 +129,7 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
 
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
-        inv = await UserInventory.get_by_user_id(interaction.user.id)
+        inv = await UserInventory(interaction.user)
         guild_items = [i for i in inv.inventory if i.guild_id == interaction.guild.id]
 
         if not current:
