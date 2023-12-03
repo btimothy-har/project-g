@@ -49,10 +49,10 @@ class UserInventory(AwaitLoader):
     
     async def load(self):
         query = await bot_client.coc_db.db__user_inventory.find_one({'_id':self.user.id})        
-        await bot_client.coc_main_log.info(query)
+        bot_client.coc_main_log.info(query)
         if query:
             inventory = query.get('inventory',{})
-            await bot_client.coc_main_log.info(inventory)
+            bot_client.coc_main_log.info(inventory)
             get_items = await asyncio.gather(*(InventoryItem.get(item_id,quantity) for item_id,quantity in inventory.items() if quantity > 0))
             self.inventory = [i for i in get_items if isinstance(i,InventoryItem)]
     
