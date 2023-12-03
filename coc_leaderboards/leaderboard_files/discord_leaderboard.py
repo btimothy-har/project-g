@@ -113,7 +113,7 @@ class DiscordLeaderboard():
 
     __slots__ = [
         'id',
-        'type',
+        '_type',
         'is_global',
         'guild_id',
         'channel_id',
