@@ -299,13 +299,13 @@ class DiscordLeaderboard():
 
     async def send_blank_lb(self):
         season = bot_client.current_season
-        if self.type == 1:
+        if self._type == 1:
             data = ClanWarLeaderboard(self,season)
-        elif self.type == 3:
+        elif self._type == 3:
             data = ResourceLootLeaderboard(self,season)
-        elif self.type == 4:
+        elif self._type == 4:
             data = DonationsLeaderboard(self,season)
-        elif self.type == 5:
+        elif self._type == 5:
             data = ClanGamesLeaderboard(self,season)
 
         embed = await data.get_embed()

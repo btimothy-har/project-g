@@ -3,6 +3,7 @@ import discord
 import re
 import coc
 import pendulum
+import bson
 
 from typing import *
 from mongoengine import *
@@ -465,7 +466,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
     newline = "\n"
     coc_client = bot_client.bot.get_cog("ClashOfClansClient")
 
-    application = await bot_client.coc_db.db__clan_application.find_one({'_id':application_id})
+    application = await bot_client.coc_db.db__clan_application.find_one({'_id':bson.ObjectId(application_id)})
     if not application:
         embed = await clash_embed(
             context=bot_client.bot,
@@ -562,7 +563,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             )
     
     await bot_client.coc_db.db__clan_application.update_one(
-        {'_id':application_id},
+        {'_id':bson.ObjectId(application_id)},
         {'$set':{
             'ticket_channel':channel.id
             }
