@@ -4,6 +4,7 @@ import asyncio
 import bson
 
 from redbot.core import bank
+from motor.motor_asyncio import ReturnDocument
 from collections import defaultdict
 
 from mongoengine import *
@@ -108,7 +109,7 @@ class ShopItem():
         self.random_items = database_entry.get('random_items',[])
     
     def __str__(self):
-        return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,}) (Stock: {self.stock})"
+        return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,})"
 
     def __eq__(self,other):
         if isinstance(other,ShopItem):
@@ -158,7 +159,8 @@ class ShopItem():
             if self._stock > 0:
                 item = await bot_client.coc_db.db__shop_item.find_one_and_update(
                     {'_id':self._id},
-                    {'$inc': {'stock':-quantity}}
+                    {'$inc': {'stock':-quantity}},
+                    return_document=ReturnDocument.AFTER
                     )
                 self._stock = item['stock']
 
@@ -167,9 +169,10 @@ class ShopItem():
             if self._stock >= 0:
                 item = await bot_client.coc_db.db__shop_item.find_one_and_update(
                     {'_id':self._id},
-                    {'$inc': {'stock':quantity}}
+                    {'$inc': {'stock':quantity}},
+                    return_document=ReturnDocument.AFTER
                     )
-                self._stock = item['stock']
+                self._stock = item['stock'] 
     
     async def delete(self):        
         async with self.lock:
