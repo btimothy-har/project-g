@@ -1201,7 +1201,7 @@ class Bank(commands.Cog):
         else:
             target = ctx.author
 
-        inventory = await UserInventory.get_by_user_id(target.id)
+        inventory = await UserInventory(target)
         embed = await inventory.get_embed(ctx)
         await ctx.reply(embed=embed)
     
@@ -1235,7 +1235,6 @@ class Bank(commands.Cog):
         """
         Open the Guild Shop.
         """
-
         store = UserStore(ctx)
         await store.start()
     
@@ -1247,7 +1246,6 @@ class Bank(commands.Cog):
     async def app_command_user_store(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
-
         store = UserStore(interaction)
         await store.start()
     
