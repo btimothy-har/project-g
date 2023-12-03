@@ -12,7 +12,8 @@ from async_property import AwaitLoader
 
 from collections import defaultdict
 
-from .item import ShopItem, db_ShopItem
+from .item import ShopItem
+from bson.int64 import Int64
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.components import clash_embed
@@ -47,7 +48,7 @@ class UserInventory(AwaitLoader):
         self.inventory = []
     
     async def load(self):
-        query = await bot_client.coc_db.db__user_inventory.find_one({'_id':self.user.id})        
+        query = await bot_client.coc_db.db__user_inventory.find_one({'_id':Int64(self.user.id)})        
         if query:
             inventory = query.get('inventory',{})
             get_items = await asyncio.gather(*(InventoryItem.get(item_id,quantity) for item_id,quantity in inventory.items() if quantity > 0))
