@@ -74,8 +74,8 @@ class WarLeagueGroup(AwaitLoader):
         if len([w for w in self.wars if w.state == WarState.INWAR]) > 0:
             return WarState.INWAR
         if len([w for w in self.wars if w.state == WarState.PREPARATION]) > 0:
-            return WarState.INWAR
-        return WarState.WAR_ENDED        
+            return WarState.PREPARATION
+        return WarState.WAR_ENDED
     
     @cached_property
     def current_round(self) -> int:
