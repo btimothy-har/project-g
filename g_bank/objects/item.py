@@ -1,12 +1,12 @@
+import asyncio
+import bson
 import discord
 import random
-import asyncio
 
-from redbot.core import bank
-
-from mongoengine import *
 from typing import *
 
+from pymongo import ReturnDocument
+from collections import defaultdict
 from coc_main.api_client import BotClashClient
 from ..exceptions import CannotPurchase
 
@@ -18,87 +18,92 @@ from ..exceptions import CannotPurchase
 
 bot_client = BotClashClient()
 
-class db_ShopItem(Document):
-    guild_id = IntField(required=True)
-    type = StringField(required=True)
-    
-    name = StringField(required=True)
-    price = IntField(required=True)
-    stock = IntField(required=True)
-    description = StringField(default="")
-    category = StringField(default="")
-    buy_message = StringField(default="")
-
-    exclusive_role = BooleanField(default=False)
-    required_role = IntField(default=0)
-    show_in_store = BooleanField(default=True)
-    disabled = BooleanField(default=False)
-    
-    role_id = IntField(default=0)
-    bidirectional_role = BooleanField(default=False)
-    
-    random_items = ListField(StringField(),default=[])
+# db__shop_item = {
+#   '_id': ObjectId(),
+#   'guild_id': int,
+#   'type': string,
+#   'name': string,
+#   'price': int,
+#   'stock': int,
+#   'description': string,
+#   'category': string,
+#   'buy_message': string,
+#   'exclusive_role': bool,
+#   'required_role': int,
+#   'show_in_store': bool,
+#   'disabled': bool,
+#   'role_id': int,
+#   'bidirectional_role': bool,
+#   'random_items': [ string ]
+#   }
 
 class ShopItem():
-    _locks = {}
+    _locks = defaultdict(asyncio.Lock)
+    __slots__ = [
+        '_id',
+        'id',
+        'guild_id',
+        'type',
+        'name',
+        'price',
+        '_stock',
+        'category',
+        'description',
+        'buy_message',
+        'exclusive_role',
+        '_required_role',
+        'show_in_store',
+        'disabled',
+        'role_id',
+        'bidirectional_role',
+        'random_items'
+        ]
 
     @classmethod
-    async def get_by_id(cls,item_id:str) -> Optional['ShopItem']:
-        def _db_query():
-            try:
-                item = db_ShopItem.objects.get(id=item_id)
-            except DoesNotExist:
-                return None
-            return item
-        
-        item = await bot_client.run_in_thread(_db_query)
-        if item is None:
-            return None
-        return cls(item)
+    async def get_by_id(cls,item_id:str) -> Optional['ShopItem']:        
+        query = await bot_client.coc_db.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
+        if query:
+            return cls(query)
+        return None
 
     @classmethod
-    async def get_by_guild(cls,guild_id:int):
-        def _db_query():
-            item = db_ShopItem.objects(guild_id=guild_id,disabled=False)
-            return [i for i in item]
-        
-        items = await bot_client.run_in_thread(_db_query)
-        return [cls(item) for item in items]
+    async def get_by_guild(cls,guild_id:int):        
+        query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'disabled':False})
+        return [cls(item) async for item in query]
 
     @classmethod
-    async def get_by_guild_category(cls,guild_id:int,category:str):
-        def _db_query():
-            item = db_ShopItem.objects(guild_id=guild_id,category=category,disabled=False)
-            return [i for i in item]
+    async def get_by_guild_category(cls,guild_id:int,category:str):        
+        query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'category':category,'disabled':False})
+        return [cls(item) async for item in query]
+
+    def __init__(self,database_entry:dict):      
         
-        items = await bot_client.run_in_thread(_db_query)
-        return [cls(item) for item in items]
-
-    def __init__(self,database_entry:db_ShopItem):      
-        self.id = str(database_entry.id)
-
-        self.guild_id = database_entry.guild_id
-
-        self.type = database_entry.type
-
-        self.name = database_entry.name
-        self.price = database_entry.price
-        self._stock = database_entry.stock
-        self._category = database_entry.category
-        self.description = database_entry.description        
-        self.buy_message = database_entry.buy_message
+        self._id = database_entry['_id']
+        self.id = str(database_entry['_id'])
+        self.guild_id = database_entry.get('guild_id',None)
         
-        self.exclusive_role = database_entry.exclusive_role
-        self._required_role = database_entry.required_role
-        self.show_in_store = database_entry.show_in_store
-        self.disabled = database_entry.disabled
+        self.type = database_entry.get('type','')
+
+        self.name = database_entry.get('name','')
+        self.price = database_entry.get('price',0)
+        self._stock = database_entry.get('stock',0)
+        self.category = database_entry.get('category','') if len(database_entry.get('category','')) > 0 else "Uncategorized"
+        self.description = database_entry.get('description',"")
+        self.buy_message = database_entry.get('buy_message',"")
         
-        self.role_id = database_entry.role_id
-        self.bidirectional_role = database_entry.bidirectional_role
-        self.random_items = database_entry.random_items
+        self.exclusive_role = database_entry.get('exclusive_role',False)
+        self._required_role = database_entry.get('required_role',0)
+        
+        self.show_in_store = database_entry.get('show_in_store',True)
+        self.disabled = database_entry.get('disabled',False)
+        
+        self.role_id = database_entry.get('role_id',0)
+        self.bidirectional_role = database_entry.get('bidirectional_role',False)
+        
+        self.random_items = database_entry.get('random_items',[])
     
     def __str__(self):
-        return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,}) (Stock: {self.stock})"
+        return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,})"
 
     def __eq__(self,other):
         if isinstance(other,ShopItem):
@@ -106,14 +111,26 @@ class ShopItem():
         return False
     
     @property
-    def lock(self):
-        try:
-            lock = ShopItem._locks[self.id]
-        except KeyError:
-            ShopItem._locks[self.id] = lock = asyncio.Lock()
-        return lock
+    def lock(self) -> asyncio.Lock:
+        return self._locks[self.id]
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return bot_client.bot.get_guild(self.guild_id)    
+    @property
+    def stock(self) -> Union[int,str]:
+        if self._stock < 0:
+            return "Infinite"
+        return self._stock
+    @property
+    def assigns_role(self) -> Optional[discord.Role]:
+        if self.type == 'role':
+            return self.guild.get_role(self.role_id)
+        return None
+    @property
+    def required_role(self) -> Optional[discord.Role]:
+        return self.guild.get_role(self._required_role)
     
-    def can_i_buy(self,member:discord.Member):        
+    def can_i_buy(self,member:discord.Member) -> bool:
         if self.disabled:
             return False
         if self.required_role:
@@ -128,84 +145,53 @@ class ShopItem():
                 return False
         return True
 
-    async def purchase(self,user:discord.Member,quantity:int=1):
-        def _update_in_db():
-            item = db_ShopItem.objects.get(id=self.id)
-            current_stock = item.stock
-
-            if current_stock > 0:
-                new_stock = current_stock - quantity
-                db_ShopItem.objects(id=self.id).update_one(set__stock=new_stock)
-                return new_stock            
-            return current_stock
-        
+    async def purchase(self,user:discord.Member,quantity:int=1):        
         async with self.lock:
             if not self.can_i_buy(user):
                 raise CannotPurchase(self)
-            self._stock = await bot_client.run_in_thread(_update_in_db)
+
+            if self._stock > 0:
+                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
+                    {'_id':self._id},
+                    {'$inc': {'stock':-quantity}},
+                    return_document=ReturnDocument.AFTER
+                    )
+                self._stock = item['stock']
 
     async def restock(self,quantity:int=1):
-        def _update_in_db():
-            item = db_ShopItem.objects.get(id=self.id)
-            current_stock = item.stock
-
-            if current_stock <= 0:
-                new_stock = current_stock + quantity
-                db_ShopItem.objects(id=self.id).update_one(set__stock=new_stock)
-                return new_stock            
-            return current_stock
-        
         async with self.lock:
-            self._stock = await bot_client.run_in_thread(_update_in_db)
+            if self._stock >= 0:
+                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
+                    {'_id':self._id},
+                    {'$inc': {'stock':quantity}},
+                    return_document=ReturnDocument.AFTER
+                    )
+                self._stock = item['stock'] 
     
-    async def delete(self):
-        def _update_in_db():
-            db_ShopItem.objects(id=self.id).update_one(set__disabled=self.disabled)
-        
+    async def delete(self):        
         async with self.lock:
             self.disabled = True
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'disabled':True}}
+                )
     
     async def unhide(self):
-        def _update_in_db():
-            db_ShopItem.objects(id=self.id).update_one(set__show_in_store=self.show_in_store)
-        
         async with self.lock:
             self.show_in_store = True
-            await bot_client.run_in_thread(_update_in_db)
-    
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'show_in_store':True}}
+                )
+                
     async def hide(self):
-        def _update_in_db():
-            db_ShopItem.objects(id=self.id).update_one(set__show_in_store=self.show_in_store)
-        
         async with self.lock:
             self.show_in_store = False
-            await bot_client.run_in_thread(_update_in_db)
-
-    @property
-    def guild(self):
-        return bot_client.bot.get_guild(self.guild_id)
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'show_in_store':False}}
+                )
     
-    @property
-    def stock(self):
-        if self._stock < 0:
-            return "Infinite"
-        return self._stock
-    
-    @property
-    def category(self):
-        return self._category if len(self._category) > 0 else "Uncategorized"
-
-    @property
-    def assigns_role(self):
-        if self.type == 'role':
-            return self.guild.get_role(self.role_id)
-        return None
-
-    @property
-    def required_role(self):
-        return self.guild.get_role(self._required_role)
-
     async def random_select(self):
         grant_items = await asyncio.gather(*(ShopItem.get_by_id(item) for item in self.random_items))
         eligible_items = [item for item in grant_items if not item.disabled]
@@ -217,32 +203,29 @@ class ShopItem():
         return chosen_item
     
     @classmethod
-    async def create(cls,**kwargs):
-        def _save_to_db():
-            item = db_ShopItem(
-                guild_id=kwargs.get('guild_id'),
-                type=kwargs.get('type'),
-                name=kwargs.get('name'),
-                price=kwargs.get('price'),
-                stock=kwargs.get('stock') if kwargs.get('stock') else -1,
-                description=kwargs.get('description') if kwargs.get('description') else "",
-                category=kwargs.get('category') if kwargs.get('category') else "",
-                buy_message=kwargs.get('buy_message') if kwargs.get('buy_message') else "",
-                exclusive_role=kwargs.get('exclusive_role') if kwargs.get('exclusive_role') else False,
-                required_role=kwargs.get('required_role') if kwargs.get('required_role') else 0,
-                show_in_store=False,
-                disabled=False,            
-                role_id=kwargs.get('role_id') if kwargs.get('role_id') else 0,
-                bidirectional_role=kwargs.get('bidirectional_role') if kwargs.get('bidirectional_role') else False,
-                random_items=kwargs.get('random_items') if kwargs.get('random_items') else []
-                )
-            item.save()
-            return item
-        item = await bot_client.run_in_thread(_save_to_db)
-
-        s_item = cls(item)
-        bot_client.coc_main_log.info(f"Created new shop item: {s_item} {s_item.guild_id} {s_item.id}")
-        return s_item
+    async def create(cls,**kwargs):        
+        new_item = await bot_client.coc_db.db__shop_item.insert_one(
+            {
+                'guild_id':kwargs['guild_id'],
+                'type':kwargs['type'],
+                'name':kwargs['name'],
+                'price':kwargs['price'],
+                'stock':kwargs.get('stock') if kwargs.get('stock') else -1,
+                'description':kwargs.get('description') if kwargs.get('description') else "",
+                'category':kwargs.get('category') if kwargs.get('category') else "Uncategorized",
+                'buy_message':kwargs.get('buy_message') if kwargs.get('buy_message') else "",
+                'exclusive_role':kwargs.get('exclusive_role') if kwargs.get('exclusive_role') else False,
+                'required_role':kwargs.get('required_role') if kwargs.get('required_role') else 0,
+                'show_in_store':False,
+                'disabled':False,
+                'role_id':kwargs.get('role_id') if kwargs.get('role_id') else 0,
+                'bidirectional_role':kwargs.get('bidirectional_role') if kwargs.get('bidirectional_role') else False,
+                'random_items':kwargs.get('random_items') if kwargs.get('random_items') else []
+                }
+            )
+        item = await cls.get_by_id(str(new_item.inserted_id))
+        bot_client.coc_main_log.info(f"Created new shop item: {item} {item.guild_id} {item.id}")
+        return item
 
 class NewShopItem():
     def __init__(self,guild_id):

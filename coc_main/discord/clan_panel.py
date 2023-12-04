@@ -1,13 +1,8 @@
 import discord
 
 from typing import *
-from mongoengine import *
-
-from ..api_client import BotClashClient as client
-from ..coc_objects.clans.clan import aClan
 from redbot.core.utils import AsyncIter
-
-from .mongo_discord import db_GuildClanPanel
+from ..api_client import BotClashClient as client
 from ..utils.components import ClanLinkMenu
 
 bot_client = client()
@@ -16,55 +11,40 @@ class GuildClanPanel():
 
     @classmethod
     async def get_for_guild(cls,guild_id:int) -> List['GuildClanPanel']:
-        def _query_db():
-            return [db for db in db_GuildClanPanel.objects(server_id=guild_id)]
-        db = await bot_client.run_in_thread(_query_db)
-        return [cls(panel) for panel in db]
+        query = bot_client.coc_db.db__guild_clan_panel.find({'server_id':guild_id})
+        return [cls(panel) async for panel in query]
 
     @classmethod
     async def get_panel(cls,guild_id:int,channel_id:int) -> Optional['GuildClanPanel']:
-        def _query_db():
-            try:
-                return db_GuildClanPanel.objects.get(
-                    server_id=guild_id,
-                    channel_id=channel_id
-                    )
-            except DoesNotExist:
-                return None
-        db = await bot_client.run_in_thread(_query_db)
-        if db:
-            return cls(db)
+        query = await bot_client.coc_db.db__guild_clan_panel.find_one({'server_id':guild_id,'channel_id':channel_id})
+        if query:
+            return cls(query)
         return None
     
-    def __init__(self,database_entry:db_GuildClanPanel):        
-        self.id = database_entry.panel_id
-        self.guild_id = database_entry.server_id
-        self.channel_id = database_entry.channel_id
-        self.message_id = database_entry.message_id
-        self.long_message_ids = database_entry.long_message_ids
+    def __init__(self,database_entry:dict):        
+        self.id = database_entry.get('_id',None)
+        self.guild_id = database_entry.get('server_id',0)
+        self.channel_id = database_entry.get('channel_id',0)
+        self.message_id = database_entry.get('message_id',0)
+        self.long_message_ids = database_entry.get('long_message_ids',[])
         self.embeds = []
     
     def __str__(self):
         return f"Clan Panel (Channel: {getattr(self.channel,'name','Unknown Channel')})"
     
     @classmethod
-    async def create(cls,guild_id:int,channel_id:int):
-        def _create_in_db():
-            panel_id = {'guild':guild_id,'channel':channel_id}
-            db_GuildClanPanel.objects(panel_id=panel_id).update_one(
-                server_id=guild_id,
-                channel_id=channel_id,
-                upsert=True
-                )
-            return db_GuildClanPanel.objects.get(panel_id=panel_id)
-        panel = await bot_client.run_in_thread(_create_in_db)
-        return cls(panel)
+    async def create(cls,guild_id:int,channel_id:int):        
+        await bot_client.coc_db.db__guild_clan_panel.insert_one(
+            {
+                '_id':{'guild':guild_id,'channel':channel_id},
+                'server_id':guild_id,
+                'channel_id':channel_id
+            }
+        )
+        return await cls.get_panel(guild_id,channel_id)
     
-    async def delete(self):
-        def _delete_from_db():
-            db_GuildClanPanel.objects(panel_id=self.id).delete()
-        
-        await bot_client.run_in_thread(_delete_from_db)
+    async def delete(self):        
+        await bot_client.coc_db.db__guild_clan_panel.delete_one({'_id':self.id})
         async for m_id in AsyncIter(self.long_message_ids):
             try:
                 message = await self.channel.fetch_message(m_id)
@@ -79,6 +59,8 @@ class GuildClanPanel():
     
     @property
     def channel(self):
+        if not self.guild:
+            return None
         return self.guild.get_channel(self.channel_id)
     
     async def fetch_message(self):
@@ -89,13 +71,7 @@ class GuildClanPanel():
                 pass
         return None
     
-    async def send_to_discord(self,embeds:list[discord.Embed]):
-        def _update_in_db():
-            db_GuildClanPanel.objects(panel_id=self.id).update(
-                set__message_id=message_ids_master[0],
-                set__long_message_ids=message_ids_master
-                )
-            
+    async def send_to_discord(self,embeds:list[discord.Embed]):            
         try:
             if not self.channel:
                 self.delete()
@@ -140,7 +116,13 @@ class GuildClanPanel():
                 else:
                     await message.delete()
             
-            await bot_client.run_in_thread(_update_in_db)
+            await bot_client.coc_db.db__guild_clan_panel.update_one(
+                {'_id':self.id},
+                {'$set':{
+                    'message_id':message_ids_master[0],
+                    'long_message_ids':message_ids_master
+                    }
+                })
 
         except Exception as exc:
             bot_client.coc_main_log.exception(

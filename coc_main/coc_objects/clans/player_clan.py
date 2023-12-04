@@ -1,9 +1,5 @@
-import coc
-
 from typing import *
-from mongoengine import *
-
-from .base_clan import *
+from .base_clan import BasicClan
 
 from ...exceptions import *
 
@@ -13,8 +9,6 @@ class aPlayerClan(BasicClan):
         self.tag = kwargs.get('tag',None)
 
         BasicClan.__init__(self,tag=self.tag)
-        # else:
-        #     BasicClan.__init__(self)
         
         if kwargs.get('name'):
             self._name = kwargs.get('name')

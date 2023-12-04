@@ -4,24 +4,34 @@ import pendulum
 
 from typing import *
 
-from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
+from ...api_client import BotClashClient as client
 
 bot_client = client()
 
 class aPlayerClanGames():
-    def __init__(self,
-        tag:str,
-        season:aClashSeason,
-        dict_value:dict):
+    __slots__ = [
+        '_lock',
+        '_prior_seen',
+        'tag',
+        'season',
+        'clan_tag',
+        'score',
+        'last_update',
+        'starting_time',
+        'ending_time'
+        ]
+    
+    def __init__(self,tag:str,season:aClashSeason,dict_value:dict):
+        self._lock = asyncio.Lock()
+        self._prior_seen = dict_value.get('priorSeen',False)
         
         self.tag = tag
-        self.season = season
-        self._lock = asyncio.Lock()
+        self.season = season        
 
         self.clan_tag = dict_value.get('clan',None)
         self.score = dict_value.get('score',0)
-        self.last_updated = dict_value.get('last_updated')
+        self.last_update = dict_value.get('last_updated',0)
 
         if isinstance(dict_value.get('starting_time'),datetime.datetime):
             if dict_value['starting_time'].timestamp() > 0:
@@ -54,9 +64,10 @@ class aPlayerClanGames():
         return {
             'clan': self.clan_tag,
             'score': self.score,
-            'last_updated': self.last_updated,
+            'last_updated': self.last_update,
             'starting_time': getattr(self.starting_time,'int_timestamp',None),
-            'ending_time': getattr(self.ending_time,'int_timestamp',None)
+            'ending_time': getattr(self.ending_time,'int_timestamp',None),
+            'priorSeen': self._prior_seen
             }
     
     @property
@@ -97,25 +108,29 @@ class aPlayerClanGames():
             return completion_str
         else:
             return ""
-
-    async def update(self,    
-        increment:int,
-        latest_value:int,
-        timestamp:pendulum.DateTime,
-        clan,
-        db_update:Callable,
-        ):
         
+    async def update_in_database(self):
+        await bot_client.coc_db.db__player_stats.update_one(
+            {'_id':self._db_id},
+            {'$set': {
+                'season':self.season.id,
+                'tag':self.tag,
+                'clangames':self.json
+                }
+            },
+            upsert=True)
+
+    async def update(self,increment:int,latest_value:int,timestamp:pendulum.DateTime,clan_tag:str):        
         async with self._lock:
-            if self.score == 0:
-                self.clan_tag = clan.tag
+            if pendulum.now() >= self.games_start and self.score == 0 and clan_tag:
+                self.clan_tag = clan_tag
                 self.starting_time = timestamp
                 bot_client.coc_data_log.debug(
                     f"Player {self.tag} {self.season.id}: Started Clan Games at {timestamp}."
                     )
 
             self.score += increment
-            self.last_updated = latest_value
+            self.last_update = latest_value
             bot_client.coc_data_log.debug(
                 f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
                 )
@@ -127,6 +142,6 @@ class aPlayerClanGames():
                     f"Player {self.tag} {self.season.id}: Finished Clan Games at {timestamp}."
                     )
             
-            await bot_client.run_in_thread(db_update,self._db_id,self.json)
-        
+            self._prior_seen = True            
+            await self.update_in_database()        
         return self

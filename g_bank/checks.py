@@ -6,6 +6,8 @@ from redbot.core import commands
 from coc_main.utils.checks import is_coleader
 
 def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if isinstance(ctx,commands.Context):
         bot = ctx.bot
         guild = bot.get_guild(1132581106571550831) #assassins guild server
@@ -22,11 +24,15 @@ def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
     return False
 
 def is_payday_server(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if ctx.guild.id in [1132581106571550831,680798075685699691]:
         return True
     return False
 
 def is_bank_server(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
     if ctx.guild.id in [1132581106571550831,680798075685699691]:
         return True
     return False

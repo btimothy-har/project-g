@@ -1,18 +1,14 @@
 import discord
-import pendulum
 import random
 
 from typing import *
-from mongoengine import *
 
 from redbot.core import app_commands
-from redbot.core.bot import Red
+from redbot.core.utils import AsyncIter
 
 from ..api_client import BotClashClient
 from ..discord.guild import ClanGuildLink
 from ..discord.member import aMember
-from ..coc_objects.clans.mongo_clan import db_Clan, db_AllianceClan, db_WarLeagueClanSetup
-from ..coc_objects.players.mongo_player import db_Player
 
 bot_client = BotClashClient()
 
@@ -46,29 +42,28 @@ async def autocomplete_seasons(interaction:discord.Interaction,current:str):
 ##### CLAN AUTOCOMPLETES
 #####
 ####################################################################################################
-async def autocomplete_clans(interaction:discord.Interaction,current:str):
-    def _get_clans_for_guild(scope_clans):
-        return [i for i in db_Clan.objects(tag__in=scope_clans)]
-    
-    def _get_clans_for_query(current):
-        clans = db_Clan.objects(
-            Q(tag__icontains=current) | Q(name__icontains=current) | Q(abbreviation=current.upper())
-            )
-        return [i for i in clans]
-    
+async def autocomplete_clans(interaction:discord.Interaction,current:str):    
     try:
         if not current:
-            clan_tags = [db.tag for db in await ClanGuildLink.get_for_guild(interaction.guild.id)]
-            clans = await bot_client.run_in_thread(_get_clans_for_guild,clan_tags)
+            clan_tags = [db.tag for db in await ClanGuildLink.get_for_guild(interaction.guild.id)]            
+            q_doc = {'_id':{'$in':clan_tags}}
         else:
-            clans = await bot_client.run_in_thread(_get_clans_for_query,current)
-        
-        lc = list(clans)    
+            q_doc = {'$or':[
+                {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                {'name':{'$regex':f'^{current}',"$options":"i"}},
+                {'abbreviation':{'$regex':f'^{current}',"$options":"i"}}
+                ]
+                }
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__clan.aggregate(pipeline)
         return [
             app_commands.Choice(
-                name=f"{c.name} | {c.tag}",
-                value=c.tag)
-            for c in random.sample(lc,min(len(lc),8))
+                name=f"{c.get('name','')} | {c['_id']}",
+                value=c['_id'])
+            async for c in query
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_clans")
@@ -86,20 +81,20 @@ async def autocomplete_war_league_clans(interaction:discord.Interaction,current:
                 ]
         else:
             clans = league_clans
-        
-        lc = list(clans)    
+
+        a_iter = AsyncIter(random.sample(clans,min(len(clans),8)))
         return [
             app_commands.Choice(
                 name=f"{c.clean_name} | {c.tag}",
                 value=c.tag)
-            for c in random.sample(lc,min(len(lc),8))
+            async for c in a_iter
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_war_league_clans")
 
 async def autocomplete_clans_coleader(interaction:discord.Interaction,current:str):
     try:
-        member = aMember(interaction.user.id,interaction.guild.id)
+        member = await aMember(interaction.user.id,interaction.guild.id)
         coleader_clans = member.coleader_clans
         
         if current:
@@ -111,12 +106,12 @@ async def autocomplete_clans_coleader(interaction:discord.Interaction,current:st
         else:
             clans = coleader_clans
         
-        lc = list(clans)
+        a_iter = AsyncIter(random.sample(clans,min(len(clans),8)))
         return [
             app_commands.Choice(
                 name=f"{c.clean_name} | {c.tag}",
                 value=c.tag)
-            for c in random.sample(lc,min(len(lc),3))
+            async for c in a_iter
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_clans_coleader")
@@ -127,63 +122,55 @@ async def autocomplete_clans_coleader(interaction:discord.Interaction,current:st
 #####
 ####################################################################################################
 async def autocomplete_players(interaction:discord.Interaction,current:str):
-    def _get_players_for_query(current):
-        players = db_Player.objects(
-            Q(tag__icontains=current) | Q(name__icontains=current)
-            )
-        return [i for i in players]
-    
-    def _get_players_for_user(user_id):
-        players = db_Player.objects(
-            Q(discord_user=user_id)
-            )
-        return [i for i in players]
-    
     try:
         if current:
-            players = await bot_client.run_in_thread(_get_players_for_query,current)
+            q_doc = {'$or':[
+                {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                {'name':{'$regex':f'^{current}',"$options":"i"}}
+                ]
+                }
         else:
-            players = await bot_client.run_in_thread(_get_players_for_user,interaction.user.id)
+            q_doc = {'discord_user':interaction.user.id}
 
-        sel_players = sorted(players,key=lambda p:(p.townhall,p.name),reverse=True)
-
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__player.aggregate(pipeline)
         return [
             app_commands.Choice(
-                name=f"{p.name} | TH{p.townhall} | {p.tag}",
-                value=p.tag
+                name=f"{p.get('name','')} | TH{p.get('townhall',1)} | {p['_id']}",
+                value=p['_id']
                 )
-            for p in random.sample(sel_players,min(len(sel_players),8))
+            async for p in query
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_players")
 
 async def autocomplete_players_members_only(interaction:discord.Interaction,current:str):
-    def _get_players_for_query(current):
-        players = db_Player.objects(
-            (Q(is_member=True)) &
-            (Q(tag__icontains=current) | Q(name__icontains=current))
-            )
-        return [i for i in players]
-    
-    def _get_players_for_user(user_id):
-        players = db_Player.objects(
-            Q(is_member=True) & Q(discord_user=user_id)
-            )
-        return [i for i in players]
-    
     try:
         if current:
-            players = await bot_client.run_in_thread(_get_players_for_query,current)
+            q_doc = {
+                'is_member':True,
+                '$or':[
+                    {'tag':{'$regex':f'^{current}',"$options":"i"}},
+                    {'name':{'$regex':f'^{current}',"$options":"i"}}
+                    ]
+                }
         else:
-            players = await bot_client.run_in_thread(_get_players_for_user,interaction.user.id)
-            
-        sel_players = sorted(players,key=lambda p:(p.townhall,p.name),reverse=True)
+            q_doc = {'is_member':True,'discord_user':interaction.user.id}
+        
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__player.aggregate(pipeline)
         return [
             app_commands.Choice(
-                name=f"{p.name} | TH{p.townhall} | {p.tag}",
-                value=p.tag
+                name=f"{p.get('name','')} | TH{p.get('townhall',1)} | {p['_id']}",
+                value=p['_id']
                 )
-            for p in random.sample(sel_players,min(len(sel_players),8))
+            async for p in query
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_players_members_only")

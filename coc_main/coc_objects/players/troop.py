@@ -2,6 +2,7 @@ from typing import *
 
 from ...api_client import coc as coc
 from ...api_client import BotClashClient as client
+
 from ...utils.constants.coc_emojis import EmojisTroops
 
 bot_client = client()

@@ -1,37 +1,35 @@
-from mongoengine import *
+# db__player = {
+#   '_id': string, #player tag
+#   'discord_user': string,
+#   'is_member': bool,
+#   'home_clan': string,
+#   'first_seen': int,
+#   'last_joined': int,
+#   'last_removed': int,
+#   'name': string,
+#   'xp_level': int,
+#   'townhall': int
+#   }
 
-class db_Player(Document):
-    tag = StringField(primary_key=True,required=True)
-    discord_user = IntField(default=0)
-    is_member = BooleanField(default=False)
-    home_clan = StringField(default="")
-    first_seen = IntField(default=0)
-    last_joined = IntField(default=0)
-    last_removed = IntField(default=0)
-
-    name = StringField(default="")
-    xp_level = IntField(default=0)
-    townhall = IntField(default=0)
-
-class db_PlayerStats(Document):
-    #ID using format {'season':'1-2023','tag':'#12345678'}
-    stats_id = DictField(primary_key=True,required=True)
-    season = StringField(required=True)
-    tag = StringField(required=True)    
-    timestamp = IntField(default=0)
-    name = StringField(default="")
-    town_hall = IntField(default=0)
-    is_member = BooleanField(default=False)
-    home_clan = StringField(default="")
-    other_clans = ListField(StringField(),default=[])
-    time_in_home_clan = IntField(default=0)        
-    last_seen = ListField(IntField(),default=[])    
-    attacks = DictField(default={})
-    defenses = DictField(default={})
-    donations_sent = DictField(default={})
-    donations_rcvd = DictField(default={})
-    loot_gold = DictField(default={})
-    loot_elixir = DictField(default={})
-    loot_darkelixir = DictField(default={})
-    capitalcontribution = DictField(default={})
-    clangames = DictField(default={})
+# db__player_stats = {
+#   '_id': { 'season': string, 'tag': string },
+#   'season': string,
+#   'tag': string,
+#   'timestamp': int,
+#   'name': string,
+#   'town_hall': int,
+#   'is_member': bool,
+#   'home_clan': string,
+#   'other_clans': [ string ],
+#   'time_in_home_clan': int,
+#   'last_seen': [ int ],
+#   'attacks': { string: int },
+#   'defenses': { string: int },
+#   'donations_sent': { string: int },
+#   'donations_rcvd': { string: int },
+#   'loot_gold': { string: int },
+#   'loot_elixir': { string: int },
+#   'loot_darkelixir': { string: int },
+#   'capitalcontribution': { string: int },
+#   'clangames': { string: int }
+#   }

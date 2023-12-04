@@ -9,7 +9,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
 from coc_main.cog_coc_client import ClashOfClansClient, aClanWar, aPlayer
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup,WarLeagueClan
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.helpers import clan_war_embed
 
@@ -25,9 +25,9 @@ bot_client = BotClashClient()
 class CWLClanGroupMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
-        clan:WarLeagueClan):
+        league_group:WarLeagueGroup):
 
-        self.league_group = clan.league_group
+        self.league_group = league_group
         self.clan = None
         self.war = None
         self.clan_nav = None
@@ -45,6 +45,7 @@ class CWLClanGroupMenu(DefaultView):
     ### START / STOP
     ##################################################
     async def start(self):
+        await asyncio.gather(*[clan.compute_lineup_stats() for clan in self.league_group.clans])
         self.is_active = True
 
         league_group_button = self._button_league_group()
@@ -162,7 +163,7 @@ class CWLClanGroupMenu(DefaultView):
             item.disabled = True
             
         self.clan_nav = None
-        self.war = aClanWar(select.values[0])
+        self.war = self.league_group.get_war(select.values[0])
 
         self.clear_items()
         self.add_item(self._button_league_group())
@@ -221,8 +222,8 @@ class CWLClanGroupMenu(DefaultView):
     def _dropdown_war_select(self,wars:list[aClanWar]):
         war_select = [discord.SelectOption(
             label=f"{war.clan_1.clean_name} vs {war.clan_2.clean_name} (Round {self.league_group.get_round_from_war(war)})",
-            value=war.war_id,
-            default=True if war.war_id == getattr(self.war,'war_id',None) else False)
+            value=war._id,
+            default=True if war._id == getattr(self.war,'_id',None) else False)
             for war in wars
             ]
         return DiscordSelectMenu(
@@ -252,7 +253,7 @@ class CWLClanGroupMenu(DefaultView):
             thumbnail=league_emoji.url
             )
         
-        for lc in self.league_group.clans:            
+        for lc in self.league_group.clans:
             embed.add_field(
                 name=f"\u200E__**{lc.clean_name} ({lc.tag})**__",
                 value=f"**Level**: {lc.level}"
@@ -302,10 +303,7 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_roster(self):
-        get_players = await asyncio.gather(*(self.client.fetch_player(p.tag) for p in self.clan.master_roster),return_exceptions=True)
-        if len([e for e in get_players if isinstance(e,ClashAPIError)]) > 0:
-            raise ClashAPIError([e for e in get_players if isinstance(e,ClashAPIError)][0])
-        roster_players = [p for p in get_players if isinstance(p,aPlayer)]
+        roster_players = await self.client.fetch_many_players(*[p.tag for p in self.clan.master_roster])
         roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(
@@ -342,7 +340,7 @@ class CWLClanGroupMenu(DefaultView):
                 + "\n\n"
                 + f"{EmojisClash.ATTACK} `{war_stats.attack_count:>3}`\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} `{war_stats.unused_attacks:>3}`\u3000"
-                + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} ({str(round((war_stats.triples/war_stats.attack_count)*100))+'%'})`\n"
+                + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} (" + (f"{str(round((war_stats.triples/war_stats.attack_count)*100))}%" if war_stats.attack_count > 0 else '0%') + f")`\n"
                 + f"{EmojisClash.STAR} `{self.clan.total_score:>4}`\u3000"
                 + f"{EmojisClash.DESTRUCTION} `{str(self.clan.total_destruction)+'%':>7}`"
                 + f"\n*Only hit rates with 4 or more attacks are shown below.*\u200b",

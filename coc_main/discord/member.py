@@ -3,41 +3,39 @@ import pendulum
 import asyncio
 
 from typing import *
-from mongoengine import *
 
+from async_property import AwaitLoader
 from redbot.core import commands
 from redbot.core.utils import chat_formatting as chat
 from redbot.core.utils import AsyncIter
 
-from ..api_client import BotClashClient as client
-
 from .guild import aGuild, ClanGuildLink
 
-from ..coc_objects.players.player import BasicPlayer, db_Player
-from ..coc_objects.clans.player_clan import db_AllianceClan, aPlayerClan
+from ..api_client import BotClashClient as client
 
-from .mongo_discord import db_DiscordMember
+from ..coc_objects.players.player import BasicPlayer
+from ..coc_objects.clans.player_clan import aPlayerClan
 
 from ..exceptions import InvalidUser, InvalidGuild, InvalidTag, CacheNotReady
-from ..utils.constants.coc_constants import ClanRanks
+from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
 
 bot_client = client()
 
-class aMember():
+class aMember(AwaitLoader):
     _global = {}
     _local = {}
 
-    @classmethod
-    async def load_all(cls) -> List['aMember']:
-
-        all_members = []
-        iter_guilds = AsyncIter(bot_client.bot.guilds)
-        async for guild in iter_guilds:
-            members = await asyncio.gather(*(cls(member.id,guild.id).refresh_clash_link()
-                for member in guild.members if not member.bot
-                ))
-            all_members.extend(members)
-        return all_members    
+    __slots__ = [
+        '_is_new',
+        '_lock',
+        'user_id',
+        'guild_id',
+        'accounts',
+        'member_accounts',
+        'home_clans',
+        'last_payday',
+        'last_role_sync'
+        ]
 
     def __new__(cls,user_id,guild_id=None):
         if guild_id:
@@ -60,12 +58,12 @@ class aMember():
         
         if self._is_new:
             self._lock = asyncio.Lock()
-            self._last_refreshed = None
-            self._account_tags = None
-            self._scope_clans = None
-            self._default_account = None
-            
-            self._last_payday = None
+
+            self.accounts = []
+            self.member_accounts = []
+            self.home_clans = []            
+            self.last_payday = pendulum.now()
+            self.last_role_sync = pendulum.now()
         
         self._is_new = False
 
@@ -80,35 +78,48 @@ class aMember():
         if not self.guild_id:
             return None
         return {'guild':self.guild_id,'user':self.user_id}
-    
-    ##################################################
-    ### CLASS METHODS
-    ##################################################
-    @classmethod
-    async def save_user_roles(cls,user_id:int,guild_id:int):
-        def _save_to_db():
-            db_DiscordMember.objects(
-                member_id=user.db_id,
-                user_id=user.user_id,
-                guild_id=user.guild_id).update_one(
-                    set__roles=[str(r.id) for r in user.discord_member.roles if r.is_assignable()],
-                    set__last_role_save=pendulum.now().int_timestamp,
-                    upsert=True)
-            
-        user = cls(user_id,guild_id)
-        if not user.discord_member:
-            raise InvalidUser(user.user_id)
-        if not user.guild:
-            raise InvalidGuild(user.guild_id)
+
+    async def _get_scope_clans(self) -> List[str]:
+        if self.guild_id:
+            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
+        else:
+            client_cog = bot_client.bot.get_cog('ClashOfClansClient')
+            return [clan.tag for clan in await client_cog.get_alliance_clans()]
         
-        last_role_sync = await user.get_last_role_sync()
-        if not last_role_sync or pendulum.now().int_timestamp - getattr(last_role_sync,'int_timestamp',0) >= 600:
-            try:
-                await user.sync_clan_roles()
-            except CacheNotReady:
-                pass
+    async def load(self):
+        scope = await self._get_scope_clans()
+        query = bot_client.coc_db.db__player.find(
+            {
+                'discord_user':self.user_id
+                },
+            {'_id':1,'is_member':1,'home_clan':1}
+            )
+        #sort by TH, exp level, alliance rank
+        self.accounts = sorted(
+            [await BasicPlayer(db['_id']) async for db in query],
+            key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
+            reverse=True
+            )
+        self.member_accounts = sorted(
+            [a for a in self.accounts if a.is_member and a.home_clan and a.home_clan.tag in scope],
+            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
+            reverse=True
+            )
         
-        await bot_client.run_in_thread(_save_to_db)
+        for a in self.member_accounts:
+            if a.home_clan.tag not in [c.tag for c in self.home_clans]:
+                self.home_clans.append(a.home_clan)
+        self.home_clans.sort(
+            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
+            reverse=True
+            )
+
+        query = await bot_client.coc_db.db__discord_member.find(
+            {'_id':self.db_id},
+            {'_id':1,'guild_id':1,'last_payday':1,'last_role_sync':1}
+            ).to_list(length=None)
+        db_lastpayday = [db.get('last_payday',0) for db in query]
+        self.last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
     
     ##################################################
     ### DISCORD MEMBER ATTRIBUTES
@@ -168,184 +179,92 @@ class aMember():
     ##################################################
     ### CLASH OF CLANS ATTRIBUTES
     ##################################################
-    async def refresh_clash_link(self,force:bool=False) -> 'aMember':
-        def _query_player_tags():
-            query = db_Player.objects(discord_user=self.user_id)
-            return [db.tag for db in query]
-        
-        now = pendulum.now().int_timestamp
-
-        async with self._lock:
-            if force or (now - getattr(self._last_refreshed,'int_timestamp',0)) > 30:
-                self._account_tags = await bot_client.run_in_thread(_query_player_tags)
-                
-                if self.guild_id:
-                    self._scope_clans = [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
-                else:
-                    client_cog = bot_client.bot.get_cog('ClashOfClansClient')
-                    self._scope_clans = [clan.tag for clan in await client_cog.get_alliance_clans()]
-                
-                self._last_refreshed = pendulum.now()
-
-        if self.guild_id:
-            global_member = aMember(self.user_id)
-            await global_member.refresh_clash_link()
-        return self
-
-    @property
-    def last_attr_refresh(self) -> Optional[pendulum.DateTime]:
-        return self._last_refreshed
-    
     @property
     def account_tags(self) -> List[str]:
-        if not self._last_refreshed:
-            raise CacheNotReady()
-        return [] if not self._account_tags else self._account_tags
-    
+        return [a.tag for a in self.accounts]
     @property
-    def accounts(self) -> List[BasicPlayer]:
-        ret_players = [
-            BasicPlayer(tag=tag) for tag in self.account_tags
-            ]
-        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
-    
-    @property
-    def member_accounts(self) -> List[BasicPlayer]:
-        ret_players = [a for a in self.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
-        return sorted(ret_players, key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
-
-    @property
-    def home_clans(self) -> List[aPlayerClan]:
-        clan_tags = list(set([a.home_clan.tag for a in self.member_accounts]))
-        return [aPlayerClan(tag=tag) for tag in clan_tags]
-    
+    def member_tags(self) -> List[str]:
+        return [a.tag for a in self.member_accounts]
     @property
     def leader_clans(self) -> List[aPlayerClan]:
-        return [hc for hc in self.home_clans if self.user_id == hc.leader]
-    
+        return [hc for hc in self.home_clans if self.user_id == hc.leader]    
     @property
     def coleader_clans(self) -> List[aPlayerClan]:
-        return [hc for hc in self.home_clans if self.user_id in hc.coleaders or self.user_id == hc.leader]
-    
+        return [hc for hc in self.home_clans if self.user_id in hc.coleaders or self.user_id == hc.leader]    
     @property
     def elder_clans(self) -> List[aPlayerClan]:
         return [hc for hc in self.home_clans if self.user_id in hc.elders or self.user_id in hc.coleaders or self.user_id == hc.leader]
-    
     @property
     def is_member(self) -> bool:
-        if len(self.home_clans) > 0:
-            return True
-        return False
-    
+        return len(self.member_accounts) > 0
     @property
     def is_elder(self) -> bool:
-        if len(self.elder_clans) > 0:
-            return True
-        return False
-
+        return len(self.elder_clans) > 0
     @property
     def is_coleader(self) -> bool:
-        if len(self.coleader_clans) > 0:
-            return True
-        return False
-    
+        return len(self.coleader_clans) > 0
     @property
     def is_leader(self) -> bool:
-        if len(self.leader_clans) > 0:
-            return True
-        return False
-    
-    @property
-    def member_start(self) -> Optional[pendulum.DateTime]:
-        if not self.is_member:
-            return None
-        if min([a.last_joined for a in self.member_accounts]) == 0:
-            return pendulum.from_timestamp(1577836800)
-        else:
-            return pendulum.from_timestamp(min([a.last_joined for a in self.member_accounts]))
-    
-    @property
-    def member_end(self) -> Optional[pendulum.DateTime]:
-        if self.is_member:
-            return None
-        return pendulum.from_timestamp(max([a.last_removed for a in self.accounts]))
+        return len(self.leader_clans) > 0
 
     ##################################################
     ### BANK ATTRIBUTES
-    ##################################################
-    @property
-    def last_payday(self) -> Optional[pendulum.DateTime]:
-        m = aMember(self.user_id)
-        if not m._last_payday:
-            db_member = db_DiscordMember.objects(user_id=self.user_id)
-            if len(db_member) == 0:
-                m._last_payday = None
-            elif max([d.last_payday for d in db_member]) == 0:
-                m._last_payday = None
-            else:
-                m._last_payday = max([d.last_payday for d in db_member])
-        if m._last_payday:
-            return pendulum.from_timestamp(m._last_payday)
-        return None
-    
+    ##################################################    
     async def set_last_payday(self,timestamp:pendulum.DateTime):
-        def _save_to_db():
-            db_DiscordMember.objects(
-                member_id=self.db_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id).update_one(
-                    set__last_payday=timestamp.int_timestamp,
-                    upsert=True
-                    )
-        m = aMember(self.user_id)
-        m._last_payday = timestamp.int_timestamp
-        await bot_client.run_in_thread(_save_to_db)
+        self.last_payday = timestamp
+        await bot_client.coc_db.db__discord_member.update_one(
+            {'_id':self.db_id},
+            {'$set':{
+                'user_id':self.user_id,
+                'guild_id':self.guild_id,
+                'last_payday':getattr(self.last_payday,'int_timestamp',None)
+                }
+            },
+            upsert=True)
 
     ##################################################
     ### ROLE ATTRIBUTES & METHODS
     ##################################################
-    async def get_last_role_sync(self) -> Optional[pendulum.DateTime]:
-        def _get_from_db():
-            try:
-                db_member = db_DiscordMember.objects.get(
-                    user_id=self.user_id,
-                    guild_id=self.guild_id
-                    )
-            except DoesNotExist:
-                return None
-            else:
-                return pendulum.from_timestamp(db_member.last_role_sync)
+    @classmethod
+    async def save_user_roles(cls,user_id:int,guild_id:int):
+        user = await cls(user_id,guild_id)
+        if not user.discord_member:
+            raise InvalidUser(user.user_id)
+        if not user.guild:
+            raise InvalidGuild(user.guild_id)
         
-        if not self.discord_member:
-            raise InvalidUser(self.user_id)
-
-        i = await bot_client.run_in_thread(_get_from_db)
-        if i:
-            return i
-        return None
-
+        try:
+            await user.sync_clan_roles()
+        except CacheNotReady:
+            pass
+        
+        await bot_client.coc_db.db__discord_member.update_one(
+            {'_id':user.db_id},
+            {'$set':{
+                'user_id':user.user_id,
+                'guild_id':user.guild_id,
+                'roles':[str(r.id) for r in user.discord_member.roles if r.is_assignable()],
+                'last_role_save':pendulum.now().int_timestamp
+                }
+            },
+            upsert=True)
+     
     async def restore_user_roles(self) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
-        def _get_saved_roles():
-            try:
-                db_member = db_DiscordMember.objects.get(user_id=self.user_id,guild_id=self.guild_id)
-            except DoesNotExist:
-                return []
-            else:
-                return [int(r) for r in db_member.roles]
-
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
         added_roles = []
-        failed_roles = []
-        
+        failed_roles = []        
         if not self.guild:
             return added_roles, failed_roles
         
-        saved_roles = await bot_client.run_in_thread(_get_saved_roles)
-        
+        db_saved_roles = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
+        saved_roles = db_saved_roles.get('roles',[]) if db_saved_roles else []
+
         async for role_id in AsyncIter(saved_roles):
             role = self.guild.guild.get_role(int(role_id))
+            if not role:
+                continue
             if role.is_assignable():
                 try:
                     await self.discord_member.add_roles(role)
@@ -355,16 +274,10 @@ class aMember():
                     added_roles.append(role)
         return added_roles, failed_roles
 
-    async def sync_clan_roles(self,context:Optional[Union[discord.Interaction,commands.Context]]=None) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
-        def _update_last_sync():
-            db_DiscordMember.objects(
-                member_id=self.db_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id).update_one(
-                    set__last_role_sync=pendulum.now().int_timestamp,
-                    upsert=True
-                    )
-            
+    async def sync_clan_roles(self,
+        context:Optional[Union[discord.Interaction,commands.Context]]=None,
+        force:bool=False) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
+
         roles_added = []
         roles_removed = []
  
@@ -372,12 +285,18 @@ class aMember():
             raise InvalidUser(self.user_id)
         if not self.guild:
             return roles_added, roles_removed
+        
+        if not force:
+            db_last_sync = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
+            ls = db_last_sync.get('last_role_sync',None) if db_last_sync else None
+            
+            if ls and pendulum.now().int_timestamp - ls < 600:
+                return roles_added, roles_removed                
     
-        await self.refresh_clash_link(force=True)
-        async with self._lock:            
+        async with self._lock:
             #Assassins guild Member Role
             if self.guild.id == 1132581106571550831:
-                global_member = aMember(self.user_id)
+                global_member = await aMember(self.user_id)
                 clan_member_role = self.guild.guild.get_role(1139855695068540979)
                 
                 if global_member.is_member:                
@@ -388,9 +307,9 @@ class aMember():
                     if clan_member_role in self.discord_member.roles:
                         roles_removed.append(clan_member_role)
 
-            linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
-            async for link in AsyncIter(linked_clans):
-                clan = aPlayerClan(tag=link.tag)
+            guild_links = await ClanGuildLink.get_for_guild(self.guild.id)
+            async for link in AsyncIter(guild_links):
+                clan = await link.clan
 
                 if clan.tag in [c.tag for c in self.home_clans]:
                     is_elder = False
@@ -445,90 +364,118 @@ class aMember():
             
             if len(roles_added) > 0:
                 try:
-                    await self.discord_member.add_roles(*roles_added)
+                    await self.discord_member.add_roles(*roles_added,reason=f"Clan Role Sync: {initiating_user} from {initiating_command}")
                 except discord.Forbidden:
                     bot_client.coc_main_log.exception(f"Error adding roles to {self.discord_member.name} {self.discord_member.id}.")
                 else:
-                    bot_client.coc_main_log.info(f"[{self.guild.name} {self.guild.id}] [{self.discord_member.name} {self.discord_member.id}] Roles Added: {chat.humanize_list([r.name for r in roles_added])}. Initiated by {initiating_user} from {initiating_command}.")
+                    bot_client.coc_main_log.info(
+                        f"[{self.guild.name} {self.guild.id}] [{self.discord_member.name} {self.discord_member.id}] Roles Added: {chat.humanize_list([r.name for r in roles_added])}. "
+                        + f"Initiated by {initiating_user} from {initiating_command}."
+                        )
                     
             if len(roles_removed) > 0:
                 try:
-                    await self.discord_member.remove_roles(*roles_removed)
+                    await self.discord_member.remove_roles(*roles_removed,reason=f"Clan Role Sync: {initiating_user} from {initiating_command}")
                 except discord.Forbidden:
                     bot_client.coc_main_log.exception(f"Error removing roles from {self.discord_member.name} {self.discord_member.id}.")
                 else:
-                    bot_client.coc_main_log.info(f"[{self.guild.name} {self.guild.id}] [{self.discord_member.name} {self.discord_member.id}] Roles Removed: {chat.humanize_list([r.name for r in roles_removed])}. Initiated by {initiating_user} from {initiating_command}.")
+                    bot_client.coc_main_log.info(
+                        f"[{self.guild.name} {self.guild.id}] [{self.discord_member.name} {self.discord_member.id}] Roles Removed: {chat.humanize_list([r.name for r in roles_removed])}. "
+                        + f"Initiated by {initiating_user} from {initiating_command}."
+                        )
             
-            await bot_client.run_in_thread(_update_last_sync)
-            
+            await bot_client.coc_db.db__discord_member.update_one(
+                {'_id':self.db_id},
+                {'$set':{
+                    'user_id':self.user_id,
+                    'guild_id':self.guild_id,
+                    'last_role_sync':pendulum.now().int_timestamp
+                    }
+                },
+                upsert=True)
         return roles_added, roles_removed
     
     ##################################################
     ### NICKNAME ATTRIBUTES & METHODS
     ##################################################
-    @property
-    def default_account(self) -> Optional[BasicPlayer]:
+    async def _get_default_account_tag(self) -> Optional[str]:
         if not self.discord_member:
             raise InvalidUser(self.user_id)
+        
         if len(self.accounts) == 0:
             return None
-      
-        de = self.member_accounts[0] if len(self.member_accounts) > 0 else self.accounts[0]
-
-        if self.guild_id == 688449973553201335 and not self.is_member:
-            return self.accounts[0]
-
-        if not self._default_account:
-            try:
-                db_member = db_DiscordMember.objects.get(user_id=self.user_id,guild_id=self.guild_id)
-                self._default_account = db_member.default_account
-            except DoesNotExist:
-                pass
         
-        if self._default_account and self._default_account in self.account_tags:
-            return BasicPlayer(tag=self._default_account)
-        else:
-            return de
+        def_tag = None
+        db = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
+        if db and db.get('default_account',None) in self.account_tags:
+            def_tag = db['default_account']
+
+        #ARIX
+        if self.guild_id == 688449973553201335:
+            if not self.is_member:
+                return self.accounts[0].tag
+            if def_tag in self.member_tags:
+                return def_tag
+            return self.member_tags[0]        
+        
+        #ARIX
+        if self.guild_id == 688449973553201335 and len(self.member_accounts) > 0:
+            return self.member_accounts[0].tag
+        
+        return self.accounts[0].tag
     
     async def set_default_account(self,tag:str):
-        def _update_in_db():
-            db_DiscordMember.objects(
-                member_id=self.db_id,
-                user_id=self.user_id,
-                guild_id=self.guild_id).update_one(
-                    set__default_account=tag,
-                    upsert=True
-                    )
-            bot_client.coc_data_log.info(f"Default Account for {self.user_id} {self.name} in {self.guild_id} {self.guild.name} set to {tag}.")
         if not self.discord_member:
             raise InvalidUser(self.user_id)
-        if tag not in self.account_tags:
+        
+        if tag not in await self.account_tags:
             raise InvalidTag(tag)
 
-        self._default_account = tag
-        await bot_client.run_in_thread(_update_in_db)
+        await bot_client.coc_db.db__discord_member.update_one(
+            {'_id':self.db_id},
+            {'$set':{
+                'user_id':self.user_id,
+                'guild_id':self.guild_id,
+                'default_account':tag
+                }
+            },
+            upsert=True)
 
     async def get_nickname(self) -> str:
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
-        await self.refresh_clash_link(force=True)
-        
-        new_nickname = self.default_account.name.replace('[AriX]','')
-        new_nickname = new_nickname.strip()
+        default_tag = await self._get_default_account_tag()
+        default_account = await BasicPlayer(default_tag) if default_tag else None
+
+        if not default_account:
+            new_nickname = self.discord_member.name
+        else:
+            new_nickname = default_account.name.replace('[AriX]','')
+            new_nickname = new_nickname.strip()
 
         if self.guild_id == 688449973553201335:
             abb_clans = []
-            linked_clans = await ClanGuildLink.get_for_guild(self.guild_id)
-            if len(self.leader_clans) > 0:
-                [abb_clans.append(c.abbreviation) for c in self.leader_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in linked_clans]]
 
-            elif len(self.home_clans) > 0:
-                if self.default_account.home_clan and self.default_account.home_clan.tag in [gc.tag for gc in linked_clans]:
-                    abb_clans.append(self.default_account.home_clan.abbreviation)
-                [abb_clans.append(c.abbreviation) for c in self.home_clans if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in [gc.tag for gc in linked_clans]]
+            guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
+            linked_clans = [link.tag for link in guild_links]
+
+            if len(self.leader_clans) > 0:
+                a_iter = AsyncIter(self.leader_clans)
+                async for c in a_iter:
+                    if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in linked_clans:
+                        abb_clans.append(c.abbreviation)
+            
+            else:
+                if default_account.home_clan and default_account.home_clan.tag in linked_clans:
+                    abb_clans.append(default_account.home_clan.abbreviation)
+                
+                if len(self.home_clans) > 0:
+                    a_iter = AsyncIter(self.home_clans)
+                    async for c in a_iter:
+                        if c.abbreviation not in abb_clans and len(c.abbreviation) > 0 and c.tag in linked_clans:
+                            abb_clans.append(c.abbreviation)
 
             if len(abb_clans) > 0:
                 new_nickname += f" | {' + '.join(abb_clans)}"
-
         return new_nickname

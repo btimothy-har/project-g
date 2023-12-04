@@ -1,13 +1,14 @@
 import discord
+
 from typing import *
-from redbot.core import commands, bank
 from functools import cached_property
+
+from redbot.core import commands, bank
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.item import ShopItem
 from ..objects.inventory import UserInventory
-
-from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed
-from coc_main.utils.constants.ui_emojis import EmojisUI
 
 class UserStore(DefaultView):
     def __init__(self,
@@ -229,14 +230,14 @@ class UserStore(DefaultView):
             await interaction.response.defer()
         
         if menu:
-            self.current_item = await ShopItem.get_by_id(menu.values[0])
+            self.current_item = [i for i in self.store_items if i.id == menu.values[0]][0]
 
         item_embed = await self.get_item_embed()
 
         user = self.guild.get_member(interaction.user.id)
 
         purchase_button = self.purchase_button
-        inventory = await UserInventory.get_by_user_id(interaction.user.id)
+        inventory = await UserInventory(interaction.user)
 
         if self.current_item.type in ['cash'] and inventory.has_item(self.current_item):
             purchase_button.disabled = True
@@ -282,7 +283,7 @@ class UserStore(DefaultView):
                 )
             return await interaction.followup.send(embed=embed,ephemeral=True)
         
-        user_inv = await UserInventory.get_by_user_id(interaction.user.id)
+        user_inv = await UserInventory(interaction.user)
         buy_item = await user_inv.purchase_item(self.current_item)
 
         purchase_msg = f"Congratulations! You spent {self.current_item.price} {currency} to purchase 1x **{self.current_item.name}**."

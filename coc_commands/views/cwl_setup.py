@@ -119,8 +119,7 @@ class CWLSeasonSetup(DefaultView):
                 await clan.disable_for_war_league()
         
         async for clan_tag in AsyncIter(select.values):
-            clan = await self.client.fetch_clan(clan_tag)
-            league_clan = clan.war_league_season(self.season)
+            league_clan = await WarLeagueClan(clan_tag,self.season)
             await league_clan.enable_for_war_league()
             
         embed = await self.get_embed()
@@ -161,11 +160,12 @@ class CWLSeasonSetup(DefaultView):
             )
         participating_clans = await WarLeagueClan.participating_by_season(self.season)
         async for cwl_clan in AsyncIter(participating_clans):
+            league_group = await cwl_clan.get_league_group()
             embed.add_field(
                 name=f"{EmojisLeagues.get(cwl_clan.war_league_name)} {cwl_clan.name} ({cwl_clan.tag})",
-                value=f"# in Roster: {len(cwl_clan.participants)} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
-                    + (f"\nIn War: Round {len(cwl_clan.league_group.rounds)-1} / {cwl_clan.league_group.number_of_rounds}\nPreparation: Round {len(cwl_clan.league_group.rounds)} / {cwl_clan.league_group.number_of_rounds}" if cwl_clan.league_group else "\nCWL Not Started" if self.season.cwl_signup_lock else "")
-                    + (f"\nMaster Roster: {len(cwl_clan.master_roster)}" if cwl_clan.league_group else "")
+                value=f"# in Roster: {len(await cwl_clan.get_participants())} (Roster {'Open' if cwl_clan.roster_open else 'Finalized'})"
+                    + (f"\nIn War: Round {len(league_group.rounds)-1} / {league_group.number_of_rounds}\nPreparation: Round {len(league_group.rounds)} / {league_group.number_of_rounds}" if league_group else "\nCWL Not Started" if self.season.cwl_signup_lock else "")
+                    + (f"\nMaster Roster: {len(cwl_clan.master_roster_tags)}" if league_group else "")
                     + "\n\u200b",
                 inline=False
                 )
@@ -181,12 +181,13 @@ class CWLSeasonSetup(DefaultView):
 
             options = []
             async for c in AsyncIter(clans):
+                league = await WarLeagueClan(c.tag,self.season)
                 options.append(discord.SelectOption(
                     label=str(c),
                     value=c.tag,
                     emoji=EmojisLeagues.get(c.war_league_name),
                     description=f"Level {c.level} | {c.war_league_name}",
-                    default=c.war_league_season(self.season).is_participating)
+                    default=league.is_participating)
                     )
             
             self.clan_selector = DiscordSelectMenu(

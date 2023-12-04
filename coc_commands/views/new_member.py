@@ -76,7 +76,7 @@ class NewMemberMenu(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=main_embed,view=self)
         
-        await self.member.refresh_clash_link(force=True)
+        await self.member.load()
 
         try:
             if len(self.member.account_tags) == 0:
@@ -104,8 +104,10 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
-        player_accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
+        player_accounts = await self.client.fetch_many_players(*self.member.account_tags)
+        player_accounts.sort(
+            key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),
+            reverse=True)
 
         self.clear_items()
         
@@ -245,7 +247,7 @@ class NewMemberMenu(DefaultView):
 
     async def _select_home_clan(self,account:aPlayer):        
         linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
-        guild_clans = await asyncio.gather(*(self.client.fetch_clan(c.tag) for c in linked_clans))
+        guild_clans = await self.client.fetch_many_clans(*[c.tag for c in linked_clans])
 
         alliance_clans = sorted([c for c in guild_clans if c.is_alliance_clan],key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
@@ -283,7 +285,7 @@ class NewMemberMenu(DefaultView):
             home_clan = [clan for clan in alliance_clans if clan.tag == home_clan_select_view.return_value][0]
             await account.new_member(self.member.user_id,home_clan)
             self.menu_summary.append(NewMember(account,home_clan))
-            self.added_count += 1        
+            self.added_count += 1
     
     ##################################################
     ### STEP 3: WRAP UP
@@ -307,8 +309,10 @@ class NewMemberMenu(DefaultView):
                 report_output += f"{EmojisUI.TASK_WARNING} **{action.account.title}** not added.\n"
         
         if self.member.discord_member:
+            await self.member.load()
+            
             report_output += "\n\u200b"
-            roles_added, roles_removed = await self.member.sync_clan_roles(self.ctx)
+            roles_added, roles_removed = await self.member.sync_clan_roles(self.ctx,True)
 
             for role in roles_added:
                 report_output += f"{EmojisUI.TASK_CHECK} Added {role.mention}.\n"

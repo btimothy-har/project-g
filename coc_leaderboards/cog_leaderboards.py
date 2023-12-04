@@ -3,21 +3,19 @@ import discord
 import pendulum
 import random
 
-from discord.ext import tasks
-
 from typing import *
-from mongoengine import *
+from discord.ext import tasks
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter,bounded_gather
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.utils.checks import is_admin
 from coc_main.utils.components import clash_embed
 
-from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive, DiscordLeaderboard, db_Leaderboard
+from .leaderboard_files.discord_leaderboard import DiscordLeaderboard
 
 lb_type_selector = [
     app_commands.Choice(name="Clan War Triples", value=1),
@@ -86,10 +84,10 @@ class Leaderboards(commands.Cog):
                     break
                 await asyncio.sleep(1)
                 
-            await bot_client.bot.wait_until_red_ready()
+            await bot_client.bot.wait_until_ready()
             self.update_leaderboards.start()
-
-        asyncio.create_task(start_cog())    
+        
+        asyncio.create_task(start_cog())
     
     async def cog_unload(self):
         self.update_leaderboards.cancel()
@@ -164,17 +162,29 @@ class Leaderboards(commands.Cog):
             )
         
         lbs = await DiscordLeaderboard.get_guild_leaderboards(guild.id)
-        async for lb in AsyncIter(lbs):
+        a_iter = AsyncIter(lbs)
+
+        async for lb in a_iter:
             embed.add_field(
                 name=f"**{getattr(lb.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await lb.fetch_message(),'jump_url','')}"
                     + f"\nID: `{lb.id}`"
-                    + f"\nType: {lb.lb_type}"
+                    + f"\nType: {lb.type}"
                     + f"\nIs Global? `{lb.is_global}`"
                     + f"\n\u200b",
                 inline=True
                 )            
         return embed
+
+    @command_group_clash_leaderboards.command(name="hdel")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_delete_history_leaderboard(self,ctx):
+        """
+        Delete all historical leaderboards.
+        """        
+        await bot_client.coc_db.db__leaderboard_archive.delete_many({})
+        await ctx.reply("Historical Leaderboards Deleted.")
 
     @command_group_clash_leaderboards.command(name="list")
     @commands.guild_only()
@@ -356,8 +366,10 @@ class Leaderboards(commands.Cog):
         async with self.leaderboard_lock:
             st = pendulum.now()
             bot_client.coc_main_log.info("Updating Leaderboards...")
+
             all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
-            await asyncio.gather(*(lb.update_leaderboard() for lb in all_leaderboards))
-            
+
+            tasks = [lb.update_leaderboard() for lb in all_leaderboards]
+            await bounded_gather(*tasks,return_exceptions=True,limit=1)
             et = pendulum.now()
             bot_client.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")

@@ -60,6 +60,7 @@ class RemoveMemberMenu(DefaultView):
             await self.ctx.followup.send(embed=no_input_embed,ephemeral=True)
             return self.stop_menu()
 
+        await self.member.load()
         self.is_active = True
 
         embed = await clash_embed(context=self.ctx,message=f"{EmojisUI.LOADING} Loading...")
@@ -95,7 +96,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.member_accounts])
+        member_accounts = await self.client.fetch_many_players(*self.member.member_tags)
         
         if len(member_accounts) == 0:
             embed = await clash_embed(
@@ -223,8 +224,8 @@ class RemoveMemberMenu(DefaultView):
                 roles_added_output = f""
                 roles_removed_output = f""
 
-                member = aMember(user_id,self.guild.id)
-                roles_added, roles_removed = await member.sync_clan_roles(self.ctx)
+                member = await aMember(user_id,self.guild.id)
+                roles_added, roles_removed = await member.sync_clan_roles(self.ctx,force=True)
 
                 for role in roles_added:
                     roles_added_output += f"{role.mention}, "

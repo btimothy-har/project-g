@@ -1,7 +1,6 @@
 import discord
 
 from typing import *
-
 from redbot.core import commands 
 
 from ...api_client import BotClashClient as client
@@ -11,7 +10,7 @@ from .clan_war_leagues import WarLeagueGroup
 from .war_summary import aClanWarSummary
 
 from ...utils.components import clash_embed
-from ...utils.constants.coc_constants import ClanWarType, WarResult, WarState
+from ...utils.constants.coc_constants import WarState
 from ...utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from ...utils.constants.ui_emojis import EmojisUI
 
@@ -22,7 +21,7 @@ async def clan_war_embed(
     clan_war:aClanWar):
         
     if clan_war.league_group_id:
-        league_group = WarLeagueGroup(group_id=clan_war.league_group_id)
+        league_group = await WarLeagueGroup(group_id=clan_war.league_group_id)
     
     embed = await clash_embed(
         context=context,

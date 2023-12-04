@@ -91,5 +91,4 @@ class CreateRecruitingReminder(DefaultView):
             interval=int(interval)
             )
         await new_reminder.send_reminder()
-        
         await interaction.followup.send(f"Your Recruiting Reminder has been created.",ephemeral=True)

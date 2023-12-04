@@ -1,10 +1,8 @@
+import asyncio
 import discord
 import pendulum
-import asyncio
 
 from typing import *
-from ..components import eclipse_embed
-
 from redbot.core import commands
 
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu
@@ -12,6 +10,7 @@ from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.war_base import eWarBase
+from ..components import eclipse_embed
 
 class BaseVaultMenu(DefaultView):
     def __init__(self,

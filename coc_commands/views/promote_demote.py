@@ -1,4 +1,5 @@
 import discord
+import asyncio
 
 from typing import *
 
@@ -56,6 +57,8 @@ class MemberRankMenu():
     #####
     ####################################################################################################
     async def promote(self):
+        await asyncio.gather(*[self.executor.load(),self.member.load()])
+
         self.rank_action = 1
         if len(self.member.home_clans) == 0:
             embed = await clash_embed(
@@ -105,6 +108,8 @@ class MemberRankMenu():
     #####
     ####################################################################################################
     async def demote(self):
+        await asyncio.gather(*[self.executor.load(),self.member.load()])
+
         self.rank_action = -1
         if len(self.member.home_clans) == 0:
             embed = await clash_embed(
@@ -192,7 +197,7 @@ class MemberRankMenu():
         target_clan = self.eligible_clans[0]
         embed = await clash_embed(
             context=self.ctx,
-            message=f"**Please confirm you want to __{self.rank_action_text}__ {self.member.mention} in {target_clan}.**"
+            message=f"**Please confirm you want to __{self.rank_action_text}__ {self.member.mention} in {target_clan.title}.**"
                 + f"\n\nCurrent Rank: {self.get_current_rank(target_clan)}"
                 + "\n> " + '\n> '.join([f"{a.title}" for a in self.member.member_accounts if a.home_clan.tag == target_clan.tag]),
             thumbnail=self.member.display_avatar,
@@ -243,7 +248,8 @@ class MemberRankMenu():
 
             report_output += f"{EmojisUI.TASK_CHECK} {self.member.mention} is now a **{new_rank}** in {clan.title}.\n"
 
-            roles_added, roles_removed = await self.member.sync_clan_roles(self.ctx)
+            await self.member.load()
+            roles_added, roles_removed = await self.member.sync_clan_roles(self.ctx,force=True)
             
             for role in roles_added:
                 report_output += f"{EmojisUI.TASK_CHECK} Added {role.mention}.\n"

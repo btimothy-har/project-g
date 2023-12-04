@@ -1,24 +1,20 @@
 import coc
 import pendulum
+import asyncio
 
 from typing import *
-from mongoengine import *
+from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
 
-from .base_clan import *
-
-from ..season.season import aClashSeason
-from ..events.clan_war_leagues import WarLeagueGroup, WarLeagueClan
-from ..events.clan_war import aClanWar
-from ..events.raid_weekend import aRaidWeekend
+from .base_clan import BasicClan
 
 from ...utils.constants.coc_emojis import EmojisClash, EmojisCapitalHall, EmojisLeagues
 from ...utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
 
-class aClan(coc.Clan,BasicClan):
+class aClan(coc.Clan,BasicClan,AwaitLoader):
     def __init__(self,**kwargs):
 
         self._name = None
@@ -30,7 +26,10 @@ class aClan(coc.Clan,BasicClan):
         BasicClan.__init__(self,tag=self.tag)
 
         self.timestamp = pendulum.now()
-        self._badge = getattr(self.badge,'url',"")   
+        self._badge = getattr(self.badge,'url',"")
+    
+    async def load(self):
+        await BasicClan.load(self)
 
     ##################################################
     ### DATA FORMATTERS
@@ -105,39 +104,25 @@ class aClan(coc.Clan,BasicClan):
         return description
     
     async def _sync_cache(self):
-        if self.is_registered_clan or self.is_active_league_clan:
-            asyncio.create_task(bot_client.clan_queue.add_many([m.tag for m in self.members]))
-
-        if BasicClan(self.tag).name != self.name:
-            await self.set_name(self.name)
-        if BasicClan(self.tag).badge != self.badge:
-            await self.set_badge(self.badge)
-        if BasicClan(self.tag).level != self.level:
-            await self.set_level(self.level)
-        if BasicClan(self.tag).capital_hall != self.capital_hall:
-            await self.set_capital_hall(self.capital_hall)
-        if BasicClan(self.tag).war_league_name != self.war_league_name:
-            await self.set_war_league(self.war_league_name)
-
-    def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
-        return WarLeagueClan(self.tag,season)
-    
-    ##################################################
-    ### CLAN METHODS
-    ##################################################
-    # async def cleanup_staff(self):
-    #     #Remove Leaders from Elders/Cos:
-    #     if self.leader in self.coleaders:
-    #         self.coleaders.remove(self.leader)
-    #     if self.leader in self.elders:
-    #         self.elders.remove(self.leader)
-
-    #     for m in self.coleaders:
-    #         mem = aMember(m)
-    #         if self.tag not in [c.tag for c in mem.home_clans]:
-    #             self.coleaders.remove(m)
-
-    #     for m in self.elders:
-    #         mem = aMember(m)
-    #         if self.tag not in [c.tag for c in mem.home_clans]:
-    #             self.elders.remove(m)
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
+            return
+        
+        if self._attributes._sync_lock.locked():
+            return
+        
+        async with self._attributes._sync_lock:          
+            basic_clan = await BasicClan(self.tag)
+            await basic_clan.update_last_sync(pendulum.now())
+            tasks = []
+            if basic_clan.name != self.name:
+                tasks.append(basic_clan.set_name(self.name))
+            if basic_clan.badge != self.badge:
+                tasks.append(basic_clan.set_badge(self.badge))
+            if basic_clan.level != self.level:
+                tasks.append(basic_clan.set_level(self.level))
+            if basic_clan.capital_hall != self.capital_hall:
+                tasks.append(basic_clan.set_capital_hall(self.capital_hall))
+            if basic_clan.war_league_name != self.war_league_name:
+                tasks.append(basic_clan.set_war_league(self.war_league_name))            
+            if tasks:
+                await asyncio.gather(*tasks)

@@ -1,26 +1,25 @@
 import discord
 import random
-import asyncio
-
-from mongoengine import *
 
 from redbot.core import app_commands
-from .objects.inventory import UserInventory
-from .objects.item import ShopItem
-
-from .checks import is_bank_admin
 
 from coc_main.api_client import BotClashClient
 from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.discord.member import aMember
 
-from coc_main.coc_objects.clans.mongo_clan import db_Clan, db_AllianceClan
+from .objects.inventory import UserInventory
+from .objects.item import ShopItem
+
+from .checks import is_bank_admin
 
 bot_client = BotClashClient()
 global_accounts = ["current","sweep","reserve"]
 
+def get_client() -> ClashOfClansClient:
+    return bot_client.bot.get_cog('ClashOfClansClient')
+
 async def autocomplete_eligible_accounts(interaction:discord.Interaction,current:str):
-    cog = bot_client.bot.get_cog("ClashOfClansClient")
+    client = get_client()
     try:
         sel_accounts = []
         if is_bank_admin(interaction):
@@ -30,10 +29,10 @@ async def autocomplete_eligible_accounts(interaction:discord.Interaction,current
                 sel_accounts.extend(global_accounts)
 
         if is_bank_admin(interaction):
-            clans = await cog.get_alliance_clans()
+            clans = await client.get_alliance_clans()
         else:
-            user = aMember(interaction.user.id)
-            clans = await asyncio.gather(*(cog.fetch_clan(c.tag) for c in user.coleader_clans))
+            user = await aMember(interaction.user.id)
+            clans = user.coleader_clans
 
         if current:
             eligible_clans = [c for c in clans if current.lower() in c.name.lower() or current.lower() in c.tag.lower() or current.lower() in c.abbreviation.lower()]
@@ -60,6 +59,48 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
     try:
         guild_items = await ShopItem.get_by_guild(interaction.guild.id)
 
+        if not current:
+            selection = guild_items
+            return [app_commands.Choice(
+                name=f"{item}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+        else:
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
+            return [app_commands.Choice(
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+    except Exception:
+        bot_client.coc_main_log.exception("Error in autocomplete_store_items")
+
+async def autocomplete_show_store_items(interaction:discord.Interaction,current:str):
+    try:
+        get_items = await ShopItem.get_by_guild(interaction.guild.id)
+        guild_items = [item for item in get_items if not item.show_in_store]
+        if not current:
+            selection = guild_items
+            return [app_commands.Choice(
+                name=f"{item}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+        else:
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
+            return [app_commands.Choice(
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+    except Exception:
+        bot_client.coc_main_log.exception("Error in autocomplete_store_items")
+
+async def autocomplete_hide_store_items(interaction:discord.Interaction,current:str):
+    try:
+        get_items = await ShopItem.get_by_guild(interaction.guild.id)
+        guild_items = [item for item in get_items if item.show_in_store]
         if not current:
             selection = guild_items
             return [app_commands.Choice(
@@ -126,7 +167,7 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
 
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
-        inv = await UserInventory.get_by_user_id(interaction.user.id)
+        inv = await UserInventory(interaction.user)
         guild_items = [i for i in inv.inventory if i.guild_id == interaction.guild.id]
 
         if not current:

@@ -5,11 +5,11 @@ import pendulum
 from typing import *
 
 from redbot.core import commands
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason
 from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
-from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
 from coc_main.discord.member import aMember
@@ -55,9 +55,8 @@ class CWLPlayerMenu(DefaultView):
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
     
-    @property
-    def session_registrations(self) -> List[NewRegistration]:
-        return list(self.user_registration.values())
+    def get_live_account(self,tag:str) -> WarLeaguePlayer:
+        return next((p for p in self.live_cwl_accounts if p.tag == tag),None)
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -91,7 +90,7 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-        self.accounts = await self.client.fetch_many_players(*self.member.account_tags)
+        self.accounts = self.member.accounts
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
@@ -168,16 +167,16 @@ class CWLPlayerMenu(DefaultView):
         
         await interaction.edit_original_response(view=self)
 
-        iter_signups = AsyncIter(self.session_registrations)
+        iter_signups = AsyncIter(list(self.user_registration.values()))
+        tasks = []
         async for player in iter_signups:
             if player.league:
-                await player.account.register(
-                    self.member.user_id,
-                    player.league
-                    )
+                tasks.append(player.account.register(self.member.user_id,player.league))
             else:
-                await player.account.unregister()
-        
+                tasks.append(player.account.unregister())
+
+        await bounded_gather(*tasks,return_exceptions=True,limit=3)
+
         self.user_registration = {}
 
         self.current_signups = await WarLeaguePlayer.get_by_user(
@@ -226,9 +225,9 @@ class CWLPlayerMenu(DefaultView):
         
         if len(select.values) > 0:
             for player_tag in select.values:
-                player = await self.client.fetch_player(player_tag)
+                league_player = await WarLeaguePlayer(player_tag,self.season)
                 self.user_registration[player_tag] = NewRegistration(
-                    player.war_league_season(self.season),
+                    league_player,
                     select.reference
                     )
 
@@ -253,9 +252,9 @@ class CWLPlayerMenu(DefaultView):
 
         if len(select.values) > 0:
             for player_tag in select.values:
-                player = await self.client.fetch_player(player_tag)
+                league_player = await WarLeaguePlayer(player_tag,self.season)
                 self.user_registration[player_tag] = NewRegistration(
-                    player.war_league_season(self.season),
+                    league_player,
                     None
                     )
         
@@ -505,18 +504,18 @@ class CWLPlayerMenu(DefaultView):
             show_author=False
             )        
         
-        player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.current_signups])
-        async for a in AsyncIter(player_accounts):
-            cwl_player = a.war_league_season(self.season)
+        a_iter = AsyncIter(self.current_signups)
+        async for cwl_account in a_iter:
+            player = await self.client.fetch_player(cwl_account.tag)
 
-            if a.tag not in self.user_registration:
+            if cwl_account.tag not in self.user_registration:
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{a.title}**",
-                        value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
-                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
-                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open and cwl_player.roster_clan.tag != getattr(a.clan,'tag',None) else "")
-                            + f"\n{a.hero_description}"
+                        name=f"**{player.title}**",
+                        value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
+                            + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
+                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -524,10 +523,11 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{a.title}**",
-                        value=f"{CWLLeagueGroups.get_description(cwl_player.league_group)}"
-                            + (f"\nCWL Clan: **{EmojisLeagues.get(cwl_player.roster_clan.league)} [{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}]({cwl_player.roster_clan.share_link})**" if cwl_player.roster_clan and not cwl_player.roster_clan.roster_open else "")
-                            + f"\n{a.hero_description}"
+                        name=f"**{player.title}**",
+                        value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
+                            + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
+                            + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -535,14 +535,16 @@ class CWLPlayerMenu(DefaultView):
                 else:
                     break
 
-        async for account in AsyncIter(self.accounts):
-            if account.tag not in self.user_registration and account.tag not in [cwl_player.tag for cwl_player in self.current_signups] and account.town_hall_level >= 10:
+        a_iter = AsyncIter(self.accounts)
+        async for account in a_iter:
+            if account.tag not in self.user_registration and account.tag not in [p.tag for p in self.current_signups] and account.town_hall_level >= 10:
 
+                cwl_player = await WarLeaguePlayer(account.tag,self.season)
                 if embed_1_ct < 10:
                     embed.add_field(
                         name=f"**{account.title}**",
                         value=f"Not Registered"
-                            + (f"(Previously registered by <@{account.war_league_season(self.season).discord_user}>)" if account.war_league_season(self.season).discord_user and account.war_league_season(self.season).is_registered else "")
+                            + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
                             + f"\n{account.hero_description}"
                             + "\n\u200b",
                         inline=False
@@ -553,7 +555,7 @@ class CWLPlayerMenu(DefaultView):
                     embed_2.add_field(
                         name=f"**{account.title}**",
                         value=f"Not Registered"
-                            + (f"(Previously registered by <@{account.war_league_season(self.season).discord_user}>)" if account.war_league_season(self.season).discord_user and account.war_league_season(self.season).is_registered else "")
+                            + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
                             + f"\n{account.hero_description}"
                             + "\n\u200b",
                         inline=False
@@ -569,7 +571,7 @@ class CWLPlayerMenu(DefaultView):
                 + f"Pressing {EmojisUI.GREEN_FIRST} **BACK** will discard the below changes.\n\u200b",
             show_author=False
             )
-        r_iter = AsyncIter(self.session_registrations)
+        r_iter = AsyncIter(list(self.user_registration.values()))
         async for m_account in r_iter:
             player = await self.client.fetch_player(m_account.account.tag)
             change_embed.add_field(
@@ -672,11 +674,10 @@ class CWLPlayerMenu(DefaultView):
     ### START LIVE CWL
     ##################################################
     async def show_live_cwl(self):
-        active_league_accounts = [a for a in await WarLeaguePlayer.get_by_user(self.season,self.member.user_id) if a.league_or_roster_clan]
+        self.live_cwl_accounts = [a for a in await WarLeaguePlayer.get_by_user(self.season,self.member.user_id) if a.league_or_roster_clan]
         
         #sort cwl accounts by clan league, then clan name
-        self.live_cwl_accounts = sorted(
-            active_league_accounts,
+        self.live_cwl_accounts.sort(
             key=lambda x:(MultiplayerLeagues.get_index(x.league),getattr(x.league_or_roster_clan,'name','')),
             reverse=True
             )
@@ -730,8 +731,7 @@ class CWLPlayerMenu(DefaultView):
     async def _callback_view_account_stats(self,interaction:discord.Interaction,select:DiscordSelectMenu):
         await interaction.response.defer()
 
-        player_tag = select.values[0]
-        self.show_account_stats = WarLeaguePlayer(player_tag,self.season)
+        self.show_account_stats = self.get_live_account(select.values[0])
         embed = await self.player_cwl_stats_warlog()
         
         self.stats_menu(current_page=9)
@@ -770,10 +770,10 @@ class CWLPlayerMenu(DefaultView):
         
         #dropdown stats per account
         cwl_accounts = [discord.SelectOption(
-            label=str(cwl_player.player_str),
+            label=f"{cwl_player.name} ({cwl_player.tag})",
             value=cwl_player.tag,
             emoji=EmojisTownHall.get(cwl_player.town_hall),
-            description=f"{cwl_player.league_clan.name} {cwl_player.league_clan.tag}" if cwl_player.league_clan else f"{cwl_player.roster_clan.name} {cwl_player.roster_clan.tag}",
+            description=f"CWL Roster: {cwl_player.league_clan.name} ({cwl_player.league_clan.tag})" if cwl_player.league_clan else f"CWL Roster: {cwl_player.roster_clan.name} ({cwl_player.roster_clan.tag})",
             default=cwl_player.tag == getattr(self.show_account_stats,'tag',None))
             for cwl_player in self.live_cwl_accounts
             ]
@@ -806,7 +806,8 @@ class CWLPlayerMenu(DefaultView):
                 show_author=False)
         
         ct = 0
-        async for cwl_player in AsyncIter(self.live_cwl_accounts):
+        a_iter = AsyncIter(self.live_cwl_accounts)
+        async for cwl_player in a_iter:
             player = await self.client.fetch_player(cwl_player.tag)
 
             ct += 1
@@ -816,7 +817,7 @@ class CWLPlayerMenu(DefaultView):
 
             e.add_field(
                 name=f"**{cwl_player.title}**",
-                value=f"CWL Clan: **{EmojisLeagues.get(cwl_player.league_or_roster_clan.league)} [{cwl_player.league_or_roster_clan.name} {cwl_player.league_or_roster_clan.tag}]({cwl_player.league_or_roster_clan.share_link})**"
+                value=f"**{EmojisLeagues.get(cwl_player.league_or_roster_clan.league)} [{cwl_player.league_or_roster_clan.name} {cwl_player.league_or_roster_clan.tag}]({cwl_player.league_or_roster_clan.share_link})**"
                     + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if cwl_player.league_or_roster_clan.tag != getattr(player.clan,'tag',None) else "")
                     + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
                     + (f"\n\u200b" if not cwl_player.league_clan else ""),
@@ -824,13 +825,14 @@ class CWLPlayerMenu(DefaultView):
                 )                
             if cwl_player.league_clan:
                 current_war = cwl_player.league_clan.current_war
+                league_group = await cwl_player.league_clan.get_league_group()
                 war_player = current_war.get_member(cwl_player.tag) if current_war else None
                 war_stats = aClanWarSummary.for_player(
                     cwl_player.tag,
                     cwl_player.league_clan.league_wars
                     )
                 e.add_field(
-                    name=f"**Current War (Round: {cwl_player.league_clan.current_round})**",
+                    name=f"**Current War (Round: {league_group.current_round})**",
                     value=(f"**War Ends In**: <t:{current_war.end_time.int_timestamp}:R>" if current_war and current_war.state == 'inWar' else f"**War Starts In**: <t:{current_war.start_time.int_timestamp}:R>" if current_war and current_war.state == 'preparation' else "War Ended" if current_war and current_war.state == 'warEnded' else "")
                         + ("Not In War" if not war_player else "")
                         + (f"\n{EmojisClash.ATTACK} `{str(len(war_player.attacks)) + ' / ' + str(current_war.attacks_per_member):^5}`" if war_player else "")
@@ -854,7 +856,7 @@ class CWLPlayerMenu(DefaultView):
     
     async def player_cwl_stats_overall(self):
         def _get_overall_stats():
-            overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts]
+            overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts if a.league_clan]
             return overall_stats
 
         overall_stats = await bot_client.run_in_thread(_get_overall_stats)
@@ -914,7 +916,15 @@ class CWLPlayerMenu(DefaultView):
         return [embed]
 
     async def player_cwl_stats_warlog(self):
+        if not self.show_account_stats.league_clan:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"CWL has not yet started for **{self.show_account_stats.name}**.",
+                success=False
+                )
+            return [embed]
         war_stats = aClanWarSummary.for_player(self.show_account_stats.tag,self.show_account_stats.league_clan.league_wars)
+        league_group = await self.show_account_stats.league_clan.get_league_group()
 
         embed = await clash_embed(
             context=self.ctx,
@@ -943,7 +953,7 @@ class CWLPlayerMenu(DefaultView):
                         for defe in war_defenses]
                         )
                     embed.add_field(
-                        name=f"R{self.show_account_stats.league_clan.league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
+                        name=f"R{league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
                         value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
                             + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
                             + (f"{attack_str}\n" if len(war_attacks) > 0 else "")

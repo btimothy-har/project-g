@@ -3,78 +3,96 @@ import discord
 import pendulum
 
 from typing import *
-from mongoengine import *
+
+from collections import defaultdict
 
 from ..api_client import BotClashClient as client
-
-from .mongo_discord import db_RecruitingPost
-
 from ..utils.components import get_bot_webhook, clash_embed, DiscordButton
 from ..utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
 
 class RecruitingReminder():
-    _locks = {}
+    _locks = defaultdict(asyncio.Lock)
+    __slots__ = [
+        'id',
+        'is_active',
+        'ad_name',
+        'ad_link',
+        'guild_id',
+        'channel_id',
+        'remind_user_id',
+        'interval',
+        'last_user_id',
+        'active_reminder_id',
+        'last_posted',
+        ]
 
     @classmethod
     async def get_by_id(cls,id:str) -> 'RecruitingReminder':
-        def _query_db():
-            try:
-                return db_RecruitingPost.objects.get(id=id)
-            except DoesNotExist:
-                return None
-        db = await bot_client.run_in_thread(_query_db)
-        if db:
-            return cls(db)
+        query = await bot_client.coc_db.db__recruiting_post.find_one({'_id':id})
+        if query:
+            return cls(query)
         return None
 
     @classmethod
     async def get_for_guild(cls,guild_id:int) -> List['RecruitingReminder']:
-        def _query_db():
-            return [db for db in db_RecruitingPost.objects(guild=guild_id)]        
-        db = await bot_client.run_in_thread(_query_db)
-        return [cls(p) for p in db]
+        query_doc = {'is_active':True,'guild':guild_id}
+        query = bot_client.coc_db.db__recruiting_post.find(query_doc)
+        return [cls(post) async for post in query]
 
     @classmethod
     async def get_all_active(cls):
-        def _query_db():
-            return [db for db in db_RecruitingPost.objects(is_active=True)]
-        db = await bot_client.run_in_thread(_query_db)
-        return [cls(p) for p in db]
+        query_doc = {'is_active':True}
+        query = bot_client.coc_db.db__recruiting_post.find(query_doc)
+        return [cls(post) async for post in query]
+    
+    def __init__(self,database:dict):
+        self.id = database['_id']
 
-    def __init__(self,db_post:db_RecruitingPost):
-        self.id = str(db_post.id)
+        self.is_active = database.get('is_active',False)
 
-        self.is_active = db_post.is_active
-        self.ad_name = db_post.ad_name
-        self.ad_link = db_post.ad_link
-        self.interval = db_post.interval
-        self.last_user = db_post.last_user
+        self.ad_name = database.get('ad_name',None)
+        self.ad_link = database.get('ad_link',None)
+        
+        self.guild_id = database.get('guild',None)
+        self.channel_id = database.get('channel',None)
+        self.remind_user_id = database.get('remind_user',None)
+        
+        self.interval = database.get('interval',None)
 
-        self._remind_user = db_post.remind_user
-        self._last_posted = db_post.last_posted
-        self._active_reminder = db_post.active_reminder
-        self._channel = db_post.channel
+        self.last_user_id = database.get('last_user',None)
+        self.active_reminder_id = database.get('active_reminder',0)
+        
+        if database.get('last_posted',None):
+            self.last_posted = pendulum.from_timestamp(database['last_posted'])
+        else:
+            self.last_posted = None
     
     def __str__(self):
         return f"{self.ad_name}: every {self.interval}hr(s) for {getattr(self.remind_user,'display_name','Unknown')} in {getattr(self.channel,'name','Unknown Channel')}"
     
     @property
     def lock(self) -> asyncio.Lock:
-        if self.id not in self._locks:
-            self._locks[self.id] = asyncio.Lock()
         return self._locks[self.id]
+
+    @property
+    def guild(self) -> Optional[discord.Guild]:
+        return bot_client.bot.get_guild(self._guild)
+    
+    @property
+    def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
+        return bot_client.bot.get_channel(self._channel)
     
     @property
     def remind_user(self) -> Optional[discord.User]:
-        return bot_client.bot.get_user(self._remind_user)
+        return self.guild.get_member(self.remind_user_id)
     
     @property
-    def last_posted(self) -> Optional[pendulum.DateTime]:
-        if self._last_posted == 0:
+    def active_reminder(self) -> int:
+        if self.active_reminder_id or self.active_reminder_id == 0:
             return None
-        return pendulum.from_timestamp(self._last_posted)
+        return self.active_reminder_id   
     
     @property
     def next_reminder(self) -> Optional[pendulum.DateTime]:
@@ -87,46 +105,55 @@ class RecruitingReminder():
         if bot_client.bot.user.id == 828838353977868368:
             return self.last_posted.add(minutes=self.interval)
         return self.last_posted.add(hours=self.interval)
-
-    @property
-    def active_reminder(self) -> int:
-        if self._active_reminder == 0:
-            return None
-        return self._active_reminder    
-    
-    @property
-    def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
-        return bot_client.bot.get_channel(self._channel)
     
     ##################################################
     ### CREATE / DELETE
     ##################################################
     @classmethod
     async def create(cls,channel:discord.TextChannel,user_to_remind:discord.Member,name:str,link:str,interval:int):
-        def _save_to_db():
-            new_post = db_RecruitingPost(
-                is_active=True,
-                ad_name=name,
-                ad_link=link,
-                guild=channel.guild.id,
-                channel=channel.id,
-                interval=interval,
-                remind_user=user_to_remind.id,
-                last_posted=0,
-                last_user=0,
-                active_reminder=0,
-                logs=[]
+        new_post = await bot_client.coc_db.db__recruiting_post.insert_one({
+            'is_active':True,
+            'ad_name':name,
+            'ad_link':link,
+            'guild':channel.guild.id,
+            'channel':channel.id,
+            'interval':interval,
+            'remind_user':user_to_remind.id,
+            'last_posted':0,
+            'last_user':0,
+            'active_reminder':0,
+            'logs':[]
+            })
+        return await cls.get_by_id(new_post.inserted_id)
+
+    async def update_active_reminder(self,reminder_id:int):
+        async with self.lock:
+            self.active_reminder_id = reminder_id
+            await bot_client.coc_db.db__recruiting_post.update_one(
+                {'_id':self.id},
+                {'$set': 
+                    {'active_reminder':self.active_reminder_id}
+                },
+                upsert=True
                 )
-            new_post.save()
-            return new_post
-        
-        ret_post = await bot_client.run_in_thread(_save_to_db)
-        return cls(ret_post)
+            bot_client.coc_main_log.info(f"{self.ad_name} {self.id} updated active reminder to {self.active_reminder_id}.")
+    
+    async def completed(self,user:discord.User):
+        async with self.lock:
+            self.last_posted = pendulum.now()
+            self.last_user_id = user.id
+            self.active_reminder_id = 0
+            await bot_client.coc_db.db__recruiting_post.update_one(
+                {'_id':self.id},
+                {'$set': 
+                    {
+                        'last_posted':self.last_posted.int_timestamp,
+                        'last_user':self.last_user_id,
+                        'active_reminder':self.active_reminder_id}
+                })
+            bot_client.coc_main_log.info(f"Recruiting Reminder {self.ad_name} completed by {user.name}.")
 
     async def delete(self):
-        def _delete_from_db():
-            db_RecruitingPost.objects.get(id=self.id).delete()
-            
         async with self.lock:
             try:
                 if self.active_reminder:
@@ -138,10 +165,10 @@ class RecruitingReminder():
                             )
                     else:
                         await webhook.delete_message(self.active_reminder)
-                self._is_active = False
+                self.is_active = False
             except:
                 pass
-            await bot_client.run_in_thread(_delete_from_db)
+            await bot_client.coc_db.db__recruiting_post.delete_one({'_id':self.id})
     
     ##################################################
     ### DISCORD HELPERS
@@ -156,10 +183,6 @@ class RecruitingReminder():
         return embed
     
     async def send_reminder(self):
-        def _update_active_reminder():
-            db_RecruitingPost.objects(id=self.id).update_one(set__active_reminder=self._active_reminder)
-            bot_client.coc_main_log.info(f"{self.ad_name} {self.id} updated active reminder to {self._active_reminder}.")
-
         now = pendulum.now()
         send = False
         async with self.lock:
@@ -199,7 +222,7 @@ class RecruitingReminder():
                         embed=post_embed,
                         view=view,
                         )
-                self._active_reminder = msg.id
+                await self.update_active_reminder(msg.id)
                 bot_client.coc_main_log.info(f"Recruiting Reminder sent for {self.ad_name}.")
         
             except asyncio.CancelledError:
@@ -208,25 +231,20 @@ class RecruitingReminder():
                 bot_client.coc_main_log.exception(f"Recruiting Reminder failed for {self.ad_name}.")
                 return exc
             else:
-                await bot_client.run_in_thread(_update_active_reminder)
                 return self
     
     async def refresh_reminder(self):
-        def _update_active_reminder():
-            db_RecruitingPost.objects(id=self.id).update_one(set__active_reminder=self._active_reminder)
-            bot_client.coc_main_log.info(f"{self.ad_name} {self.id} updated active reminder to {self._active_reminder}.")
-
         async with self.lock:
             if not self.is_active:
                 return None
             if not self.active_reminder:
                 return None
-            
             if not self.channel:
                 return await self.delete()
             
             post_embed = await self.embed()
             view = RecruitingPostPrompt(self.id)
+
             webhook = await get_bot_webhook(bot_client.bot,self.channel)
             if isinstance(self.channel,discord.Thread):
                 msg = await webhook.edit_message(
@@ -243,8 +261,7 @@ class RecruitingReminder():
                     embed=post_embed,
                     view=view
                     )
-            self._active_reminder = msg.id
-            await bot_client.run_in_thread(_update_active_reminder)
+            await self.update_active_reminder(msg.id)
 
 class RecruitingPostPrompt(discord.ui.View):
     def __init__(self,post_id:str):
@@ -260,41 +277,24 @@ class RecruitingPostPrompt(discord.ui.View):
         self.add_item(self.button)
     
     async def _post_confirmed(self,interaction:discord.Interaction,button:DiscordButton):
-        def _update_post_in_db():
-            db_RecruitingPost.objects(id=self.post_id).update_one(
-                set__last_posted=now.int_timestamp,
-                set__last_user=interaction.user.id,
-                set__active_reminder=0,
-                )
-
         if not interaction.response.is_done():
             await interaction.response.defer()
-        try:
-            lock = RecruitingReminder._locks[self.post_id]
-        except KeyError:
-            RecruitingReminder._locks[self.post_id] = lock = asyncio.Lock()
         
-        async with lock:
-            post = await RecruitingReminder.get_by_id(self.post_id)
-            now = pendulum.now()
+        post = await RecruitingReminder.get_by_id(self.post_id)
 
-            embed = await post.embed()
-            embed.add_field(
-                name="Posted By",
-                value=f"{interaction.user.mention}"
-                    + f"\nTimestamp: <t:{now.int_timestamp}:R>",
-                inline=False
-                )
+        embed = await post.embed()
+        embed.add_field(
+            name="Posted By",
+            value=f"{interaction.user.mention}"
+                + f"\nTimestamp: <t:{pendulum.now().int_timestamp}:R>",
+            inline=False
+            )
 
-            self.button.label = f"Completed!"
-            self.button.style = discord.ButtonStyle.green
-            self.button.disabled = True
+        self.button.label = f"Completed!"
+        self.button.style = discord.ButtonStyle.green
+        self.button.disabled = True
+        
+        await interaction.edit_original_response(embed=embed,view=self)
+        await post.completed(interaction.user)
             
-            await interaction.edit_original_response(embed=embed,view=self)
-
-            post._last_posted = now.int_timestamp
-            post._active_reminder = 0
-            post.last_user = interaction.user.id
-            await bot_client.run_in_thread(_update_post_in_db)
-            bot_client.coc_main_log.info(f"Recruiting Reminder {post.ad_name} completed by {interaction.user.name}.")
         self.stop()

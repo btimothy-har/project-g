@@ -63,7 +63,9 @@ class MemberNicknameMenu(DefaultView):
     #####
     ####################################################################################################  
     async def start(self):
-        self.is_active = True        
+        self.is_active = True
+        await self.member.load()
+
         embed = await clash_embed(context=self.ctx,message=f"{EmojisUI.LOADING} Loading...")
         if isinstance(self.ctx,discord.Interaction):
             self.message = await self.ctx.followup.send(embed=embed,view=self,ephemeral=self.ephemeral,wait=True)
@@ -87,7 +89,7 @@ class MemberNicknameMenu(DefaultView):
     async def _select_accounts(self):
 
         if self.guild.id == 688449973553201335: #ARIX
-            player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.member_accounts])
+            player_accounts = await self.client.fetch_many_players(*self.member.member_tags)
 
             dropdown_options = [discord.SelectOption(
                 label=f"{account.name} | {account.tag}",
@@ -106,7 +108,7 @@ class MemberNicknameMenu(DefaultView):
             self.add_item(dropdown_menu)
 
         else:
-            player_accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
+            player_accounts = await self.client.fetch_many_players(*self.member.account_tags)
 
             dropdown_options = [discord.SelectOption(
                 label=f"{account.name} | {account.tag}",

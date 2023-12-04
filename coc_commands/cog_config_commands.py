@@ -6,17 +6,15 @@ from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
+from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 
 from coc_main.discord.guild import aGuild, ClanGuildLink, GuildClanPanel, aGuildClocks, GuildApplicationPanel
-
 from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin, has_manage_server
 
 from .views.create_application_panel import CreateApplicationMenu
 from .views.create_recruiting_reminder import CreateRecruitingReminder, RecruitingReminder
-from coc_main.discord.mongo_discord import db_RecruitingPost
 
 bot_client = BotClashClient()
 
@@ -262,7 +260,8 @@ class ClashServerConfig(commands.Cog):
             title="**Clan Panels**"
             )
         clan_panels = await GuildClanPanel.get_for_guild(ctx.guild.id)
-        for panel in clan_panels:
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -284,7 +283,8 @@ class ClashServerConfig(commands.Cog):
             title="**Clan Panels**"
             )
         clan_panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
-        for panel in clan_panels:
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
@@ -462,7 +462,8 @@ class ClashServerConfig(commands.Cog):
             )
         
         application_panels = await GuildApplicationPanel.get_for_guild(ctx.guild.id)
-        for panel in application_panels:
+        a_iter = AsyncIter(application_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"
@@ -500,7 +501,8 @@ class ClashServerConfig(commands.Cog):
             )
         
         application_panels = await GuildApplicationPanel.get_for_guild(interaction.guild.id)
-        for panel in application_panels:
+        a_iter = AsyncIter(application_panels)
+        async for panel in a_iter:
             embed.add_field(
                 name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
                 value=f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}"

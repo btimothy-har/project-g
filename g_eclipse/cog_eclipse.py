@@ -1,15 +1,14 @@
-import os
+import asyncio
 import coc
 import discord
 import pendulum
+import os
 import urllib
-import asyncio
 
+from discord.ext import tasks
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
-from redbot.core.utils import AsyncIter
-from discord.ext import tasks
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
@@ -67,16 +66,7 @@ class ECLIPSE(commands.Cog):
     def dump_channel(self) -> discord.TextChannel:
         return self.bot.get_channel(self._dump_channel)
 
-    async def cog_load(self):
-        async def start_eclipse_cog():
-            while True:
-                if getattr(bot_client,'_api_logged_in',False):
-                    break
-                await asyncio.sleep(1)
-            await bot_client.bot.wait_until_red_ready()
-            await eWarBase.load_all()
-
-        asyncio.create_task(start_eclipse_cog())
+    async def cog_load(self):        
         self.delete_dump_messages.start()
     
     async def cog_unload(self):

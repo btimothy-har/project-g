@@ -1,17 +1,15 @@
 import coc
-import os
 import discord
+import os
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from redbot.core import Config, commands, app_commands
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
 
 from .api_client import BotClashClient
-
 from .utils.components import DefaultView, DiscordModal, DiscordButton, clash_embed
 
 ############################################################
@@ -88,6 +86,11 @@ class ClashOfClansMain(commands.Cog):
     ### COG LOAD
     ##################################################
     async def cog_unload(self):
+        self.client._is_initialized = False
+        cog = self.bot.get_cog('ClashOfClansTasks')
+        if cog:
+            await cog.shutdown()
+
         await self.client.shutdown()
         del self.client
 
@@ -122,7 +125,7 @@ class ClashOfClansMain(commands.Cog):
 
             client = coc.Client(
                 key_count=int(clashapi_login.get("keys",1)),
-                key_names='Created for Project G, from coc.py',
+                key_names='project-g',
                 )
             await client.login(clashapi_login.get("username"),clashapi_login.get("password"))
             keys.extend(client.http._keys)

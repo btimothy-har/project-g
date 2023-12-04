@@ -2,20 +2,17 @@ import asyncio
 import discord
 
 from typing import *
-from mongoengine import *
-
-from ..cog_coc_client import ClashOfClansClient
-from ..api_client import BotClashClient as client
 
 from redbot.core.utils import AsyncIter
 
-from .clan_link import ClanGuildLink, db_ClanGuildLink
-from .clan_panel import GuildClanPanel, db_GuildClanPanel
-from .application_panel import GuildApplicationPanel, ClanApplyMenu, db_GuildApplyPanel
+from .clan_link import ClanGuildLink
+from .clan_panel import GuildClanPanel
+from .application_panel import GuildApplicationPanel, ClanApplyMenu
 from .clocks import aGuildClocks
 from .helpers import guild_clan_panel_embed, guild_application_panel_embed
 
-from ..coc_objects.clans.clan import aClan, db_Clan, db_AllianceClan
+from ..cog_coc_client import ClashOfClansClient
+from ..api_client import BotClashClient as client
 
 from ..exceptions import InvalidGuild
 
@@ -64,7 +61,8 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        linked_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in linked_clans))
+        linked_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        
         embeds = []
         if self.id == 688449973553201335:
             arix_rank = {
@@ -73,9 +71,17 @@ class aGuild():
                 '#2YL99GC9L':3,
                 '#92G9J8CG':4
                 }
-            clans = sorted(linked_clans,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+            clans = sorted(
+                linked_clans,
+                key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
         else:
-            clans = sorted(linked_clans,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+            clans = sorted(
+                linked_clans,
+                key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
         
         async for clan in AsyncIter(clans):
             embed = await guild_clan_panel_embed(clan=clan)
@@ -103,7 +109,6 @@ class aGuild():
                     )                
         async for panel in AsyncIter(guild_panels):
             await panel.send_to_discord(embeds)
-        
         bot_client.coc_main_log.info(f"Clan Panels for {self.guild.name} ({self.id}) updated.")
 
     ##################################################
@@ -115,7 +120,8 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        all_clans = await asyncio.gather(*(self.coc_client.fetch_clan(c.tag) for c in linked_clans))
+        all_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        
         if self.id == 688449973553201335:
             arix_rank = {
                 '#20YLR2LUJ':1,
@@ -123,9 +129,17 @@ class aGuild():
                 '#2YL99GC9L':3,
                 '#92G9J8CG':4
                 }
-            clans = sorted(all_clans,key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+            clans = sorted(
+                all_clans,
+                key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
         else:
-            clans = sorted(all_clans,key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),reverse=True)
+            clans = sorted(
+                all_clans,
+                key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
 
         embed = await guild_application_panel_embed(guild=self.guild,clans=clans)
 

@@ -6,7 +6,7 @@ import re
 from typing import *
 
 from redbot.core import commands
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason
 from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
@@ -30,6 +30,7 @@ class CWLRosterMenu(DefaultView):
 
         self.season = season
         self.clan = clan
+        self.all_participants = []
 
         self._modified_to_save = []
         self._ph_finalize_button = None
@@ -57,6 +58,13 @@ class CWLRosterMenu(DefaultView):
     def modified_to_save(self) -> List[WarLeaguePlayer]:
         return self._modified_to_save
 
+    @property
+    def clan_participants(self) -> List[WarLeaguePlayer]:
+        return [p for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag]
+    
+    def get_league_player(self,tag:str) -> Optional[WarLeaguePlayer]:
+        return next((p for p in self.all_participants if p.tag == tag),None)
+
     ##################################################
     ### OVERRIDE BUILT IN METHODS
     ##################################################
@@ -83,7 +91,9 @@ class CWLRosterMenu(DefaultView):
     ##################################################
     ### MENUS START
     ##################################################
-    async def start(self):        
+    async def start(self):
+        self.all_participants = await WarLeaguePlayer.signups_by_season(self.season)
+
         self.is_active = True
         await self.add_main_menu()
         embeds = await self.clan_embed()
@@ -115,16 +125,17 @@ class CWLRosterMenu(DefaultView):
             message=f"**Menu closed**")
         await interaction.response.edit_message(embed=embed,view=None)
 
-        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
-
     ##################################################
     ### SAVE BUTTON
     ##################################################
     async def _callback_save(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
-        
-        await asyncio.gather(*(cwl_player.save_roster_clan() for cwl_player in self.modified_to_save))
-        await self.clan.reset_roster()
+
+        tasks = [player.save_roster_clan() for player in self.modified_to_save]
+        await bounded_gather(*tasks)
+        self.modified_to_save = []
+
+        self.all_participants = await WarLeaguePlayer.signups_by_season(self.season)
         await self.add_main_menu()
 
         self._ph_save_button.label = "Saved!"
@@ -144,8 +155,14 @@ class CWLRosterMenu(DefaultView):
             item.disabled = True
         await interaction.edit_original_response(view=self)
 
-        await self.clan.finalize_roster()
-        await self.clan.reset_roster()
+        tasks = [player.save_roster_clan() for player in self.modified_to_save]
+        await bounded_gather(*tasks)
+
+        finalized = await self.clan.finalize_roster()
+        if not finalized:
+            await interaction.followup.send("I couldn't finalize this roster. This might be due to conflicting rosters. Double check the roster players again.",ephemeral=True)
+            return await self._callback_home(interaction,button)
+        
         await self.add_main_menu()
 
         embeds = await self.clan_embed()
@@ -157,7 +174,7 @@ class CWLRosterMenu(DefaultView):
     async def _callback_reset(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
-        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
+        self.all_participants = await WarLeaguePlayer.signups_by_season(self.season)
         await self.add_main_menu()
         
         self._ph_reset_button.label = "Roster Reset"
@@ -211,11 +228,11 @@ class CWLRosterMenu(DefaultView):
         await interaction.response.defer()
         tags = AsyncIter(list.values)
         async for t in tags:
-            if len(self.clan.participants) >= 35:
+            if len(self.clan_participants) >= 35:
                 await interaction.followup.send("This clan already has 35 players in roster. You cannot add more.",ephemeral=True)
                 break
-            player = WarLeaguePlayer(t,self.season)
-            player.roster_clan_tag = self.clan.tag
+            player = self.get_league_player(t)
+            player.roster_clan = self.clan
             self.modified_to_save.append(player)
             
         embeds = await self.clan_embed()
@@ -230,8 +247,8 @@ class CWLRosterMenu(DefaultView):
         await interaction.response.defer()
         tags = AsyncIter(list.values)
         async for t in tags:
-            player = WarLeaguePlayer(t,self.season)
-            player.roster_clan_tag = None
+            player = self.get_league_player(t)
+            player.roster_clan = None
             self.modified_to_save.append(player)
        
         embeds = await self.clan_embed()
@@ -362,7 +379,6 @@ class CWLRosterMenu(DefaultView):
         embeds = await self.clan_embed()
         await self.add_player_menu()
         await interaction.edit_original_response(embeds=embeds,view=self)
-
     
     ##################################################
     ### HELP BUTTONS
@@ -491,10 +507,10 @@ class CWLRosterMenu(DefaultView):
                         label=str(player),
                         value=player.tag,
                         emoji=player.town_hall.emoji,
-                        description=(f"{round((player.hero_strength/player.max_hero_strength)*100)}% " if player.max_hero_strength > 0 else "0% ")
-                            + (f"| {round((player.troop_strength/player.max_troop_strength)*100)}% " if player.max_troop_strength > 0 else "0% ")
-                            + (f"| {round((player.spell_strength/player.max_spell_strength)*100)}% " if player.max_spell_strength > 0 else "0% ")
-                            + (f"| Current Roster: {player.war_league_season(self.season).roster_clan.name[:12]}" if player.war_league_season(self.season).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(player.war_league_season(self.season).league_group)}"),
+                        description=f"{round(player.hero_strength_pct)}% "
+                            + f"| {round((player.troop_strength_pct))}% "
+                            + f"| {round((player.spell_strength_pct))}% "
+                            + (f"| Current Roster: {self.get_league_player(player.tag).roster_clan.name[:12]}" if self.get_league_player(player.tag).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(self.get_league_player(player.tag).league_group)}"),
                         default=False)
                         for player in clan_participants
                         ]
@@ -536,8 +552,7 @@ class CWLRosterMenu(DefaultView):
                 label="Exit",
                 style=discord.ButtonStyle.red,
                 row=4
-                ))
-            
+                ))            
             self.add_item(DiscordButton(
                 function=self._callback_main_help,
                 emoji=EmojisUI.HELP,
@@ -546,7 +561,8 @@ class CWLRosterMenu(DefaultView):
                 row=4
                 ))
         
-        participants = await self.client.fetch_many_players(*[p.tag for p in self.clan.participants])
+        clan_participants = [p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag]
+        participants = await self.client.fetch_many_players(*clan_participants)
         _add_main_menu(participants)
     
     ##################################################
@@ -564,10 +580,10 @@ class CWLRosterMenu(DefaultView):
                 label=str(a),
                 value=a.tag,
                 emoji=a.town_hall.emoji,
-                description=(f"{round((a.hero_strength/a.max_hero_strength)*100)}% " if a.max_hero_strength > 0 else "0% ")
-                    + f"| " + (f"{round((a.troop_strength/a.max_troop_strength)*100)}% " if a.max_troop_strength > 0 else "0% ")
-                    + f"| " + (f"{round((a.spell_strength/a.max_spell_strength)*100)}% " if a.max_spell_strength > 0 else "0% ")
-                    + (f"| Current Roster: {a.war_league_season(self.season).roster_clan.name[:12]}" if a.war_league_season(self.season).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(a.war_league_season(self.season).league_group)}"),
+                description=f"{round(a.hero_strength_pct)}% "
+                    + f"| " + f"{round(a.hero_strength_pct)}% "
+                    + f"| " + f"{round(a.spell_strength_pct)}% "
+                    + (f"| Current Roster: {self.get_league_player(a.tag).roster_clan.name[:12]}" if self.get_league_player(a.tag).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(self.get_league_player(a.tag).league_group)}"),
                 default=False)
                 for a in sampled_players
                 ]
@@ -676,7 +692,8 @@ class CWLRosterMenu(DefaultView):
     
     async def get_eligible_participants(self) -> Tuple[List[aPlayer],List[aPlayer]]:
         def eligible_for_rostering(player:aPlayer):
-            if not player.war_league_season(self.season).roster_clan or player.war_league_season(self.season).roster_clan.roster_open:
+            league_player = self.get_league_player(player.tag)
+            if not league_player.roster_clan or league_player.roster_clan.roster_open:
                 return True
             return False
         def pred_members_only(player:aPlayer):
@@ -698,7 +715,8 @@ class CWLRosterMenu(DefaultView):
             return True
         def pred_not_yet_rostered(player:aPlayer):
             if self.not_yet_rostered:
-                return not player.war_league_season(self.season).roster_clan
+                league_player = self.get_league_player(player.tag)
+                return not league_player.roster_clan
             return True
         def pred_townhall_levels(player:aPlayer):
             if len(self.th_filter) > 0:
@@ -706,11 +724,11 @@ class CWLRosterMenu(DefaultView):
             return True
         def pred_registration_group(player:aPlayer):
             if len(self.group_filter) > 0:
-                return player.war_league_season(self.season).league_group in self.group_filter
+                league_player = self.get_league_player(player.tag)
+                return league_player.league_group in self.group_filter
             return True
         
-        signups = await WarLeaguePlayer.signups_by_season(self.season)
-        participants = await self.client.fetch_many_players(*[p.tag for p in signups])
+        participants = await self.client.fetch_many_players(*[p.tag for p in self.all_participants])
 
         all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
         eligible_participants = sorted(
@@ -720,19 +738,20 @@ class CWLRosterMenu(DefaultView):
         return all_participants, eligible_participants
 
     async def autofill_participants(self,max_participants:int):
-        eligible_participants = await WarLeaguePlayer.signups_by_group(
-            season=self.season,
-            group=CWLLeagueGroups.from_league_name(self.clan.league)
-            )
+        eligible_participants = [p for p in self.all_participants if p.league_group <= CWLLeagueGroups.from_league_name(self.clan.league) and p.league_group < 99]
         
-        participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None and p.league_group < 99]
+        participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None]
         unrostered_players = await self.client.fetch_many_players(*[p.tag for p in participants_not_rostered])
+        unrostered_players.sort(key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)
 
-        async for p in AsyncIter(sorted(unrostered_players,key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)):
-            cwl_player = p.war_league_season(self.season)
-            cwl_player.roster_clan_tag = self.clan.tag
+        a_iter = AsyncIter(unrostered_players)
+        async for p in a_iter:
+            cwl_player = self.get_league_player(p.tag)
+            cwl_player.roster_clan = self.clan
             self.modified_to_save.append(cwl_player)
-            if len(self.clan.participants) >= max_participants:
+
+            clan_participants = [p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag]
+            if len(clan_participants) >= max_participants:
                 break
     
     ##################################################
@@ -755,7 +774,7 @@ class CWLRosterMenu(DefaultView):
             show_author=False,
             )
         
-        participants = await self.client.fetch_many_players(*[p.tag for p in self.clan.participants][:35])
+        participants = await self.client.fetch_many_players(*[p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag][:35])
 
         a_participants = AsyncIter(participants)
         async for i,p in a_participants.enumerate(start=1):
@@ -860,9 +879,9 @@ class CWLRosterMenu(DefaultView):
                 else:
                     break
 
-        if len(self.clan.participants) > 30:
+        if len(participants) > 30:
             return [embed_1,embed_2,embed_3]
-        elif len(self.clan.participants) > 15:
+        elif len(participants) > 15:
             return [embed_1,embed_2]
         return [embed_1]
     
@@ -921,9 +940,10 @@ class CWLRosterMenu(DefaultView):
                 if mem.tag not in [p.tag for p in ref_members]:
                     ref_members.append(mem)
 
-        chunked_members = list(chunks(ref_members,25))
-        iter_chunks = AsyncIter(chunked_members)
-        async for i, members_chunk in iter_chunks.enumerate(start=1):
+        chunked_members = [a async for a in chunks(ref_members,25)]
+        a_iter = AsyncIter(chunked_members)
+
+        async for i,members_chunk in a_iter.enumerate(start=1):
             member_text = "\n".join([
                 (f"{evaluate_player_status(player)}")
                 + (f"{EmojisUI.LOGOUT}" if player.clan.tag != clan.tag else f"{EmojisUI.SPACER}")
@@ -938,5 +958,5 @@ class CWLRosterMenu(DefaultView):
                 message=header_text+member_text,
                 thumbnail=clan.badge,
                 )
-            collect_embeds[i] = embed        
+            collect_embeds[i] = embed
         return list(collect_embeds.values())

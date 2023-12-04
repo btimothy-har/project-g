@@ -1,6 +1,7 @@
 import discord
 import aiohttp
 import unicodedata
+import asyncio
 
 from typing import *
 from redbot.core.bot import Red
@@ -21,9 +22,10 @@ def s_convert_seconds_to_str(seconds):
 
     return dtime_days, dtime_hours, dtime_minutes, dtime
 
-def chunks(lst, n):
+async def chunks(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+        await asyncio.sleep(0)
 
 def check_rtl(text:str):
     def is_rtl(char):

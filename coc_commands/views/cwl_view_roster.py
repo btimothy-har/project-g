@@ -83,8 +83,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.clan = await self.client.fetch_clan(self.league_clan.tag)
 
         if self.league_clan.status == 'CWL Started':
-            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-            self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+            await asyncio.gather(*(self.league_clan.compute_lineup_stats(),self.league_clan.get_participants()))
+            self.reference_list = await self.client.fetch_many_players(*self.league_clan.master_roster_tags)
+            self.reference_list.sort(
+                key=lambda x:(x.town_hall.level,x.hero_strength),
+                reverse=True)
 
         else:
             if self.league_clan.roster_open:
@@ -100,9 +103,12 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 else:
                     await self.ctx.reply(embed=embed,view=None)
                 return
-
-            roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-            self.reference_list = sorted(roster_players,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
+            
+            await self.league_clan.get_participants()
+            self.reference_list = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
+            self.reference_list.sort(
+                key=lambda x:(x.town_hall.level,x.hero_strength),
+                reverse=True)
             
             mem_in_clan = await self.client.fetch_many_players(*[p.tag for p in self.clan.members])
             async for mem in AsyncIter(mem_in_clan):
@@ -175,10 +181,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
             return f"{EmojisUI.SPACER}"
 
         embeds = []
-        chunked_members = list(chunks(self.reference_list,25))
-        iter_chunks = AsyncIter(chunked_members)
+        chunked_members = [a async for a in chunks(self.reference_list,25)]
+        a_iter = AsyncIter(chunked_members)
 
-        async for i, members_chunk in iter_chunks.enumerate():
+        async for i,members_chunk in a_iter.enumerate():
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.reference_list)})"
 
             header_text = f"**Season:** {self.league_clan.season.description}"
@@ -231,10 +237,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
     
     async def _set_roster_strength_content(self):
         embeds = []
-        chunked_members = list(chunks(self.reference_list,25))
-        iter_chunks = AsyncIter(chunked_members)
+        chunked_members = [a async for a in chunks(self.reference_list,25)]
+        a_iter = AsyncIter(chunked_members)
 
-        async for i, members_chunk in iter_chunks.enumerate():
+        async for i, members_chunk in a_iter.enumerate():
             startend = f"Showing members {i*25+1} to {(i*25+1)+len(members_chunk)-1}. (Total: {len(self.reference_list)})"
 
             header_text = f"**Season:** {self.league_clan.season.description}"
@@ -254,8 +260,8 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n"            
             header_text += f"{EmojisUI.SPACER}{EmojisUI.SPACER}`{'':<1}{'BK':>2}{'':<2}{'AQ':>2}{'':<2}{'GW':>2}{'':<2}{'RC':>2}{'':<2}{'':<15}`\n"
             member_text = "\n".join([
-                f"{EmojisTownHall.get(player.town_hall)}"
-                + (f"{EmojisUI.YES}" if player in self.league_clan.participants else f"{EmojisUI.SPACER}")
+                f"{EmojisTownHall.get(player.town_hall.level)}"
+                + (f"{EmojisUI.YES}" if player.tag in [p.tag for p in self.league_clan.participants] else f"{EmojisUI.SPACER}")
                 + f"`{'':<1}{getattr(player.barbarian_king,'level',''):>2}"
                 + f"{'':<2}{getattr(player.archer_queen,'level',''):>2}"
                 + f"{'':<2}{getattr(player.grand_warden,'level',''):>2}"
@@ -270,6 +276,7 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 thumbnail=self.clan.badge,
                 )
             embeds.append(embed)
+
         self.paginate_options = embeds
         self.page_index = 0
 

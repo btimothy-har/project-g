@@ -49,8 +49,8 @@ class UserProfileMenu(DefaultView):
             self.add_item(self.add_link_button)
             self.add_item(self.delete_link_button)
     
-    @property
-    def client(self) -> ClashOfClansClient:
+    @classmethod
+    def coc_client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
@@ -64,6 +64,8 @@ class UserProfileMenu(DefaultView):
     ### START / STOP
     ##################################################
     async def start(self):
+        await self.member
+        
         self.is_active = True
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
 
@@ -82,7 +84,8 @@ class UserProfileMenu(DefaultView):
         await add_link_view._start_add_link()
 
         await add_link_view.wait()
-        await self.member.refresh_clash_link(force=True)
+        await self.member.load()
+
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
         await interaction.edit_original_response(embeds=embed,view=self)
     
@@ -92,7 +95,8 @@ class UserProfileMenu(DefaultView):
         await delete_link_view._start_delete_link()
 
         await delete_link_view.wait()
-        await self.member.refresh_clash_link(force=True)
+        await self.member.load()
+
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
         await interaction.edit_original_response(embeds=embed,view=self)
     
@@ -102,12 +106,15 @@ class UserProfileMenu(DefaultView):
     @staticmethod
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
 
-        cog = bot_client.bot.get_cog("ClashOfClansClient")
-        m_accounts = await cog.fetch_many_players(*member.account_tags)
+        client = UserProfileMenu.coc_client()
+        m_accounts = await client.fetch_many_players(*member.account_tags)
 
-        m_accounts.sort(key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),reverse=True)
-
-        global_member = aMember(member.user_id)
+        m_accounts.sort(
+            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
+            reverse=True
+            )
+        
+        global_member = await aMember(member.user_id)
 
         embed = await clash_embed(
             context=ctx,
@@ -297,7 +304,7 @@ class DeleteLinkMenu(DefaultView):
     ### CALLBACK METHODS
     ################################################## 
     async def _start_delete_link(self):
-
+        await self.member.load()
         m_accounts = await self.client.fetch_many_players(*self.member.account_tags)
         m_accounts.sort(key=lambda x:(x.town_hall_level,x.exp_level,x.clean_name),reverse=True)
 

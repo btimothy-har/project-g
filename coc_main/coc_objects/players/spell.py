@@ -2,12 +2,12 @@ from typing import *
 
 from ...api_client import coc as coc
 from ...api_client import BotClashClient as client
+
 from ...utils.constants.coc_emojis import EmojisSpells
 
 bot_client = client()
 
 class aSpell():
-
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int):
         i = bot_client.coc.get_spell(name,level=1)

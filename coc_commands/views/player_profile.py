@@ -21,7 +21,7 @@ bot_client = BotClashClient()
 class PlayerProfileMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
-        accounts:List[str]):
+        accounts:List[aPlayer]):
         
         self.accounts = accounts
         self.current_page = "summary"
@@ -226,13 +226,15 @@ class PlayerProfileMenu(DefaultView):
     async def _summary_embed(self):
         player = self.current_account
 
+        current_season = await player.get_current_season()
+
         discord_user = self.guild.get_member(player.discord_user)
         embed = await clash_embed(
             context=self.ctx,
             title=f"**{player}**",
             message=(f"{player.member_description}\n" if player.is_member else "")
                 + f"{EmojisClash.EXP} {player.exp_level}\u3000{EmojisClash.CLAN} {player.clan_description}\n"
-                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(player.current_season._last_seen))}:R>\n" if len(player.current_season._last_seen) > 0 else "")
+                + (f"{EmojisUI.TIMER} Last Seen: <t:{int(max(current_season.last_seen))}:R>\n" if len(current_season.last_seen) > 0 else "")
                 + (f"{player.discord_user_str}\n" if player.discord_user else ""),
             thumbnail=getattr(discord_user,'display_avatar',None),
             )
@@ -250,23 +252,23 @@ class PlayerProfileMenu(DefaultView):
             )
         
         if player.is_member:
-            td, th, tm, ts = s_convert_seconds_to_str(player.current_season.time_in_home_clan)
+            td, th, tm, ts = s_convert_seconds_to_str(current_season.time_in_home_clan)
             embed.add_field(
-                name="**Current Season Stats with AriX**",
+                name="**Current Season Stats with The Guild**",
                 value=(f"{player.home_clan.emoji} {td} days spent in {player.home_clan.name}\n\n" if player.home_clan else "")
                     + f"**Activity**\n"
-                    + f"{EmojisClash.ATTACK} {player.current_season.attacks}\u3000{EmojisClash.DEFENSE} {player.current_season.defenses}\n"
+                    + f"{EmojisClash.ATTACK} {current_season.attacks}\u3000{EmojisClash.DEFENSE} {current_season.defenses}\n"
                     + f"**Donations**\n"
-                    + f"{EmojisClash.DONATIONSOUT} {player.current_season.donations_sent}\u3000{EmojisClash.DONATIONSRCVD} {player.current_season.donations_rcvd}\n"
+                    + f"{EmojisClash.DONATIONSOUT} {current_season.donations_sent}\u3000{EmojisClash.DONATIONSRCVD} {current_season.donations_rcvd}\n"
                     + f"**Loot**\n"
-                    + f"{EmojisClash.GOLD} {player.current_season.loot_gold}\u3000{EmojisClash.ELIXIR} {player.current_season.loot_elixir}\u3000{EmojisClash.DARKELIXIR} {player.current_season.loot_darkelixir}\n"
+                    + f"{EmojisClash.GOLD} {current_season.loot_gold}\u3000{EmojisClash.ELIXIR} {current_season.loot_elixir}\u3000{EmojisClash.DARKELIXIR} {current_season.loot_darkelixir}\n"
                     + f"**Clan Capital**\n"
-                    + f"{EmojisClash.CAPITALGOLD} {player.current_season.capitalcontribution}\u3000{EmojisClash.CAPITALRAID} {self.current_raidstats.raids_participated}\u3000{EmojisClash.RAIDMEDALS} {self.current_raidstats.medals_earned:,}\n"
+                    + f"{EmojisClash.CAPITALGOLD} {current_season.capitalcontribution}\u3000{EmojisClash.CAPITALRAID} {self.current_raidstats.raids_participated}\u3000{EmojisClash.RAIDMEDALS} {self.current_raidstats.medals_earned:,}\n"
                     + f"**Clan War Performance**\n"
                     + f"{EmojisClash.CLANWAR} {self.current_warstats.wars_participated}\u3000{EmojisClash.STAR} {self.current_warstats.offense_stars}\u3000{EmojisClash.THREESTARS} {self.current_warstats.triples}\u3000{EmojisClash.UNUSEDATTACK} {self.current_warstats.unused_attacks}\n"
                     + f"**Clan Games**\n"
-                    + f"{EmojisClash.CLANGAMES} {player.current_season.clangames.score:,} "
-                    + (f"{EmojisUI.TIMER} {player.current_season.clangames.time_to_completion}\n" if player.current_season.clangames.ending_time else "\n")
+                    + f"{EmojisClash.CLANGAMES} {current_season.clangames.score:,} "
+                    + (f"{EmojisUI.TIMER} {current_season.clangames.time_to_completion}\n" if current_season.clangames.ending_time else "\n")
                     + f"\u200b",
                 inline=False
                 )

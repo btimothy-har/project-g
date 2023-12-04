@@ -1,11 +1,11 @@
 import coc
+import asyncio
 import pendulum
 
 from typing import *
 
 from functools import cached_property
-
-from ...api_client import BotClashClient as client
+from async_property import AwaitLoader
 
 from .townhall import aTownHall
 from .hero import aHero
@@ -13,13 +13,14 @@ from .troop import aTroop
 from .spell import aSpell
 from .pet import aPet
 
-from .base_player import BasicPlayer, db_Player
-from .player_season import aPlayerSeason, db_PlayerStats
+from .base_player import BasicPlayer
+from .player_season import aPlayerSeason
 
 from ..season.season import aClashSeason
 from ..clans.player_clan import aPlayerClan
 from ..events.clan_war_leagues import WarLeaguePlayer
-from ...exceptions import CacheNotReady
+
+from ...api_client import BotClashClient as client
 
 from ...utils.constants.coc_constants import HeroAvailability, TroopAvailability, SpellAvailability, PetAvailability
 from ...utils.constants.coc_constants import EmojisHeroes, EmojisLeagues
@@ -31,7 +32,7 @@ bot_client = client()
 ##### DATABASE
 #####
 ##################################################
-class aPlayer(coc.Player,BasicPlayer):
+class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def __init__(self,**kwargs):
 
         self._name = None
@@ -64,6 +65,11 @@ class aPlayer(coc.Player,BasicPlayer):
     
     def __hash__(self):
         return hash(self.tag)
+
+    async def load(self):
+        if self.clan:
+            await self.clan
+        await BasicPlayer.load(self)
     
     @property
     def name(self) -> str:
@@ -228,6 +234,12 @@ class aPlayer(coc.Player,BasicPlayer):
     def min_hero_strength(self) -> int:
         return sum([hero.min_level for hero in self.heroes])
     @cached_property
+    def hero_strength_pct(self) -> float:
+        try:
+            return round((self.hero_strength / self.max_hero_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
+    @cached_property
     def hero_rushed_pct(self) -> float:
         try:
             rushed_levels = sum([(h.min_level - h.level) for h in self.heroes if h.is_rushed])
@@ -258,6 +270,12 @@ class aPlayer(coc.Player,BasicPlayer):
     def min_troop_strength(self) -> int:
         return (sum([troop.min_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.min_level for pet in self.pets]))
     @cached_property
+    def troop_strength_pct(self) -> float:
+        try:
+            return round((self.troop_strength / self.max_troop_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
+    @cached_property
     def troop_rushed_pct(self) -> float:
         try:
             rushed_troops = sum([(t.min_level - t.level) for t in self.troops if t.is_rushed and not t.is_super_troop]) + sum([(p.min_level - p.level) for p in self.pets if p.is_rushed])
@@ -274,6 +292,12 @@ class aPlayer(coc.Player,BasicPlayer):
     @cached_property
     def min_spell_strength(self) -> int:
         return sum([spell.min_level for spell in self.spells])
+    @cached_property
+    def spell_strength_pct(self) -> float:
+        try:
+            return round((self.spell_strength / self.max_spell_strength)*100,2)
+        except ZeroDivisionError:
+            return 0
     @cached_property
     def spell_rushed_pct(self) -> float:
         try:
@@ -364,38 +388,54 @@ class aPlayer(coc.Player,BasicPlayer):
     ### PLAYER SEASON STATS
     ##################################################    
     async def _sync_cache(self):
-        if BasicPlayer(self.tag).is_new:
-            await BasicPlayer.player_first_seen(self.tag)
-
-        if BasicPlayer(self.tag).name != self.name:
-            await self.set_name(self.name)
-        if BasicPlayer(self.tag).exp_level != self.exp_level:
-            await self.set_exp_level(self.exp_level)
-        if BasicPlayer(self.tag).town_hall_level != self.town_hall_level:
-            await self.set_town_hall_level(self.town_hall_level)
+        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
+            return
         
-        if self.name != self.current_season.name:
-            await self.current_season.update_name(self.name)
-        if self.town_hall_level != self.current_season.town_hall:
-            await self.current_season.update_townhall(self.town_hall_level)
-        if getattr(self.home_clan,'tag',None) != getattr(self.current_season.home_clan,'tag',None):
-            await self.current_season.update_home_clan(getattr(self.home_clan,'tag',None))
-        if self.is_member != self.current_season.is_member:
-            await self.current_season.update_member(self.is_member)
+        if self._attributes._sync_lock.locked():
+            return
+        
+        async with self._attributes._sync_lock:
+            basic_player = await BasicPlayer(self.tag)
+            basic_player._attributes._last_sync = self.timestamp
 
-    @property
-    def current_season(self):
-        return aPlayerSeason(self.tag,bot_client.current_season)
-    
-    @property
-    def season_data(self):
-        return {season.id:aPlayerSeason(self.tag,season) for season in bot_client.tracked_seasons}
-    
-    def get_season_stats(self,season:aClashSeason):
-        return aPlayerSeason(self.tag,season)
+            if basic_player.is_new:
+                await BasicPlayer.player_first_seen(self.tag)
             
-    def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
-        return WarLeaguePlayer(self.tag,season)
+            tasks = []
+
+            if basic_player.name != self.name:
+                tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
+            if basic_player.exp_level != self.exp_level:
+                tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
+            if basic_player.town_hall_level != self.town_hall_level:
+                tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
+
+            if self.is_member:
+                current_season = await self.get_current_season()
+
+                if self.name != current_season.name:
+                    tasks.append(asyncio.create_task(current_season.update_name(self.name)))
+
+                if self.town_hall_level != current_season.town_hall:
+                    tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
+
+                if getattr(self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
+                    tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(self.home_clan,'tag',None))))
+
+                if self.is_member != current_season.is_member:
+                    tasks.append(asyncio.create_task(current_season.update_member(self.is_member)))
+            
+            if tasks:
+                await asyncio.gather(*tasks)
+
+    async def get_current_season(self) -> aPlayerSeason:
+        return await aPlayerSeason(self.tag,bot_client.current_season)
+    
+    async def get_season_stats(self,season:aClashSeason):
+        return await aPlayerSeason(self.tag,season)
+            
+    async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
+        return await WarLeaguePlayer(self.tag,season)
 
     def get_hero(self,hero_name:str):
         return next((hero for hero in self._heroes if hero.name == hero_name),None)

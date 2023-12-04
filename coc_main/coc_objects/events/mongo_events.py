@@ -1,90 +1,89 @@
-from mongoengine import *
-
 ##################################################
 #####
 ##### WAR LEAGUE GROUP
 #####
 ##################################################
-class db_ClanWar(Document):
-    war_id = StringField(primary_key=True,required=True)
-    type = StringField(default="")
-    state = StringField(default="")
-    war_tag = StringField(default="")
-    league_group = StringField(default="")
-    preparation_start_time = IntField(default=0)
-    start_time = IntField(default=0)
-    end_time = IntField(default=0)
-    team_size = IntField(default=0)
-    attacks_per_member = IntField(default=0)
-    clans = ListField(DictField(),default=[])
-    members = ListField(DictField(),default=[])
-    attacks = ListField(DictField(),default=[])
-    is_alliance_war = BooleanField(default=False)
-    last_save = IntField(default=0)
+# db__clan_war = {
+#     '_id': string,
+#     'type': string,
+#     'state': string,
+#     'war_tag': string,
+#     'league_group': string,
+#     'preparation_start_time': int,
+#     'start_time': int,
+#     'end_time': int,
+#     'team_size': int,
+#     'attacks_per_member': int,
+#     'clans': [ {} ],
+#     'members': [ {} ],
+#     'attacks': [ {} ],
+#     'is_alliance_war': bool,
+#     'last_save': int
+#     }
 
 ##################################################
 #####
 ##### CLAN WAR LEAGUES
 #####
 ##################################################
-class db_WarLeagueGroup(Document):
-    group_id = StringField(primary_key=True,required=True)
-    season = StringField(default="")
-    state = StringField(default="")
-    league = StringField(default="")
-    number_of_rounds = IntField(default=0)
-    rounds = ListField(ListField(StringField()),default=[])
-    clans = ListField(StringField(),default=[])
+# db__war_league_group = {
+#     '_id': string,
+#     'season': string,
+#     'state': string,
+#     'league': string,
+#     'number_of_rounds': int,
+#     'rounds': [ [ string, string ], [ string, string ] ],
+#     'clans': [ string ]
+#     }
 
-class db_WarLeagueClan(Document):
-    #ID using format {'season':'1-2023','tag':'#12345678'}
-    cwl_id = DictField(primary_key=True,required=True)
-    season = StringField(default="",required=True)
-    tag = StringField(default="",required=True)
-    name = StringField(default="")
-    is_participating = BooleanField(default=False)
-    roster_open = BooleanField(default=True)    
-    league_group = StringField(default="") #hash
-    master_roster = ListField(StringField(),default=[])
-    
-    #signup_open = BooleanField(default=False)
+# db__war_league_clan = {
+#     '_id': { 'season': string, 'tag': string },
+#     'season': string,
+#     'tag': string,
+#     'name': string,
+#     'is_participating': bool,
+#     'roster_open': bool,
+#     'league_group': string,
+#     'master_roster': [ string, string, string ]
+#     }
 
-class db_WarLeaguePlayer(Document):
-    #ID using format {'season':'1-2023','tag':'#12345678'}
-    cwl_id = DictField(primary_key=True,required=True)
-    season = StringField(default="",required=True)
-    tag = StringField(default="",required=True)
-    name = StringField(default="")
-    registered = BooleanField(default=False)
-    discord_user = IntField(default=0)
-    roster_clan = StringField(default="")    
-    league_clan = StringField(default="")
-    league_group = IntField(default=0)
-    townhall = IntField(default=0)
+# db__war_league_player = {
+#     '_id': { 'season': string, 'tag': string },
+#     'season': string,
+#     'tag': string,
+#     'name': string,
+#     'registered': bool,
+#     'discord_user': int,
+#     'roster_clan': string,
+#     'league_clan': string,
+#     'league_group': int,
+#     'townhall': int
+#     }
 
 ##################################################
 #####
 ##### RAID WEEKEND
 #####
 ##################################################
-class db_RaidWeekend(Document):
-    raid_id = StringField(primary_key=True,required=True)
-    clan_tag = StringField(default="")
-    clan_name = StringField(default="")
-    clan_badge = StringField(default="")
-    clan_level = IntField(default=0)
-    starting_trophies = IntField(default=0)
-    ending_trophies = IntField(default=0)
-    is_alliance_raid = BooleanField(default=False)
-    state = StringField(default="")
-    start_time = IntField(default=0)
-    end_time = IntField(default=0)
-    total_loot = IntField(default=0)
-    attack_count = IntField(default=0)
-    destroyed_district_count = IntField(default=0)
-    offensive_reward = IntField(default=0)
-    defensive_reward = IntField(default=0)
-    attack_log = ListField(DictField(),default=[])
-    defense_log = ListField(DictField(),default=[])
-    members = ListField(DictField(),default=[])
-    last_save = IntField(default=0)
+# db__raid_weekend = {
+#     '_id': string,
+#     'clan_tag': string,
+#     'clan_name': string,
+#     'clan_badge': string,
+#     'clan_level': int,
+#     'starting_trophies': int,
+#     'ending_trophies': int,
+#     'is_alliance_raid': bool,
+#     'state': string,
+#     'start_time': int,
+#     'end_time': int,
+#     'total_loot': int,
+#     'attack_count': int,
+#     'destroyed_district_count': int,
+#     'offensive_reward': int,
+#     'defensive_reward': int,
+#     'attack_log': [ {} ],
+#     'defense_log': [ {} ],
+#     'members': [ {} ],
+#     'last_save': int
+#     }

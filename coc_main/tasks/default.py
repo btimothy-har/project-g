@@ -1,14 +1,12 @@
-import coc
 import asyncio
-import math
 import pendulum
-import random
+import copy
 
 from typing import *
+from aiolimiter import AsyncLimiter
+from collections import deque, defaultdict
 
-from collections import deque
 from ..api_client import BotClashClient as client
-from ..exceptions import InvalidTag, ClashAPIError
 from ..cog_coc_client import ClashOfClansClient
 
 bot_client = client()
@@ -26,54 +24,30 @@ class TaskLoop():
     async def report_fatal_error(message,error):
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         await cog.report_error(message,error)
-    
-    @classmethod
-    def loops(cls) -> List['TaskLoop']:
-        return list(cls._loops.values())
-
-    @classmethod
-    def keys(cls) -> List[str]:
-        return list(cls._loops.keys())
 
     def __init__(self):
+        self.last_loop = pendulum.now()
+        self.dispatch_time = deque(maxlen=100)
+        self.run_time = deque(maxlen=10000)
+
         self._active = False
         self._running = False
-        self._collector = None
-        self._last_loop = None
+
         self._tags = set()
-        self._queue = asyncio.Queue()
+        self._last_db_update = pendulum.now().subtract(minutes=30)
+        
+        self._loop_semaphore = asyncio.Semaphore(100)
+        self._task_semaphore = asyncio.Semaphore(10)
 
-        self.run_time = deque(maxlen=100)
-    
-    def add_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)        
-        if n_tag not in self._tags:
-            self._tags.add(n_tag)
-            return True, n_tag
-        return False, n_tag
-    
-    def remove_to_loop(self,tag:str):
-        n_tag = coc.utils.correct_tag(tag)
-        if n_tag in self._tags:
-            self._tags.discard(n_tag)
-            return True, n_tag
-        return False, n_tag
-    
+        self._cached = {}
+        self._locks = defaultdict(asyncio.Lock)
+        
     async def _loop_task(self):
-        pass
-
-    async def _collector_task(self):
         pass
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
-    
-    @property
-    def last_loop(self) -> pendulum.DateTime:
-        if self._last_loop:
-            return self._last_loop
-        return pendulum.now()
 
     @property
     def coc_client(self) -> ClashOfClansClient:
@@ -84,17 +58,7 @@ class TaskLoop():
         return self.coc_client.api_maintenance
     
     @property
-    def task_lock(self) -> asyncio.Lock:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_lock
-    
-    @property
-    def task_semaphore(self) -> asyncio.Semaphore:
-        cog = bot_client.bot.get_cog('ClashOfClansTasks')
-        return cog.task_semaphore
-    
-    @property
-    def api_semaphore(self) -> asyncio.Semaphore:
+    def api_limiter(self) -> AsyncLimiter:
         cog = bot_client.bot.get_cog('ClashOfClansTasks')
         return cog.api_semaphore
     
@@ -103,16 +67,10 @@ class TaskLoop():
     ##################################################
     async def start(self):
         self._active = True
-        self._collector = asyncio.create_task(self._collector_task())
         await self._loop_task()
     
     async def stop(self):
-        self._active = False        
-        try:
-            self._collector.cancel()
-            await self._collector
-        except:
-            pass
+        self._active = False
     
     def unlock(self,lock:asyncio.Lock):
         try:
@@ -131,22 +89,19 @@ class TaskLoop():
             return False
         except:
             return False
-    
-    @property
-    def runtime_min(self) -> int:
-        try:
-            return min(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
-        except:
-            return 0    
-    @property
-    def runtime_max(self) -> int:
-        try:
-            return max(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
-        except:
-            return 0                
+           
     @property
     def runtime_avg(self) -> int:
+        runtime = copy.copy(self.run_time)
         try:
-            return sum(self.run_time)/len(self.run_time) if self.loop_active and len(self.run_time) > 0 else 0
+            return sum(runtime)/len(runtime) if len(runtime) > 0 else 0
+        except:
+            return 0
+    
+    @property
+    def dispatch_avg(self) -> int:
+        runtime = copy.copy(self.dispatch_time)
+        try:
+            return sum(runtime)/len(runtime) if len(runtime) > 0 else 0
         except:
             return 0
