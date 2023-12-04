@@ -6,11 +6,10 @@ from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
+from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 
 from coc_main.discord.guild import aGuild, ClanGuildLink, GuildClanPanel, aGuildClocks, GuildApplicationPanel
-
 from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin, has_manage_server
 

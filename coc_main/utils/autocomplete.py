@@ -2,7 +2,6 @@ import discord
 import random
 
 from typing import *
-from mongoengine import *
 
 from redbot.core import app_commands
 from redbot.core.utils import AsyncIter

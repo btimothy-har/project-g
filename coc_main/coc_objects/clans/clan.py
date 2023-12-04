@@ -1,18 +1,13 @@
 import coc
 import pendulum
+import asyncio
 
 from typing import *
-from mongoengine import *
 from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
 
-from .base_clan import *
-
-from ..season.season import aClashSeason
-from ..events.clan_war_leagues import WarLeagueGroup, WarLeagueClan
-from ..events.clan_war import aClanWar
-from ..events.raid_weekend import aRaidWeekend
+from .base_clan import BasicClan
 
 from ...utils.constants.coc_emojis import EmojisClash, EmojisCapitalHall, EmojisLeagues
 from ...utils.constants.ui_emojis import EmojisUI
@@ -130,7 +125,4 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             if basic_clan.war_league_name != self.war_league_name:
                 tasks.append(basic_clan.set_war_league(self.war_league_name))            
             if tasks:
-                await asyncio.gather(*tasks)            
-
-    def war_league_season(self,season:aClashSeason) -> WarLeagueClan:
-        return WarLeagueClan(self.tag,season)
+                await asyncio.gather(*tasks)

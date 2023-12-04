@@ -1,18 +1,18 @@
 import asyncio
 import pendulum
-import random
 import copy
 
 from typing import *
 
-from collections import defaultdict
 from redbot.core.utils import AsyncIter, bounded_gather
+
+from .default import TaskLoop
 
 from ..api_client import BotClashClient as client
 from ..cog_coc_client import ClashOfClansClient
 from ..exceptions import InvalidTag, ClashAPIError
 
-from .default import TaskLoop
+
 
 from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan

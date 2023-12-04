@@ -2,14 +2,13 @@ import asyncio
 import discord
 import pendulum
 
-from ..api_client import BotClashClient as client
-
-from .default import TaskLoop
 from redbot.core.utils import AsyncIter,bounded_gather
 
+from .default import TaskLoop
+from ..api_client import BotClashClient as client
 from ..discord.guild import aGuild
-from ..discord.recruiting_reminder import RecruitingReminder
 from ..discord.member import aMember
+from ..discord.recruiting_reminder import RecruitingReminder
 
 bot_client = client()
 

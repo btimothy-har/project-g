@@ -4,9 +4,9 @@ import asyncio
 
 from typing import *
 
+from collections import defaultdict
 from redbot.core.utils import AsyncIter
 
-from collections import defaultdict
 from ...api_client import BotClashClient as client
 from ...cog_coc_client import ClashOfClansClient
 
@@ -14,8 +14,6 @@ from ...coc_objects.players.player import aPlayer
 from ...coc_objects.clans.clan import aClan
 from ...coc_objects.events.clan_war import aClanWar
 from ...coc_objects.events.raid_weekend import aRaidWeekend
-
-from ...discord.mongo_discord import db_ClanEventReminder
 
 from ...utils.components import get_bot_webhook, s_convert_seconds_to_str
 

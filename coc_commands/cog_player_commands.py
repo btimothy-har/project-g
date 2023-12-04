@@ -1,4 +1,3 @@
-import asyncio
 import discord
 import pendulum
 
@@ -15,7 +14,6 @@ from coc_main.discord.member import aMember
 from coc_main.utils.components import handle_command_error, clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
-from coc_main.exceptions import CacheNotReady, ClashAPIError
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu

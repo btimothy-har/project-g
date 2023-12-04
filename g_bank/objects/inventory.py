@@ -1,28 +1,26 @@
-import discord
-import copy
-import pendulum
 import asyncio
 import bson
+import discord
+import pendulum
 
 from typing import *
-from mongoengine import *
-
-from redbot.core import bank
-from redbot.core.utils import AsyncIter,bounded_gather
 from async_property import AwaitLoader
-
 from collections import defaultdict
 
-from .item import ShopItem
+from redbot.core import bank
+from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.components import clash_embed
 
+from .item import ShopItem
+
 bot_client = BotClashClient()
 
-class db_UserInventory(Document):
-    user_id = IntField(required=True,primary_key=True)
-    inventory = DictField(default={})
+# db__user_inventory = {
+#   '_id': user_id,    
+#   'inventory': {}
+#   }
 
 class InventoryItem(ShopItem):
     def __init__(self,item:dict,quantity:int):        

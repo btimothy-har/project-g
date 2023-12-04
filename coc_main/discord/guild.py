@@ -2,20 +2,17 @@ import asyncio
 import discord
 
 from typing import *
-from mongoengine import *
 
-from ..cog_coc_client import ClashOfClansClient
-from ..api_client import BotClashClient as client
+from redbot.core.utils import AsyncIter
 
-from redbot.core.utils import AsyncIter, bounded_gather
-
-from .clan_link import ClanGuildLink, db_ClanGuildLink
-from .clan_panel import GuildClanPanel, db_GuildClanPanel
-from .application_panel import GuildApplicationPanel, ClanApplyMenu, db_GuildApplyPanel
+from .clan_link import ClanGuildLink
+from .clan_panel import GuildClanPanel
+from .application_panel import GuildApplicationPanel, ClanApplyMenu
 from .clocks import aGuildClocks
 from .helpers import guild_clan_panel_embed, guild_application_panel_embed
 
-from ..coc_objects.clans.clan import aClan, db_Clan, db_AllianceClan
+from ..cog_coc_client import ClashOfClansClient
+from ..api_client import BotClashClient as client
 
 from ..exceptions import InvalidGuild
 

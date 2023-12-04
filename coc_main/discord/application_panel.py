@@ -1,28 +1,25 @@
 import asyncio
 import discord
 import re
-import coc
 import pendulum
 import bson
 
 from typing import *
-from mongoengine import *
 
 from redbot.core.utils import AsyncIter
+
+from .clan_link import ClanGuildLink
+from .helpers import account_recruiting_summary
 
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client
 
-from ..coc_objects.players.player import BasicPlayer, aPlayer, db_Player
+from ..coc_objects.players.player import BasicPlayer, aPlayer
 from ..coc_objects.clans.clan import aClan
-
-from .mongo_discord import db_GuildApplyPanel, db_ClanApplication
-from .clan_link import ClanGuildLink
-from .helpers import account_recruiting_summary
 
 from ..utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed
 from ..utils.constants.coc_emojis import EmojisClash
-from ..exceptions import InvalidTag, ClashAPIError
+from ..exceptions import ClashAPIError
 
 bot_client = client()
 

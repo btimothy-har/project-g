@@ -1,10 +1,8 @@
-import asyncio
 import discord
 import pendulum
 import re
 
 from typing import *
-from mongoengine import *
 
 from collections import defaultdict
 from numerize import numerize
@@ -14,9 +12,7 @@ from coc_main.api_client import BotClashClient, aClashSeason
 from coc_main.cog_coc_client import ClashOfClansClient, aClan
 from coc_main.cog_coc_tasks import ClashOfClansTasks
 
-from coc_main.coc_objects.players.player import aPlayer, db_PlayerStats
-from coc_main.coc_objects.clans.clan import db_AllianceClan
-from coc_main.discord.guild import aGuild, ClanGuildLink
+from coc_main.discord.guild import ClanGuildLink
 
 from coc_main.utils.components import clash_embed, DiscordButton
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
@@ -34,7 +30,6 @@ leaderboard_types = {
     }
 
 eligible_townhalls = list(range(9,16))[::-1]
-
 bot_client = BotClashClient()
 
 ##################################################
@@ -42,37 +37,34 @@ bot_client = BotClashClient()
 ##### DATABASE
 #####
 ##################################################
-class db_Leaderboard(Document):
-    type = IntField(required=True)
-    is_global = BooleanField(default=False,required=True)
-    guild_id = IntField(default=0,required=True)
-    channel_id = IntField(default=0,required=True)
-    message_id = IntField(default=0)
+# db__leaderboard = {
+#     '_id': ObjectId,
+#     'type': int,
+#     'is_global': bool,
+#     'guild_id': int,
+#     'channel_id': int,
+#     'message_id': int
+#     }
 
 ##################################################
 #####
 ##### ARCHIVED SEASONS
 #####
 ##################################################
-class db_Leaderboard_Archive(Document):
-    type = IntField(required=True)
-    is_global = BooleanField(default=False,required=True)
-    guild_id = IntField(default=0,required=True)
-    season = StringField(default="",required=True)
-    embed = DictField(default={})
+# db__leaderboard_archive = {
+#     '_id': ObjectId,
+#     'type': int,
+#     'is_global': bool,
+#     'guild_id': int,
+#     'season': string,
+#     'embed': dict
+#     }
 
 ##################################################
 #####
-##### DATABASE
+##### LEADERBOARD VIEW
 #####
 ##################################################
-class db_Leaderboard(Document):
-    type = IntField(required=True)
-    is_global = BooleanField(default=False,required=True)
-    guild_id = IntField(default=0,required=True)
-    channel_id = IntField(default=0,required=True)
-    message_id = IntField(default=0)
-
 class LeaderboardView(discord.ui.View):
     def __init__(self,leaderboard:'DiscordLeaderboard'):
 
@@ -110,7 +102,6 @@ class LeaderboardView(discord.ui.View):
 #####
 ##################################################
 class DiscordLeaderboard():
-
     __slots__ = [
         'id',
         '_type',

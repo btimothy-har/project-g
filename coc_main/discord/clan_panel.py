@@ -1,13 +1,8 @@
 import discord
 
 from typing import *
-from mongoengine import *
-
-from ..api_client import BotClashClient as client
-from ..coc_objects.clans.clan import aClan
 from redbot.core.utils import AsyncIter
-
-from .mongo_discord import db_GuildClanPanel
+from ..api_client import BotClashClient as client
 from ..utils.components import ClanLinkMenu
 
 bot_client = client()

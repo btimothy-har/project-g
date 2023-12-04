@@ -1,15 +1,14 @@
-import os
+import asyncio
 import coc
 import discord
 import pendulum
+import os
 import urllib
-import asyncio
 
+from discord.ext import tasks
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
-from redbot.core.utils import AsyncIter
-from discord.ext import tasks
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient

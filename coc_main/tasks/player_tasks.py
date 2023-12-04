@@ -1,7 +1,7 @@
 import asyncio
 import coc
-import pendulum
 import copy
+import pendulum
 
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather

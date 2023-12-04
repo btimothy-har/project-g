@@ -3,10 +3,8 @@ import discord
 import pendulum
 import random
 
-from discord.ext import tasks
-
 from typing import *
-from mongoengine import *
+from discord.ext import tasks
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
@@ -17,7 +15,7 @@ from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.utils.checks import is_admin
 from coc_main.utils.components import clash_embed
 
-from .leaderboard_files.discord_leaderboard import db_Leaderboard_Archive, DiscordLeaderboard, db_Leaderboard
+from .leaderboard_files.discord_leaderboard import DiscordLeaderboard
 
 lb_type_selector = [
     app_commands.Choice(name="Clan War Triples", value=1),

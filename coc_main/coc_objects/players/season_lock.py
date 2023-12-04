@@ -1,6 +1,6 @@
 import asyncio
-from collections import defaultdict
 
+from collections import defaultdict
 from ..season.season import aClashSeason
 
 class PlayerSeason():

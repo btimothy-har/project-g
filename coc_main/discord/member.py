@@ -3,19 +3,18 @@ import pendulum
 import asyncio
 
 from typing import *
-from mongoengine import *
 
 from async_property import AwaitLoader
 from redbot.core import commands
 from redbot.core.utils import chat_formatting as chat
 from redbot.core.utils import AsyncIter
 
-from ..api_client import BotClashClient as client
-
 from .guild import aGuild, ClanGuildLink
 
-from ..coc_objects.players.player import BasicPlayer, db_Player
-from ..coc_objects.clans.player_clan import db_AllianceClan, aPlayerClan
+from ..api_client import BotClashClient as client
+
+from ..coc_objects.players.player import BasicPlayer
+from ..coc_objects.clans.player_clan import aPlayerClan
 
 from ..exceptions import InvalidUser, InvalidGuild, InvalidTag, CacheNotReady
 from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues

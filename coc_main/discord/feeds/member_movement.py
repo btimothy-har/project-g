@@ -1,18 +1,18 @@
 import coc
 import discord
 import pendulum
-import asyncio
 
 from typing import *
-
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from .clan_feed import ClanDataFeed
+
 from ...api_client import BotClashClient as client
 from ...cog_coc_client import ClashOfClansClient
+
 from ...coc_objects.players.player import aPlayer
 from ...coc_objects.clans.clan import BasicClan, aClan
-from ...discord.mongo_discord import db_ClanDataFeed
+
 from ...utils.constants.coc_emojis import EmojisClash, EmojisLeagues
 from ...utils.components import clash_embed, get_bot_webhook
 

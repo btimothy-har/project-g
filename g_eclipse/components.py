@@ -6,7 +6,6 @@ from typing import *
 from redbot.core.bot import Red
 from redbot.core import commands
 
-
 async def eclipse_embed(
     context: Union[Red, commands.Context, discord.Interaction],
     title: Optional[str] = None,

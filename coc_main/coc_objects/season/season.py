@@ -3,12 +3,11 @@ import logging
 import asyncio
 
 from typing import *
-from mongoengine import *
 
 from collections import defaultdict
+from async_property import AwaitLoader
 
 from redbot.core.bot import Red
-from async_property import AwaitLoader
 
 coc_main_logger = logging.getLogger("coc.main")
 
@@ -63,7 +62,7 @@ class aClashSeason(AwaitLoader):
         return hash(self.season_start)
 
     async def load(self):
-        season = await self._bot.coc_db.db__seasons.find_one({'_id':self.id})
+        season = await self._bot.coc_db.d_season.find_one({'_id':self.id})
 
         self.is_current = season.get('s_is_current',False) if season else False
         self.clangames_max = season.get('clangames_max',4000) if season else 4000
@@ -179,7 +178,7 @@ class aClashSeason(AwaitLoader):
     async def open_cwl_signups(self):            
         async with self._lock:
             self.cwl_signup = True
-            await self._bot.coc_db.db__seasons.update_one(
+            await self._bot.coc_db.d_season.update_one(
                 {'_id':self.id},
                 {'$set': 
                     {'cwl_signup':True}
@@ -191,7 +190,7 @@ class aClashSeason(AwaitLoader):
     async def close_cwl_signups(self):
         async with self._lock:
             self.cwl_signup = False
-            await self._bot.coc_db.db__seasons.update_one(
+            await self._bot.coc_db.d_season.update_one(
                 {'_id':self.id},
                 {'$set': 
                     {'cwl_signup':False}

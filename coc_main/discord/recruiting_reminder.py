@@ -3,13 +3,10 @@ import discord
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from collections import defaultdict
+
 from ..api_client import BotClashClient as client
-
-from .mongo_discord import db_RecruitingPost
-
 from ..utils.components import get_bot_webhook, clash_embed, DiscordButton
 from ..utils.constants.ui_emojis import EmojisUI
 

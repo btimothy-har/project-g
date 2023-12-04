@@ -4,13 +4,12 @@ import pendulum
 
 from typing import *
 
-from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
+from ...api_client import BotClashClient as client
 
 bot_client = client()
 
 class aPlayerClanGames():
-
     __slots__ = [
         '_lock',
         '_prior_seen',

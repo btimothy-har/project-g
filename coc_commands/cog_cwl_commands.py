@@ -8,7 +8,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClan
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
 from coc_main.discord.member import aMember

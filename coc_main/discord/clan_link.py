@@ -1,19 +1,14 @@
 import discord
 
 from typing import *
-from mongoengine import *
+from async_property import async_cached_property
 
 from ..api_client import BotClashClient as client
 from ..coc_objects.clans.clan import BasicClan
 
-from .mongo_discord import db_ClanGuildLink
-
-from async_property import async_cached_property
-
 bot_client = client()
 
 class ClanGuildLink():
-
     @classmethod
     async def get_link(cls,clan_tag:str,guild_id:int) -> Optional['ClanGuildLink']:
         link = await bot_client.coc_db.db__clan_guild_link.find_one(

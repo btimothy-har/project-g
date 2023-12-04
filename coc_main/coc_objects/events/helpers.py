@@ -1,7 +1,6 @@
 import discord
 
 from typing import *
-
 from redbot.core import commands 
 
 from ...api_client import BotClashClient as client
@@ -11,7 +10,7 @@ from .clan_war_leagues import WarLeagueGroup
 from .war_summary import aClanWarSummary
 
 from ...utils.components import clash_embed
-from ...utils.constants.coc_constants import ClanWarType, WarResult, WarState
+from ...utils.constants.coc_constants import WarState
 from ...utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from ...utils.constants.ui_emojis import EmojisUI
 

@@ -6,16 +6,15 @@ import asyncio
 import motor.motor_asyncio
 
 import coc
-from coc.ext import discordlinks
 
 from typing import *
-from mongoengine import *
-
+from coc.ext import discordlinks
 from aiolimiter import AsyncLimiter
 from art import text2art
 from time import process_time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import humanize_list
 
@@ -156,7 +155,7 @@ class BotClashClient():
             raise Exception("BotClashClient must be initialized with a bot instance.")
         
         if not self._is_initialized:
-            self.thread_pool = ThreadPoolExecutor(max_workers=2)
+            self.thread_pool = ThreadPoolExecutor(max_workers=4)
 
             # LOGGERS
             self.coc_main_log = coc_main_logger
@@ -464,14 +463,6 @@ class BotClashClient():
             raise LoginNotSet(f"Clash of Clans Database Username not set.")
         if clash_database.get("password") is None:
             raise LoginNotSet(f"Clash of Clans Database Password not set.")
-        
-        #connect to mongoengine
-        connect(
-            db=clash_database.get("dbprimary"),
-            username=clash_database.get("username"),
-            password=clash_database.get("password"),
-            uuidRepresentation="pythonLegacy"
-            )
 
         self.bot.motor_client = motor.motor_asyncio.AsyncIOMotorClient(
             f'mongodb://{clash_database.get("username")}:{clash_database.get("password")}@localhost:27017/admin',
@@ -510,7 +501,6 @@ class BotClashClient():
             self.discordlinks_log.error(
                 f"Clash DiscordLinks Password is not set. Skipping login."
                 )
-
         try:
             self.discordlinks_client = await discordlinks.login(
                 discordlinks_login.get("username"),

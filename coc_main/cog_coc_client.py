@@ -4,17 +4,18 @@ import discord
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from collections import deque
 from discord.ext import tasks
+
 from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter,bounded_gather
+
 from .api_client import BotClashClient, aClashSeason
 
-from .coc_objects.clans.clan import BasicClan, aClan, db_Clan, db_AllianceClan, db_WarLeagueClanSetup
-from .coc_objects.players.player import BasicPlayer, aPlayer, db_Player, db_PlayerStats
+from .coc_objects.players.player import BasicPlayer, aPlayer
+from .coc_objects.clans.clan import BasicClan, aClan
 from .coc_objects.events.clan_war import aClanWar
 from .coc_objects.events.clan_war_leagues import WarLeagueGroup
 from .coc_objects.events.raid_weekend import aRaidWeekend
@@ -22,7 +23,7 @@ from .coc_objects.events.raid_weekend import aRaidWeekend
 from .exceptions import InvalidTag, ClashAPIError, InvalidAbbreviation
 
 from .utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
-from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI, s_convert_seconds_to_str
+from .utils.components import clash_embed, DefaultView, DiscordButton, EmojisUI
 
 bot_client = BotClashClient()
 

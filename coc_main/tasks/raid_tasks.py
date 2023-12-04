@@ -1,18 +1,16 @@
-import coc
 import asyncio
-import pendulum
+import coc
 import copy
+import pendulum
 
 from typing import *
-
-from collections import defaultdict
 from redbot.core.utils import AsyncIter,bounded_gather
+from .default import TaskLoop
 
 from ..api_client import BotClashClient as client
 from ..cog_coc_client import ClashOfClansClient
 from ..exceptions import InvalidTag, ClashAPIError
 
-from .default import TaskLoop
 from ..coc_objects.clans.clan import aClan
 from ..coc_objects.events.raid_weekend import aRaidWeekend
 from ..discord.feeds.reminders import EventReminder
@@ -57,8 +55,8 @@ class DefaultRaidTasks():
             raid.ending_trophies = new_clan.capital_points
             await raid.save_to_database()
 
-            # if raid.attack_count > 0:
-            #     await RaidResultsFeed.send_results(new_clan,raid)
+            if raid.attack_count > 0:
+                await RaidResultsFeed.start_feed(new_clan,raid)
 
         except:
             bot_client.coc_main_log.exception(f"Error in Raid Ended task.")

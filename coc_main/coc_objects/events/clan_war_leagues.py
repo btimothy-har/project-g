@@ -5,7 +5,6 @@ import hashlib
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from functools import cached_property
 from collections import defaultdict
@@ -21,7 +20,7 @@ from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
 from ..players.base_player import BasicPlayer
 
-from ...utils.constants.coc_constants import ClanWarType, WarResult, MultiplayerLeagues, WarState, CWLLeagueGroups
+from ...utils.constants.coc_constants import MultiplayerLeagues, WarState, CWLLeagueGroups
 
 from ...exceptions import InvalidTag, ClashAPIError
 

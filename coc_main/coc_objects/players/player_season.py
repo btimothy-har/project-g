@@ -1,27 +1,22 @@
-import asyncio
 import pendulum
 
 from typing import *
-from mongoengine import *
-
 from async_property import AwaitLoader
 
-from ...api_client import BotClashClient as client
-from ..season.season import aClashSeason
-
-from .mongo_player import db_PlayerStats
 from .player_stat import aPlayerStat
 from .player_clangames import aPlayerClanGames
 from .season_lock import PlayerSeason
 
+from ..season.season import aClashSeason
 from ..clans.player_clan import aPlayerClan
+
+from ...api_client import BotClashClient as client
 from ...utils.utils import check_rtl
 
 bot_client = client()
 
 class aPlayerSeason(AwaitLoader,PlayerSeason):
     _cache = {}
-
     __slots__ = [
         '_new',
         '_loaded',

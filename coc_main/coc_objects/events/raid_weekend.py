@@ -1,15 +1,9 @@
-import urllib
-import asyncio
-import discord
-
 import coc
 import hashlib
 import pendulum
 
 from typing import *
-from mongoengine import *
 
-from redbot.core.utils import AsyncIter
 from async_property import AwaitLoader
 
 from ...api_client import BotClashClient as client
@@ -17,11 +11,6 @@ from ...api_client import BotClashClient as client
 from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
 from ..players.base_player import BasicPlayer
-
-from .mongo_events import db_RaidWeekend
-
-from ...utils.constants.coc_emojis import EmojisClash
-from ...utils.constants.ui_emojis import EmojisUI
 
 bot_client = client()
 

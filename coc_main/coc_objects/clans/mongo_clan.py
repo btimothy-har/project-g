@@ -1,44 +1,28 @@
-from mongoengine import *
+# db__clan = {
+#     '_id': string, #clan tag
+#     'abbreviation': string,
+#     'emoji': string,
+#     'unicode_emoji': string,
+#     'name': string,
+#     'badge': string,
+#     'level': int,
+#     'capital_hall': int,
+#     'war_league': string
+#     }
 
-class db_Clan(Document):
-    tag = StringField(primary_key=True,required=True)
-    abbreviation = StringField(default="")
-    emoji = StringField(default="")
-    unicode_emoji = StringField(default="")
+# db__alliance_clan = {
+#     '_id': string, #clan tag
+#     'description': string,
+#     'recruitment_level': [ int ],
+#     'recruitment_info': string,
+#     'leader': int,
+#     'coleaders': [ int ],
+#     'elders': [ int ]
+#     }
 
-    name = StringField(default="")
-    badge = StringField(default="")
-    level = IntField(default=0)
-    capital_hall = IntField(default=0)
-    war_league = StringField(default="")
-
-    meta = {
-        'indexes': [
-            'abbreviation'
-            ]
-        }
-
-class db_AllianceClan(Document):
-    tag = StringField(primary_key=True,required=True)
-    description = StringField(default="")
-    recruitment_level = ListField(IntField(),default=[])
-    recruitment_info = StringField(default="")
-    leader = IntField(default=0)
-    coleaders = ListField(IntField(),default=[])
-    elders = ListField(IntField(),default=[])
-    
-    #deprecated
-    announcement_channel = IntField(default=0)
-    member_role = IntField(default=0)
-    home_guild = IntField(default=0)
-    elder_role = IntField(default=0)
-    coleader_role = IntField(default=0)
-
-class db_WarLeagueClanSetup(Document):
-    tag = StringField(primary_key=True,required=True)
-    is_active = BooleanField(default=False)
-    role = IntField(default=0)
-    channel = IntField(default=0)
-
-    #deprecated
-    webhook = IntField(default=0)
+# db__war_league_clan_setup = {
+#     '_id': string, #clan tag
+#     'is_active': bool,
+#     'role': int,
+#     'channel': int
+#     }

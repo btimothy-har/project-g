@@ -1,20 +1,16 @@
 import discord
 import random
-import asyncio
-
-from mongoengine import *
 
 from redbot.core import app_commands
-from .objects.inventory import UserInventory
-from .objects.item import ShopItem
-
-from .checks import is_bank_admin
 
 from coc_main.api_client import BotClashClient
 from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.discord.member import aMember
 
-from coc_main.coc_objects.clans.mongo_clan import db_Clan, db_AllianceClan
+from .objects.inventory import UserInventory
+from .objects.item import ShopItem
+
+from .checks import is_bank_admin
 
 bot_client = BotClashClient()
 global_accounts = ["current","sweep","reserve"]

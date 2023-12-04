@@ -1,32 +1,26 @@
-import asyncio
 import discord
 import pendulum
 import re
-import random
 
 from typing import *
-from mongoengine import *
-
 from collections import Counter
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter, bounded_gather
+from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, db_Clan, db_AllianceClan, aClanWar, aPlayer
+from coc_main.cog_coc_client import ClashOfClansClient, aClan
 
 from coc_main.utils.components import clash_embed, MenuConfirmation, ClanLinkMenu
 from coc_main.utils.utils import chunks
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_clans_coleader, autocomplete_seasons
 from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_admin_or_coleader
 
-from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisClash
+from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from coc_main.discord.clan_link import ClanGuildLink
-from coc_main.coc_objects.players.mongo_player import db_PlayerStats
-from coc_main.exceptions import ClashAPIError
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu

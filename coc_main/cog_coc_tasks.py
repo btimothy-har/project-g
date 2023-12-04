@@ -1,28 +1,24 @@
-import discord
 import asyncio
 import coc
+import discord
 import pendulum
 import logging
 
 from typing import *
-from mongoengine import *
 
 from art import text2art
-from itertools import islice
 from discord.ext import tasks
+from aiolimiter import AsyncLimiter
+
 from redbot.core import commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter, bounded_gather
-from redbot.core.utils.chat_formatting import humanize_list,box
-from aiolimiter import AsyncLimiter
+from redbot.core.utils import AsyncIter
 
 from .api_client import BotClashClient as client
 from .cog_coc_client import ClashOfClansClient
 
-from .coc_objects.clans.clan import db_Clan, db_WarLeagueClanSetup, aClan, BasicClan
-from .coc_objects.players.player import db_Player, db_PlayerStats, aPlayer, BasicPlayer
-from .coc_objects.events.clan_war import db_ClanWar, aClanWar
-from .coc_objects.events.raid_weekend import db_RaidWeekend, aRaidWeekend
+from .coc_objects.season.season import aClashSeason
+from .coc_objects.players.player import BasicPlayer
 
 from .tasks.player_tasks import PlayerLoop
 from .tasks.clan_tasks import ClanLoop
@@ -30,9 +26,6 @@ from .tasks.war_tasks import ClanWarLoop
 from .tasks.raid_tasks import ClanRaidLoop
 from .tasks.guild_tasks import DiscordGuildLoop
 
-from .coc_objects.season.season import aClashSeason
-from .coc_objects.clans.mongo_clan import db_AllianceClan
-from .discord.guild import aGuild
 from .discord.member import aMember
 from .discord.application_panel import GuildApplicationPanel, listener_user_application
 from .discord.recruiting_reminder import RecruitingReminder

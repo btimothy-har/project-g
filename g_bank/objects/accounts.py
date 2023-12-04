@@ -3,13 +3,12 @@ import pendulum
 import xlsxwriter
 
 from collections import defaultdict
-from redbot.core.utils import AsyncIter
 from async_property import AwaitLoader
+
+from redbot.core.utils import AsyncIter
+
 from coc_main.api_client import BotClashClient
 from coc_main.cog_coc_client import ClashOfClansClient, aClan
-
-from .transaction import db_BankTransaction
-from mongoengine import *
 
 bot_client = BotClashClient()
 

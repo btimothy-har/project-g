@@ -4,20 +4,13 @@ import asyncio
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from collections import defaultdict
 from async_property import AwaitLoader
-from redbot.core.utils import AsyncIter
 from ...api_client import BotClashClient as client
-from .mongo_clan import db_Clan, db_AllianceClan, db_WarLeagueClanSetup
-from ..players.mongo_player import db_Player
-
-from ...discord.mongo_discord import db_ClanGuildLink
 
 from ...utils.constants.coc_emojis import EmojisTownHall
 from ...utils.utils import check_rtl
-from ...exceptions import CacheNotReady
 
 bot_client = client()
 

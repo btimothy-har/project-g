@@ -1,16 +1,12 @@
-import coc
 import asyncio
-import math
 import pendulum
-import random
 import copy
 
 from typing import *
 from aiolimiter import AsyncLimiter
-
 from collections import deque, defaultdict
+
 from ..api_client import BotClashClient as client
-from ..exceptions import InvalidTag, ClashAPIError
 from ..cog_coc_client import ClashOfClansClient
 
 bot_client = client()

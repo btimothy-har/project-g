@@ -1,15 +1,12 @@
-import discord
-import random
 import asyncio
 import bson
+import discord
+import random
 
-from redbot.core import bank
-from pymongo import ReturnDocument
-from collections import defaultdict
-
-from mongoengine import *
 from typing import *
 
+from pymongo import ReturnDocument
+from collections import defaultdict
 from coc_main.api_client import BotClashClient
 from ..exceptions import CannotPurchase
 
@@ -21,30 +18,27 @@ from ..exceptions import CannotPurchase
 
 bot_client = BotClashClient()
 
-class db_ShopItem(Document):
-    guild_id = IntField(required=True)
-    type = StringField(required=True)
-    
-    name = StringField(required=True)
-    price = IntField(required=True)
-    stock = IntField(required=True)
-    description = StringField(default="")
-    category = StringField(default="")
-    buy_message = StringField(default="")
-
-    exclusive_role = BooleanField(default=False)
-    required_role = IntField(default=0)
-    show_in_store = BooleanField(default=True)
-    disabled = BooleanField(default=False)
-    
-    role_id = IntField(default=0)
-    bidirectional_role = BooleanField(default=False)
-    
-    random_items = ListField(StringField(),default=[])
+# db__shop_item = {
+#   '_id': ObjectId(),
+#   'guild_id': int,
+#   'type': string,
+#   'name': string,
+#   'price': int,
+#   'stock': int,
+#   'description': string,
+#   'category': string,
+#   'buy_message': string,
+#   'exclusive_role': bool,
+#   'required_role': int,
+#   'show_in_store': bool,
+#   'disabled': bool,
+#   'role_id': int,
+#   'bidirectional_role': bool,
+#   'random_items': [ string ]
+#   }
 
 class ShopItem():
     _locks = defaultdict(asyncio.Lock)
-
     __slots__ = [
         '_id',
         'id',

@@ -1,4 +1,5 @@
 from typing import *
+
 from ...utils.constants.coc_emojis import EmojisTownHall
 
 class aTownHall():

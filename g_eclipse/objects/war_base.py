@@ -1,16 +1,13 @@
+import asyncio
 import discord
 import pendulum
 import urllib
-import asyncio
 
 from typing import *
-from mongoengine import *
 
-from functools import cached_property
-from collections import defaultdict
-
-from redbot.core.utils import AsyncIter
 from async_property import AwaitLoader
+from collections import defaultdict
+from functools import cached_property
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.constants.coc_emojis import EmojisTroops, EmojisTownHall
@@ -21,17 +18,18 @@ bot_client = BotClashClient()
 
 max_th = 15
 
-class dbWarBase(Document):
-    base_id = StringField(primary_key=True,required=True)
-    townhall = IntField(default=0)
-    source = StringField(default="")
-    builder = StringField(default="")
-    added_on = IntField(default=0)
-    base_type = StringField(default="")
-    defensive_cc = StringField(default="")
-    base_image = StringField(default="")
-    builder_notes = StringField(default="")
-    claims = ListField(IntField(),default=[])
+# db_war_base = {
+#   '_id': string,
+#   'townhall': int,
+#   'source': string,
+#   'builder': string,
+#   'added_on': int,
+#   'base_type': string,
+#   'defensive_cc': string,
+#   'base_image': string,
+#   'builder_notes': string,
+#   'claims': [ int ]
+#   }
 
 class eWarBase(AwaitLoader):
     _locks = defaultdict(asyncio.Lock)    
@@ -144,7 +142,7 @@ class eWarBase(AwaitLoader):
         for troop in parsed_cc[0]:
             if defensive_cc_str != "":
                 defensive_cc_str += "\u3000"
-            defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
+            defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} {troop[0].name} x{troop[1]}"
         return defensive_cc_str
 
     @property

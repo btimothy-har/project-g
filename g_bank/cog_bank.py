@@ -1,7 +1,7 @@
-import coc
 import asyncio
-import os
+import coc
 import discord
+import os
 import pendulum
 import xlsxwriter
 
@@ -12,21 +12,10 @@ from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
 
-from .objects.accounts import BankAccount, MasterAccount, ClanAccount
-from .objects.inventory import UserInventory
-from .objects.item import ShopItem, db_ShopItem
-from .views.store_manager import AddItem
-from .views.user_store import UserStore
-
-from .checks import is_bank_admin, is_payday_server, is_bank_server, is_coleader_or_bank_admin
-from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items
-
-from mee6rank.mee6rank import Mee6Rank
-
 from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbreviation
 from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWeekend
 
-from coc_main.coc_objects.players.player import aPlayer, aHero, db_Player
+from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidMember
 
@@ -41,6 +30,17 @@ from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroA
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
+
+from .objects.accounts import BankAccount, MasterAccount, ClanAccount
+from .objects.inventory import UserInventory
+from .objects.item import ShopItem
+from .views.store_manager import AddItem
+from .views.user_store import UserStore
+
+from .checks import is_bank_admin, is_payday_server, is_coleader_or_bank_admin
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items
+
+from mee6rank.mee6rank import Mee6Rank
 
 bot_client = BotClashClient()
 non_member_multiplier = 0.2

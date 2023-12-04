@@ -1,10 +1,10 @@
 import discord
-from typing import *
 
+from typing import *
 from functools import cached_property
+
 from ...api_client import BotClashClient as client
 from ...coc_objects.clans.clan import BasicClan
-from ...discord.mongo_discord import db_ClanDataFeed
 
 bot_client = client()
 
@@ -15,7 +15,6 @@ feed_description = {
     }
 
 class ClanDataFeed():
-
     @classmethod
     async def get_by_id(cls,id:str) -> 'ClanDataFeed':
         query = await bot_client.coc_db.db__clan_data_feed.find_one({'_id':id})

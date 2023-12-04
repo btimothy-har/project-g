@@ -1,22 +1,11 @@
-import asyncio
 import discord
 import pendulum
 import requests
 
 from typing import *
-from mongoengine import *
-
 from redbot.core.utils import AsyncIter
-
 from ..api_client import BotClashClient as client
-
 from ..coc_objects.season.season import aClashSeason
-
-from .mongo_discord import db_ClockConfig
-
-# from ...constants.coc_constants import *
-# from ...constants.coc_emojis import *
-# from ...exceptions import *
 
 bot_client = client()
 

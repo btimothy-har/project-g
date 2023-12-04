@@ -1,17 +1,15 @@
 import coc
-import os
 import discord
+import os
 import pendulum
 
 from typing import *
-from mongoengine import *
 
 from redbot.core import Config, commands, app_commands
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
 
 from .api_client import BotClashClient
-
 from .utils.components import DefaultView, DiscordModal, DiscordButton, clash_embed
 
 ############################################################
