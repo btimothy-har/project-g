@@ -19,6 +19,8 @@ from ..components import eclipse_embed
 
 bot_client = BotClashClient()
 
+max_th = 15
+
 class dbWarBase(Document):
     base_id = StringField(primary_key=True,required=True)
     townhall = IntField(default=0)
@@ -50,12 +52,15 @@ class eWarBase(AwaitLoader):
     @classmethod
     async def by_user_claim(cls,user_id:int):
         query = bot_client.coc_db.db_war_base.find({'claims':user_id})
-        return [await cls(q['_id']) async for q in query]
+        bases = [await cls(q['_id']) async for q in query]
+        return sorted(bases,key=lambda x:(x.added_on),reverse=True)
 
     @classmethod
     async def by_townhall_level(cls,townhall:int):
-        if townhall == 15:
-            cutoff = pendulum.now().subtract(months=4).int_timestamp
+        if townhall == max_th:
+            cutoff = pendulum.now().subtract(months=3).int_timestamp
+        elif townhall == max_th - 1 or townhall == max_th - 2:
+            cutoff = pendulum.now().subtract(months=6).int_timestamp
         else:
             cutoff = pendulum.now().subtract(months=12).int_timestamp
 

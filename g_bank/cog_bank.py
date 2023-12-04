@@ -958,66 +958,84 @@ class Bank(commands.Cog):
     @command_group_bank.command(name="deposit")
     @commands.guild_only()
     @commands.check(is_bank_admin)
-    async def subcommand_bank_deposit(self,ctx:commands.Context,account_type_or_clan_abbreviation:str,amount:int):
+    async def subcommand_bank_deposit(self,ctx:commands.Context,amount:int,account_type:str,account_id:Union[int,str]):
         """
-        Deposit Amount to a Global or Clan Bank Account.
+        Deposit Amount to a Bank Account.
+
+        Valid account_type: `user`, `clan`, or `global`
         """
-        if account_type_or_clan_abbreviation in global_accounts:
-            account = await MasterAccount(account_type_or_clan_abbreviation)
+        if account_type not in ['user','clan','global']:
+            return await ctx.reply("Invalid account type. Valid types are `user`, `clan`, or `global`.")
+        
+        if account_type == 'global':
+            if account_id not in global_accounts:
+                return await ctx.reply("Invalid account. Valid accounts are `current`, `sweep`, or `reserve`.")
+            
+            account = await MasterAccount(account_id)
             await account.deposit(
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Deposit."
                 )
+            
+        if account_type == 'clan':
+            clan = await self.client.from_clan_abbreviation(account_id)
+
+            account = await ClanAccount(clan)
+            await account.deposit(
+                amount=amount,
+                user_id=ctx.author.id,
+                comment=f"Manual Withdrawal."
+                )
         
-        else:
-            try:
-                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
-            except InvalidAbbreviation as exc:
-                return await ctx.reply(exc.message)
-            else:
-                account = await ClanAccount(clan)
-                await account.deposit(
-                    amount=amount,
-                    user_id=ctx.author.id,
-                    comment=f"Manual Deposit."
-                    )        
+        if account_type == 'user':
+            user = ctx.bot.get_user(account_id)
+            if not user:
+                return await ctx.reply("Invalid User.")
+            await bank.deposit_credits(user,amount)
         await ctx.tick()
     
     @app_command_group_bank.command(name="deposit",
-        description="[Bank Admin only] Deposit Amount to a Global or Clan Bank Account.")
+        description="[Bank Admin only] Deposit Amount to a Bank Account.")
     @app_commands.check(is_bank_admin)
     @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
     @app_commands.describe(
+        amount="The amount to deposit.",
         select_account="Select an Account to deposit.",
-        amount="The amount to deposit.")
-    async def app_command_bank_deposit(self,interaction:discord.Interaction,select_account:str,amount:int):
-        
+        user="Select a User to deposit to.",
+        )
+    async def app_command_bank_deposit(self,interaction:discord.Interaction,amount:int,select_account:Optional[str],user:Optional[discord.Member]=None):
+
         await interaction.response.defer(ephemeral=True)
         currency = await bank.get_currency_name()
 
-        if select_account in global_accounts:
-            account = await MasterAccount(select_account)
-            await account.deposit(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Deposit."
-                )
-            return await interaction.followup.send(f"Deposited {amount:,} {currency} to {select_account.capitalize()} account.",ephemeral=True)
-        
-        else:
-            try:
-                clan = await self.client.fetch_clan(select_account)
-            except InvalidAbbreviation as exc:
-                return await interaction.followup.send(exc.message,ephemeral=True)
-            else:
-                account = await ClanAccount(clan)
+        if select_account:
+            if select_account in global_accounts:
+                account = await MasterAccount(select_account)
                 await account.deposit(
                     amount=amount,
                     user_id=interaction.user.id,
                     comment=f"Manual Deposit."
                     )
-                return await interaction.followup.send(f"Deposited {amount:,} {currency} to {clan.title}.",ephemeral=True)
+                return await interaction.followup.send(f"Deposited {amount:,} {currency} to {select_account.capitalize()} account.",ephemeral=True)
+            
+            else:
+                try:
+                    clan = await self.client.fetch_clan(select_account)
+                except InvalidAbbreviation as exc:
+                    return await interaction.followup.send(exc.message,ephemeral=True)
+                else:
+                    account = await ClanAccount(clan)
+                    await account.deposit(
+                        amount=amount,
+                        user_id=interaction.user.id,
+                        comment=f"Manual Deposit."
+                        )
+                    return await interaction.followup.send(f"Deposited {amount:,} {currency} to {clan.title}.",ephemeral=True)
+        
+        if user:
+            await bank.deposit_credits(user,amount)
+            return await interaction.followup.send(f"Deposited {amount:,} {currency} to {user.display_name}.",ephemeral=True)
                 
     ##################################################
     ### WITHDRAW
@@ -1025,62 +1043,83 @@ class Bank(commands.Cog):
     @command_group_bank.command(name="withdraw")
     @commands.guild_only()
     @commands.check(is_bank_admin)
-    async def subcommand_bank_withdraw(self,ctx:commands.Context,account_type_or_clan_abbreviation:str,amount:int):
+    async def subcommand_bank_withdraw(self,ctx:commands.Context,amount:int,account_type:str,account_id:Union[int,str]):
         """
-        Withdraw Amount from a Global or Clan Bank Account.
+        Withdraw Amount from a Bank Account.
+
+        Valid account_type: `user`, `clan`, or `global`
         """
 
-        if account_type_or_clan_abbreviation in global_accounts:
-            account = await MasterAccount(account_type_or_clan_abbreviation)
+        if account_type not in ['user','clan','global']:
+            return await ctx.reply("Invalid account type. Valid types are `user`, `clan`, or `global`.")
+        
+        if account_type == 'global':
+            if account_id not in global_accounts:
+                return await ctx.reply("Invalid account. Valid accounts are `current`, `sweep`, or `reserve`.")
+            
+            account = await MasterAccount(account_id)
+            await account.withdraw(
+                amount=amount,
+                user_id=ctx.author.id,
+                comment=f"Manual Withdrawal."
+                )
+            
+        if account_type == 'clan':
+            clan = await self.client.from_clan_abbreviation(account_id)
+
+            account = await ClanAccount(clan)
             await account.withdraw(
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Withdrawal."
                 )
         
-        else:
-            clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
-       
-            account = await ClanAccount(clan)
-            await account.withdraw(
-                amount=amount,
-                user_id=ctx.author.id,
-                comment=f"Manual Withdrawal."
-                )        
+        if account_type == 'user':
+            user = ctx.bot.get_user(account_id)
+            if not user:
+                return await ctx.reply("Invalid User.")
+
+            await bank.withdraw_credits(user,amount)
         await ctx.tick()
     
     @app_command_group_bank.command(name="withdraw",
-        description="[Bank Admin only] Withdraw Amount from a Global or Clan Bank Account.")
+        description="[Bank Admin only] Withdraw Amount from a Bank Account.")
     @app_commands.check(is_bank_admin)
     @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
     @app_commands.describe(
-        select_account="Select an Account to withdraw.",
-        amount="The amount to withdraw.")
-    async def app_command_bank_deposit(self,interaction:discord.Interaction,select_account:str,amount:int):
+        amount="The amount to withdraw.",
+        select_account="Select an Account to withdraw from.",
+        user="Select a User to withdraw from.",
+        )
+    async def app_command_bank_withdraw(self,interaction:discord.Interaction,amount:int,select_account:Optional[str],user:Optional[discord.Member]=None):
         
         await interaction.response.defer(ephemeral=True)
-
         currency = await bank.get_currency_name()
 
-        if select_account in global_accounts:
-            account = await MasterAccount(select_account)
-            await account.withdraw(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Withdrawal."
-                )
-            return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {select_account.capitalize()} account.",ephemeral=True)
+        if select_account:
+            if select_account in global_accounts:
+                account = await MasterAccount(select_account)
+                await account.withdraw(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Manual Withdrawal."
+                    )
+                return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {select_account.capitalize()} account.",ephemeral=True)
+            
+            else:
+                clan = await self.client.fetch_clan(select_account)
+            
+                account = await ClanAccount(clan)
+                await account.withdraw(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Manual Withdrawal."
+                    )
+                return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {clan.title}.",ephemeral=True)
         
-        else:
-            clan = await self.client.fetch_clan(select_account)
-           
-            account = await ClanAccount(clan)
-            await account.withdraw(
-                amount=amount,
-                user_id=interaction.user.id,
-                comment=f"Manual Withdrawal."
-                )
-            return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {clan.title}.",ephemeral=True)
+        if user:
+            await bank.withdraw_credits(user,amount)
+            return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {user.display_name}.",ephemeral=True)
     
     ##################################################
     ### REWARD
