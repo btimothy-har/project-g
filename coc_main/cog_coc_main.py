@@ -1,16 +1,13 @@
 import coc
-import discord
 import os
-import pendulum
 
 from typing import *
 
-from redbot.core import Config, commands, app_commands
+from redbot.core import Config, commands
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
 
 from .api_client import BotClashClient
-from .utils.components import DefaultView, DiscordModal, DiscordButton, clash_embed
 
 ############################################################
 ############################################################
@@ -141,108 +138,3 @@ class ClashOfClansMain(commands.Cog):
         await self.client.api_logout()
         await self.client.api_login()
         await ctx.reply(f"API Login reloaded.")
-    
-    ##################################################
-    ### REPORT BUTTON
-    ##################################################
-    @commands.command(name="report")
-    @commands.cooldown(rate=1,per=60,type=commands.BucketType.user)
-    @commands.guild_only()
-    async def command_report(self,ctx:commands.Context):
-        """
-        Report an issue to the Bot Owner.        
-        """
-        report_view = ReportButton(ctx)
-
-        await ctx.reply(f"Click the button to send a report.",view=report_view)
-    
-    @app_commands.command(
-        name="report",
-        description="Report an issue to the Bot Owner.")
-    @app_commands.guild_only()
-    @app_commands.checks.cooldown(rate=1,per=60)
-    async def app_command_report(self,interaction:discord.Interaction):
-
-        report_view = ReportButton(interaction)
-        await interaction.response.send_modal(report_view.report_modal)
-
-class ReportButton(DefaultView):
-    def __init__(self,context:Union[discord.Interaction,commands.Context]):
-        self.message = context.message        
-        super().__init__(context)
-
-        self.is_active = True
-
-        button = DiscordButton(
-            function=self.send_modal,
-            label=f"Click to Report an Issue",
-            )
-        self.add_item(button)
-    
-    async def send_modal(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.send_modal(self.report_modal)
-        self.clear_items()        
-        await interaction.followup.edit_message(interaction.message.id,view=self)
-    
-    async def _callback_send_report(self,interaction:discord.Interaction,modal:DiscordModal):
-        await interaction.response.defer()
-
-        mesge = await interaction.followup.send(
-            content=f"Thanks for the report! I've sent it to the bot owner.",
-            wait=True
-            )
-
-        channel = interaction.client.get_channel(1161269740594020403)
-        summary = modal.children[0].value
-        describe = modal.children[1].value
-
-        embed = await clash_embed(
-            context=interaction,
-            message=f"**Summary:** {summary}"
-                + f"\n\n**Description**"
-                + f"\n{describe}",
-            timestamp=pendulum.now()
-            )
-        embed.add_field(
-            name="User",
-            value=f"{interaction.user.mention} ({interaction.user.id})",
-            inline=False
-            )
-        embed.add_field(
-            name="Guild",
-            value=f"{interaction.guild.name}",
-            inline=True
-            )
-        embed.add_field(
-            name="Channel",
-            value=f"{interaction.channel.mention}",
-            inline=True
-            )
-        embed.add_field(
-            name="Message",
-            value=f"{mesge.jump_url}",
-            inline=True
-            )        
-        await channel.send(embed=embed)
-
-    @property
-    def report_modal(self):
-        modal = DiscordModal(
-            function=self._callback_send_report,
-            title=f"Create Application Menu",
-            )
-        summary = discord.ui.TextInput(
-            label="Title",
-            style=discord.TextStyle.short,
-            placeholder="Use this to summarize your report.",
-            required=True
-            )
-        describe = discord.ui.TextInput(
-            label="Message",
-            style=discord.TextStyle.long,
-            placeholder="Provide more details here. The more the better!",
-            required=True
-            )
-        modal.add_item(summary)
-        modal.add_item(describe)
-        return modal
