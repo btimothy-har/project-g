@@ -165,12 +165,12 @@ class Bank(commands.Cog):
         embed = await clash_embed(
             context=self.bot,
             message=f"`{user.id}`"
-                + f"\n\n{user.mention}\u3000" + ("+" if amount >= 0 else "-") + f"{abs(amount):,} {currency}",
+                + f"**{user.mention}\u3000" + ("+" if amount >= 0 else "-") + f"{abs(amount):,} {currency}**",
             success=True if amount >= 0 else False,
             timestamp=pendulum.now()
             )
-        embed.add_field(name="**Reason**",value=comment,inline=False)
-        embed.add_field(name="**Executing User**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=False)
+        embed.add_field(name="**Reason**",value=comment,inline=True)
+        embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
 
         embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
 
@@ -1389,6 +1389,12 @@ class Bank(commands.Cog):
                     comment=f"Reward transfer to {user.name} {user.id}."
                     )
                 await bank.deposit_credits(user,amount)
+                await self._send_log(
+                    user=user,
+                    done_by=interaction.user,
+                    amount=amount,
+                    comment=f"Reward distribution."
+                    )
                 return user
             except:
                 return None
