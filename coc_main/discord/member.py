@@ -419,9 +419,8 @@ class aMember(AwaitLoader):
                 return def_tag
             return self.member_tags[0]        
         
-        #ARIX
-        if self.guild_id == 688449973553201335 and len(self.member_accounts) > 0:
-            return self.member_accounts[0].tag
+        if def_tag:
+            return def_tag
         
         return self.accounts[0].tag
     
