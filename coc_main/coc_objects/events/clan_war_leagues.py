@@ -127,12 +127,14 @@ class WarLeagueGroup(AwaitLoader):
         combined = f"{season.id}-{''.join(sorted([clan.tag for clan in api_data.clans]))}"
         group_id = hashlib.sha256(combined.encode()).hexdigest()
 
-        war_ids_by_rounds = []
+        wars_by_rounds = []
         async for round in AsyncIter(api_data.rounds):
             a_iter = AsyncIter(round)
             tasks = [cls.get_league_war(group_id,tag) async for tag in a_iter]
-            wars_in_round = await bounded_gather(*tasks,limit=1)
-            war_ids_by_rounds.append([war._id for war in wars_in_round if war is not None])
+            wars_by_rounds.append(await bounded_gather(*tasks,limit=1))
+
+        wars_by_rounds.sort(key=lambda inner_list: min(obj._timestamp for obj in inner_list))
+        war_ids_by_rounds = [[war._id for war in round] for round in wars_by_rounds]
         
         await bot_client.coc_db.db__war_league_group.update_one(
             {'_id':group_id},
