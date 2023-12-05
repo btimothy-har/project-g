@@ -224,7 +224,7 @@ class CWLClanGroupMenu(DefaultView):
             label=f"{war.clan_1.clean_name} vs {war.clan_2.clean_name} (Round {self.league_group.get_round_from_war(war)})",
             value=war._id,
             default=True if war._id == getattr(self.war,'_id',None) else False)
-            for war in wars
+            for war in sorted(wars,key=lambda x: x.preparation_start_time.int_timestamp)
             ]
         return DiscordSelectMenu(
             function=self._callback_select_war,
