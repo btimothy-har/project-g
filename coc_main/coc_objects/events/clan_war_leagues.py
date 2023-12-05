@@ -79,7 +79,7 @@ class WarLeagueGroup(AwaitLoader):
     @cached_property
     def current_round(self) -> int:
         for i, round in enumerate(reversed(self.rounds)):
-            if any([w for w in self.wars if w._id in round]):
+            if any([w for w in self.wars if w._id in round and w.state == self.state]):
                 return len(self.rounds) - i
     
     ##################################################
