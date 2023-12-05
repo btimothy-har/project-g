@@ -1568,7 +1568,7 @@ class Bank(commands.Cog):
             return await interaction.followup.send("You can't redeem items for bots!")
         
         get_item = await ShopItem.get_by_id(item)
-        inventory = await UserInventory(user.id)
+        inventory = await UserInventory(user)
 
         if not inventory.has_item(get_item):
             return await interaction.followup.send(f"{user.mention} doesn't have that item.")
