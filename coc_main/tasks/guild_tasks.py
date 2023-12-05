@@ -58,8 +58,8 @@ class DiscordGuildLoop(TaskLoop):
                 self._running = True
                 a_iter = AsyncIter(bot_client.bot.guilds)
 
-                tasks = [self._run_single_loop(guild) async for guild in a_iter]
-                await asyncio.gather(*tasks)
+                async for guild in a_iter:
+                    asyncio.create_task(self._run_single_loop(guild))
                                      
                 self.last_loop = pendulum.now()
                 self._running = False
