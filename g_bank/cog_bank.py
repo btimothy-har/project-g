@@ -523,6 +523,15 @@ class Bank(commands.Cog):
         guild_only=True
         )
     
+    @commands.command(name="runtax")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_run_tax(self,ctx:commands.Context):
+        await ctx.tick()
+        await self.apply_bank_taxes()
+        await self.month_end_sweep()
+        await ctx.reply("Taxes have been applied and the month-end sweep has been completed.")
+    
     ##################################################
     ### BALANCE
     ##################################################
