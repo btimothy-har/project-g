@@ -78,11 +78,11 @@ class RecruitingReminder():
 
     @property
     def guild(self) -> Optional[discord.Guild]:
-        return bot_client.bot.get_guild(self._guild)
+        return bot_client.bot.get_guild(self.guild_id)
     
     @property
     def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
-        return bot_client.bot.get_channel(self._channel)
+        return bot_client.bot.get_channel(self.channel_id)
     
     @property
     def remind_user(self) -> Optional[discord.User]:
