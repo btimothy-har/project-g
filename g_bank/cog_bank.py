@@ -28,7 +28,7 @@ from coc_main.tasks.raid_tasks import ClanRaidLoop
 from coc_main.utils.components import clash_embed, MenuPaginator
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
-from coc_main.utils.checks import is_admin
+from coc_main.utils.checks import is_admin, is_owner
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
 
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
@@ -1230,6 +1230,57 @@ class Bank(commands.Cog):
             return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,} {currency}.",ephemeral=True)
         else:
             return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
+    
+    @app_command_group_bank.command(name="distribute-all",
+        description="Distribute a set amount of money to all Discord Users.")
+    @app_commands.check(is_owner)
+    @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
+    @app_commands.describe(
+        select_account="Select an Account to withdraw the reward from.",
+        amount="The amount to distribute."
+        )
+    async def app_command_bank_reward_all(self,
+        interaction:discord.Interaction,
+        select_account:str,
+        amount:int):
+        
+        await interaction.response.defer()
+
+        async def _helper_reward_user(account:BankAccount,user:discord.Member):
+            try:
+                await account.withdraw(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Reward transfer to {user.name} {user.id}."
+                    )
+                await bank.deposit_credits(user,amount)
+                return user
+            except:
+                return None
+            
+        currency = await bank.get_currency_name()
+
+        if select_account in global_accounts:
+            if not is_bank_admin(interaction):
+                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
+            account = await MasterAccount(select_account)
+            
+        else:
+            clan = await self.client.fetch_clan(select_account)
+            check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
+            if not check_permissions:
+                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
+            account = await ClanAccount(clan)
+
+        count = 0
+        u_iter = AsyncIter(interaction.client.users)
+        async for user in u_iter:
+            if user.bot:
+                continue
+            await _helper_reward_user(account,user)
+            count += 1
+        
+        return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY
@@ -1457,6 +1508,30 @@ class Bank(commands.Cog):
         await inventory.add_item_to_inventory(get_item)
 
         return await interaction.followup.send(f"1x **{get_item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)
+
+    @app_command_group_shopitem.command(
+        name="distribute-all",
+        description="Administratively distribute an item to all users."
+        )
+    @app_commands.check(is_owner)
+    @app_commands.autocomplete(item=autocomplete_distribute_items)
+    @app_commands.describe(
+        item="Select an item to distribute. Only Basic items can be distributed."
+        )
+    async def app_command_distribute_all_item(self,interaction:discord.Interaction,item:str):
+
+        await interaction.response.defer(ephemeral=True)
+        count = 0
+        u_iter = AsyncIter(interaction.client.users)
+        async for user in u_iter:
+            if user.bot:
+                continue
+            count += 1
+            get_item = await ShopItem.get_by_id(item)
+            inventory = await UserInventory(user)
+            await inventory.add_item_to_inventory(get_item)
+
+        return await interaction.followup.send(f"1x **{get_item.name}** has been added to {count} users.",ephemeral=True)
 
     ##################################################
     ### SHOP ITEM / REDEEM

@@ -18,6 +18,12 @@ def is_admin(interaction:discord.Interaction):
             return True    
     return False
 
+def is_owner(interaction:discord.Interaction):
+    bot = interaction.client
+    if interaction.user.id in bot.owner_ids:
+        return True    
+    return False
+
 def has_manage_roles(interaction:discord.Interaction):
     bot = interaction.client
     if interaction.user.id in bot.owner_ids:
