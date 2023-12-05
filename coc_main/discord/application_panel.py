@@ -523,10 +523,10 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
 
     tags_query = bot_client.coc_db.db__player.find({'discord_user':member.id},{'_id':1})
     member_account_tags = [db['_id'] async for db in tags_query]
-    other_accounts = [tag for tag in member_account_tags if tag not in application.tags]
+    other_accounts = [tag for tag in member_account_tags if tag not in application.get('tags')]
 
     if len(accounts) == 0:
-        accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.tags)
+        accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.get('tags'))
     else:
         accounts_embed_text = ""
         async for a in AsyncIter(accounts):
