@@ -1,4 +1,5 @@
 import discord
+import bson
 
 from typing import *
 from functools import cached_property
@@ -17,7 +18,7 @@ feed_description = {
 class ClanDataFeed():
     @classmethod
     async def get_by_id(cls,id:str) -> 'ClanDataFeed':
-        query = await bot_client.coc_db.db__clan_data_feed.find_one({'_id':id})
+        query = await bot_client.coc_db.db__clan_data_feed.find_one({'_id':bson.ObjectId(id)})
         return cls(query) if query else None
 
     @classmethod
@@ -45,13 +46,13 @@ class ClanDataFeed():
         return await cls.get_by_id(feed.inserted_id)
 
     def __init__(self,database:dict):
-        self._id = database['_id']
+        self._id = str(database['_id'])
         self.type = database['type']
         self.guild_id = database['guild_id']
         self.channel_id = database['channel_id']
     
     async def delete(self):
-        await bot_client.coc_db.db__clan_data_feed.delete_one({'_id':self._id})
+        await bot_client.coc_db.db__clan_data_feed.delete_one({'_id':bson.ObjectId(self._id)})
 
     @cached_property
     def description(self) -> str:
