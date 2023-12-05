@@ -29,7 +29,6 @@ class GuildUtility(commands.Cog):
     #####
     ############################################################
     ############################################################
-
     @commands.command(name="unlockcounting")
     @commands.guild_only()
     @commands.check(administrator_check)
@@ -65,23 +64,32 @@ class GuildUtility(commands.Cog):
                 embed.set_footer(text=message.guild.name,icon_url=message.guild.icon if message.guild.icon else self.bot.user.display_avatar)
                 return await message.channel.send(embed=embed)
     
+    ############################################################
+    ############################################################
+    #####
+    ##### SLASH WRAPPER
+    #####
+    ############################################################
+    ############################################################    
     @app_commands.command(name="away",
         description="Tell the bot you're away or back.")
     @app_commands.guild_only()
     @app_commands.describe(
-        message="[Optional] The custom message to display when you're mentioned.",
-        status="[Optional] Only reply when you're set to this status on Discord."
+        status="Only reply when you're set to this status on Discord.",
+        message="[Optional] The custom message to display when you're mentioned."        
         )
     @app_commands.choices(status=[
+        app_commands.Choice(name="Always",value=0),
         app_commands.Choice(name="Do Not Disturb",value=1),
         app_commands.Choice(name="Gaming",value=2),
         app_commands.Choice(name="Idle",value=3),
         app_commands.Choice(name="Listening",value=4),
         app_commands.Choice(name="Offline",value=5)
         ])
-    async def app_command_away_(self,interaction:discord.Interaction,message:Optional[str]=None,status:Optional[int]=0):
+    async def app_command_away_(self,interaction:discord.Interaction,status:int,message:Optional[str]=None):
 
         command_dict = {
+            0: "away",
             1: "dnd",
             2: "gaming",
             3: "idle",
@@ -156,7 +164,7 @@ class GuildUtility(commands.Cog):
     @app_commands.choices(random=[
         app_commands.Choice(name="Yes",value=1),
         app_commands.Choice(name="No",value=0)])
-    async def app_command_gif_(self,interaction:discord.Interaction,keywords:str,random:int):
+    async def app_command_gif_(self,interaction:discord.Interaction,keywords:str,random:Optional[int]=0):
 
         await interaction.response.defer()
         context = await Context.from_interaction(interaction)
@@ -169,4 +177,74 @@ class GuildUtility(commands.Cog):
         await context.invoke(
             self.bot.get_command(command_dict.get(random,0)),
             keywords=keywords
+            )
+    
+    app_command_group_dictionary = app_commands.Group(
+        name="dictionary",
+        description="Group for Dictionary commands."
+        )
+    
+    @app_command_group_dictionary.command(
+        name="antonym",
+        description="Displays antonyms for a given word.")
+    @app_commands.describe(
+        word="The word to find antonyms for.")
+    async def app_command_dictionary_antonym_(self,interaction:discord.Interaction,word:str):            
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("antonym"),
+            word=word
+            )
+    
+    @app_command_group_dictionary.command(
+        name="synonym",
+        description="Displays synonyms for a given word.")
+    @app_commands.describe(
+        word="The word to find synonyms for.")
+    async def app_command_dictionary_synonym_(self,interaction:discord.Interaction,word:str):
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("synonym"),
+            word=word
+            )
+    
+    @app_command_group_dictionary.command(
+        name="define",
+        description="Displays definitions for a given word.")
+    @app_commands.describe(
+        word="The word to find definitions for.")
+    async def app_command_dictionary_define_(self,interaction:discord.Interaction,word:str):
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("define"),
+            word=word
+            )
+
+    app_command_group_wolfram = app_commands.Group(
+        name="wolfram",
+        description="Ask Wolfram Alpha any question."
+        )
+    
+    @app_command_group_wolfram.command(
+        name="ask",
+        description="Ask Wolfram Alpha any question.")
+    @app_commands.describe(
+        question="The question to ask.")
+    async def app_command_dictionary_wolfram_ask_(self,interaction:discord.Interaction,question:str):
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("wolframimage"),
+            arguments=question
+            )
+        
+    @app_command_group_wolfram.command(
+        name="solve",
+        description="Ask Wolfram Alpha any math question. Returns step by step answers.")
+    @app_commands.describe(
+        question="The question to ask.")
+    async def app_command_dictionary_wolfram_solve_(self,interaction:discord.Interaction,question:str):
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("wolframsolve"),
+            query=question
             )
