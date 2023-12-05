@@ -6,10 +6,10 @@ import pendulum
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
 
+from .default import TaskLoop
+
 from ..api_client import BotClashClient as client
 from ..exceptions import InvalidTag, ClashAPIError
-
-from .default import TaskLoop
 
 from ..coc_objects.players.player import aPlayer
 from ..utils.constants.coc_constants import activity_achievements
