@@ -56,7 +56,7 @@ class eWarBase(AwaitLoader):
     @classmethod
     async def by_townhall_level(cls,townhall:int):
         if townhall == max_th:
-            cutoff = pendulum.now().subtract(months=3).int_timestamp
+            cutoff = pendulum.now().subtract(months=4).int_timestamp
         elif townhall == max_th - 1 or townhall == max_th - 2:
             cutoff = pendulum.now().subtract(months=6).int_timestamp
         else:
@@ -142,7 +142,7 @@ class eWarBase(AwaitLoader):
         for troop in parsed_cc[0]:
             if defensive_cc_str != "":
                 defensive_cc_str += "\u3000"
-            defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} {troop[0].name} x{troop[1]}"
+            defensive_cc_str += f"{EmojisTroops.get(troop[0].name)} x{troop[1]}"
         return defensive_cc_str
 
     @property
