@@ -106,7 +106,8 @@ class aMember(AwaitLoader):
             reverse=True
             )
         
-        for a in self.member_accounts:
+        a_iter = AsyncIter(self.member_accounts)        
+        async for a in a_iter:
             if a.home_clan.tag not in [c.tag for c in self.home_clans]:
                 self.home_clans.append(a.home_clan)
         self.home_clans.sort(
@@ -428,7 +429,7 @@ class aMember(AwaitLoader):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
-        if tag not in await self.account_tags:
+        if tag not in self.account_tags:
             raise InvalidTag(tag)
 
         await bot_client.coc_db.db__discord_member.update_one(
