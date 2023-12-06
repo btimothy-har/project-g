@@ -706,8 +706,9 @@ class Bank(commands.Cog):
     @app_commands.guild_only()
     @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
     @app_commands.describe(
+        select_user="Select a User to view balances for. Only usable by Bank Admins.",
         select_clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
-    async def app_command_bank_balance(self,interaction:discord.Interaction,select_clan:Optional[str]=None):        
+    async def app_command_bank_balance(self,interaction:discord.Interaction,select_user:Optional[discord.Member]=None,select_clan:Optional[str]=None):        
         await interaction.response.defer()
 
         if select_clan:

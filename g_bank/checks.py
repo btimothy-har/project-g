@@ -19,7 +19,7 @@ def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
 
     bank_admins = bot.get_cog("Bank").bank_admins
     
-    if user.id in bot.owner_ids or user.id in bank_admins:
+    if getattr(user,'id',0) in bot.owner_ids or getattr(user,'id',0) in bank_admins:
         return True
     return False
 
