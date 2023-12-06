@@ -243,7 +243,7 @@ class Leaderboards(commands.Cog):
             title="**Leaderboard Created**",
             message=f"Channel: {getattr(lb.channel,'name','Unknown Channel')}"
                 + f"\nID: `{lb.id}`"
-                + f"\nType: {lb.lb_type}"
+                + f"\nType: {lb.type}"
                 + f"\nIs Global? `{lb.is_global}`",
             success=True,
             timestamp=pendulum.now()
