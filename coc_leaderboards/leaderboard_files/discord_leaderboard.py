@@ -1,6 +1,7 @@
 import discord
 import pendulum
 import re
+import bson
 
 from typing import *
 
@@ -119,7 +120,8 @@ class DiscordLeaderboard():
         return [bot_client.current_season] + bot_client.tracked_seasons[:3]
 
     def __init__(self,database_entry:dict):
-        self.id = database_entry.get('_id')
+        self._id = database_entry.get('_id')
+        self.id = str(self._id)
 
         self._type = database_entry.get('type',0)
         self.is_global = database_entry.get('is_global',False)
@@ -157,7 +159,7 @@ class DiscordLeaderboard():
     
     @classmethod
     async def get_by_id(cls,leaderboard_id:str) -> 'DiscordLeaderboard':
-        find_lb = await bot_client.coc_db.db__leaderboard.find_one({'_id':leaderboard_id})
+        find_lb = await bot_client.coc_db.db__leaderboard.find_one({'_id':bson.ObjectId(leaderboard_id)})
         if find_lb:
             return cls(find_lb)
         return None
@@ -193,7 +195,7 @@ class DiscordLeaderboard():
         message = await self.fetch_message()
         if message:
             await message.delete()  
-        await bot_client.coc_db.db__leaderboard.delete_one({'_id':self.id})
+        await bot_client.coc_db.db__leaderboard.delete_one({'_id':self._id})
 
     async def fetch_message(self) -> Optional[discord.Message]:
         if self.channel:
@@ -338,7 +340,7 @@ class DiscordLeaderboard():
                 
             self.message_id = message.id
             await bot_client.coc_db.db__leaderboard.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': {
                     'message_id':self.message_id
                     }
@@ -470,7 +472,7 @@ class ResourceLootLeaderboard(Leaderboard):
                 'season':season.id,
                 'attacks.season_total': {'$gt':0},
                 'loot_darkelixir.season_total': {'$gt':0},
-                'home_clan_tag': {'$in':[c.tag for c in leaderboard_clans]}
+                'home_clan': {'$in':[c.tag for c in leaderboard_clans]}
                 },
                 {'tag':1})
             
@@ -555,7 +557,7 @@ class DonationsLeaderboard(Leaderboard):
                 'is_member':True,
                 'season':season.id,
                 'donations_sent.season_total': {'$gt':0},
-                'home_clan_tag': {'$in':[c.tag for c in leaderboard_clans]}
+                'home_clan': {'$in':[c.tag for c in leaderboard_clans]}
                 },
                 {'tag':1})
         
