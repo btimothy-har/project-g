@@ -374,10 +374,19 @@ class Bank(commands.Cog):
             if not member:
                 return
             
+            distribute = False            
+            if old_player.clan.is_alliance_clan:
+                distribute = True
+            if new_player.clan.is_alliance_clan:
+                distribute = True
+
+            if not distribute:
+                return
+            
             old_ach = old_player.get_achievement(achievement.name)
             new_ach = new_player.get_achievement(achievement.name)            
             increment = new_ach.value - old_ach.value
-            
+
             membership_multiplier = 1 if new_player.is_member else non_member_multiplier
             total_reward = round((10 * (increment // 1000)) * membership_multiplier)
 
