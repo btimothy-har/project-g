@@ -82,7 +82,8 @@ class UserInventory(AwaitLoader):
                 {'$inc': {
                     f'inventory.{item.id}': -quantity
                     }
-                }
+                },
+                upsert=True
             )
             await self.load()
             return True
@@ -94,7 +95,8 @@ class UserInventory(AwaitLoader):
                 {'$inc': {
                     f'inventory.{item.id}': quantity
                     }
-                }
+                },
+                upsert=True
             )
             await self.load()
 
