@@ -136,7 +136,7 @@ class DiscordLeaderboard():
         self._leaderboard_data = {}
     
     def __str__(self):
-        return f"{self.type} Leaderboard (Global: {self.is_global}"
+        return f"{self.type} Leaderboard (Global: {self.is_global})"
     
     @property
     def client(self) -> ClashOfClansClient:
