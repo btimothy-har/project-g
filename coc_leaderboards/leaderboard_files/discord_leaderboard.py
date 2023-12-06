@@ -104,6 +104,7 @@ class LeaderboardView(discord.ui.View):
 ##################################################
 class DiscordLeaderboard():
     __slots__ = [
+        '_id',
         'id',
         '_type',
         'is_global',

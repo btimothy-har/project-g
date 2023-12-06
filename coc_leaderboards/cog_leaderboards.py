@@ -24,6 +24,8 @@ lb_type_selector = [
     app_commands.Choice(name="Clan Games", value=5)
     ]
 
+bot_client = BotClashClient()
+
 async def autocomplete_leaderboard_selector(interaction:discord.Interaction,current:str):
     try:
         guild_leaderboards = await DiscordLeaderboard.get_guild_leaderboards(interaction.guild.id)
@@ -33,17 +35,12 @@ async def autocomplete_leaderboard_selector(interaction:discord.Interaction,curr
         else:
             sel_lb = guild_leaderboards
 
+        sample = random.sample(sel_lb,min(5,len(sel_lb)))
+
         return [
-            app_commands.Choice(
-                name=str(lb),
-                value=lb.id
-                )
-            for lb in random.sample(sel_lb,min(5,len(sel_lb)))
-            ]
+            app_commands.Choice(name=str(lb),value=lb.id) for lb in sample] 
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_leaderboard_selector")
-
-bot_client = BotClashClient()
 
 ############################################################
 ############################################################
