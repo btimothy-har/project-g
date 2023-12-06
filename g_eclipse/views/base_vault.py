@@ -418,8 +418,6 @@ class BaseVaultMenu(DefaultView):
         show_base = self.all_bases[self.base_index]
         embed,file = await show_base.base_embed()
 
-        dump_task = asyncio.create_task(self.cog.dump_channel.send(f"{self.user.id} {self.user.name} @ {self.channel.mention}",file=file))        
-
         embed.add_field(
             name=f"🔍 Bookmarked by: {len(show_base.claims)} member(s)",
             value=f"**You have bookmarked this base.\n\u200b**"
@@ -432,9 +430,10 @@ class BaseVaultMenu(DefaultView):
             inline=False
             )
         
-        dump_message = await dump_task
-        embed.set_image(url=dump_message.attachments[0].url)
-        self.cog.dump_messages.append(dump_message.id)
+        if file:
+            dump_message = await self.cog.dump_channel.send(f"{self.user.id} {self.user.name} @ {self.channel.mention}",file=file)
+            embed.set_image(url=dump_message.attachments[0].url)
+            self.cog.dump_messages.append(dump_message.id)
         return embed
 
     async def _send_base_link_embed(self):

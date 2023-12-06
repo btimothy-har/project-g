@@ -375,9 +375,9 @@ class Bank(commands.Cog):
                 return
             
             distribute = False            
-            if old_player.clan.is_alliance_clan:
+            if getattr(old_player.clan,'is_alliance_clan',False):
                 distribute = True
-            if new_player.clan.is_alliance_clan:
+            if getattr(new_player.clan,'is_alliance_clan',False):
                 distribute = True
 
             if not distribute:

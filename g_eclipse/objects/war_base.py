@@ -172,8 +172,11 @@ class eWarBase(AwaitLoader):
             await self.load()
 
     async def base_embed(self):
-        image_file_path = bot_client.bot.base_image_path + '/' + self.base_image
-        image_file = discord.File(image_file_path,'image.png')
+        try:
+            image_file_path = bot_client.bot.base_image_path + '/' + self.base_image
+            image_file = discord.File(image_file_path,'image.png')
+        except:
+            image_file = None
 
         base_text = (f"Date Added: {pendulum.from_timestamp(self.added_on).format('DD MMM YYYY')}"
                 + f"\n\nFrom: **{self.source}**\nBuilder: **{self.builder}**"
@@ -186,5 +189,6 @@ class eWarBase(AwaitLoader):
             context=bot_client.bot,
             title=f"**TH{self.town_hall} {EmojisTownHall.get(int(self.town_hall))} {self.base_type}**",
             message=base_text)
-        embed.set_image(url="attachment://image.png")
+        if image_file:
+            embed.set_image(url="attachment://image.png")
         return embed,image_file
