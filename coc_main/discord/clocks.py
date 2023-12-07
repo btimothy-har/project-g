@@ -249,7 +249,7 @@ class aGuildClocks():
     
     async def update_clangames_channel(self):
         now = pendulum.now('UTC')
-        season = aClashSeason.get_current_season()
+        season = await aClashSeason.get_current_season()
 
         if season.clangames_start < season.clangames_end.add(hours=24) < now:
             clangames_season = season.next_season()
@@ -295,7 +295,7 @@ class aGuildClocks():
     
     async def update_clangames_event(self):
         now = pendulum.now('UTC')
-        season = aClashSeason.get_current_season()
+        season = await aClashSeason.get_current_season()
 
         if season.clangames_start < season.clangames_end.add(hours=24) < now:
             clangames_season = season.next_season()
@@ -332,7 +332,7 @@ class aGuildClocks():
     
     async def update_warleagues_channel(self):
         now = pendulum.now('UTC')
-        season = aClashSeason.get_current_season()
+        season = await aClashSeason.get_current_season()
 
         if season.cwl_start < season.cwl_end.add(hours=24) < now:
             warleague_season = season.next_season()
@@ -377,7 +377,7 @@ class aGuildClocks():
     
     async def update_warleagues_event(self):
         now = pendulum.now('UTC')
-        season = aClashSeason.get_current_season()
+        season = await aClashSeason.get_current_season()
 
         if season.cwl_start < season.cwl_end.add(hours=24) < now:
             warleague_season = season.next_season()
