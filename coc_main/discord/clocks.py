@@ -91,7 +91,7 @@ class aGuildClocks():
         else:
             self.use_channels = True
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'use_channels':self.use_channels
                 }
@@ -104,7 +104,7 @@ class aGuildClocks():
         else:
             self.use_events = True
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'use_events':self.use_events
                 }
@@ -124,7 +124,7 @@ class aGuildClocks():
     async def new_season_channel(self,channel_id:int):
         self._season_channel = channel_id        
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'season_channel':self._season_channel
                 }
@@ -166,7 +166,7 @@ class aGuildClocks():
     async def new_raids_channel(self,channel_id:int):
         self._raids_channel = channel_id
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'raids_channel':self._raids_channel
                 }
@@ -240,7 +240,7 @@ class aGuildClocks():
     async def new_clangames_channel(self,channel_id:int):
         self._clangames_channel = channel_id
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'clangames_channel':self._clangames_channel
                 }
@@ -323,7 +323,7 @@ class aGuildClocks():
     async def new_league_channel(self,channel_id:int):
         self._warleague_channel = channel_id
         await bot_client.coc_db.db__clock_config.update_one(
-            {'s_id':self.id},
+            {'_id':self.id},
             {'$set':{
                 'warleague_channel':self._warleague_channel
                 }
