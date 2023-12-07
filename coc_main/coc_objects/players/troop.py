@@ -7,6 +7,24 @@ from ...utils.constants.coc_emojis import EmojisTroops
 
 bot_client = client()
 
+th_16_max_level = {
+    'Barbarian': 12,
+    'Archer': 12,
+    'Giant': 12,
+    'Wall Breaker': 12,
+    'Balloon': 11,
+    'Wizard': 12,
+    'Healer': 9,
+    'Dragon': 11,
+    'P.E.K.K.A': 11,
+    'Miner': 10,
+    'Electro Dragon': 7,
+    'Dragon Rider': 4,
+    'Valkyrie': 11,
+    'Golem': 13,
+    'Witch': 7,
+    }
+
 class aTroop():
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int):
@@ -95,8 +113,15 @@ class aTroop():
         return self._game_troop.level    
     @property
     def max_level(self) -> int:
+        th = self._th_level
+        if th == 16:
+            if self.name in th_16_max_level:
+                return th_16_max_level[self.name]
+            else:
+                th = 15
+        
         try:
-            m = self._game_troop.get_max_level_for_townhall(max(self._th_level,3))
+            m = self._game_troop.get_max_level_for_townhall(max(th,3))
         except:
             m = None
         return m if m else self._game_troop.max_level

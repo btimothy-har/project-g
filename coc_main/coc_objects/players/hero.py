@@ -74,6 +74,13 @@ class aHero():
         return self._game_hero.level    
     @property
     def max_level(self) -> int:
+        if self._th_level == 16:
+            if self.name in ['Barbarian King','Archer Queen']:
+                return 95
+            if self.name in ['Grand Warden']:
+                return 70
+            if self.name in ['Royal Champion']:
+                return 45
         try:
             m = self._game_hero.get_max_level_for_townhall(max(self._th_level,3))
         except:
