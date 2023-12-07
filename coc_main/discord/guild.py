@@ -3,7 +3,7 @@ import discord
 
 from typing import *
 
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from .clan_link import ClanGuildLink
 from .clan_panel import GuildClanPanel
@@ -159,16 +159,22 @@ class aGuild():
     ##################################################    
     async def update_clocks(self):
         clock_config = await aGuildClocks.get_for_guild(self.id)
+        tasks = []
         if getattr(clock_config,'use_channels',False):
-            await asyncio.gather(
+            tasks.extend([
                 clock_config.update_season_channel(),
                 clock_config.update_raidweekend_channel(),
                 clock_config.update_clangames_channel(),
                 clock_config.update_warleagues_channel()
-                )        
+                ])
+            
         if getattr(clock_config,'use_events',False):
-            await asyncio.gather(
+            tasks.extend([
                 clock_config.update_raidweekend_event(),
                 clock_config.update_clangames_event(),
                 clock_config.update_warleagues_event()
-                )
+                ])
+        
+        if len(tasks) == 0:
+            return
+        await bounded_gather(*tasks,limit=1)
