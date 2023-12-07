@@ -131,9 +131,10 @@ class WarLeagueGroup(AwaitLoader):
         async for round in AsyncIter(api_data.rounds):
             a_iter = AsyncIter(round)
             tasks = [cls.get_league_war(group_id,tag) async for tag in a_iter]
-            wars_by_rounds.append(await bounded_gather(*tasks,limit=1))
+            get_wars = await bounded_gather(*tasks,limit=1))
+            wars_by_rounds.append([w for w in get_wars if isinstance(w,aClanWar)])
 
-        wars_by_rounds.sort(key=lambda inner_list: min(obj.preparation_start_time.int_timestamp for obj in inner_list))
+        wars_by_rounds.sort(key=lambda inner_list: min(war.preparation_start_time.int_timestamp for war in inner_list))
         war_ids_by_rounds = [[war._id for war in round] for round in wars_by_rounds]
         
         await bot_client.coc_db.db__war_league_group.update_one(
