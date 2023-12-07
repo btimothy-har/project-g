@@ -146,9 +146,7 @@ class DiscordLeaderboard():
         return bot_client.bot.get_guild(self.guild_id)
     @property
     def channel(self):
-        if not self.guild:
-            return None
-        return self.guild.get_channel(self.channel_id)    
+        return bot_client.bot.get_channel(self.channel_id)
     @property
     def type(self):
         return leaderboard_types.get(self._type,"Unknown Leaderboard")

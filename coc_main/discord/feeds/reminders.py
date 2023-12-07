@@ -85,9 +85,7 @@ class EventReminder():
     
     @property
     def channel(self) -> Union[discord.TextChannel,discord.Thread]:
-        if not self.guild:
-            return None
-        return self.guild.get_channel(self.channel_id)    
+        return bot_client.bot.get_channel(self.channel_id)
     
     @property
     def type(self) -> str:
