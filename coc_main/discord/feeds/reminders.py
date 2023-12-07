@@ -117,7 +117,7 @@ class EventReminder():
                 }
             )
     
-    async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*player_tags):        
+    async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
 
         if not self.next_reminder:
@@ -127,10 +127,10 @@ class EventReminder():
         
         async with self._lock:            
             if (time_remaining.total_seconds() / 3600) < self.next_reminder:
-                tags = AsyncIter(player_tags)
-                async for player_tag in tags:
+                a_iter = AsyncIter(players)
+                async for rem_player in a_iter:
                     try:
-                        player = await self.coc_client.fetch_player(player_tag)
+                        player = await self.coc_client.fetch_player(rem_player.tag)
                         try:
                             member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
                         except (discord.Forbidden,discord.NotFound):
@@ -143,7 +143,7 @@ class EventReminder():
                             r = self.active_reminders[member.id] = MemberReminder(member)
                         r.add_account(player)
                     except:
-                        bot_client.coc_main_log.exception(f"Error adding account {player_tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
+                        bot_client.coc_main_log.exception(f"Error adding account {rem_player.tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
             
             if len(self.active_reminders) > 0:
                 if self._type == 1:

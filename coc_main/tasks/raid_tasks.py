@@ -69,7 +69,7 @@ class ClanRaidLoop(TaskLoop):
     
     @classmethod
     async def _setup_raid_reminder(cls,clan:aClan,current_raid:aRaidWeekend,reminder:EventReminder):        
-        remind_members = [m.tag for m in current_raid.members if m.attack_count < 6]
+        remind_members = [m for m in current_raid.members if m.attack_count < 6]
         await reminder.send_reminder(current_raid,*remind_members)
     
     @classmethod
