@@ -64,7 +64,5 @@ class ClanDataFeed():
     
     @cached_property
     def channel(self) -> Optional[discord.TextChannel]:
-        if not self.guild:
-            return None
-        return self.guild.get_channel(self.channel_id)
+        return bot_client.bot.get_channel(self.channel_id)
     

@@ -100,13 +100,11 @@ class GuildApplicationPanel():
     
     @property
     def channel(self) -> Optional[discord.TextChannel]:
-        if not self.guild:
-            return None
-        return self.guild.get_channel(self.channel_id)
+        return bot_client.bot.get_channel(self.channel_id)
 
     @property
     def listener_channel(self) -> Optional[discord.TextChannel]:
-        return self.guild.get_channel(self._tickettool_channel)
+        return bot_client.bot.get_channel(self._tickettool_channel)
     
     async def fetch_message(self) -> Optional[discord.Message]:
         if self.channel:
