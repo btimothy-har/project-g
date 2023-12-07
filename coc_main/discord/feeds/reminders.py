@@ -119,7 +119,6 @@ class EventReminder():
     
     async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*player_tags):        
         time_remaining = event.end_time - pendulum.now()
-        await self.refresh_intervals(time_remaining)
 
         if not self.next_reminder:
             return        
@@ -127,33 +126,32 @@ class EventReminder():
             return
         
         async with self._lock:            
-            if self.next_reminder < (time_remaining.total_seconds() / 3600):
-                return
-
-            tags = AsyncIter(player_tags)
-            async for player_tag in tags:
-                try:
-                    player = await self.coc_client.fetch_player(player_tag)
+            if (time_remaining.total_seconds() / 3600) < self.next_reminder:
+                tags = AsyncIter(player_tags)
+                async for player_tag in tags:
                     try:
-                        member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
-                    except (discord.Forbidden,discord.NotFound):
-                        member = None
-                    if not member:
-                        continue                    
-                    try:
-                        r = self.active_reminders[member.id]
-                    except KeyError:
-                        r = self.active_reminders[member.id] = MemberReminder(member)
-                    r.add_account(player)
-                except:
-                    bot_client.coc_main_log.exception(f"Error adding account {player_tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
+                        player = await self.coc_client.fetch_player(player_tag)
+                        try:
+                            member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
+                        except (discord.Forbidden,discord.NotFound):
+                            member = None
+                        if not member:
+                            continue                    
+                        try:
+                            r = self.active_reminders[member.id]
+                        except KeyError:
+                            r = self.active_reminders[member.id] = MemberReminder(member)
+                        r.add_account(player)
+                    except:
+                        bot_client.coc_main_log.exception(f"Error adding account {player_tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
             
-            if len(self.active_reminders) == 0:
-                return
-            if self._type == 1:
-                await self.send_war_reminders(event)
-            elif self._type == 2:
-                await self.send_raid_reminders(event)
+            if len(self.active_reminders) > 0:
+                if self._type == 1:
+                    await self.send_war_reminders(event)
+                elif self._type == 2:
+                    await self.send_raid_reminders(event)
+            
+            await self.refresh_intervals(time_remaining)
     
     async def send_war_reminders(self,clan_war:aClanWar):
         clan = await self.coc_client.fetch_clan(self.tag)
