@@ -1,6 +1,7 @@
 import asyncio
 import discord
 import pendulum
+import bson
 
 from typing import *
 
@@ -15,6 +16,7 @@ bot_client = client()
 class RecruitingReminder():
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
+        '_id',
         'id',
         'is_active',
         'ad_name',
@@ -30,7 +32,7 @@ class RecruitingReminder():
 
     @classmethod
     async def get_by_id(cls,id:str) -> 'RecruitingReminder':
-        query = await bot_client.coc_db.db__recruiting_post.find_one({'_id':id})
+        query = await bot_client.coc_db.db__recruiting_post.find_one({'_id':bson.ObjectId(id)})
         if query:
             return cls(query)
         return None
@@ -48,7 +50,8 @@ class RecruitingReminder():
         return [cls(post) async for post in query]
     
     def __init__(self,database:dict):
-        self.id = database['_id']
+        self._id = database['_id']
+        self.id = str(self.id)
 
         self.is_active = database.get('is_active',False)
 
@@ -130,7 +133,7 @@ class RecruitingReminder():
         async with self.lock:
             self.active_reminder_id = reminder_id
             await bot_client.coc_db.db__recruiting_post.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': 
                     {'active_reminder':self.active_reminder_id}
                 },
@@ -144,7 +147,7 @@ class RecruitingReminder():
             self.last_user_id = user.id
             self.active_reminder_id = 0
             await bot_client.coc_db.db__recruiting_post.update_one(
-                {'_id':self.id},
+                {'_id':self._id},
                 {'$set': 
                     {
                         'last_posted':self.last_posted.int_timestamp,
