@@ -13,7 +13,7 @@ class aGuildClocks():
 
     @classmethod
     async def get_for_guild(cls,guild_id:int):        
-        database = await bot_client.coc_db.db__clock_config.find_one({'s_id':guild_id})      
+        database = await bot_client.coc_db.db__clock_config.find_one({'_id':guild_id})      
         if not database:
             return cls(guild_id,{})  
         return cls(guild_id,database)

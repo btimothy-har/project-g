@@ -58,8 +58,8 @@ class DiscordGuildLoop(TaskLoop):
                 self._running = True
                 a_iter = AsyncIter(bot_client.bot.guilds)
 
-                async for guild in a_iter:
-                    asyncio.create_task(self._run_single_loop(guild))
+                tasks = [self._run_single_loop(guild) async for guild in a_iter]
+                await bounded_gather(*tasks,semaphore=self._loop_semaphore)
                                      
                 self.last_loop = pendulum.now()
                 self._running = False
@@ -91,13 +91,12 @@ class DiscordGuildLoop(TaskLoop):
             self._locks[guild.id] = locks = {}
         
         tasks = [
-            self._save_member_roles(guild,locks),
-            self._update_clocks(guild,locks),
-            self._update_clan_panels(guild,locks),
-            self._update_application_panels(guild,locks),
-            self._update_recruiting_reminder(guild,locks)
+            asyncio.create_task(self._save_member_roles(guild,locks)),
+            asyncio.create_task(self._update_clocks(guild,locks)),
+            asyncio.create_task(self._update_clan_panels(guild,locks)),
+            asyncio.create_task(self._update_application_panels(guild,locks)),
+            asyncio.create_task(self._update_recruiting_reminder(guild,locks))
             ]
-        await bounded_gather(*tasks,semaphore=self._loop_semaphore)
     
     async def _save_member_roles(self,guild:discord.Guild,locks:dict):
         try:
