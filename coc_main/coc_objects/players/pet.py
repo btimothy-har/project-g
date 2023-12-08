@@ -63,15 +63,25 @@ class aPet():
         return self._game_pet.level    
     @property
     def max_level(self) -> int:
+        th = self._th_level
+        if th == 16:
+            if self.name == 'Spirit Fox':
+                return 10
+            else:
+                th = 15
         try:
-            m = self._game_pet.get_max_level_for_townhall(max(self._th_level,3))
+            m = self._game_pet.get_max_level_for_townhall(max(th,3))
         except:
             m = None
         return m if m else self._game_pet.max_level
     @property
     def min_level(self) -> int:
+        th = self._th_level
+        if th == 16:
+            if self.name == 'Spirit Fox':
+                return 0
         try:
-            m = self._game_pet.get_max_level_for_townhall(max(self._th_level-1,3))
+            m = self._game_pet.get_max_level_for_townhall(max(th-1,3))
         except:
             m = None
         return m if m else 0

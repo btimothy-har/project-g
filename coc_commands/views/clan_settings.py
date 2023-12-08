@@ -288,13 +288,13 @@ class ClanSettingsMenu(DefaultView):
             value=th,
             emoji=EmojisTownHall.get(th),
             default=th in self.clan.recruitment_level)
-            for th in range(15,0,-1)]
+            for th in range(16,0,-1)]
         select_recruitment_level = DiscordSelectMenu(
             function=self._callback_recruitment_level,
             options=recruitment_options,
             placeholder="Change the Recruitment TH Levels.",
             min_values=0,
-            max_values=15,
+            max_values=16,
             row=2
             )        
         button_clan_description = DiscordButton(

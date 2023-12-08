@@ -16,7 +16,7 @@ from ..components import eclipse_embed
 
 bot_client = BotClashClient()
 
-max_th = 15
+max_th = 16
 
 # db_war_base = {
 #   '_id': string,
@@ -58,7 +58,7 @@ class eWarBase(AwaitLoader):
         if townhall == max_th:
             cutoff = pendulum.now().subtract(months=4).int_timestamp
         elif townhall == max_th - 1 or townhall == max_th - 2:
-            cutoff = pendulum.now().subtract(months=6).int_timestamp
+            cutoff = pendulum.now().subtract(months=9).int_timestamp
         else:
             cutoff = pendulum.now().subtract(months=12).int_timestamp
 

@@ -184,6 +184,7 @@ class EmojisPets:
     DIGGY = "<:Diggy:1037000169360732220>"
     POISON_LIZARD = "<:PoisonLizard:1037000167221629048>"
     PHOENIX = "<:Phoenix:1037000168035340360>"
+    SPIRIT_FOX = "<:spirit_fox:1182701308323565568>"
 
     @classmethod
     def get(cls, pet:str):
