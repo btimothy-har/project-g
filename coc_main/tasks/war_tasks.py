@@ -127,9 +127,10 @@ class ClanWarLoop(TaskLoop):
     
     @classmethod
     async def _setup_war_reminder(cls,clan:aClan,current_war:aClanWar,reminder:EventReminder):
-        reminder_clan = current_war.get_clan(clan.tag)
-        remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
-        await reminder.send_reminder(current_war,*remind_members)
+        if current_war.type in reminder.sub_type:
+            reminder_clan = current_war.get_clan(clan.tag)
+            remind_members = [m for m in reminder_clan.members if m.unused_attacks > 0]
+            await reminder.send_reminder(current_war,*remind_members)
 
     @classmethod
     def add_war_end_event(cls,event):

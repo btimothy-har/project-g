@@ -119,13 +119,10 @@ class EventReminder():
     async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
 
-        if not self.next_reminder:
-            return        
         if self._lock.locked():
             return
-        
-        async with self._lock:            
-            if (time_remaining.total_seconds() / 3600) < self.next_reminder:
+        async with self._lock:
+            if self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder:
                 a_iter = AsyncIter(players)
                 async for rem_player in a_iter:
                     try:
