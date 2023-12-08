@@ -107,15 +107,14 @@ class EventReminder():
         return reminder_text
     
     async def refresh_intervals(self,time_reference):
-        async with self._lock:
-            self.interval_tracker = [i for i in self.reminder_interval if i < (time_reference.total_seconds() / 3600)]
-            await bot_client.coc_db.db__clan_event_reminder.update_one(
-                {'_id':self._id},
-                {'$set': {
-                    'interval_tracker':self.interval_tracker
-                    }
+        self.interval_tracker = [i for i in self.reminder_interval if i < (time_reference.total_seconds() / 3600)]
+        await bot_client.coc_db.db__clan_event_reminder.update_one(
+            {'_id':self._id},
+            {'$set': {
+                'interval_tracker':self.interval_tracker
                 }
-            )
+            }
+        )
     
     async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
