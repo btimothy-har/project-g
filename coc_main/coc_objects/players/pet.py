@@ -11,8 +11,8 @@ class aPet():
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int) -> 'aPet':
         if name == 'Spirit Fox':
-            i = bot_client.coc.get_pet('L.A.S.S.I.',level=1)
-            i.name = 'Spirit Fox'        
+            i = bot_client.coc.get_pet('L.A.S.S.I',level=1)
+            i.name = 'Spirit Fox'
         else:
             i = bot_client.coc.get_pet(name,level=1)
         pet = cls(i,th_level)
