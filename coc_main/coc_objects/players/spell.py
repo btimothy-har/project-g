@@ -64,6 +64,8 @@ class aSpell():
         return self._game_spell.is_dark_spell
     @property
     def level(self) -> int:
+        if isinstance(self._level,int):
+            return self._level
         return self._game_spell.level    
     @property
     def max_level(self) -> int:

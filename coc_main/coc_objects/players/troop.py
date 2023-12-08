@@ -110,6 +110,8 @@ class aTroop():
         return self._game_troop.original_troop
     @property
     def level(self) -> int:
+        if isinstance(self._level,int):
+            return self._level
         return self._game_troop.level    
     @property
     def max_level(self) -> int:
