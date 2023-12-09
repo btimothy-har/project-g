@@ -155,7 +155,7 @@ class TroopAvailability:
         12: ['Yeti','Headhunter','Wall Wrecker','Battle Blimp','Stone Slammer','Super Giant','Rocket Balloon','Super Wizard','Super Dragon','Inferno Dragon','Super Minion','Super Valkyrie','Super Witch','Ice Hound','Super Bowler'],
         13: ['Dragon Rider','Apprentice Warden','Super Hog Rider','Super Miner','Siege Barracks','Log Launcher'],
         14: ['Electro Titan','Flame Flinger'],
-        15: ['Battle Drill'],
+        15: ['Battle Drill','Root Rider'],
         16: []
         }
 
@@ -261,6 +261,7 @@ class TroopCampSize:
         "Headhunter": 6,
         "Dragon Rider": 25,
         "Electro Titan": 32,
+        "Root Rider": 20,
         "Wall Wrecker": 1,
         "Battle Blimp": 1,
         "Stone Slammer": 1,
