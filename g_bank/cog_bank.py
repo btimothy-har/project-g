@@ -192,7 +192,14 @@ class Bank(commands.Cog):
         if not user:
             return "No user found."
         balance = await bank.get_balance(user)
-        return f"{user.display_name} has {balance:,} {await bank.get_currency_name()}."
+
+        result_json = {
+            'user': user.display_name,
+            'balance': balance,
+            'currency': await bank.get_currency_name(),
+            }
+
+        return f"Do not change the currency text, return it as provided in the result. {user.display_name}'s bank account: {result_json}."
 
     ############################################################
     #####
