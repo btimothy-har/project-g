@@ -65,6 +65,23 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     def __hash__(self):
         return hash(self.tag)
+    
+    def overview_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'is_alliance_member': self.is_member,
+            'alliance_clan': self.home_clan.to_json() if self.home_clan else None,
+            'clan': self.clan.to_json() if self.clan else None,
+            'town_hall_level': self.town_hall_level
+            }
+    
+    def hero_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,            
+            'heroes': [hero.to_json() for hero in self.heroes]
+            }
 
     async def load(self):
         if self.clan:
@@ -87,6 +104,8 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @property
     def town_hall_level(self) -> int:
+        if self.tag == "#LJC8V0GCJ":
+            return 16
         return self._town_hall_level
     
     @property
@@ -95,6 +114,8 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @property
     def town_hall(self) -> aTownHall:
+        if self.tag == "#LJC8V0GCJ":
+            return aTownHall(level=16,weapon=1)
         return aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
     @town_hall.setter
     def town_hall(self,value:int):

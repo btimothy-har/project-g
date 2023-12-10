@@ -42,6 +42,7 @@ class EmojisTownHall:
     TH13 = "<:13:1045961633131941889>"
     TH14 = "<:14:1045961676974997606>"
     TH15 = "<:15:1045961696939872276>"
+    TH16 = "<:16:1182255918176546826>"
 
     @classmethod
     def get(cls, townhall:int):
@@ -183,6 +184,7 @@ class EmojisPets:
     DIGGY = "<:Diggy:1037000169360732220>"
     POISON_LIZARD = "<:PoisonLizard:1037000167221629048>"
     PHOENIX = "<:Phoenix:1037000168035340360>"
+    SPIRIT_FOX = "<:spirit_fox:1182701308323565568>"
 
     @classmethod
     def get(cls, pet:str):
@@ -215,6 +217,7 @@ class EmojisTroops:
     DRAGON_RIDER = "<:DragonRider:1043099676615909387>"
     ELECTRO_TITAN = "<:ElectroTitan:1036998366237818890>"
     APPRENTICE_WARDEN = "<:apprentice_warden:1117805712614096968>"
+    ROOT_RIDER = "<:root_rider:1183054320531427360>"
 
     #Super Troops
     SUPER_BARBARIAN = "<:SuperBarbarian:1037032254116995103>"

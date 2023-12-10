@@ -375,7 +375,7 @@ class BaseVaultMenu(DefaultView):
     ##################################################
     async def _base_vault_home_embed(self,no_base=None):
         base_vault_intro = (f"Welcome to the **E.C.L.I.P.S.E. Base Vault**. "
-            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from TH9 {EmojisTownHall.get(9)} to TH15 {EmojisTownHall.get(15)}. "
+            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from TH9 {EmojisTownHall.get(9)} to TH16 {EmojisTownHall.get(16)}. "
             + f"\n\nAccess to the base vault is a members' privilege. **DO NOT SHARE ANY BASE LINKS WITH ANYONE, INCLUDING FELLOW MEMBERS**."
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
             + f"\n\n**__Retrieving Bases__**"

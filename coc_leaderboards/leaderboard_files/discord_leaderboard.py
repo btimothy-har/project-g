@@ -30,7 +30,7 @@ leaderboard_types = {
     5: "Clan Games",
     }
 
-eligible_townhalls = list(range(9,16))[::-1]
+eligible_townhalls = [16,15,14,13,12,11,10]
 bot_client = BotClashClient()
 
 ##################################################

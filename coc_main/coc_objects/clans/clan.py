@@ -31,6 +31,28 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
     async def load(self):
         await BasicClan.load(self)
 
+    def to_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'abbreviation': self.abbreviation,
+            'name': self.name,
+            'badge': self.badge,
+            'level': self.level,
+            'location': getattr(self.location,'name','Not Provided'),
+            'member_count': self.member_count,
+            'members': self.members_dict,
+            'share_link': self.share_link,
+            'capital_hall': self.capital_hall,
+            'clan_war_league': self.war_league_name,
+            'war_wins': self.war_wins,
+            'war_ties': self.war_ties,
+            'war_losses': self.war_losses,
+            'description': self.description,
+            'leader': getattr(bot_client.bot.get_user(self.leader),'name','No Leader'),
+            'coleaders': [bot_client.bot.get_user(i).name for i in self.coleaders if bot_client.bot.get_user(i)],
+            'elder': [bot_client.bot.get_user(i).name for i in self.elders if bot_client.bot.get_user(i)],
+            }
+
     ##################################################
     ### DATA FORMATTERS
     ##################################################

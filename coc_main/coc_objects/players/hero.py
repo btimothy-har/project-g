@@ -20,6 +20,17 @@ class aHero():
         self._th_level = th_level
         self._level = None
 
+    def to_json(self) -> dict:
+        return {
+            'name': self.name,
+            'level': self.level,
+            'max_level': self.max_level,
+            'min_level': self.min_level,
+            'emoji': self.emoji,
+            'is_rushed': self.is_rushed,
+            'village': self.village,
+            }
+
     @property
     def emoji(self) -> str:
         return EmojisHeroes.get(self.name)
@@ -74,6 +85,13 @@ class aHero():
         return self._game_hero.level    
     @property
     def max_level(self) -> int:
+        if self._th_level == 16:
+            if self.name in ['Barbarian King','Archer Queen']:
+                return 95
+            if self.name in ['Grand Warden']:
+                return 70
+            if self.name in ['Royal Champion']:
+                return 45
         try:
             m = self._game_hero.get_max_level_for_townhall(max(self._th_level,3))
         except:

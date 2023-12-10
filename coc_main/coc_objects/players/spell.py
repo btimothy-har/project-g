@@ -7,6 +7,13 @@ from ...utils.constants.coc_emojis import EmojisSpells
 
 bot_client = client()
 
+th_16_max_level = {
+    'Healing Spell': 10,
+    'Lightning Spell': 11,
+    'Recall Spell': 5,
+    'Poison Spell': 10
+    }
+
 class aSpell():
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int):
@@ -19,6 +26,17 @@ class aSpell():
         self._game_spell = spell
         self._th_level = th_level
         self._level = None
+    
+    def to_json(self) -> dict:
+        return {
+            'name': self.name,
+            'level': self.level,
+            'max_level': self.max_level,
+            'min_level': self.min_level,
+            'emoji': self.emoji,
+            'is_rushed': self.is_rushed,
+            'village': self.village,
+            }
 
     @property
     def emoji(self) -> str:
@@ -57,11 +75,19 @@ class aSpell():
         return self._game_spell.is_dark_spell
     @property
     def level(self) -> int:
+        if isinstance(self._level,int):
+            return self._level
         return self._game_spell.level    
     @property
     def max_level(self) -> int:
+        th = self._th_level
+        if th == 16:
+            if self.name in th_16_max_level:
+                return th_16_max_level[self.name]
+            else:
+                th = 15        
         try:
-            m = self._game_spell.get_max_level_for_townhall(max(self._th_level,3))
+            m = self._game_spell.get_max_level_for_townhall(max(th,3))
         except:
             m = None
         return m if m else self._game_spell.max_level

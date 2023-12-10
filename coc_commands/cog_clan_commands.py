@@ -96,6 +96,31 @@ class Clans(commands.Cog):
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
     
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = {
+            "name": "_assistant_get_clan_information",
+            "description": "Returns a list of Clans matching the input, with detailed information in JSON.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "clan": {
+                        "description": "Clan Name or Abbreviation. An abbreviation is a 2 or 3 alphanumeric string.",
+                        "type": "string",
+                        },
+                    },
+                "required": ["clan"],
+                },
+            }
+        await cog.register_function(cog_name="Clans", schema=schema)
+    
+    async def _assistant_get_clan_information(self,clan:str,*args,**kwargs) -> str:
+        alliance_clans = await self.client.get_alliance_clans()
+        find_clan = [c for c in alliance_clans if clan.lower() in c.name.lower() or clan.lower() in c.abbreviation.lower()]
+
+        ret_clans = [c.to_json() for c in find_clan]
+        return ret_clans
+    
     ##################################################
     ### CLAN ABBREVIATION LISTENER
     ##################################################

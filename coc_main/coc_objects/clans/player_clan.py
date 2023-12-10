@@ -17,6 +17,14 @@ class aPlayerClan(BasicClan):
         if kwargs.get('level'):
             self._level = kwargs.get('level')
     
+    def to_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'badge': self.badge,
+            'level': self.level,
+            }
+    
     @property
     def name(self) -> str:
         if getattr(self,'_name',None) is None:

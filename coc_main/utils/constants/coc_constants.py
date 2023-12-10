@@ -50,9 +50,9 @@ class CWLLeagueGroups:
         99: f"{EmojisLeagues.UNRANKED}",
         }
     eligibility = {
-        1: [15,14],
-        2: [15,14,13,12],
-        9: [15,14,13,12,11,10]
+        1: [16,15],
+        2: [16,15,14,13],
+        9: [16,15,14,13,12,11,10]
         }
     from_league_name_dict = {
         'Champion League I': 1,
@@ -124,6 +124,7 @@ class HeroAvailability:
         13: ['Royal Champion'],
         14: [],
         15: [],
+        16: []
         }
 
     @classmethod
@@ -154,7 +155,8 @@ class TroopAvailability:
         12: ['Yeti','Headhunter','Wall Wrecker','Battle Blimp','Stone Slammer','Super Giant','Rocket Balloon','Super Wizard','Super Dragon','Inferno Dragon','Super Minion','Super Valkyrie','Super Witch','Ice Hound','Super Bowler'],
         13: ['Dragon Rider','Apprentice Warden','Super Hog Rider','Super Miner','Siege Barracks','Log Launcher'],
         14: ['Electro Titan','Flame Flinger'],
-        15: ['Battle Drill']
+        15: ['Battle Drill','Root Rider'],
+        16: []
         }
 
     @classmethod
@@ -185,7 +187,8 @@ class SpellAvailability:
         12: [],
         13: ['Recall Spell'],
         14: [],
-        15: []
+        15: [],
+        16: []
         }
     @classmethod
     def return_all_unlocked(cls,input_th:int):
@@ -215,7 +218,8 @@ class PetAvailability:
         12: [],
         13: [],
         14: ['L.A.S.S.I','Electro Owl','Mighty Yak','Unicorn'],
-        15: ['Frosty','Diggy','Poison Lizard','Phoenix']
+        15: ['Frosty','Diggy','Poison Lizard','Phoenix'],
+        16: ['Spirit Fox']
         }
     @classmethod
     def return_all_unlocked(cls,input_th:int):
@@ -257,6 +261,7 @@ class TroopCampSize:
         "Headhunter": 6,
         "Dragon Rider": 25,
         "Electro Titan": 32,
+        "Root Rider": 20,
         "Wall Wrecker": 1,
         "Battle Blimp": 1,
         "Stone Slammer": 1,
@@ -312,7 +317,8 @@ clan_castle_size = {
     12: [40,2,1],
     13: [45,2,1],
     14: [45,3,1],
-    15: [50,3,1]
+    15: [50,3,1],
+    16: [50,3,1]
     }
 
 activity_achievements = [

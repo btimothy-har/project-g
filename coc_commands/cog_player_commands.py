@@ -15,6 +15,8 @@ from coc_main.utils.components import handle_command_error, clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
+from coc_main.exceptions import ClashAPIError, InvalidTag
+
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
 from .views.promote_demote import MemberRankMenu
@@ -222,6 +224,52 @@ class Players(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
+    
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = [
+            {
+                "name": "_assistant_get_linked_user_accounts",
+                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Only returns high-level information. Use other functions to get specific details. Returns a list of JSON objects.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_account_heroes",
+                "description": "Gets only Hero details for a Clash Account, based on the Tag provided. Returns a JSON object.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "account_tag": {
+                            "description": "The unique player tag of the account.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["account_tag"],
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="Players", schemas=schema)
+
+    async def _assistant_get_linked_user_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."        
+        member = await aMember(user.id,guild.id)
+        accounts = await self.client.fetch_many_players(*member.account_tags)
+        return f"Only provide the user with their Account Name, Tag, and Townhall Level: {[a.overview_json() for a in accounts]}"
+    
+    async def _assistant_get_account_heroes(self,account_tag:str,*args,**kwargs) -> str:
+        try:
+            account = await self.client.fetch_player(account_tag)
+        except ClashAPIError as exc:
+            return f"Error: {exc.message}"
+        except InvalidTag:
+            return "Invalid Tag."
+        if not account:
+            return "No account found."
+        return f"Hero Levels for account {account.name} (Tag: {account.tag}): {account.hero_json()}"
     
     ############################################################
     ############################################################
