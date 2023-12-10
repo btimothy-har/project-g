@@ -175,6 +175,25 @@ class Bank(commands.Cog):
         embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
 
         await self.log_channel.send(embed=embed)
+    
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = {
+            "name": "_assistant_get_member_balance",
+            "description": "Gets a user's bank",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                },
+            }
+        await cog.register_function(cog_name="Bank", schema=schema)
+
+    async def _assistant_get_member_balance(self,*args,**kwargs) -> str:
+        user = kwargs.get('user',None)
+        if not user:
+            return "No user found."
+        balance = await bank.get_balance(user)
+        return f"{user.display_name} has {balance:,} {await bank.get_currency_name()}."
 
     ############################################################
     #####

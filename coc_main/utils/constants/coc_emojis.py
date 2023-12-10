@@ -217,7 +217,7 @@ class EmojisTroops:
     DRAGON_RIDER = "<:DragonRider:1043099676615909387>"
     ELECTRO_TITAN = "<:ElectroTitan:1036998366237818890>"
     APPRENTICE_WARDEN = "<:apprentice_warden:1117805712614096968>"
-    ROOT_RIDER = "<:root_rider:1183032550231375974>"
+    ROOT_RIDER = "<:root_rider:1183054320531427360>"
 
     #Super Troops
     SUPER_BARBARIAN = "<:SuperBarbarian:1037032254116995103>"
