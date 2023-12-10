@@ -36,7 +36,8 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_found(clan:aClan,war:aClanWar):
         try:
-            await bot_client.player_queue.add_many([m.tag for m in war.members])
+            tasks = [bot_client.player_queue.put(m.tag) for m in war.members]
+            await bounded_gather(*tasks,limit=1)
         except asyncio.CancelledError:
             return
         except Exception:
