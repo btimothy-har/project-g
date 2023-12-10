@@ -194,13 +194,15 @@ class EventReminder():
                 username=clan.name,
                 avatar_url=clan.badge,
                 content=reminder_text,
-                thread=self.channel
+                thread=self.channel,
+                wait = True
                 )
         else:
             r_msg = await webhook.send(
                 username=clan.name,
                 avatar_url=clan.badge,
                 content=reminder_text,
+                wait = True
                 )
         bot_client.coc_main_log.info(f"Clan {clan}: Sent Raid Reminders to {len(self.active_reminders)} players. Reminder ID: {r_msg.id}")
     
