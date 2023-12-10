@@ -104,8 +104,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @property
     def town_hall_level(self) -> int:
-        if self.tag == "#LJC8V0GCJ":
-            return 16
         return self._town_hall_level
     
     @property
@@ -114,8 +112,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @property
     def town_hall(self) -> aTownHall:
-        if self.tag == "#LJC8V0GCJ":
-            return aTownHall(level=16,weapon=1)
         return aTownHall(level=self.town_hall_level,weapon=self.town_hall_weapon)
     @town_hall.setter
     def town_hall(self,value:int):
