@@ -230,15 +230,15 @@ class Players(commands.Cog):
         schema = [
             {
                 "name": "_assistant_get_linked_user_accounts",
-                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Returns a list of JSON objects.",
+                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Only returns high-level information. Use other functions to get specific details. Returns a list of JSON objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
                     },
                 },
             {
-                "name": "_assistant_get_account_details",
-                "description": "Gets details for a Clash Account, based on the Tag provided. Returns a JSON object.",
+                "name": "_assistant_get_account_heroes",
+                "description": "Gets only Hero details for a Clash Account, based on the Tag provided. Returns a JSON object.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -258,16 +258,16 @@ class Players(commands.Cog):
             return "No user found."        
         member = await aMember(user.id,guild.id)
         accounts = await self.client.fetch_many_players(*member.account_tags)
-        return [a.to_json() for a in accounts]
+        return [a.overview_json() for a in accounts]
     
-    async def _assistant_get_account_details(self,account_tag:str,*args,**kwargs) -> str:
+    async def _assistant_get_account_heroes(self,account_tag:str,*args,**kwargs) -> str:
         try:
             account = await self.client.fetch_player(account_tag)
         except ClashAPIError as exc:
             return f"Error: {exc.message}"
         except InvalidTag:
             return "Invalid Tag."        
-        return account.to_json()
+        return account.hero_json()
     
     ############################################################
     ############################################################
