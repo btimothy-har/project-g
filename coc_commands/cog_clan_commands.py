@@ -107,9 +107,9 @@ class Clans(commands.Cog):
                     "clan": {
                         "description": "Clan Name or Abbreviation. An abbreviation is a 2 or 3 alphanumeric string.",
                         "type": "string",
-                        "required": True,
                         },
                     },
+                "required": ["clan"],
                 },
             }
         await cog.register_function(cog_name="Clans", schema=schema)
