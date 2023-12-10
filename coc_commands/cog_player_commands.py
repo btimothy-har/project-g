@@ -223,6 +223,26 @@ class Players(commands.Cog):
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
     
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = {
+            "name": "_assistant_get_linked_user_accounts",
+            "description": "Gets a user's Clash Accounts that are linked to their Discord ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                },
+            }
+        await cog.register_function(cog_name="Players", schema=schema)
+
+    async def _assistant_get_linked_user_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."
+        
+        member = await aMember(user.id,guild.id)
+        accounts_str = "\n".join([f"{a.name} ({a.tag}) - Townhall {a.town_hall_level}" for a in await self.client.fetch_many_players(*member.account_tags)])
+        return f"{user.display_name} has the following accounts linked:\n{accounts_str}"
+    
     ############################################################
     ############################################################
     #####

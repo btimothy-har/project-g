@@ -173,7 +173,6 @@ class Bank(commands.Cog):
         embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
 
         embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
-
         await self.log_channel.send(embed=embed)
     
     @commands.Cog.listener()
@@ -189,6 +188,7 @@ class Bank(commands.Cog):
         await cog.register_function(cog_name="Bank", schema=schema)
 
     async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
+        bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
         if not user:
             return "No user found."
         balance = await bank.get_balance(user)
