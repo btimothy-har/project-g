@@ -1,6 +1,7 @@
 import discord
 import pendulum
 import asyncio
+import bson
 
 from typing import *
 
@@ -36,6 +37,7 @@ class EventReminder():
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         '_id',
+        'id',
         'tag',
         '_type',
         'sub_type',
@@ -60,6 +62,7 @@ class EventReminder():
     
     def __init__(self,database:dict):
         self._id = database['_id']
+        self.id = str(self._id)
 
         self.tag = database.get('tag',None)
         self._type = database.get('type',None)
@@ -96,7 +99,7 @@ class EventReminder():
         return max(self.interval_tracker) if self.interval_tracker and len(self.interval_tracker) > 0 else None
     
     async def delete(self):
-        await bot_client.coc_db.db__clan_event_reminder.delete_one({'_id':self.id})
+        await bot_client.coc_db.db__clan_event_reminder.delete_one({'_id':self._id})
 
     async def generate_reminder_text(self):
         reminder_text = ""
@@ -203,7 +206,7 @@ class EventReminder():
     
     @classmethod
     async def get_by_id(cls,id:str) -> 'EventReminder':
-        query = await bot_client.coc_db.db__clan_event_reminder.find_one({'_id':id})
+        query = await bot_client.coc_db.db__clan_event_reminder.find_one({'_id':bson.ObjectId(id)})
         return cls(query) if query else None
     
     @classmethod
