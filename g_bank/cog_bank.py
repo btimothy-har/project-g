@@ -188,8 +188,7 @@ class Bank(commands.Cog):
             }
         await cog.register_function(cog_name="Bank", schema=schema)
 
-    async def _assistant_get_member_balance(self,*args,**kwargs) -> str:
-        user = kwargs.get('user',None)
+    async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
         if not user:
             return "No user found."
         balance = await bank.get_balance(user)
