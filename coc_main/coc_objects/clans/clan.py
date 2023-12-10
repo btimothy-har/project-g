@@ -48,7 +48,7 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             'war_ties': self.war_ties,
             'war_losses': self.war_losses,
             'description': self.description,
-            'leader': bot_client.bot.get_user(self.leader,'name','No Leader'),
+            'leader': getattr(bot_client.bot.get_user(self.leader),'name','No Leader'),
             'coleaders': [bot_client.bot.get_user(i).name for i in self.coleaders if bot_client.bot.get_user(i)],
             'elder': [bot_client.bot.get_user(i).name for i in self.elders if bot_client.bot.get_user(i)],
             }
