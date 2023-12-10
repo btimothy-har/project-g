@@ -1,4 +1,5 @@
 import discord
+import xml.etree.ElementTree as ET
 
 from typing import *
 from redbot.core import commands, app_commands
@@ -248,3 +249,50 @@ class GuildUtility(commands.Cog):
             self.bot.get_command("wolframsolve"),
             query=question
             )
+    
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = [
+            {
+                "name": "_assistant_wolfram_query",
+                "description": "Submits a query to WolframAlpha and gets a response. This can be used to source for factual information outside your existing training model.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "description": "The question or query to search Wolfram for.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["question"],
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="GuildUtility", schemas=schema)
+    
+    async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
+        wolfram_cog = bot.get_cog("Wolfram")
+        api_key = await wolfram_cog.config.WOLFRAM_API_KEY()
+        if not api_key:
+            return "No API key set for Wolfram Alpha."
+
+        url = "http://api.wolframalpha.com/v2/query?"
+        query = question
+        payload = {"input": query, "appid": api_key}
+        headers = {"user-agent": "Red-cog/2.0.0"}
+
+        async with wolfram_cog.session.get(url, params=payload, headers=headers) as r:
+            result = await r.text()
+        
+        root = ET.fromstring(result)
+        a = []
+        for pt in root.findall(".//plaintext"):
+            if pt.text:
+                a.append(pt.text.capitalize())
+        if len(a) < 1:
+            message = "There is as yet insufficient data for a meaningful answer."
+        else:
+            message = "\n".join(a[0:3])
+            if "Current geoip location" in message:
+                message = "There is as yet insufficient data for a meaningful answer."
+        return message
