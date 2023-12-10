@@ -180,7 +180,7 @@ class Bank(commands.Cog):
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schema = {
             "name": "_assistant_get_member_balance",
-            "description": "Gets a user's bank",
+            "description": "Gets a user's bank balance in the Guild Bank.",
             "parameters": {
                 "type": "object",
                 "properties": {},
