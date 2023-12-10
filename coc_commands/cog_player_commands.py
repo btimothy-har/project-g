@@ -258,7 +258,7 @@ class Players(commands.Cog):
             return "No user found."        
         member = await aMember(user.id,guild.id)
         accounts = await self.client.fetch_many_players(*member.account_tags)
-        return [a.overview_json() for a in accounts]
+        return f"Only provide the user with their Account Name, Tag, and Townhall Level: {[a.overview_json() for a in accounts]}"
     
     async def _assistant_get_account_heroes(self,account_tag:str,*args,**kwargs) -> str:
         try:
@@ -266,7 +266,9 @@ class Players(commands.Cog):
         except ClashAPIError as exc:
             return f"Error: {exc.message}"
         except InvalidTag:
-            return "Invalid Tag."        
+            return "Invalid Tag."
+        if not account:
+            return "No account found."
         return account.hero_json()
     
     ############################################################
