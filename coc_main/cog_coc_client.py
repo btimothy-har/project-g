@@ -116,7 +116,7 @@ class ClashOfClansClient(commands.Cog):
     @tasks.loop(minutes=10.0)
     async def bot_status_update_loop(self):
         try:
-            if self.client.last_status_update != None and (pendulum.now().int_timestamp - self.client.last_status_update.int_timestamp) < 14400:
+            if self.client.last_status_update != None and (pendulum.now().int_timestamp - self.client.last_status_update.int_timestamp) < (6* 3600):
                 return            
             await self.bot.change_presence(
                 activity=discord.Activity(

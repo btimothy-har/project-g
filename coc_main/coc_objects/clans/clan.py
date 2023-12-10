@@ -48,9 +48,9 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             'war_ties': self.war_ties,
             'war_losses': self.war_losses,
             'description': self.description,
-            'leader': getattr(bot_client.bot.get_user(self.leader),'name','No Leader'),
-            'coleaders': [bot_client.bot.get_user(i).name for i in self.coleaders if bot_client.bot.get_user(i)],
-            'elder': [bot_client.bot.get_user(i).name for i in self.elders if bot_client.bot.get_user(i)],
+            'leader': getattr(bot_client.bot.get_user(self.leader),'display_name','No Leader'),
+            'coleaders': [bot_client.bot.get_user(i).display_name for i in self.coleaders if bot_client.bot.get_user(i)],
+            'elder': [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)],
             }
 
     ##################################################
@@ -132,10 +132,13 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         if self._attributes._sync_lock.locked():
             return
         
-        async with self._attributes._sync_lock:          
+        async with self._attributes._sync_lock:
             basic_clan = await BasicClan(self.tag)
             await basic_clan.update_last_sync(pendulum.now())
-            tasks = []
+            tasks = [
+                basic_clan.clean_elders(),
+                basic_clan.clean_coleaders(),
+                ]
             if basic_clan.name != self.name:
                 tasks.append(basic_clan.set_name(self.name))
             if basic_clan.badge != self.badge:

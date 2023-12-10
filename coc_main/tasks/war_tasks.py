@@ -80,7 +80,7 @@ class DefaultWarTasks():
                     elif war.type == ClanWarType.CWL:
                         await bot_client.update_bot_status(
                             cooldown=60,
-                            text=f"{new_clan.abbreviation} winning in CWL!"
+                            text=f"{new_clan.abbreviation} crushing CWL!"
                             )
         except asyncio.CancelledError:
             return
@@ -96,7 +96,7 @@ class DefaultWarTasks():
             time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
             if clan.is_registered_clan and len(clan.abbreviation) > 0 and time_remaining > 3600:
                 war_clan = war.get_clan(clan.tag)
-                if war_clan.attacks_used > 0:
+                if war_clan.attacks_used > 0 and war_clan.result == WarResult.WINNING:
                     await bot_client.update_bot_status(
                         cooldown=360,
                         text=f"{clan.abbreviation} {WarResult.ongoing(war.get_clan(clan.tag).result)} in war!"

@@ -7,6 +7,8 @@ from typing import *
 
 from collections import defaultdict
 from async_property import AwaitLoader
+from redbot.core.utils import AsyncIter
+
 from ...api_client import BotClashClient as client
 
 from ...utils.constants.coc_emojis import EmojisTownHall
@@ -367,6 +369,30 @@ class BasicClan(AwaitLoader):
     ##### DATABASE INTERACTIONS
     #####
     ##################################################
+    async def clean_elders(self):
+        e_iter = AsyncIter(self.elders)
+        async for elder in e_iter:
+            q_doc = {
+                'discord_user':elder,
+                'home_clan':self.tag,
+                'is_member':True
+                }
+            player_accounts = await bot_client.coc_db.db__player.find(q_doc,{'_id':1}).to_list(None)
+            if len(player_accounts) == 0:
+                await self.remove_elder(elder)
+    
+    async def clean_coleaders(self):
+        c_iter = AsyncIter(self.coleaders)
+        async for coleader in c_iter:
+            q_doc = {
+                'discord_user':coleader,
+                'home_clan':self.tag,
+                'is_member':True
+                }
+            player_accounts = await bot_client.coc_db.db__player.find(q_doc,{'_id':1}).to_list(None)
+            if len(player_accounts) == 0:
+                await self.remove_coleader(coleader)
+
     async def set_name(self,new_name:str):        
         async with self._attributes._lock:
             self._attributes.name = new_name
