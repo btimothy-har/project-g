@@ -277,7 +277,7 @@ class GuildUtility(commands.Cog):
             return "No API key set for Wolfram Alpha."
 
         url = "http://api.wolframalpha.com/v2/query?"
-        query = " ".join(question)
+        query = question
         payload = {"input": query, "appid": api_key}
         headers = {"user-agent": "Red-cog/2.0.0"}
 
