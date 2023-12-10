@@ -227,38 +227,38 @@ class Players(commands.Cog):
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
-        schema = {
-            "name": "_assistant_get_linked_user_accounts",
-            "description": "Gets a user's Clash Accounts that are linked to their Discord ID.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                },
-            }
-        await cog.register_function(cog_name="Players", schema=schema)
-
-        schema = {
-            "name": "_assistant_get_account_details",
-            "description": "Gets details for a Clash Account, based on the Tag provided. Returns a JSON object.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "account_tag": {
-                        "description": "The unique player tag of the account.",
-                        "type": "string",
-                        },
+        schema = [
+            {
+                "name": "_assistant_get_linked_user_accounts",
+                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Returns a list of JSON objects.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
                     },
-                "required": ["account_tag"],
                 },
-            }
-        await cog.register_function(cog_name="Players", schema=schema)
+            {
+                "name": "_assistant_get_account_details",
+                "description": "Gets details for a Clash Account, based on the Tag provided. Returns a JSON object.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "account_tag": {
+                            "description": "The unique player tag of the account.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["account_tag"],
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="Players", schemas=schema)
 
     async def _assistant_get_linked_user_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
         if not user:
             return "No user found."        
         member = await aMember(user.id,guild.id)
-        accounts_str = "\n".join([f"TH{a.town_hall_level} {a.name} ({a.tag})" for a in await self.client.fetch_many_players(*member.account_tags)])
-        return f"{user.display_name} has the following accounts linked:\n{accounts_str}"
+        accounts = await self.client.fetch_many_players(*member.account_tags)
+        return [a.to_json() for a in accounts]
     
     async def _assistant_get_account_details(self,account_tag:str,*args,**kwargs) -> str:
         try:
@@ -266,8 +266,7 @@ class Players(commands.Cog):
         except ClashAPIError as exc:
             return f"Error: {exc.message}"
         except InvalidTag:
-            return "Invalid Tag."
-        
+            return "Invalid Tag."        
         return account.to_json()
     
     ############################################################
