@@ -51,7 +51,7 @@ class RecruitingReminder():
     
     def __init__(self,database:dict):
         self._id = database['_id']
-        self.id = str(self.id)
+        self.id = str(self._id)
 
         self.is_active = database.get('is_active',False)
 
