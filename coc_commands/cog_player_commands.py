@@ -269,7 +269,7 @@ class Players(commands.Cog):
             return "Invalid Tag."
         if not account:
             return "No account found."
-        return account.hero_json()
+        return f"Hero Levels for account {account.name} (Tag: {account.tag}): {account.hero_json()}"
     
     ############################################################
     ############################################################
