@@ -110,7 +110,7 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
     def long_description(self) -> str:
         description = f"{EmojisClash.CLAN} Level {self.level}\u3000"
         description += f"{EmojisUI.MEMBERS} {self.member_count}" + (f" (R:{self.alliance_member_count})" if self.is_alliance_clan else "") + "\u3000"
-        description += f"{EmojisUI.GLOBE} {self.location.name}\n"
+        description += f"{EmojisUI.GLOBE} {getattr(self.location,'name','No Location')}\n"
         description += (f"{EmojisClash.CLANWAR} W{self.war_wins}/D{self.war_ties}/L{self.war_losses} (Streak: {self.war_win_streak})\n" if self.public_war_log else "")
         description += f"{EmojisClash.WARLEAGUES}" + (f"{EmojisLeagues.get(self.war_league.name)} {self.war_league.name}\n" if self.war_league else "Unranked\n")
         description += f"{EmojisCapitalHall.get(self.capital_hall)} CH {self.capital_hall}\u3000"

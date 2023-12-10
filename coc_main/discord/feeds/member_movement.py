@@ -38,7 +38,7 @@ class ClanMemberFeed(ClanDataFeed):
     @classmethod
     async def member_join(cls,clan:aClan,player:coc.ClanMember):
         try:
-            clan_feeds = await cls.feeds_for_clan(clan)
+            clan_feeds = await cls.feeds_for_clan(clan,type=type)
 
             if len(clan_feeds) > 0:
                 client = cls.get_coc_client()
@@ -75,7 +75,7 @@ class ClanMemberFeed(ClanDataFeed):
     @classmethod
     async def member_leave(cls,clan:aClan,player:coc.ClanMember):
         try:
-            clan_feeds = await cls.feeds_for_clan(clan)
+            clan_feeds = await cls.feeds_for_clan(clan,type=type)
 
             if len(clan_feeds) > 0:
                 client = cls.get_coc_client() 

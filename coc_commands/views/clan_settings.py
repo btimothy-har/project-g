@@ -1037,7 +1037,7 @@ class ClanSettingsMenu(DefaultView):
 
         clan_raid_reminder_options = [discord.SelectOption(
             label=f"Raid Reminder: {getattr(reminder.channel,'name','Unknown Channel')}",
-            value=str(reminder._id),
+            value=str(reminder.id),
             )
             for reminder in self.raid_reminders
             ]

@@ -1,6 +1,7 @@
 import discord
 import pendulum
 import asyncio
+import bson
 
 from typing import *
 
@@ -36,6 +37,7 @@ class EventReminder():
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         '_id',
+        'id',
         'tag',
         '_type',
         'sub_type',
@@ -60,6 +62,7 @@ class EventReminder():
     
     def __init__(self,database:dict):
         self._id = database['_id']
+        self.id = str(self._id)
 
         self.tag = database.get('tag',None)
         self._type = database.get('type',None)
@@ -96,7 +99,7 @@ class EventReminder():
         return max(self.interval_tracker) if self.interval_tracker and len(self.interval_tracker) > 0 else None
     
     async def delete(self):
-        await bot_client.coc_db.db__clan_event_reminder.delete_one({'_id':self.id})
+        await bot_client.coc_db.db__clan_event_reminder.delete_one({'_id':self._id})
 
     async def generate_reminder_text(self):
         reminder_text = ""
@@ -107,53 +110,47 @@ class EventReminder():
         return reminder_text
     
     async def refresh_intervals(self,time_reference):
-        async with self._lock:
-            self.interval_tracker = [i for i in self.reminder_interval if i < (time_reference.total_seconds() / 3600)]
-            await bot_client.coc_db.db__clan_event_reminder.update_one(
-                {'_id':self._id},
-                {'$set': {
-                    'interval_tracker':self.interval_tracker
-                    }
+        self.interval_tracker = [i for i in self.reminder_interval if i < (time_reference.total_seconds() / 3600)]
+        await bot_client.coc_db.db__clan_event_reminder.update_one(
+            {'_id':self._id},
+            {'$set': {
+                'interval_tracker':self.interval_tracker
                 }
-            )
+            }
+        )
     
-    async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*player_tags):        
+    async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
-        await self.refresh_intervals(time_remaining)
 
-        if not self.next_reminder:
-            return        
         if self._lock.locked():
             return
-        
-        async with self._lock:            
-            if self.next_reminder < (time_remaining.total_seconds() / 3600):
-                return
-
-            tags = AsyncIter(player_tags)
-            async for player_tag in tags:
-                try:
-                    player = await self.coc_client.fetch_player(player_tag)
+        async with self._lock:
+            if self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder:
+                a_iter = AsyncIter(players)
+                async for rem_player in a_iter:
                     try:
-                        member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
-                    except (discord.Forbidden,discord.NotFound):
-                        member = None
-                    if not member:
-                        continue                    
-                    try:
-                        r = self.active_reminders[member.id]
-                    except KeyError:
-                        r = self.active_reminders[member.id] = MemberReminder(member)
-                    r.add_account(player)
-                except:
-                    bot_client.coc_main_log.exception(f"Error adding account {player_tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
+                        player = await self.coc_client.fetch_player(rem_player.tag)
+                        try:
+                            member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
+                        except (discord.Forbidden,discord.NotFound):
+                            member = None
+                        if not member:
+                            continue                    
+                        try:
+                            r = self.active_reminders[member.id]
+                        except KeyError:
+                            r = self.active_reminders[member.id] = MemberReminder(member)
+                        r.add_account(player)
+                    except:
+                        bot_client.coc_main_log.exception(f"Error adding account {rem_player.tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
             
-            if len(self.active_reminders) == 0:
-                return
-            if self._type == 1:
-                await self.send_war_reminders(event)
-            elif self._type == 2:
-                await self.send_raid_reminders(event)
+            if len(self.active_reminders) > 0:
+                if self._type == 1:
+                    await self.send_war_reminders(event)
+                elif self._type == 2:
+                    await self.send_raid_reminders(event)
+            
+            await self.refresh_intervals(time_remaining)
     
     async def send_war_reminders(self,clan_war:aClanWar):
         clan = await self.coc_client.fetch_clan(self.tag)
@@ -197,19 +194,21 @@ class EventReminder():
                 username=clan.name,
                 avatar_url=clan.badge,
                 content=reminder_text,
-                thread=self.channel
+                thread=self.channel,
+                wait = True
                 )
         else:
             r_msg = await webhook.send(
                 username=clan.name,
                 avatar_url=clan.badge,
                 content=reminder_text,
+                wait = True
                 )
         bot_client.coc_main_log.info(f"Clan {clan}: Sent Raid Reminders to {len(self.active_reminders)} players. Reminder ID: {r_msg.id}")
     
     @classmethod
     async def get_by_id(cls,id:str) -> 'EventReminder':
-        query = await bot_client.coc_db.db__clan_event_reminder.find_one({'_id':id})
+        query = await bot_client.coc_db.db__clan_event_reminder.find_one({'_id':bson.ObjectId(id)})
         return cls(query) if query else None
     
     @classmethod

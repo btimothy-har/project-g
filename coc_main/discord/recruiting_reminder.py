@@ -51,7 +51,7 @@ class RecruitingReminder():
     
     def __init__(self,database:dict):
         self._id = database['_id']
-        self.id = str(self.id)
+        self.id = str(self._id)
 
         self.is_active = database.get('is_active',False)
 
@@ -77,7 +77,7 @@ class RecruitingReminder():
     
     @property
     def lock(self) -> asyncio.Lock:
-        return self._locks[self.id]
+        return self._locks[self._id]
 
     @property
     def guild(self) -> Optional[discord.Guild]:
@@ -171,7 +171,7 @@ class RecruitingReminder():
                 self.is_active = False
             except:
                 pass
-            await bot_client.coc_db.db__recruiting_post.delete_one({'_id':self.id})
+            await bot_client.coc_db.db__recruiting_post.delete_one({'_id':self._id})
     
     ##################################################
     ### DISCORD HELPERS
