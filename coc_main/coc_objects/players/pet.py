@@ -23,6 +23,17 @@ class aPet():
         self._game_pet = pet
         self._th_level = th_level
         self._level = None
+    
+    def to_json(self) -> dict:
+        return {
+            'name': self.name,
+            'level': self.level,
+            'max_level': self.max_level,
+            'min_level': self.min_level,
+            'emoji': self.emoji,
+            'is_rushed': self.is_rushed,
+            'village': self.village,
+            }
 
     @property
     def emoji(self) -> str:
@@ -71,7 +82,7 @@ class aPet():
     @property
     def upgrade_resource(self) -> coc.Resource:
         if self.name == 'Spirit Fox':
-            return 0
+            return coc.Resource.dark_elixir
         return self._game_pet.upgrade_resource    
     @property
     def upgrade_time(self) -> coc.TimeDelta:

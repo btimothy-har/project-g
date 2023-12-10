@@ -65,6 +65,29 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     def __hash__(self):
         return hash(self.tag)
+    
+    def to_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'is_alliance_member': self.is_member,
+            'alliance_clan': self.home_clan.to_json() if self.home_clan else None,
+            'exp_level': self.exp_level,
+            'clan': self.clan.to_json() if self.clan else None,
+            'town_hall_level': self.town_hall_level,
+            'town_hall_weapon': self.town_hall_weapon,
+            'best_trophies': self.best_trophies,
+            'war_stars': self.war_stars,
+            'war_opted_in': self.war_opted_in,
+            'heroes': [hero.to_json() for hero in self.heroes],
+            'pets': [pet.to_json() for pet in self.pets],
+            'elixir_troops': [troop.to_json() for troop in self.elixir_troops],
+            'darkelixir_troops': [troop.to_json() for troop in self.darkelixir_troops],
+            'siege_machines': [troop.to_json() for troop in self.siege_machines],
+            'elixir_spells': [spell.to_json() for spell in self.elixir_spells],
+            'darkelixir_spells': [spell.to_json() for spell in self.darkelixir_spells],
+            'super_troops': [troop.to_json() for troop in self.super_troops]
+            }
 
     async def load(self):
         if self.clan:

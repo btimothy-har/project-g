@@ -20,6 +20,17 @@ class aHero():
         self._th_level = th_level
         self._level = None
 
+    def to_json(self) -> dict:
+        return {
+            'name': self.name,
+            'level': self.level,
+            'max_level': self.max_level,
+            'min_level': self.min_level,
+            'emoji': self.emoji,
+            'is_rushed': self.is_rushed,
+            'village': self.village,
+            }
+
     @property
     def emoji(self) -> str:
         return EmojisHeroes.get(self.name)

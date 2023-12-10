@@ -15,7 +15,7 @@ from coc_main.utils.components import handle_command_error, clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
-from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
+from coc_main.exceptions import ClashAPIError, InvalidTag
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -237,13 +237,38 @@ class Players(commands.Cog):
             }
         await cog.register_function(cog_name="Players", schema=schema)
 
+        schema = {
+            "name": "_assistant_get_account_details",
+            "description": "Gets details for a Clash Account, based on the Tag provided. Returns a JSON object.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "account_tag": {
+                        "description": "The unique player tag of the account.",
+                        "type": "string",
+                        },
+                    },
+                "required": ["account_tag"],
+                },
+            }
+        await cog.register_function(cog_name="Players", schema=schema)
+
     async def _assistant_get_linked_user_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
         if not user:
-            return "No user found."
-        
+            return "No user found."        
         member = await aMember(user.id,guild.id)
-        accounts_str = "\n".join([f"{EmojisTownHall.get(a.town_hall_level)} TH{a.town_hall_level} {a.name} ({a.tag})" for a in await self.client.fetch_many_players(*member.account_tags)])
+        accounts_str = "\n".join([f"TH{a.town_hall_level} {a.name} ({a.tag})" for a in await self.client.fetch_many_players(*member.account_tags)])
         return f"{user.display_name} has the following accounts linked:\n{accounts_str}"
+    
+    async def _assistant_get_account_details(self,account_tag:str,*args,**kwargs) -> str:
+        try:
+            account = await self.client.fetch_player(account_tag)
+        except ClashAPIError as exc:
+            return f"Error: {exc.message}"
+        except InvalidTag:
+            return "Invalid Tag."
+        
+        return account.to_json()
     
     ############################################################
     ############################################################
