@@ -229,10 +229,13 @@ class aMember(AwaitLoader):
     @classmethod
     async def save_user_roles(cls,user_id:int,guild_id:int):
         user = await cls(user_id,guild_id)
+
         if not user.discord_member:
             raise InvalidUser(user.user_id)
         if not user.guild:
             raise InvalidGuild(user.guild_id)
+        
+        await cls(user_id)
         
         try:
             await user.sync_clan_roles()
