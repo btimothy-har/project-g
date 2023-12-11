@@ -150,14 +150,8 @@ class RemoveMemberMenu(DefaultView):
             )
         await interaction.edit_original_response(embed=embed,view=self)
 
-        async for tag in AsyncIter(menu.values):
-            try:
-                player = await self.client.fetch_player(tag)
-            except InvalidTag:
-                continue
-            else:
-                if isinstance(player,aPlayer):
-                    self.remove_accounts.append(player)        
+        get_accounts = await self.client.fetch_many_players(*menu.values)
+        self.remove_accounts.extend(get_accounts)  
         await self._remove_accounts_process()
     
     ####################################################################################################
@@ -210,7 +204,10 @@ class RemoveMemberMenu(DefaultView):
         accounts_removed_list = []
         discord_users = []
 
-        async for account in AsyncIter(self.remove_accounts):
+        a_iter = AsyncIter(self.remove_accounts)
+
+        async for a in a_iter:
+            account = await self.client.fetch_player(a.tag)
             await account.remove_member()
             accounts_removed_list.append(f"**{account.title}**")
 
@@ -218,8 +215,9 @@ class RemoveMemberMenu(DefaultView):
                 discord_users.append(account.discord_user)
         
         report_output += f"{EmojisUI.TASK_CHECK} Accounts Removed: {chat.humanize_list(accounts_removed_list)}.\n"
-        
-        async for user_id in AsyncIter(discord_users):
+    
+        u_iter = AsyncIter(discord_users)
+        async for user_id in u_iter:
             try:
                 roles_added_output = f""
                 roles_removed_output = f""
