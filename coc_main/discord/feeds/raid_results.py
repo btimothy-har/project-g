@@ -145,5 +145,5 @@ class RaidResultsFeed(ClanDataFeed):
             file = discord.File(fp,filename="raid_image.png")
             return file
 
-        file = save_im,background
+        file = save_im(background)
         return file

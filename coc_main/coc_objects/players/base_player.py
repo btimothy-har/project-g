@@ -223,16 +223,21 @@ class BasicPlayer(AwaitLoader):
             await self.home_clan.remove_member(self.tag)
 
         async with self._attributes._lock:
+            ts = pendulum.now()
             self._attributes.is_member = False
-            self.home_clan = self._attributes.home_clan_tag = None
-            self._attributes.last_removed = pendulum.now()
+            self._attributes.home_clan_tag = None
+            self._attributes.last_removed = ts
+
+            self.home_clan = None
 
             await bot_client.coc_db.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'is_member':self.is_member,
-                    'home_clan':None,
-                    'last_removed':getattr(self.last_removed,'int_timestamp',pendulum.now().int_timestamp)
+                    'is_member':False,
+                    'last_removed':ts.int_timestamp
+                    },
+                '$unset':{
+                    'home_clan':''
                     }
                 },
                 upsert=True
