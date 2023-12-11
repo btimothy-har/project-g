@@ -20,6 +20,8 @@ from ..coc_objects.clans.clan import aClan
 
 from ..utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed
 from ..utils.constants.coc_emojis import EmojisClash
+from ..utils.constants.ui_emojis import EmojisUI
+
 from ..exceptions import ClashAPIError
 
 bot_client = client()
@@ -216,6 +218,7 @@ class ClanApplyMenu(discord.ui.View):
     def add_link_button(self):
         add_button = DiscordButton(
             function=self._callback_add_link,
+            emoji=EmojisUI.ADD,
             label="Link a Clash Account",
             style=discord.ButtonStyle.secondary
             )
