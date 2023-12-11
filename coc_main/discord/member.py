@@ -28,11 +28,11 @@ class aMember(AwaitLoader):
     __slots__ = [
         '_is_new',
         '_lock',
+        '_scope_clans'
         'user_id',
         'guild_id',
         'accounts',
         'member_accounts',
-        'home_clans',
         'last_payday',
         'last_role_sync'
         ]
@@ -58,10 +58,10 @@ class aMember(AwaitLoader):
         
         if self._is_new:
             self._lock = asyncio.Lock()
+            self._scope_clans = []
 
             self.accounts = []
-            self.member_accounts = []
-            self.home_clans = []            
+            self.member_accounts = []   
             self.last_payday = pendulum.now()
             self.last_role_sync = pendulum.now()
         
@@ -87,7 +87,7 @@ class aMember(AwaitLoader):
             return [clan.tag for clan in await client_cog.get_alliance_clans()]
         
     async def load(self):
-        scope = await self._get_scope_clans()
+        self._scope_clans = await self._get_scope_clans()
         query = bot_client.coc_db.db__player.find(
             {
                 'discord_user':self.user_id
@@ -100,6 +100,7 @@ class aMember(AwaitLoader):
             key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
+<<<<<<< Updated upstream
         self.member_accounts = sorted(
             [a for a in self.accounts if a.is_member and a.home_clan and a.home_clan.tag in scope],
             key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
@@ -114,6 +115,8 @@ class aMember(AwaitLoader):
             key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
             reverse=True
             )
+=======
+>>>>>>> Stashed changes
 
         query = await bot_client.coc_db.db__discord_member.find(
             {'_id':self.db_id},
@@ -184,8 +187,28 @@ class aMember(AwaitLoader):
     def account_tags(self) -> List[str]:
         return [a.tag for a in self.accounts]
     @property
+    def member_accounts(self) -> List[BasicPlayer]:
+        mem = [a for a in self.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
+        mem.sort(
+            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
+            reverse=True
+            )
+        return mem
+    @property
     def member_tags(self) -> List[str]:
         return [a.tag for a in self.member_accounts]
+    @property
+    def home_clans(self) -> List[aPlayerClan]:
+        accounts = self.member_accounts
+        mem = []
+        for a in accounts:
+            if a.home_clan.tag not in [c.tag for c in mem]:
+                mem.append(a.home_clan)
+        mem.sort(
+            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
+            reverse=True
+            )
+        return mem
     @property
     def leader_clans(self) -> List[aPlayerClan]:
         return [hc for hc in self.home_clans if self.user_id == hc.leader]    
