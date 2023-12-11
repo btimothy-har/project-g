@@ -100,23 +100,6 @@ class aMember(AwaitLoader):
             key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
-<<<<<<< Updated upstream
-        self.member_accounts = sorted(
-            [a for a in self.accounts if a.is_member and a.home_clan and a.home_clan.tag in scope],
-            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
-            reverse=True
-            )
-        
-        a_iter = AsyncIter(self.member_accounts)        
-        async for a in a_iter:
-            if a.home_clan.tag not in [c.tag for c in self.home_clans]:
-                self.home_clans.append(a.home_clan)
-        self.home_clans.sort(
-            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
-            reverse=True
-            )
-=======
->>>>>>> Stashed changes
 
         query = await bot_client.coc_db.db__discord_member.find(
             {'_id':self.db_id},
