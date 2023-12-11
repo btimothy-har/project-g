@@ -28,11 +28,10 @@ class aMember(AwaitLoader):
     __slots__ = [
         '_is_new',
         '_lock',
+        '_scope_clans'
         'user_id',
         'guild_id',
         'accounts',
-        'member_accounts',
-        'home_clans',
         'last_payday',
         'last_role_sync'
         ]
@@ -58,10 +57,9 @@ class aMember(AwaitLoader):
         
         if self._is_new:
             self._lock = asyncio.Lock()
+            self._scope_clans = []
 
             self.accounts = []
-            self.member_accounts = []
-            self.home_clans = []            
             self.last_payday = pendulum.now()
             self.last_role_sync = pendulum.now()
         
@@ -81,15 +79,13 @@ class aMember(AwaitLoader):
 
     async def _get_scope_clans(self) -> List[str]:
         if self.guild_id:
-            links = await ClanGuildLink.get_for_guild(self.guild_id)
-            return [l.tag for l in links]
+            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
         else:
             client_cog = bot_client.bot.get_cog('ClashOfClansClient')
-            clans = await client_cog.get_alliance_clans()
-            return [c.tag for c in clans]
+            return [clan.tag for clan in await client_cog.get_alliance_clans()]
         
     async def load(self):
-        scope = await self._get_scope_clans()
+        self._scope_clans = await self._get_scope_clans()
         query = bot_client.coc_db.db__player.find(
             {
                 'discord_user':self.user_id
@@ -97,25 +93,9 @@ class aMember(AwaitLoader):
             {'_id':1,'is_member':1,'home_clan':1}
             )
         #sort by TH, exp level, alliance rank
-        
-        self.accounts = [await BasicPlayer(db['_id']) async for db in query]
-        self.accounts.sort(
-            key=lambda x: (x.town_hall_level,x.exp_level),
-            reverse=True
-            )
-        
-        self.member_accounts = [a for a in self.accounts if a.is_member and getattr(a.home_clan,'tag',None) in scope]
-        self.member_accounts.sort(
-            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
-            reverse=True
-            )
-        
-        a_iter = AsyncIter(self.member_accounts)        
-        async for a in a_iter:
-            if a.home_clan.tag not in [c.tag for c in self.home_clans]:
-                self.home_clans.append(a.home_clan)
-        self.home_clans.sort(
-            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
+        self.accounts = sorted(
+            [await BasicPlayer(db['_id']) async for db in query],
+            key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
             reverse=True
             )
 
@@ -188,8 +168,28 @@ class aMember(AwaitLoader):
     def account_tags(self) -> List[str]:
         return [a.tag for a in self.accounts]
     @property
+    def member_accounts(self) -> List[BasicPlayer]:
+        mem = [a for a in self.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
+        mem.sort(
+            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
+            reverse=True
+            )
+        return mem
+    @property
     def member_tags(self) -> List[str]:
         return [a.tag for a in self.member_accounts]
+    @property
+    def home_clans(self) -> List[aPlayerClan]:
+        accounts = self.member_accounts
+        mem = []
+        for a in accounts:
+            if a.home_clan.tag not in [c.tag for c in mem]:
+                mem.append(a.home_clan)
+        mem.sort(
+            key=lambda x:(x.level, MultiplayerLeagues.get_index(x.war_league_name), x.capital_hall),
+            reverse=True
+            )
+        return mem
     @property
     def leader_clans(self) -> List[aPlayerClan]:
         return [hc for hc in self.home_clans if self.user_id == hc.leader]    
@@ -292,7 +292,7 @@ class aMember(AwaitLoader):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         if not self.guild:
-            raise InvalidUser(self.user_id)
+            return roles_added, roles_removed
         
         if not force:
             db_last_sync = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
@@ -303,7 +303,7 @@ class aMember(AwaitLoader):
     
         async with self._lock:
             #Assassins guild Member Role
-            if self.guild_id == 1132581106571550831:
+            if self.guild.id == 1132581106571550831:
                 global_member = await aMember(self.user_id)
                 clan_member_role = self.guild.guild.get_role(1139855695068540979)
                 
@@ -315,13 +315,11 @@ class aMember(AwaitLoader):
                     if clan_member_role in self.discord_member.roles:
                         roles_removed.append(clan_member_role)
 
-            guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
-
-            hc_tags = [c.tag for c in self.home_clans]
+            guild_links = await ClanGuildLink.get_for_guild(self.guild.id)
             async for link in AsyncIter(guild_links):
-                if link.tag in hc_tags:
-                    clan = await link.get_clan()
+                clan = await link.clan
 
+                if clan.tag in [c.tag for c in self.home_clans]:
                     is_elder = False
                     is_coleader = False
 
@@ -355,11 +353,9 @@ class aMember(AwaitLoader):
                     if link.member_role:
                         if link.member_role in self.discord_member.roles:
                             roles_removed.append(link.member_role)
-
                     if link.elder_role:
                         if link.elder_role in self.discord_member.roles:
                             roles_removed.append(link.elder_role)
-
                     if link.coleader_role:
                         if link.coleader_role in self.discord_member.roles:
                             roles_removed.append(link.coleader_role)
