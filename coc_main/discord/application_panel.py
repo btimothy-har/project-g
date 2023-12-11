@@ -225,6 +225,8 @@ class ClanApplyMenu(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
 
         self.reload_items()
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+        
         add_link_view = AddLinkMenu(interaction,interaction.user)
         await add_link_view._start_add_link()
 
