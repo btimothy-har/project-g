@@ -18,6 +18,7 @@ class AddLinkMenu(DefaultView):
         context:discord.Interaction,
         member:aMember):
 
+        self.m_id = 0
         self.member = member
         self.start_add_link = DiscordButton(
             function=self._callback_add_link,
@@ -81,11 +82,12 @@ class AddLinkMenu(DefaultView):
         self.message = await self.ctx.followup.send(embed=embed,view=self,ephemeral=True,wait=True)
         
     async def _callback_add_link(self,interaction:discord.Interaction,button:DiscordButton):
+        self.m_id = interaction.message.id
         await interaction.response.send_modal(self.add_link_modal)
     
     async def _callback_add_link_modal(self,interaction:discord.Interaction,modal:DiscordModal):
         await interaction.response.defer(ephemeral=True)
-        await self.ctx.edit_original_response(view=None)
+        await interaction.followup.edit_message(self.m_id,view=None)
 
         o_tag = modal.children[0].value
         api_token = modal.children[1].value
@@ -118,7 +120,7 @@ class AddLinkMenu(DefaultView):
                     + f"\n{self.add_link_account.long_description}",
                 success=False
                 )
-            await interaction.edit_original_response(embed=embed,view=None)
+            await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
             return self.stop_menu()
 
         if verify:
@@ -128,7 +130,7 @@ class AddLinkMenu(DefaultView):
                 message=f"The account **{self.add_link_account.tag}** is now linked to your Discord account!",
                 success=True
                 )
-            await interaction.edit_original_response(embed=embed,view=None)
+            await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
         else:
             embed = await clash_embed(
                 context=self.ctx,
@@ -136,7 +138,7 @@ class AddLinkMenu(DefaultView):
                 success=False,
                 view=None
                 )
-            await interaction.edit_original_response(embed=embed,view=None)
+            await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
         self.stop()
 
 class DeleteLinkMenu(DefaultView):
