@@ -76,6 +76,9 @@ class ClanGuildLink():
     async def clan(self) -> BasicClan:
         return await BasicClan(tag=self.tag)
     
+    async def get_clan(self) -> BasicClan:
+        return await BasicClan(tag=self.tag)
+    
     @property
     def guild(self) -> discord.Guild:
         return bot_client.bot.get_guild(self.guild_id)

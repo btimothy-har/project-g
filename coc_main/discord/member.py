@@ -81,10 +81,12 @@ class aMember(AwaitLoader):
 
     async def _get_scope_clans(self) -> List[str]:
         if self.guild_id:
-            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
+            links = await ClanGuildLink.get_for_guild(self.guild_id)
+            return [l.tag for l in links]
         else:
             client_cog = bot_client.bot.get_cog('ClashOfClansClient')
-            return [clan.tag for clan in await client_cog.get_alliance_clans()]
+            clans = await client_cog.get_alliance_clans()
+            return [c.tag for c in clans]
         
     async def load(self):
         scope = await self._get_scope_clans()
@@ -95,14 +97,16 @@ class aMember(AwaitLoader):
             {'_id':1,'is_member':1,'home_clan':1}
             )
         #sort by TH, exp level, alliance rank
-        self.accounts = sorted(
-            [await BasicPlayer(db['_id']) async for db in query],
-            key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
+        
+        self.accounts = [await BasicPlayer(db['_id']) async for db in query]
+        self.accounts.sort(
+            key=lambda x: (x.town_hall_level,x.exp_level),
             reverse=True
             )
-        self.member_accounts = sorted(
-            [a for a in self.accounts if a.is_member and a.home_clan and a.home_clan.tag in scope],
-            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level,x.clean_name),
+        
+        self.member_accounts = [a for a in self.accounts if a.is_member and getattr(a.home_clan,'tag',None) in scope]
+        self.member_accounts.sort(
+            key=lambda x: (ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
             reverse=True
             )
         
@@ -288,7 +292,7 @@ class aMember(AwaitLoader):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         if not self.guild:
-            return roles_added, roles_removed
+            raise InvalidUser(self.user_id)
         
         if not force:
             db_last_sync = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
@@ -299,7 +303,7 @@ class aMember(AwaitLoader):
     
         async with self._lock:
             #Assassins guild Member Role
-            if self.guild.id == 1132581106571550831:
+            if self.guild_id == 1132581106571550831:
                 global_member = await aMember(self.user_id)
                 clan_member_role = self.guild.guild.get_role(1139855695068540979)
                 
@@ -311,11 +315,13 @@ class aMember(AwaitLoader):
                     if clan_member_role in self.discord_member.roles:
                         roles_removed.append(clan_member_role)
 
-            guild_links = await ClanGuildLink.get_for_guild(self.guild.id)
-            async for link in AsyncIter(guild_links):
-                clan = await link.clan
+            guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
 
-                if clan.tag in [c.tag for c in self.home_clans]:
+            hc_tags = [c.tag for c in self.home_clans]
+            async for link in AsyncIter(guild_links):
+                if link.tag in hc_tags:
+                    clan = await link.get_clan()
+
                     is_elder = False
                     is_coleader = False
 
@@ -349,9 +355,11 @@ class aMember(AwaitLoader):
                     if link.member_role:
                         if link.member_role in self.discord_member.roles:
                             roles_removed.append(link.member_role)
+
                     if link.elder_role:
                         if link.elder_role in self.discord_member.roles:
                             roles_removed.append(link.elder_role)
+
                     if link.coleader_role:
                         if link.coleader_role in self.discord_member.roles:
                             roles_removed.append(link.coleader_role)
