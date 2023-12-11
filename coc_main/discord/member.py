@@ -32,7 +32,6 @@ class aMember(AwaitLoader):
         'user_id',
         'guild_id',
         'accounts',
-        'member_accounts',
         'last_payday',
         'last_role_sync'
         ]
@@ -61,7 +60,6 @@ class aMember(AwaitLoader):
             self._scope_clans = []
 
             self.accounts = []
-            self.member_accounts = []   
             self.last_payday = pendulum.now()
             self.last_role_sync = pendulum.now()
         
