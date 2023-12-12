@@ -9,7 +9,7 @@ from redbot.core import commands
 from redbot.core.utils import chat_formatting as chat
 from redbot.core.utils import AsyncIter
 
-from .guild import aGuild, ClanGuildLink
+from .clan_link import ClanGuildLink
 
 from ..api_client import BotClashClient as client
 
@@ -79,7 +79,7 @@ class aMember(AwaitLoader):
 
     async def _get_scope_clans(self) -> List[str]:
         if self.guild:
-            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
+            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild.id)]
         else:
             client_cog = bot_client.bot.get_cog('ClashOfClansClient')
             return [clan.tag for clan in await client_cog.get_alliance_clans()]
@@ -110,19 +110,13 @@ class aMember(AwaitLoader):
     ### DISCORD MEMBER ATTRIBUTES
     ##################################################
     @property
-    def guild(self) -> Optional[aGuild]:
-        if not self.guild_id:
-            return None
-        try:
-            return aGuild(self.guild_id)
-        except InvalidGuild:
-            return None
+    def guild(self) -> Optional[discord.Guild]:
+        return bot_client.bot.get_guild(self.guild_id) if self.guild_id else None
         
     @property
     def discord_member(self) -> Optional[Union[discord.User,discord.Member]]:
-        guild = bot_client.bot.get_guild(self.guild_id) if self.guild_id else None
-        if guild:
-            return guild.get_member(self.user_id)
+        if self.guild:
+            return self.guild.get_member(self.user_id)
         return bot_client.bot.get_user(self.user_id)
 
     @property
@@ -270,7 +264,7 @@ class aMember(AwaitLoader):
         saved_roles = db_saved_roles.get('roles',[]) if db_saved_roles else []
 
         async for role_id in AsyncIter(saved_roles):
-            role = self.guild.guild.get_role(int(role_id))
+            role = self.guild.get_role(int(role_id))
             if not role:
                 continue
             if role.is_assignable():

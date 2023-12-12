@@ -9,6 +9,7 @@ from typing import *
 from redbot.core.utils import AsyncIter
 
 from .clan_link import ClanGuildLink
+from .add_delete_link import AddLinkMenu
 from .helpers import account_recruiting_summary
 
 from ..cog_coc_client import ClashOfClansClient
@@ -19,6 +20,8 @@ from ..coc_objects.clans.clan import aClan
 
 from ..utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed
 from ..utils.constants.coc_emojis import EmojisClash
+from ..utils.constants.ui_emojis import EmojisUI
+
 from ..exceptions import ClashAPIError
 
 bot_client = client()
@@ -156,17 +159,22 @@ class ClanApplyMenu(discord.ui.View):
         self.clans = list_of_clans
         super().__init__(timeout=None)
 
-        if self.panel.can_user_select_clans:
-            self.add_item(self.select_menu())
-        else:
-            self.add_item(self.apply_button())
-    
+        self.reload_items()
+
     @property
     def coc_client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
 
     async def on_timeout(self):
         pass
+
+    def reload_items(self):
+        self.clear_items()
+        if self.panel.can_user_select_clans:
+            self.add_item(self.select_menu())
+        else:
+            self.add_item(self.apply_button())
+        self.add_item(self.add_link_button())
 
     def select_menu(self):
         dropdown_options = [discord.SelectOption(
@@ -188,13 +196,8 @@ class ClanApplyMenu(discord.ui.View):
     async def _callback_select_clan(self,interaction:discord.Interaction,select:discord.ui.Select):
         await interaction.response.defer(ephemeral=True)
 
-        self.clear_items()
-        if self.panel.can_user_select_clans:
-            self.add_item(self.select_menu())
-        else:
-            self.add_item(self.apply_button())
+        self.reload_items()
         await interaction.followup.edit_message(interaction.message.id,view=self)
-
         await ClanApplyMenuUser.start_user_application(interaction,select.values)
     
     def apply_button(self):
@@ -208,14 +211,27 @@ class ClanApplyMenu(discord.ui.View):
     async def _callback_apply(self,interaction:discord.Interaction,select:discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
 
-        self.clear_items()
-        if self.panel.can_user_select_clans:
-            self.add_item(self.select_menu())
-        else:
-            self.add_item(self.apply_button())
+        self.reload_items()
         await interaction.followup.edit_message(interaction.message.id,view=self)
-
         await ClanApplyMenuUser.start_user_application(interaction)
+    
+    def add_link_button(self):
+        add_button = DiscordButton(
+            function=self._callback_add_link,
+            emoji=EmojisUI.ADD,
+            label="Link a Clash Account",
+            style=discord.ButtonStyle.blurple
+            )
+        return add_button
+    
+    async def _callback_add_link(self,interaction:discord.Interaction,select:discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+
+        self.reload_items()
+        await interaction.followup.edit_message(interaction.message.id,view=self)
+        
+        add_link_view = AddLinkMenu(interaction,interaction.user)
+        await add_link_view._start_add_link()
 
 ##################################################
 #####
