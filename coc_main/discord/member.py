@@ -302,7 +302,7 @@ class aMember(AwaitLoader):
                 return roles_added, roles_removed                
     
         async with self._lock:
-            self.load()
+            await self.load()
 
             #Assassins guild Member Role
             if self.guild.id == 1132581106571550831:
