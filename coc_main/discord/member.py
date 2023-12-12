@@ -78,8 +78,8 @@ class aMember(AwaitLoader):
         return {'guild':self.guild_id,'user':self.user_id}
 
     async def _get_scope_clans(self) -> List[str]:
-        if self.guild_id:
-            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild_id)]
+        if self.guild:
+            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild.id)]
         else:
             client_cog = bot_client.bot.get_cog('ClashOfClansClient')
             return [clan.tag for clan in await client_cog.get_alliance_clans()]
@@ -296,6 +296,8 @@ class aMember(AwaitLoader):
                 return roles_added, roles_removed                
     
         async with self._lock:
+            await self.load()
+
             #Assassins guild Member Role
             if self.guild.id == 1132581106571550831:
                 global_member = await aMember(self.user_id)

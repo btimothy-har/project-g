@@ -344,7 +344,7 @@ class BasicClan(AwaitLoader):
                 {'_id':self.tag},
                 {'$set':{
                     'coleaders':self.coleaders,
-                    'elders':self.coleaders
+                    'elders':self.elders
                     }
                 },
                 upsert=True)
@@ -358,7 +358,7 @@ class BasicClan(AwaitLoader):
             await bot_client.coc_db.db__alliance_clan.update_one(
                 {'_id':self.tag},
                 {'$set':{
-                    'elders':self.coleaders
+                    'elders':self.elders
                     }
                 },
                 upsert=True)
