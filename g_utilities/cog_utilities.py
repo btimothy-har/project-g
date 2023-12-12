@@ -296,6 +296,19 @@ class GuildUtility(commands.Cog):
             keywords=keywords
             )
     
+    @app_commands.command(name="wikipedia",
+        description="Get information from Wikipedia.")
+    @app_commands.describe(
+        query="The query to search.")
+    async def app_command_wikipedia_(self,interaction:discord.Interaction,query:str):
+
+        await interaction.response.defer()
+        context = await Context.from_interaction(interaction)
+        await context.invoke(
+            self.bot.get_command("wikipedia"),
+            query=query
+            )
+    
     app_command_group_dictionary = app_commands.Group(
         name="dictionary",
         description="Group for Dictionary commands."
