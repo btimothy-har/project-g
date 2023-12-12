@@ -18,6 +18,7 @@ from coc_main.discord.guild import ClanGuildLink
 from coc_main.utils.components import clash_embed, DiscordButton
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.exceptions import ClashAPIError
 
 from .leaderboard_player import ClanWarLeaderboardPlayer, ResourceLootLeaderboardPlayer, DonationsLeaderboardPlayer, ClanGamesLeaderboardPlayer
 from ..exceptions import LeaderboardExists
@@ -284,6 +285,9 @@ class DiscordLeaderboard():
 
                 await self.consolidate_data(season,data,archive)
             await self.send_to_discord()
+        
+        except ClashAPIError:
+            return
 
         except Exception as ex:
             bot_client.coc_main_log.exception(f"Error updating {self.type} Leaderboard for {self.guild.name}.")
