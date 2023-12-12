@@ -91,7 +91,7 @@ class GuildUtility(commands.Cog):
                 },
             {
                 "name": "_assistant_wikipedia_search",
-                "description": "Searches Wikipedia for results. Returns multiple pages as a list. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
+                "description": "Searches Wikipedia for results. Only returns 3 results at a time. Use different queries to find different results. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -144,14 +144,15 @@ class GuildUtility(commands.Cog):
         num_of_results = len(get_result)
 
         ret = {}
+        res = get_result[:3]
         if len(get_result) < 1:
             return "Could not find a response in Wikipedia."
         
-        for i, result in enumerate(get_result):
+        for i, result in enumerate(res):
             k = f"Page {i+1}"
             ret[k] = result.to_dict()
         
-        return f"There are {num_of_results} pages. Results: {ret}"
+        return f"There are {num_of_results} pages. Only returning the first {len(ret)} results: {ret}"
     
     async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
         wolfram_cog = bot.get_cog("Wolfram")
