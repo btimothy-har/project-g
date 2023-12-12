@@ -96,7 +96,7 @@ class GuildUtility(commands.Cog):
                     "type": "object",
                     "properties": {
                         "query": {
-                            "description": "The query to search Wikipedia for.",
+                            "description": "The query to search Wikipedia for. As Wikipedia uses strict search, you may need to try different queries to find the result you're looking for. It may help to search for a broad subject and scroll through results. For example, instead of searching for 'Jollibee History', search for 'Jollibee' and review the results. ",
                             "type": "string",
                             },
                         "page_num": {
@@ -137,7 +137,7 @@ class GuildUtility(commands.Cog):
             name=f"Chat with {user.display_name}",
             reason=reason
             )
-        await thread.send(f"{user.mention}")
+        await thread.send(f"{user.mention}, please note that to chat with me here, you will need to either reply or mention me in your message.")
 
         return f"Created a thread with {user.display_name}. Let the user know to continue the conversation there."
 
