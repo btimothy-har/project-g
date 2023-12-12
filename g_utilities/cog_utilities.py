@@ -91,7 +91,7 @@ class GuildUtility(commands.Cog):
                 },
             {
                 "name": "_assistant_wikipedia_search",
-                "description": "Searches Wikipedia for results. Returns paginated information. Submit repeated requests with the page_num parameter to view more pages.",
+                "description": "Searches Wikipedia for results. Returns paginated information. Submit repeated requests with the page_num parameter to view more pages. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
                 "parameters": {
                     "type": "object",
                     "properties": {
