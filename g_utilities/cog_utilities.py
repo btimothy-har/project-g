@@ -91,20 +91,16 @@ class GuildUtility(commands.Cog):
                 },
             {
                 "name": "_assistant_wikipedia_search",
-                "description": "Searches Wikipedia for results. Returns paginated information. Submit repeated requests with the page_num parameter to view more pages. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
+                "description": "Searches Wikipedia for results. Returns multiple pages as a list. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "query": {
-                            "description": "The query to search Wikipedia for. As Wikipedia uses strict search, you may need to try different queries to find the result you're looking for. It may help to search for a broad subject and scroll through results. For example, instead of searching for 'Jollibee History', search for 'Jollibee' and review the results. ",
+                            "description": "The query to search Wikipedia for. As Wikipedia uses strict search, you may need to try different queries to find the result you're looking for. It may help to search for a broad subject and filter through results. For example, instead of searching for 'Jollibee History', search for 'Jollibee' and review the results. ",
                             "type": "string",
-                            },
-                        "page_num": {
-                            "description": "The result page you'd like to retrieve.",
-                            "type": "string",
-                            },
+                            }
                         },
-                    "required": ["query","page_num"],
+                    "required": ["query"],
                     },
                 },
             {
@@ -141,22 +137,21 @@ class GuildUtility(commands.Cog):
 
         return f"Created a thread with {user.display_name}. Let the user know to continue the conversation there."
 
-    async def _assistant_wikipedia_search(self,bot:Red,query:str,page_num:int=1,*args,**kwargs) -> str:
+    async def _assistant_wikipedia_search(self,bot:Red,query:str,*args,**kwargs) -> str:
         wikipedia_cog = bot.get_cog("Wikipedia")
         
         get_result, a = await wikipedia_cog.perform_search(query)
         num_of_results = len(get_result)
 
+        ret = {}
         if len(get_result) < 1:
             return "Could not find a response in Wikipedia."
         
-        n_page = int(page_num)
-
-        if n_page > num_of_results:
-            return f"You've exceeded the number of available pages. There are only {len(num_of_results)} pages. The last page is: {get_result[-1].to_dict()}."
+        for i, result in enumerate(get_result):
+            k = f"Page {i+1}"
+            ret[k] = result.to_dict()
         
-        page = get_result[n_page-1]
-        return f"There are {num_of_results} pages. Returning page {n_page}.\n\n{page.to_dict()}"
+        return f"There are {num_of_results} pages. Results: {ret}"
     
     async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
         wolfram_cog = bot.get_cog("Wolfram")
