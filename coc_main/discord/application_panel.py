@@ -220,7 +220,7 @@ class ClanApplyMenu(discord.ui.View):
             function=self._callback_add_link,
             emoji=EmojisUI.ADD,
             label="Link a Clash Account",
-            style=discord.ButtonStyle.secondary
+            style=discord.ButtonStyle.blurple
             )
         return add_button
     
