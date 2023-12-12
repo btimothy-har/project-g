@@ -68,6 +68,124 @@ class GuildUtility(commands.Cog):
     ############################################################
     ############################################################
     #####
+    ##### ASSISTANT UTILS
+    #####
+    ############################################################
+    ############################################################ 
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schema = [
+            {
+                "name": "_assistant_create_thread",
+                "description": "Creates a private thread to have a private conversation with a user. Use this if the user has requested to speak with you privately, or if you need to speak with them privately. Remember to let the user know why you are creating the thread.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "reason": {
+                            "description": "The reason you created this thread.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["reason"],
+                    },
+                },
+            {
+                "name": "_assistant_wikipedia_search",
+                "description": "Searches Wikipedia for results. Returns paginated information. Submit repeated requests with the page_num parameter to view more pages.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "description": "The query to search Wikipedia for.",
+                            "type": "string",
+                            },
+                        "page_num": {
+                            "description": "The result page you'd like to retrieve.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["query","page_num"],
+                    },
+                },
+            {
+                "name": "_assistant_wolfram_query",
+                "description": "Submits a query to WolframAlpha. This can be used to source for factual information outside your existing training model.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "description": "The question or query to search Wolfram for.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["question"],
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="GuildUtility", schemas=schema)
+
+    async def _assistant_create_thread(self,
+        user:discord.Member,
+        channel:Union[discord.TextChannel,discord.Thread,discord.ForumChannel],
+        reason:str,
+        *args,**kwargs) -> str:
+    
+        if not isinstance(channel,discord.TextChannel):
+            return "You are already chatting in a thread."
+        
+        thread = await channel.create_thread(
+            name=f"Chat with {user.display_name}",
+            reason=reason
+            )
+        await thread.send(f"{user.mention}")
+
+        return f"Created a thread with {user.display_name}. Let the user know to continue the conversation there."
+
+    async def _assistant_wikipedia_search(self,bot:Red,query:str,page_num:int=1,*args,**kwargs) -> str:
+        wikipedia_cog = bot.get_cog("Wikipedia")
+        
+        get_result, a = await wikipedia_cog.perform_search(query)
+        num_of_results = len(get_result)
+
+        if len(get_result) < 1:
+            return "Could not find a response in Wikipedia."
+
+        if page_num > num_of_results:
+            return f"You've exceeded the number of available pages. There are only {len(num_of_results)} pages. The last page is: {get_result[-1].to_dict()}."
+        
+        page = get_result[page_num-1]
+        return f"There are {num_of_results} pages. Returning page {page_num}.\n\n{page.to_dict()}"
+    
+    async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
+        wolfram_cog = bot.get_cog("Wolfram")
+        api_key = await wolfram_cog.config.WOLFRAM_API_KEY()
+        if not api_key:
+            return "No API key set for Wolfram Alpha."
+
+        url = "http://api.wolframalpha.com/v2/query?"
+        query = question
+        payload = {"input": query, "appid": api_key}
+        headers = {"user-agent": "Red-cog/2.0.0"}
+
+        async with wolfram_cog.session.get(url, params=payload, headers=headers) as r:
+            result = await r.text()
+        
+        root = ET.fromstring(result)
+        a = []
+        for pt in root.findall(".//plaintext"):
+            if pt.text:
+                a.append(pt.text.capitalize())
+        if len(a) < 1:
+            message = "Could not find a response in WolframAlpha."
+        else:
+            message = "\n".join(a[0:3])
+            if "Current geoip location" in message:
+                message = "Could not find a response in WolframAlpha."
+        return message
+    
+    ############################################################
+    ############################################################
+    #####
     ##### SLASH WRAPPER
     #####
     ############################################################
@@ -249,50 +367,3 @@ class GuildUtility(commands.Cog):
             self.bot.get_command("wolframsolve"),
             query=question
             )
-    
-    @commands.Cog.listener()
-    async def on_assistant_cog_add(self,cog:commands.Cog):
-        schema = [
-            {
-                "name": "_assistant_wolfram_query",
-                "description": "Submits a query to WolframAlpha and gets a response. This can be used to source for factual information outside your existing training model.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "question": {
-                            "description": "The question or query to search Wolfram for.",
-                            "type": "string",
-                            },
-                        },
-                    "required": ["question"],
-                    },
-                }
-            ]
-        await cog.register_functions(cog_name="GuildUtility", schemas=schema)
-    
-    async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
-        wolfram_cog = bot.get_cog("Wolfram")
-        api_key = await wolfram_cog.config.WOLFRAM_API_KEY()
-        if not api_key:
-            return "No API key set for Wolfram Alpha."
-
-        url = "http://api.wolframalpha.com/v2/query?"
-        query = question
-        payload = {"input": query, "appid": api_key}
-        headers = {"user-agent": "Red-cog/2.0.0"}
-
-        async with wolfram_cog.session.get(url, params=payload, headers=headers) as r:
-            result = await r.text()
-        
-        root = ET.fromstring(result)
-        a = []
-        for pt in root.findall(".//plaintext"):
-            if pt.text:
-                a.append(pt.text.capitalize())
-        if len(a) < 1:
-            message = "There is as yet insufficient data for a meaningful answer."
-        else:
-            message = "\n".join(a[0:3])
-            if "Current geoip location" in message:
-                message = "There is as yet insufficient data for a meaningful answer."
-        return message
