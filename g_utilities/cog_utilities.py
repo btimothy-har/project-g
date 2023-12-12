@@ -149,12 +149,14 @@ class GuildUtility(commands.Cog):
 
         if len(get_result) < 1:
             return "Could not find a response in Wikipedia."
+        
+        n_page = int(page_num)
 
-        if page_num > num_of_results:
+        if n_page > num_of_results:
             return f"You've exceeded the number of available pages. There are only {len(num_of_results)} pages. The last page is: {get_result[-1].to_dict()}."
         
-        page = get_result[page_num-1]
-        return f"There are {num_of_results} pages. Returning page {page_num}.\n\n{page.to_dict()}"
+        page = get_result[n_page-1]
+        return f"There are {num_of_results} pages. Returning page {n_page}.\n\n{page.to_dict()}"
     
     async def _assistant_wolfram_query(self,bot:Red,question:str,*args,**kwargs) -> str:
         wolfram_cog = bot.get_cog("Wolfram")
