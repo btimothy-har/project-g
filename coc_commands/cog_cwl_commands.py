@@ -115,16 +115,10 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_signup_for_cwl",
-                "description": "Triggers the sign up process for a user to register for the upcoming Clan War Leagues. You DO NOT have to reply after invoking this function.",
+                "description": "Triggers the sign up process for a user to register for the upcoming Clan War Leagues.",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "message_id": {
-                            "description": "The message ID that prompted you to use this function.",
-                            "type": "integer"
-                            },
-                        },
-                    "required": ["message_id"]
+                    "properties": {},
                     },
                 },
             ]
@@ -150,6 +144,7 @@ class ClanWarLeagues(commands.Cog):
         
         if context:
             await context.invoke('mycwl')
+            return "The CWL command has been invoked, you do not need to reply to the user."
         else:
             return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
     
