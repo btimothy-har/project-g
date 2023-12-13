@@ -143,7 +143,7 @@ class ClanWarLeagues(commands.Cog):
                 context = await bot.get_context(message)
         
         if context:
-            await context.invoke('mycwl')
+            await context.invoke(bot.get_command('mycwl'))
             return "The CWL command has been invoked, you do not need to reply to the user."
         else:
             return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
