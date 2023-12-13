@@ -119,7 +119,10 @@ class ClanWarLeagues(commands.Cog):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "message_id": "The message ID that prompted you to use this function."
+                        "message_id": {
+                            "description": "The message ID that prompted you to use this function.",
+                            "type": "integer"
+                            },
                         },
                     "required": ["message_id"]
                     },
