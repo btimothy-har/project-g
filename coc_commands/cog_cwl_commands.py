@@ -139,7 +139,7 @@ class ClanWarLeagues(commands.Cog):
         *args,**kwargs) -> str:
 
         async def invoke_command(context):
-            await asyncio.sleep(1)
+            await asyncio.sleep(3)
             await context.invoke(bot.get_command('mycwl'))
 
         context = None
@@ -149,7 +149,7 @@ class ClanWarLeagues(commands.Cog):
         
         if context:
             asyncio.create_task(invoke_command(context))
-            return "The function ran successfully. DO NOT respond any further to the user."
+            return "The function ran successfully. The user will see the signup message in the current channel. DO NOT respond any further to the user."
         else:
             return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
     
