@@ -138,14 +138,20 @@ class ClanWarLeagues(commands.Cog):
         return info.to_dict()
 
     async def _assistant_signup_for_cwl(self,
-        bot:Red,    
+        bot:Red,
         channel:Union[discord.TextChannel,discord.Thread,discord.ForumChannel],
-        message_id:int,*args,**kwargs) -> str:
+        user:discord.User,
+        *args,**kwargs) -> str:
 
-        msg = await channel.fetch_message(message_id)
-        context = await bot.get_context(msg)
+        context = None
+        async for message in channel.history(limit=100):
+            if message.author.id == user.id:
+                context = await bot.get_context(message)
         
-        await context.invoke('mycwl')
+        if context:
+            await context.invoke('mycwl')
+        else:
+            return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
     
     ############################################################
     ############################################################
