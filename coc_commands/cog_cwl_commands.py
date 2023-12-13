@@ -90,6 +90,59 @@ class ClanWarLeagues(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
+        
+    ##################################################
+    ### ASSISTANT COG FUNCTIONS
+    ##################################################
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schemas = [
+            {
+                "name": "_assistant_get_cwl_season",
+                "description": "Identifies the next upcoming Clan War League season.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_cwl_information",
+                "description": "Provides you with detailed information on how Clan War Leagues work in The Assassins Guild.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_signup_for_cwl",
+                "description": "Triggers the sign up process for a user to register for the upcoming Clan War Leagues. You DO NOT have to reply after invoking this function.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message_id": "The message ID that prompted you to use this function."
+                        },
+                    "required": ["message_id"]
+                    },
+                },
+            ]
+        await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
+    
+    async def _assistant_get_cwl_season(self,*args,**kwargs) -> str:
+        return f"The next upcoming Clan War League season is {self.active_war_league_season.description}."
+
+    async def _assistant_get_cwl_information(self,*args,**kwargs) -> dict:
+        info = await self.cwl_information()
+        return info.to_dict()
+
+    async def _assistant_signup_for_cwl(self,
+        bot:Red,    
+        channel:Union[discord.TextChannel,discord.Thread,discord.ForumChannel],
+        message_id:int,*args,**kwargs) -> str:
+
+        msg = await channel.fetch_message(message_id)
+        context = await bot.get_context(msg)
+        
+        await context.invoke('mycwl')
     
     ############################################################
     ############################################################
@@ -175,7 +228,10 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / INFO
     ##################################################
-    async def cwl_information(self,context:Union[commands.Context,discord.Interaction]):
+    async def cwl_information(self,context:Optional[Union[commands.Context,discord.Interaction]]=None):
+        if not context:
+            context = self.bot
+        
         embed = await clash_embed(
             context=context,
             title=f"Clan War Leagues with AriX",
