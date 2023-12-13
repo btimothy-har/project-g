@@ -437,8 +437,8 @@ class ClanApplyMenuUser(DefaultView):
                 'api_error':False
                 }
             )
-            application_id = application.inserted_id
-
+        
+        application_id = application.inserted_id
         l_channel = modal.panel.listener_channel
         if l_channel:
             await l_channel.send(f"{getattr(modal.panel,'tickettool_prefix','')}ticket {application_id} {self.member.id}")
