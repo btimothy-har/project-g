@@ -103,12 +103,13 @@ class BankAccount(AwaitLoader):
         workbook = xlsxwriter.Workbook(report_file)
         worksheet = workbook.add_worksheet('Bank Transactions')
 
-        rpt_transactions = sorted(transactions,key=lambda t:t.timestamp,reverse=True)
+        rpt_transactions = sorted(transactions,key=lambda t:t['timestamp'],reverse=True)
         headers = ['Timestamp','User','Account','Debit','Credit','Comment']
 
         row = 0
         col = 0
-        async for h in AsyncIter(headers):
+        h_iter = AsyncIter(headers)
+        async for h in h_iter:
             worksheet.write(row,col,h)
             col += 1
 
@@ -117,23 +118,22 @@ class BankAccount(AwaitLoader):
             col = 0
             row += 1
 
-            transaction_user = bot_client.bot.get_user(t.user)
-
             m_data = []
-            m_data.append(pendulum.from_timestamp(t.timestamp).to_iso8601_string())
-            if t.user == bot_client.bot.user.id:
+            m_data.append(pendulum.from_timestamp(t['timestamp']).to_iso8601_string())
+            if t['user'] == bot_client.bot.user.id:
                 m_data.append('System')
             else:
-                m_data.append(transaction_user.name if transaction_user else t.user)
+                transaction_user = bot_client.bot.get_user(t['user'])
+                m_data.append(transaction_user.name if transaction_user else t['user'])
                 
-            m_data.append(t.account)
-            if t.amount < 0:
-                m_data.append(t.amount * -1)
+            m_data.append(t['account'])
+            if t['amount'] < 0:
+                m_data.append(t['amount'] * -1)
                 m_data.append('')
             else:
                 m_data.append('')
-                m_data.append(t.amount)
-            m_data.append(t.comment)
+                m_data.append(t['amount'])
+            m_data.append(t['comment'])
 
             for d in m_data:
                 worksheet.write(row,col,d)
