@@ -109,7 +109,7 @@ class CWLPlayerMenu(DefaultView):
             self.message = await self.ctx.original_response()
         else:
             try:
-                self.message = await self.ctx.reply(embeds=embeds, view=self)
+                self.message = await self.ctx.send(embeds=embeds, view=self)
             except discord.HTTPException:
                 self.message = await self.ctx.send(embeds=embeds, view=self)
     
@@ -693,7 +693,7 @@ class CWLPlayerMenu(DefaultView):
                 self.message = await self.ctx.original_response()
             else:
                 try:
-                    self.message = await self.ctx.reply(embed=embed,view=None)
+                    self.message = await self.ctx.send(embed=embed,view=None)
                 except discord.HTTPException:
                     self.message = await self.ctx.send(embed=embed,view=None)
             return self.stop_menu()
@@ -707,7 +707,7 @@ class CWLPlayerMenu(DefaultView):
             self.message = await self.ctx.original_response()
         else:
             try:
-                self.message = await self.ctx.reply(embeds=embed, view=self)
+                self.message = await self.ctx.send(embeds=embed, view=self)
             except discord.HTTPException:
                 self.message = await self.ctx.send(embeds=embed, view=self)
     

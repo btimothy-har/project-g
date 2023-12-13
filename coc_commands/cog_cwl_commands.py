@@ -116,7 +116,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_signup_for_cwl",
-                "description": "Triggers the sign up process for a user to register for the upcoming Clan War Leagues.",
+                "description": "Starts the sign up process for a user to register for the upcoming Clan War Leagues (CWL). If CWL is currently active, the user will be shown their current roster and stats. You only need to invoke this function if the user requests for CWL information specific to them.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -148,8 +148,13 @@ class ClanWarLeagues(commands.Cog):
                 context = await bot.get_context(message)
         
         if context:
+            season = self.active_war_league_season
+
             asyncio.create_task(invoke_command(context))
-            return "The function ran successfully. The user will see the signup message in the current channel. DO NOT respond any further to the user."
+            if pendulum.now() < season.cwl_start:
+                return "The signup process was run successfully. The user will see the signup message in the current channel. DO NOT respond any further to the user."
+            else:
+                return "The command was run successfully. As CWL is currently active, the user will see their current roster and stats in the current channel. DO NOT respond any further to the user."
         else:
             return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
     
