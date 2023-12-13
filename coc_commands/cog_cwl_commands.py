@@ -1,5 +1,6 @@
 import discord
 import pendulum
+import asyncio
 
 from typing import *
 
@@ -137,13 +138,17 @@ class ClanWarLeagues(commands.Cog):
         user:discord.User,
         *args,**kwargs) -> str:
 
+        async def invoke_command(context):
+            await asyncio.sleep(1)
+            await context.invoke(bot.get_command('mycwl'))
+
         context = None
         async for message in channel.history(limit=100,oldest_first=False):
             if message.author.id == user.id:
                 context = await bot.get_context(message)
         
         if context:
-            await context.invoke(bot.get_command('mycwl'))
+            asyncio.create_task(invoke_command(context))
             return "The function ran successfully. DO NOT respond any further to the user."
         else:
             return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
