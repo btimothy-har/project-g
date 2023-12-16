@@ -181,6 +181,7 @@ class ClanWarLeagues(commands.Cog):
                         elo_gain += 0.75 # +0.5 for 3 star
             await player.adjust_war_elo(elo_gain)
         
+        bot_client.coc_main_log.info(f"ELO for {war}")
         war_clan = war.get_clan(clan.tag)
         p_iter = AsyncIter(war_clan.members)
         tasks = [player_elo_adjustment(p) async for p in p_iter]
@@ -428,6 +429,7 @@ class ClanWarLeagues(commands.Cog):
             elif war.clan_2.is_alliance_clan:
                 clan = war.clan_2
             if clan:
+                bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
                 await self.war_elo_adjustment(clan,war)
         
         await ctx.reply("Done.")
