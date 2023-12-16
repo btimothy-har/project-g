@@ -202,7 +202,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_cwl_information",
-                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands. Use this when being asked about CWL.",
+                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands. Use this when being asked about CWL. Always tell the user that they can run `/cwl info` for more information.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -217,7 +217,6 @@ class ClanWarLeagues(commands.Cog):
     async def _assistant_get_cwl_information(self,*args,**kwargs) -> str:
         info = await self.cwl_information()
         x = info.to_dict()
-        bot_client.coc_main_log.info(x)
         return f"CWL Information: {x}"
     
     ############################################################
