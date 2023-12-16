@@ -416,7 +416,7 @@ class ClanWarLeagues(commands.Cog):
             'state': 'warEnded',
             'preparation_start_time': {'$gte': date.int_timestamp},
             }
-        query = await bot_client.coc_db.db__clan_war.find(q_doc)
+        query = bot_client.coc_db.db__clan_war.find(q_doc)
         war_list = [await aClanWar(w['_id']) async for w in query]
 
         w_iter = AsyncIter(war_list)
