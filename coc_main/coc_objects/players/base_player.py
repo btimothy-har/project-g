@@ -111,10 +111,6 @@ class BasicPlayer(AwaitLoader):
         return self._attributes.town_hall_level
     
     @property
-    def town_hall(self) -> int:
-        return self.town_hall_level
-    
-    @property
     def discord_user(self) -> int:
         if not self._attributes._loaded:
             raise CacheNotReady(f"{self} has not been loaded.")
