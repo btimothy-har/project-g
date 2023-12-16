@@ -254,15 +254,15 @@ class BasicPlayer(AwaitLoader):
                 + f"\n\tLast Removed: {self.last_removed}"
                 )
     
-    async def adjust_war_elo(self,amount:int):
+    async def adjust_war_elo(self,amount:float):
         async with self._attributes._lock:
             player = await bot_client.coc_db.db__player.find_one_and_update(
                 {'_id':self.tag},
-                {'$inc':{'war_elo':self.war_elo}},
+                {'$inc':{'war_elo':amount}},
                 return_document=ReturnDocument.AFTER
                 )
             self._attributes.war_elo = player['war_elo']
-            bot_client.coc_data_log.debug(f"{self}: war_elo changed to {self.war_elo}.")
+            bot_client.coc_data_log.info(f"{self}: war_elo changed to {self.war_elo}.")
 
     ##################################################
     #####
