@@ -367,7 +367,7 @@ class CWLPlayerMenu(DefaultView):
             emoji=EmojisTownHall.get(account.town_hall.level),
             description=account.clan_description,
             default=False)
-            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 14 and i <=25]
+            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 15 and i <=25]
         
         group_2_accounts = [discord.SelectOption(
             label=str(account),
@@ -375,7 +375,7 @@ class CWLPlayerMenu(DefaultView):
             emoji=EmojisTownHall.get(account.town_hall.level),
             description=account.clan_description,
             default=False)
-            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 12 and i <=25]
+            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 13 and i <=25]
         
         group_3_accounts = [discord.SelectOption(
             label=str(account),
@@ -397,7 +397,7 @@ class CWLPlayerMenu(DefaultView):
             group_1_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_1_accounts,
-                placeholder=f"Group A: Up to Champion I (TH14+)",
+                placeholder=f"Group A: Up to Champion I (TH15+)",
                 min_values=0,
                 max_values=len(group_1_accounts),
                 row=1,
@@ -409,7 +409,7 @@ class CWLPlayerMenu(DefaultView):
             group_2_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_2_accounts,
-                placeholder=f"Group B: Up to Master II (TH12+)",
+                placeholder=f"Group B: Up to Master II (TH13+)",
                 min_values=0,
                 max_values=len(group_2_accounts),
                 row=2,
@@ -515,7 +515,8 @@ class CWLPlayerMenu(DefaultView):
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
-                            + f"\n{player.hero_description}"
+                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
+                            + f"\u3000{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -527,7 +528,8 @@ class CWLPlayerMenu(DefaultView):
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
-                            + f"\n{player.hero_description}"
+                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
+                            + f"\u3000{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -545,7 +547,8 @@ class CWLPlayerMenu(DefaultView):
                         name=f"**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{account.hero_description}"
+                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
+                            + f"\u3000{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -556,7 +559,8 @@ class CWLPlayerMenu(DefaultView):
                         name=f"**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{account.hero_description}"
+                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
+                            + f"\u3000{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
