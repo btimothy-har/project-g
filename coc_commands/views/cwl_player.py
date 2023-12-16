@@ -637,8 +637,8 @@ class CWLPlayerMenu(DefaultView):
                 + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
                 + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
                 + "\n\nThere are currently 4 League Groups available:"
-                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH14} TH15+)"
-                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH12} TH13+)"
+                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
                 + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
                 + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
@@ -767,7 +767,6 @@ class CWLPlayerMenu(DefaultView):
         self.add_item(hitrate_button)
         self.add_item(self._close_button())
         
-        
         #dropdown stats per account
         cwl_accounts = [discord.SelectOption(
             label=f"{cwl_player.name} ({cwl_player.tag})",
@@ -816,7 +815,7 @@ class CWLPlayerMenu(DefaultView):
                 e = embed_2
 
             e.add_field(
-                name=f"**{cwl_player.title}**",
+                name=f"{EmojisUI.ELO} {cwl_player.war_elo:,}\u3000**{cwl_player.title}**",
                 value=f"**{EmojisLeagues.get(cwl_player.league_or_roster_clan.league)} [{cwl_player.league_or_roster_clan.name} {cwl_player.league_or_roster_clan.tag}]({cwl_player.league_or_roster_clan.share_link})**"
                     + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if cwl_player.league_or_roster_clan.tag != getattr(player.clan,'tag',None) else "")
                     + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
@@ -847,6 +846,7 @@ class CWLPlayerMenu(DefaultView):
                         + f"\n{EmojisClash.THREESTARS} `{war_stats.triples:^5}`"
                         + f"\n{EmojisClash.STAR} `{war_stats.offense_stars:^5}`"
                         + f"\n{EmojisClash.DESTRUCTION} `{str(war_stats.offense_destruction)+'%':^5}`"
+                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():,}`"
                         + "\n\u200b",
                     inline=True
                     )

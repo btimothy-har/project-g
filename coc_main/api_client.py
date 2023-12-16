@@ -286,7 +286,6 @@ class BotClashClient():
             await self._current_season.set_as_current()
         
         self.coc_main_log.info(f"Current Season: {self.current_season.description}")
-
         
         tracked_seasons = self.coc_db.d_season.find({
             "$or": [

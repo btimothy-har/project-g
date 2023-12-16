@@ -21,6 +21,8 @@ from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
+from coc_main.utils.constants.coc_emojis import EmojisClash
+from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
 from coc_main.utils.checks import is_member, is_admin, is_coleader
 
@@ -139,7 +141,7 @@ class ClanWarLeagues(commands.Cog):
 
                 elo_gain += (att.defender.town_hall - att.attacker.town_hall)
             
-            adj_elo = round((elo_gain * (roster_elo / player.war_elo))) - 3
+            adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
             await player.adjust_war_elo(adj_elo)
         
         if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:
@@ -205,25 +207,7 @@ class ClanWarLeagues(commands.Cog):
                     "type": "object",
                     "properties": {},
                     },
-                },
-            {
-                "name": "_assistant_signup_for_cwl",
-                "description": "Registers a user's account for the next upcoming Clan War League season. Call this function multiple times to register multiple accounts.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "account_tag": {
-                            "description": "The unique player tag of the account. The discord_user of the account must match the current user. Prompt the user to choose from their available linked accounts.",
-                            "type": "string",
-                            },
-                        "league_group": {
-                            "description": "The league group the account is signing up for. Must be one of the following: A, B, C or D. A is up to Champion League I, B is up to Master League II, C is up to Crystal League II, and D is for Lazy CWL.",
-                            "type": "string",
-                            },
-                        },
-                    "required": ["account_tag","league_group"],
-                    },
-                },
+                }
             ]
         await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
     
@@ -233,34 +217,6 @@ class ClanWarLeagues(commands.Cog):
     async def _assistant_get_cwl_information(self,*args,**kwargs) -> dict:
         info = await self.cwl_information()
         return info.to_dict()
-
-    async def _assistant_signup_for_cwl(self,
-        bot:Red,
-        user:discord.User,
-        account_tag:str,
-        league_group:str,
-        *args,**kwargs) -> str:
-
-        if not coc.utils.is_valid_tag(account_tag):
-            return f"Invalid Player Tag: {account_tag}"
-        
-        if league_group.upper() not in ['A','B','C','D']:
-            return f"Invalid League Group: {league_group}"
-        
-        season = self.active_war_league_season
-        league_player = await WarLeaguePlayer(account_tag,season)
-
-        if league_player.discord_user != user.id:
-            return f"Account {account_tag} is not registered to the invoking user."
-        
-        group_dict = {
-            'A': 1,
-            'B': 2,
-            'C': 9,
-            'D': 99,
-            }
-        await league_player.register(user.id,group_dict[league_group.upper()])
-        return f"Account {account_tag} has been registered for Group {league_group.upper()}."
     
     ############################################################
     ############################################################
@@ -352,16 +308,16 @@ class ClanWarLeagues(commands.Cog):
         
         embed = await clash_embed(
             context=context,
-            title=f"Clan War Leagues with AriX",
-            message=f"In AriX, we collaborate as an Alliance in the monthly Clan War Leagues. "
-                + f"Together as an Alliance, you'll be able to play in a League that best suits your interest and/or skill level."
-                + f"\n\nThe information below details what a typical CWL season looks like in AriX."
+            title=f"Clan War Leagues with The Assassins Guild",
+            message=f"In the Guild, our clans collaborate together in the monthly Clan War Leagues."
+                + f"As a member of the Guild, you'll be able to play in a League that best suits your interest and/or skill level."
+                + f"\n\nThe information below details what a typical CWL season will look like."
                 + f"\n\u200b",
                 )
         embed.add_field(
             name=f"**Registration**",
             value=f"In order to participate in CWL, you must first register. Registration is done on an account-basis, and you are **not** required to register every account."
-                + f"\n\nRegistration typically opens on/around the 15th of every month, and lasts until the last day of the month. You will be able to manage your registrations through our AriX Bot, with the `/mycwl` command."
+                + f"\n\nRegistration typically opens on/around the 15th of every month, and lasts until the last day of the month. You will be able to manage your registrations through N.E.B.U.L.A., with the `/mycwl` command."
                 + f"\n\u200b",
             inline=False
             )
@@ -371,8 +327,8 @@ class ClanWarLeagues(commands.Cog):
                 + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
                 + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
                 + "\n\nThere are currently 4 League Groups available:"
-                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH14} TH14+)"
-                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH12} TH12+)"
+                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
                 + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
                 + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
@@ -388,10 +344,38 @@ class ClanWarLeagues(commands.Cog):
             inline=False
             )
         embed.add_field(
+            name="**The War Rank System**",
+            value=f"You might see the following icon on some of your player profiles: {EmojisUI.ELO}. This is your **War Rank**. War Ranks are used in rostering, between players of equal Townhall and Hero Levels. The higher your War Rank, the more likely you will be rostered as close to your League Group as possible."
+                + "\n"
+                + f"\n__**Rank Points are gained by playing in CWL.**__"
+                + f"\n- You lose -3 rank points for every war you are rostered in."
+                + f"\n- You gain: +1 for a 1-star hit, +2 for a 2-star hit, +4 for a 3-star hit."
+                + f"\n- For a hit against a different TH level, you gain/lose points based on the difference in TH levels."
+                + f"\n- Your final rank point gain/loss will be adjusted by the average Rank of your War Clan."
+                + "\n"
+                + f"\n__**You can also gain Rank Points from regular wars.**__"
+                + f"\n- Only attacks against equivalent TH opponents count."
+                + f"\n- -1 for a 0-star hit"
+                + f"\n- -0.75 for a 1-star hit"
+                + f"\n- -0.25 for a 2-star hit"
+                + f"\n- +5 for a 3-star hit"
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
             name="**Rostering**",
-            value="Based on your indicated League Group, you will be rostered into one of our CWL Clans for the CWL period. **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
-                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster through our AriX Bot, with the `/mycwl` command."
+            value="Based on your indicated League Group and War Rank, you will be rostered into one of our CWL Clans for the CWL period. **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
+                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster with the `/mycwl` command."
                 + "\n\n**Important:** Once rosters are published, your registration cannot be modified further. If you cannot participate in CWL, please contact a Leader immediately."
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
+            name="**Useful Commands**",
+            value=f"**/mycwl** - Manage your CWL Signups, Rosters, Stats."
+                + f"\n**/cwl info** - Shows this page!"
+                + f"\n**/cwl clan roster** - Shows a League Clan's CWL Roster."
+                + f"\n**/cwl clan group** - Shows a League Clan's CWL Group."
                 + "\n\u200b",
             inline=False
             )

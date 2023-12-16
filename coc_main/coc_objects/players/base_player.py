@@ -137,10 +137,10 @@ class BasicPlayer(AwaitLoader):
             return 'Non-Member'
     
     @property
-    def war_elo(self) -> int:
+    def war_elo(self) -> float:
         if not self._attributes._loaded:
             raise CacheNotReady(f"{self} has not been loaded.")
-        return self._attributes.war_elo
+        return round(self._attributes.war_elo,1)
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
