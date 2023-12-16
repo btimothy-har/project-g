@@ -421,6 +421,7 @@ class ClanWarLeagues(commands.Cog):
 
         w_iter = AsyncIter(war_list)
         async for war in w_iter:
+            bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
             clan = None
             if war.clan_1.is_alliance_clan:
                 clan = war.clan_1
