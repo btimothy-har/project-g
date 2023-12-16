@@ -68,7 +68,7 @@ class WarLeagueGroup(AwaitLoader):
     ##################################################
     ### OBJECT ATTRIBUTES
     ##################################################    
-    @cached_property
+    @property
     def state(self) -> str:
         if len([w for w in self.wars if w.state == WarState.INWAR]) > 0:
             return WarState.INWAR
@@ -76,7 +76,7 @@ class WarLeagueGroup(AwaitLoader):
             return WarState.PREPARATION
         return WarState.WAR_ENDED
     
-    @cached_property
+    @property
     def current_round(self) -> int:
         for i, round in enumerate(reversed(self.rounds)):
             if any([w for w in self.wars if w._id in round and w.state == self.state]):
@@ -280,7 +280,7 @@ class WarLeagueClan(BasicClan):
     ### CWL SETUP ATTRIBUTES
     ### These are usable during CWL setup
     ##################################################
-    async def get_participants(self):
+    async def get_participants(self) -> List['WarLeaguePlayer']:
         q_doc = {
             'season':self.season.id,
             'registered':True,
@@ -288,6 +288,7 @@ class WarLeagueClan(BasicClan):
             }
         query = bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
         self.participants = [await WarLeaguePlayer(db_player['tag'],self.season) async for db_player in query]
+        self.avg_elo = round(sum([p.war_elo for p in self.participants])/len(self.participants),2)
         return self.participants
     
     ##################################################
@@ -507,6 +508,26 @@ class WarLeaguePlayer(BasicPlayer):
     ##################################################
     ### PLAYER METHODS
     ##################################################
+    async def estimate_elo(self):
+        elo_gain = 0
+        w_iter = AsyncIter(self.war_log)
+        async for war in w_iter:
+            w_member = war.get_member(self.tag)
+            if w_member:
+                a_iter = AsyncIter(w_member.attacks)
+                async for att in a_iter:
+                    if att.stars >= 1:
+                        elo_gain += 1
+                    if att.stars >= 2:
+                        elo_gain += 1
+                    if att.stars >= 3:
+                        elo_gain += 2
+                    elo_gain += (att.defender.town_hall - att.attacker.town_hall)
+        
+        await self.league_clan.get_participants()
+        adj_elo = round((elo_gain * (self.league_clan.avg_elo / self.war_elo)),3) - 3
+        return adj_elo
+
     async def register(self,discord_user:int,league_group:int):
         async with self._lock:
             self.is_registered = True

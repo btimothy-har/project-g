@@ -1,20 +1,28 @@
 import discord
+import asyncio
 import pendulum
+import asyncio
+import coc
 
 from typing import *
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
-from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aPlayer
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
+from coc_main.coc_objects.events.clan_war import aWarPlayer
 
 from coc_main.discord.member import aMember
+from coc_main.tasks.war_tasks import ClanWarLoop
 
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
+from coc_main.utils.constants.coc_constants import WarState, ClanWarType
+from coc_main.utils.constants.coc_emojis import EmojisClash
+from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
 from coc_main.utils.checks import is_member, is_admin, is_coleader
 
@@ -50,6 +58,13 @@ class ClanWarLeagues(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
+    
+    async def cog_load(self):
+        asyncio.create_task(self.load_events())
+    
+    async def cog_unload(self):
+        ClanWarLoop.remove_war_end_event(self.cwl_elo_adjustment)
+        ClanWarLoop.remove_war_end_event(self.war_elo_adjustment)
     
     @property
     def bot_client(self) -> BotClashClient:
@@ -90,6 +105,120 @@ class ClanWarLeagues(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
+        
+    ############################################################
+    ##### WAR ELO TASKS
+    ############################################################    
+    async def load_events(self):
+        while True:
+            if getattr(bot_client,'_is_initialized',False):
+                break
+            await asyncio.sleep(1)
+        
+        ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
+        ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
+
+    async def cwl_elo_adjustment(self,clan:aClan,war:aClanWar):
+        if war.type != ClanWarType.CWL:
+            return
+        if war._league_group == '':
+            return
+        
+        league_group = await WarLeagueGroup(war._league_group)
+        if not league_group:
+            return
+
+        async def player_elo_adjustment(player:aWarPlayer,roster_elo:float):
+            elo_gain = 0
+            att_iter = AsyncIter(player.attacks)
+            async for att in att_iter:
+                if att.stars >= 1:
+                    elo_gain += 1
+                if att.stars >= 2:
+                    elo_gain += 1
+                if att.stars >= 3:
+                    elo_gain += 2
+
+                elo_gain += (att.defender.town_hall - att.attacker.town_hall)
+            
+            adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
+            await player.adjust_war_elo(adj_elo)
+        
+        if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:
+            league_clan = league_group.get_clan(clan.tag)
+
+            if not league_clan:
+                return
+        
+            clan_roster = await league_clan.get_participants()
+            try:
+                avg_elo = sum([p.war_elo for p in clan_roster]) / len(clan_roster)
+            except ZeroDivisionError:
+                avg_elo = 0
+
+            w_iter = AsyncIter(league_clan.league_wars)
+            async for war in w_iter:
+                w_clan = war.get_clan(clan.tag)
+                p_iter = AsyncIter(w_clan.members)
+                tasks = [player_elo_adjustment(p,avg_elo) async for p in p_iter]
+                await bounded_gather(*tasks)
+        
+    async def war_elo_adjustment(self,clan:aClan,war:aClanWar):
+        if war.type != ClanWarType.RANDOM:
+            return
+        
+        async def player_elo_adjustment(player:aWarPlayer):
+            elo_gain = 0
+            att_iter = AsyncIter(player.attacks)
+            async for att in att_iter:
+                if att.defender.town_hall == att.attacker.town_hall:
+                    elo_gain += -1
+                    if att.stars >= 1:
+                        elo_gain += 0.25 # -0.75 for 1 star
+                    if att.stars >= 2:
+                        elo_gain += 0.5 # -0.25 for 2 star
+                    if att.stars >= 3:
+                        elo_gain += 0.75 # +0.5 for 3 star
+            await player.adjust_war_elo(elo_gain)
+        
+        bot_client.coc_main_log.info(f"ELO for {war}")
+        war_clan = war.get_clan(clan.tag)
+        p_iter = AsyncIter(war_clan.members)
+        tasks = [player_elo_adjustment(p) async for p in p_iter]
+        await bounded_gather(*tasks)
+    
+    ##################################################
+    ### ASSISTANT COG FUNCTIONS
+    ##################################################
+    @commands.Cog.listener()
+    async def on_assistant_cog_add(self,cog:commands.Cog):
+        schemas = [
+            {
+                "name": "_assistant_get_cwl_season",
+                "description": "Identifies the next upcoming season for the Clan War Leagues (CWL).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_cwl_information",
+                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands. Use this when being asked about CWL. Always tell the user that they can run `/cwl info` for more information.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
+    
+    async def _assistant_get_cwl_season(self,*args,**kwargs) -> str:
+        return f"The next upcoming Clan War Leagues is for the {self.active_war_league_season.description} season."
+
+    async def _assistant_get_cwl_information(self,*args,**kwargs) -> str:
+        info = await self.cwl_information()
+        x = info.to_dict()
+        return f"CWL Information: {x}"
     
     ############################################################
     ############################################################
@@ -175,19 +304,22 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / INFO
     ##################################################
-    async def cwl_information(self,context:Union[commands.Context,discord.Interaction]):
+    async def cwl_information(self,context:Optional[Union[commands.Context,discord.Interaction]]=None):
+        if not context:
+            context = self.bot
+        
         embed = await clash_embed(
             context=context,
-            title=f"Clan War Leagues with AriX",
-            message=f"In AriX, we collaborate as an Alliance in the monthly Clan War Leagues. "
-                + f"Together as an Alliance, you'll be able to play in a League that best suits your interest and/or skill level."
-                + f"\n\nThe information below details what a typical CWL season looks like in AriX."
+            title=f"Clan War Leagues with The Assassins Guild",
+            message=f"In the Guild, our clans collaborate together in the monthly Clan War Leagues."
+                + f"As a member of the Guild, you'll be able to play in a League that best suits your interest and/or skill level."
+                + f"\n\nThe information below details what a typical CWL season will look like."
                 + f"\n\u200b",
                 )
         embed.add_field(
             name=f"**Registration**",
             value=f"In order to participate in CWL, you must first register. Registration is done on an account-basis, and you are **not** required to register every account."
-                + f"\n\nRegistration typically opens on/around the 15th of every month, and lasts until the last day of the month. You will be able to manage your registrations through our AriX Bot, with the `/mycwl` command."
+                + f"\n\nRegistration typically opens on/around the 15th of every month, and lasts until the last day of the month. You will be able to manage your registrations through N.E.B.U.L.A., with the `/mycwl` command."
                 + f"\n\u200b",
             inline=False
             )
@@ -197,8 +329,8 @@ class ClanWarLeagues(commands.Cog):
                 + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
                 + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
                 + "\n\nThere are currently 4 League Groups available:"
-                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH14} TH14+)"
-                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH12} TH12+)"
+                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
                 + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
                 + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
@@ -214,10 +346,39 @@ class ClanWarLeagues(commands.Cog):
             inline=False
             )
         embed.add_field(
+            name="**The War Rank System**",
+            value=f"You might see the following icon on some of your player profiles: {EmojisUI.ELO}. This is your **War Rank**."
+                + f"\n\nWar Ranks are used for rostering players of equal Townhall and Hero Levels. The higher your War Rank, the more likely you will be rostered as close to your League Group as possible."
+                + "\n"
+                + f"\n__Rank Points are gained by playing in CWL.__"
+                + f"\n- You lose -3 rank points for every war you are rostered in."
+                + f"\n- You gain: +1 for a 1-star hit, +2 for a 2-star hit, +4 for a 3-star hit."
+                + f"\n- For a hit against a different TH level, you gain/lose points based on the difference in TH levels."
+                + f"\n- Your final rank point gain/loss will be adjusted by the average Rank of your War Clan."
+                + "\n"
+                + f"\n__You can also gain Rank Points from regular wars.__"
+                + f"\n- Only attacks against equivalent TH opponents count."
+                + f"\n- -1 for a 0-star hit"
+                + f"\n- -0.75 for a 1-star hit"
+                + f"\n- -0.25 for a 2-star hit"
+                + f"\n- +0.5 for a 3-star hit"
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
             name="**Rostering**",
-            value="Based on your indicated League Group, you will be rostered into one of our CWL Clans for the CWL period. **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
-                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster through our AriX Bot, with the `/mycwl` command."
+            value="Based on your indicated League Group and War Rank, you will be rostered into one of our CWL Clans for the CWL period. **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
+                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster with the `/mycwl` command."
                 + "\n\n**Important:** Once rosters are published, your registration cannot be modified further. If you cannot participate in CWL, please contact a Leader immediately."
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
+            name="**Useful Commands**",
+            value=f"**/mycwl** - Manage your CWL Signups, Rosters, Stats."
+                + f"\n**/cwl info** - Shows this page!"
+                + f"\n**/cwl clan roster** - Shows a League Clan's CWL Roster."
+                + f"\n**/cwl clan group** - Shows a League Clan's CWL Group."
                 + "\n\u200b",
             inline=False
             )
@@ -242,6 +403,36 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.cwl_information(interaction)
 
         await interaction.followup.send(embed=embed,ephemeral=True)
+
+    @commands.command(name="cwlelo")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def command_cwlelo(self,ctx):
+        """
+        [Owner-only] Adjusts the ELO of all CWL Players.
+        """
+        date = pendulum.datetime(2023,12,1)
+        q_doc = {
+            'type': 'random',
+            'state': 'warEnded',
+            'preparation_start_time': {'$gte': date.int_timestamp},
+            }
+        query = bot_client.coc_db.db__clan_war.find(q_doc)
+        war_list = [await aClanWar(w['_id']) async for w in query]
+
+        w_iter = AsyncIter(war_list)
+        async for war in w_iter:
+            bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
+            clan = None
+            if war.clan_1.is_alliance_clan:
+                clan = war.clan_1
+            elif war.clan_2.is_alliance_clan:
+                clan = war.clan_2
+            if clan:
+                bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
+                await self.war_elo_adjustment(clan,war)
+        
+        await ctx.reply("Done.")
     
     ##################################################
     ### CWL / SETUP

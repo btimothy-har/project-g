@@ -90,7 +90,7 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-        self.accounts = self.member.accounts
+        self.accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
@@ -109,7 +109,7 @@ class CWLPlayerMenu(DefaultView):
             self.message = await self.ctx.original_response()
         else:
             try:
-                self.message = await self.ctx.reply(embeds=embeds, view=self)
+                self.message = await self.ctx.send(embeds=embeds, view=self)
             except discord.HTTPException:
                 self.message = await self.ctx.send(embeds=embeds, view=self)
     
@@ -367,7 +367,7 @@ class CWLPlayerMenu(DefaultView):
             emoji=EmojisTownHall.get(account.town_hall.level),
             description=account.clan_description,
             default=False)
-            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 14 and i <=25]
+            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 15 and i <=25]
         
         group_2_accounts = [discord.SelectOption(
             label=str(account),
@@ -375,7 +375,7 @@ class CWLPlayerMenu(DefaultView):
             emoji=EmojisTownHall.get(account.town_hall.level),
             description=account.clan_description,
             default=False)
-            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 12 and i <=25]
+            for i,account in enumerate(self.accounts,start=1) if account.town_hall.level >= 13 and i <=25]
         
         group_3_accounts = [discord.SelectOption(
             label=str(account),
@@ -397,7 +397,7 @@ class CWLPlayerMenu(DefaultView):
             group_1_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_1_accounts,
-                placeholder=f"Group A: Up to Champion I (TH14+)",
+                placeholder=f"Group A: Up to Champion I (TH15+)",
                 min_values=0,
                 max_values=len(group_1_accounts),
                 row=1,
@@ -409,7 +409,7 @@ class CWLPlayerMenu(DefaultView):
             group_2_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_2_accounts,
-                placeholder=f"Group B: Up to Master II (TH12+)",
+                placeholder=f"Group B: Up to Master II (TH13+)",
                 min_values=0,
                 max_values=len(group_2_accounts),
                 row=2,
@@ -511,7 +511,7 @@ class CWLPlayerMenu(DefaultView):
             if cwl_account.tag not in self.user_registration:
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{player.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{player.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
@@ -523,7 +523,7 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{player.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{player.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
@@ -542,7 +542,7 @@ class CWLPlayerMenu(DefaultView):
                 cwl_player = await WarLeaguePlayer(account.tag,self.season)
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{account.title}**",
+                        name=f"{EmojisUI.ELO} {account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
                             + f"\n{account.hero_description}"
@@ -553,7 +553,7 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{account.title}**",
+                        name=f"{EmojisUI.ELO} {account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
                             + f"\n{account.hero_description}"
@@ -629,6 +629,7 @@ class CWLPlayerMenu(DefaultView):
             message=f"- You may modify your registration options at any time through this menu."
                 + f"\n- Changes to your registration **cannot** be made once registration is closed."
                 + f"\n- Once a CWL Roster has been finalized, you cannot withdraw your registration."
+                + f"\n\nUse `/cwl info` for more details on CWL."
                 + f"\n\u200b"
             )
         embed.add_field(
@@ -637,8 +638,8 @@ class CWLPlayerMenu(DefaultView):
                 + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
                 + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
                 + "\n\nThere are currently 4 League Groups available:"
-                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH14} TH15+)"
-                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH12} TH13+)"
+                + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
                 + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
                 + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
@@ -693,7 +694,7 @@ class CWLPlayerMenu(DefaultView):
                 self.message = await self.ctx.original_response()
             else:
                 try:
-                    self.message = await self.ctx.reply(embed=embed,view=None)
+                    self.message = await self.ctx.send(embed=embed,view=None)
                 except discord.HTTPException:
                     self.message = await self.ctx.send(embed=embed,view=None)
             return self.stop_menu()
@@ -707,7 +708,7 @@ class CWLPlayerMenu(DefaultView):
             self.message = await self.ctx.original_response()
         else:
             try:
-                self.message = await self.ctx.reply(embeds=embed, view=self)
+                self.message = await self.ctx.send(embeds=embed, view=self)
             except discord.HTTPException:
                 self.message = await self.ctx.send(embeds=embed, view=self)
     
@@ -767,7 +768,6 @@ class CWLPlayerMenu(DefaultView):
         self.add_item(hitrate_button)
         self.add_item(self._close_button())
         
-        
         #dropdown stats per account
         cwl_accounts = [discord.SelectOption(
             label=f"{cwl_player.name} ({cwl_player.tag})",
@@ -816,7 +816,7 @@ class CWLPlayerMenu(DefaultView):
                 e = embed_2
 
             e.add_field(
-                name=f"**{cwl_player.title}**",
+                name=f"{EmojisUI.ELO} {cwl_player.war_elo:,}\u3000**{cwl_player.title}**",
                 value=f"**{EmojisLeagues.get(cwl_player.league_or_roster_clan.league)} [{cwl_player.league_or_roster_clan.name} {cwl_player.league_or_roster_clan.tag}]({cwl_player.league_or_roster_clan.share_link})**"
                     + (f"\n{EmojisUI.TASK_WARNING} **You are not in your CWL Clan.**" if cwl_player.league_or_roster_clan.tag != getattr(player.clan,'tag',None) else "")
                     + (f"\n*CWL Not Started*" if not cwl_player.league_clan else "")
@@ -847,6 +847,7 @@ class CWLPlayerMenu(DefaultView):
                         + f"\n{EmojisClash.THREESTARS} `{war_stats.triples:^5}`"
                         + f"\n{EmojisClash.STAR} `{war_stats.offense_stars:^5}`"
                         + f"\n{EmojisClash.DESTRUCTION} `{str(war_stats.offense_destruction)+'%':^5}`"
+                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():,}`"
                         + "\n\u200b",
                     inline=True
                     )

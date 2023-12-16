@@ -3,6 +3,7 @@
 #   'discord_user': string,
 #   'is_member': bool,
 #   'home_clan': string,
+#   'war_elo': int,
 #   'first_seen': int,
 #   'last_joined': int,
 #   'last_removed': int,
