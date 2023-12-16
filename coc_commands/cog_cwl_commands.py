@@ -416,16 +416,18 @@ class ClanWarLeagues(commands.Cog):
             'state': 'warEnded',
             'preparation_start_time': {'$gte': date.int_timestamp},
             }
-        query = await bot_client.coc_db.db__clan_war.find(q_doc).to_list(None)
-        async for w in AsyncIter(query):
-            clan_war = await aClanWar(w['_id'])
+        query = await bot_client.coc_db.db__clan_war.find(q_doc)
+        war_list = [await aClanWar(w['_id']) async for w in query]
+
+        w_iter = AsyncIter(war_list)
+        async for war in w_iter:
             clan = None
-            if clan_war.clan_1.is_alliance_clan:
-                clan = clan_war.clan_1
-            elif clan_war.clan_2.is_alliance_clan:
-                clan = clan_war.clan_2
+            if war.clan_1.is_alliance_clan:
+                clan = war.clan_1
+            elif war.clan_2.is_alliance_clan:
+                clan = war.clan_2
             if clan:
-                await self.war_elo_adjustment(clan,clan_war)
+                await self.war_elo_adjustment(clan,war)
         
         await ctx.reply("Done.")
     
