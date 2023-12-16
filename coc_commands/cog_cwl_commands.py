@@ -1,21 +1,26 @@
 import discord
+import asyncio
 import pendulum
 import asyncio
+import coc
 
 from typing import *
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
-from redbot.core.utils import AsyncIter
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
-from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aPlayer
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
+from coc_main.coc_objects.events.clan_war import aWarPlayer
 
 from coc_main.discord.member import aMember
+from coc_main.tasks.war_tasks import ClanWarLoop
 
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
+from coc_main.utils.constants.coc_constants import WarState, ClanWarType
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
 from coc_main.utils.checks import is_member, is_admin, is_coleader
 
@@ -51,6 +56,13 @@ class ClanWarLeagues(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
+    
+    async def cog_load(self):
+        asyncio.create_task(self.load_events())
+    
+    async def cog_unload(self):
+        ClanWarLoop.remove_war_end_event(self.cwl_elo_adjustment)
+        ClanWarLoop.remove_war_end_event(self.war_elo_adjustment)
     
     @property
     def bot_client(self) -> BotClashClient:
@@ -92,6 +104,86 @@ class ClanWarLeagues(commands.Cog):
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
         
+    ############################################################
+    ##### WAR ELO TASKS
+    ############################################################    
+    async def load_events(self):
+        while True:
+            if getattr(bot_client,'_is_initialized',False):
+                break
+            await asyncio.sleep(1)
+        
+        ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
+        ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
+
+    async def cwl_elo_adjustment(self,clan:aClan,war:aClanWar):
+        if war.type != ClanWarType.CWL:
+            return
+        if war._league_group == '':
+            return
+        
+        league_group = await WarLeagueGroup(war._league_group)
+        if not league_group:
+            return
+
+        async def player_elo_adjustment(player:aWarPlayer,roster_elo:float):
+            elo_gain = 0
+            att_iter = AsyncIter(player.attacks)
+            async for att in att_iter:
+                if att.stars >= 1:
+                    elo_gain += 1
+                if att.stars >= 2:
+                    elo_gain += 1
+                if att.stars >= 3:
+                    elo_gain += 2
+
+                elo_gain += (att.defender.town_hall - att.attacker.town_hall)
+            
+            adj_elo = round((elo_gain * (roster_elo / player.war_elo))) - 3
+            await player.adjust_war_elo(adj_elo)
+        
+        if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:
+            league_clan = league_group.get_clan(clan.tag)
+
+            if not league_clan:
+                return
+        
+            clan_roster = await league_clan.get_participants()
+            try:
+                avg_elo = sum([p.war_elo for p in clan_roster]) / len(clan_roster)
+            except ZeroDivisionError:
+                avg_elo = 0
+
+            w_iter = AsyncIter(league_clan.league_wars)
+            async for war in w_iter:
+                w_clan = war.get_clan(clan.tag)
+                p_iter = AsyncIter(w_clan.members)
+                tasks = [player_elo_adjustment(p,avg_elo) async for p in p_iter]
+                await bounded_gather(*tasks)
+        
+    async def war_elo_adjustment(self,clan:aClan,war:aClanWar):
+        if war.type != ClanWarType.RANDOM:
+            return
+        
+        async def player_elo_adjustment(player:aWarPlayer):
+            elo_gain = 0
+            att_iter = AsyncIter(player.attacks)
+            async for att in att_iter:
+                if att.defender.town_hall == att.attacker.town_hall:
+                    elo_gain = -1
+                    if att.stars >= 1:
+                        elo_gain += 0.25 # -0.75 for 1 star
+                    if att.stars >= 2:
+                        elo_gain += 0.5 # -0.25 for 2 star
+                    if att.stars >= 3:
+                        elo_gain += 0.75 # +0.5 for 3 star
+            await player.adjust_war_elo(elo_gain)
+        
+        war_clan = war.get_clan(clan.tag)
+        p_iter = AsyncIter(war_clan.members)
+        tasks = [player_elo_adjustment(p) async for p in p_iter]
+        await bounded_gather(*tasks)
+    
     ##################################################
     ### ASSISTANT COG FUNCTIONS
     ##################################################
@@ -116,10 +208,20 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_signup_for_cwl",
-                "description": "Starts the sign up process for a user to register for the upcoming Clan War Leagues (CWL). If CWL is currently active, the user will be shown their current roster and stats. You only need to invoke this function if the user requests for CWL information specific to them.",
+                "description": "Registers a user's account for the next upcoming Clan War League season. Call this function multiple times to register multiple accounts.",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "account_tag": {
+                            "description": "The unique player tag of the account. The discord_user of the account must match the current user.",
+                            "type": "string",
+                            },
+                        "league_group": {
+                            "description": "The league group the account is signing up for. Must be one of the following: A, B, C or D. A is up to Champion League I, B is up to Master League II, C is up to Crystal League II, and D is for Lazy CWL.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["account_tag","league_group"],
                     },
                 },
             ]
@@ -134,29 +236,31 @@ class ClanWarLeagues(commands.Cog):
 
     async def _assistant_signup_for_cwl(self,
         bot:Red,
-        channel:Union[discord.TextChannel,discord.Thread,discord.ForumChannel],
         user:discord.User,
+        account_tag:str,
+        league_group:str,
         *args,**kwargs) -> str:
 
-        async def invoke_command(context):
-            await asyncio.sleep(3)
-            await context.invoke(bot.get_command('mycwl'))
-
-        context = None
-        async for message in channel.history(limit=100,oldest_first=False):
-            if message.author.id == user.id:
-                context = await bot.get_context(message)
+        if not coc.utils.is_valid_tag(account_tag):
+            return f"Invalid Player Tag: {account_tag}"
         
-        if context:
-            season = self.active_war_league_season
+        if league_group.upper() not in ['A','B','C','D']:
+            return f"Invalid League Group: {league_group}"
+        
+        season = self.active_war_league_season
+        league_player = await WarLeaguePlayer(account_tag,season)
 
-            asyncio.create_task(invoke_command(context))
-            if pendulum.now() < season.cwl_start:
-                return "The signup process was run successfully. The user will see the signup message in the current channel. DO NOT respond any further to the user."
-            else:
-                return "The command was run successfully. As CWL is currently active, the user will see their current roster and stats in the current channel. DO NOT respond any further to the user."
-        else:
-            return "An error occurred in initiating the command. Please inform the user to use the `/mycwl` command."
+        if league_player.discord_user != user.id:
+            return f"Account {account_tag} is not registered to the invoking user."
+        
+        group_dict = {
+            'A': 1,
+            'B': 2,
+            'C': 9,
+            'D': 99,
+            }
+        await league_player.register(user.id,group_dict[league_group.upper()])
+        return f"Account {account_tag} has been registered for Group {league_group.upper()}."
     
     ############################################################
     ############################################################

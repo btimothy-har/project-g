@@ -4,6 +4,7 @@ import asyncio
 
 from typing import *
 
+from pymongo import ReturnDocument
 from collections import defaultdict
 from async_property import AwaitLoader
 
@@ -110,6 +111,10 @@ class BasicPlayer(AwaitLoader):
         return self._attributes.town_hall_level
     
     @property
+    def town_hall(self) -> int:
+        return self.town_hall_level
+    
+    @property
     def discord_user(self) -> int:
         if not self._attributes._loaded:
             raise CacheNotReady(f"{self} has not been loaded.")
@@ -134,6 +139,12 @@ class BasicPlayer(AwaitLoader):
                 return 'Member'
         else:
             return 'Non-Member'
+    
+    @property
+    def war_elo(self) -> int:
+        if not self._attributes._loaded:
+            raise CacheNotReady(f"{self} has not been loaded.")
+        return self._attributes.war_elo
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
@@ -246,6 +257,16 @@ class BasicPlayer(AwaitLoader):
                 f"Player {self} has been removed as a member."
                 + f"\n\tLast Removed: {self.last_removed}"
                 )
+    
+    async def adjust_war_elo(self,amount:int):
+        async with self._attributes._lock:
+            player = await bot_client.coc_db.db__player.find_one_and_update(
+                {'_id':self.tag},
+                {'$inc':{'war_elo':self.war_elo}},
+                return_document=ReturnDocument.AFTER
+                )
+            self._attributes.war_elo = player['war_elo']
+            bot_client.coc_data_log.debug(f"{self}: war_elo changed to {self.war_elo}.")
 
     ##################################################
     #####
@@ -302,6 +323,7 @@ class _PlayerAttributes():
         'town_hall_level',
         'discord_user',
         'home_clan_tag',
+        'war_elo',
         'is_member',
         'first_seen',
         'last_joined',
@@ -325,6 +347,7 @@ class _PlayerAttributes():
             self.town_hall_level = None
             self.discord_user = None
             self.home_clan_tag = None
+            self.war_elo = None
             self.is_member = None
             self.first_seen = None
             self.last_joined = None
@@ -350,6 +373,8 @@ class _PlayerAttributes():
             self.town_hall_level = database.get('townhall','') if database else 0
             self.discord_user = database.get('discord_user','') if database else 0
             self.home_clan_tag = database.get('home_clan',None) if database else None
+            self.war_elo = database.get('war_elo',0) if database else 0
+
             self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
 
             fs = database.get('first_seen',0) if database else 0

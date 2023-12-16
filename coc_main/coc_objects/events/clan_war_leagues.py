@@ -68,7 +68,7 @@ class WarLeagueGroup(AwaitLoader):
     ##################################################
     ### OBJECT ATTRIBUTES
     ##################################################    
-    @cached_property
+    @property
     def state(self) -> str:
         if len([w for w in self.wars if w.state == WarState.INWAR]) > 0:
             return WarState.INWAR
@@ -76,7 +76,7 @@ class WarLeagueGroup(AwaitLoader):
             return WarState.PREPARATION
         return WarState.WAR_ENDED
     
-    @cached_property
+    @property
     def current_round(self) -> int:
         for i, round in enumerate(reversed(self.rounds)):
             if any([w for w in self.wars if w._id in round and w.state == self.state]):
@@ -280,7 +280,7 @@ class WarLeagueClan(BasicClan):
     ### CWL SETUP ATTRIBUTES
     ### These are usable during CWL setup
     ##################################################
-    async def get_participants(self):
+    async def get_participants(self) -> List['WarLeaguePlayer']:
         q_doc = {
             'season':self.season.id,
             'registered':True,
