@@ -402,6 +402,32 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.cwl_information(interaction)
 
         await interaction.followup.send(embed=embed,ephemeral=True)
+
+    @commands.command(name="cwlelo")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def command_cwlelo(self,ctx):
+        """
+        [Owner-only] Adjusts the ELO of all CWL Players.
+        """
+        date = pendulum.datetime(2023,12,1)
+        q_doc = {
+            'type': 'random',
+            'state': 'warEnded',
+            'preparation_start': {'$gte': date.int_timestamp},
+            }
+        query = await bot_client.coc_db.db__clan_war.find(q_doc).to_list(None)
+        async for w in AsyncIter(query):
+            clan_war = await aClanWar(w['_id'])
+            clan = None
+            if clan_war.clan_1.is_alliance_clan:
+                clan = clan_war.clan_1
+            elif clan_war.clan_2.is_alliance_clan:
+                clan = clan_war.clan_2
+            if clan:
+                await self.war_elo_adjustment(clan,clan_war)
+        
+        await ctx.reply("Done.")
     
     ##################################################
     ### CWL / SETUP
