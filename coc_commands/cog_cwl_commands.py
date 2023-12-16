@@ -216,7 +216,9 @@ class ClanWarLeagues(commands.Cog):
 
     async def _assistant_get_cwl_information(self,*args,**kwargs) -> dict:
         info = await self.cwl_information()
-        return info.to_dict()
+        return {
+            'content':info.to_dict()
+            }
     
     ############################################################
     ############################################################
