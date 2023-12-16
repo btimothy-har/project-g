@@ -194,7 +194,7 @@ class ClanWarLeagues(commands.Cog):
         schemas = [
             {
                 "name": "_assistant_get_cwl_season",
-                "description": "Identifies the next upcoming Clan War League season.",
+                "description": "Identifies the next upcoming season for the Clan War Leagues (CWL).",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -202,7 +202,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_cwl_information",
-                "description": "Provides you with detailed information on how Clan War Leagues work in The Assassins Guild.",
+                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -212,7 +212,7 @@ class ClanWarLeagues(commands.Cog):
         await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
     
     async def _assistant_get_cwl_season(self,*args,**kwargs) -> str:
-        return f"The next upcoming Clan War League season is {self.active_war_league_season.description}."
+        return f"The next upcoming Clan War Leagues is for the {self.active_war_league_season.description} season."
 
     async def _assistant_get_cwl_information(self,*args,**kwargs) -> dict:
         info = await self.cwl_information()
@@ -345,20 +345,21 @@ class ClanWarLeagues(commands.Cog):
             )
         embed.add_field(
             name="**The War Rank System**",
-            value=f"You might see the following icon on some of your player profiles: {EmojisUI.ELO}. This is your **War Rank**. War Ranks are used in rostering, between players of equal Townhall and Hero Levels. The higher your War Rank, the more likely you will be rostered as close to your League Group as possible."
+            value=f"You might see the following icon on some of your player profiles: {EmojisUI.ELO}. This is your **War Rank**."
+                + f"\n\nWar Ranks are used for rostering players of equal Townhall and Hero Levels. The higher your War Rank, the more likely you will be rostered as close to your League Group as possible."
                 + "\n"
-                + f"\n__**Rank Points are gained by playing in CWL.**__"
+                + f"\n__Rank Points are gained by playing in CWL.__"
                 + f"\n- You lose -3 rank points for every war you are rostered in."
                 + f"\n- You gain: +1 for a 1-star hit, +2 for a 2-star hit, +4 for a 3-star hit."
                 + f"\n- For a hit against a different TH level, you gain/lose points based on the difference in TH levels."
                 + f"\n- Your final rank point gain/loss will be adjusted by the average Rank of your War Clan."
                 + "\n"
-                + f"\n__**You can also gain Rank Points from regular wars.**__"
+                + f"\n__You can also gain Rank Points from regular wars.__"
                 + f"\n- Only attacks against equivalent TH opponents count."
                 + f"\n- -1 for a 0-star hit"
                 + f"\n- -0.75 for a 1-star hit"
                 + f"\n- -0.25 for a 2-star hit"
-                + f"\n- +5 for a 3-star hit"
+                + f"\n- +0.5 for a 3-star hit"
                 + "\n\u200b",
             inline=False
             )
