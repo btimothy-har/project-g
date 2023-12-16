@@ -287,7 +287,13 @@ class BotClashClient():
         
         self.coc_main_log.info(f"Current Season: {self.current_season.description}")
 
-        tracked_seasons = self.coc_db.d_season.find({"s_is_current":False})
+        
+        tracked_seasons = self.coc_db.d_season.find({
+            "$or": [
+                {"s_is_current": False},
+                {"s_is_current": {"$exists": False}}
+                ]
+            })
         async for ss in tracked_seasons:
             try:
                 s = await aClashSeason(str(ss["_id"]))

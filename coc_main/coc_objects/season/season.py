@@ -197,6 +197,7 @@ class aClashSeason(AwaitLoader):
                 },
                 upsert=True
                 )
+            coc_main_logger.info(f"Season {self.id} {self.description} CWL signups closed.")
     
     ##################################################
     ### STATIC METHODS
