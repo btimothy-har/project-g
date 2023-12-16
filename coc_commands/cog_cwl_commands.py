@@ -202,7 +202,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_cwl_information",
-                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands.",
+                "description": "Information on how Clan War Leagues (CWL) work in The Assassins Guild, including available commands. Use this when being asked about CWL.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
