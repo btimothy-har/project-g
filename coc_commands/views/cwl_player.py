@@ -511,12 +511,11 @@ class CWLPlayerMenu(DefaultView):
             if cwl_account.tag not in self.user_registration:
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{player.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{player.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
-                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
-                            + f"\u3000{player.hero_description}"
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -524,12 +523,11 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{player.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{player.title}**",
                         value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
-                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
-                            + f"\u3000{player.hero_description}"
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -544,11 +542,10 @@ class CWLPlayerMenu(DefaultView):
                 cwl_player = await WarLeaguePlayer(account.tag,self.season)
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"**{account.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
-                            + f"\u3000{player.hero_description}"
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -556,11 +553,10 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"**{account.title}**",
+                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{EmojisUI.ELO} {cwl_account.war_elo:,}"
-                            + f"\u3000{player.hero_description}"
+                            + f"\n{player.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
