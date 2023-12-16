@@ -629,6 +629,7 @@ class CWLPlayerMenu(DefaultView):
             message=f"- You may modify your registration options at any time through this menu."
                 + f"\n- Changes to your registration **cannot** be made once registration is closed."
                 + f"\n- Once a CWL Roster has been finalized, you cannot withdraw your registration."
+                + f"\n\nUse `/cwl info` for more details on CWL."
                 + f"\n\u200b"
             )
         embed.add_field(
