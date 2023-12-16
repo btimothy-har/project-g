@@ -214,11 +214,11 @@ class ClanWarLeagues(commands.Cog):
     async def _assistant_get_cwl_season(self,*args,**kwargs) -> str:
         return f"The next upcoming Clan War Leagues is for the {self.active_war_league_season.description} season."
 
-    async def _assistant_get_cwl_information(self,*args,**kwargs) -> dict:
+    async def _assistant_get_cwl_information(self,*args,**kwargs) -> str:
         info = await self.cwl_information()
         x = info.to_dict()
         bot_client.coc_main_log.info(x)
-        return x
+        return f"CWL Information: {x}"
     
     ############################################################
     ############################################################
