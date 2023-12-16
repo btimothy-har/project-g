@@ -213,7 +213,7 @@ class ClanWarLeagues(commands.Cog):
                     "type": "object",
                     "properties": {
                         "account_tag": {
-                            "description": "The unique player tag of the account. The discord_user of the account must match the current user.",
+                            "description": "The unique player tag of the account. The discord_user of the account must match the current user. Prompt the user to choose from their available linked accounts.",
                             "type": "string",
                             },
                         "league_group": {
