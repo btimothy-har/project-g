@@ -542,10 +542,10 @@ class CWLPlayerMenu(DefaultView):
                 cwl_player = await WarLeaguePlayer(account.tag,self.season)
                 if embed_1_ct < 10:
                     embed.add_field(
-                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{account.title}**",
+                        name=f"{EmojisUI.ELO} {account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{player.hero_description}"
+                            + f"\n{account.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
@@ -553,10 +553,10 @@ class CWLPlayerMenu(DefaultView):
 
                 elif embed_2_ct < 10:
                     embed_2.add_field(
-                        name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{account.title}**",
+                        name=f"{EmojisUI.ELO} {account.war_elo:,}\u3000**{account.title}**",
                         value=f"Not Registered"
                             + (f"(Previously registered by <@{cwl_player.discord_user}>)" if cwl_player.discord_user and cwl_player.is_registered else "")
-                            + f"\n{player.hero_description}"
+                            + f"\n{account.hero_description}"
                             + "\n\u200b",
                         inline=False
                         )
