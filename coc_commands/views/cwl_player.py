@@ -90,7 +90,7 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-        self.accounts = self.member.accounts
+        self.accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
