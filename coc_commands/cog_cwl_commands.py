@@ -172,7 +172,7 @@ class ClanWarLeagues(commands.Cog):
             att_iter = AsyncIter(player.attacks)
             async for att in att_iter:
                 if att.defender.town_hall == att.attacker.town_hall:
-                    elo_gain = -1
+                    elo_gain += -1
                     if att.stars >= 1:
                         elo_gain += 0.25 # -0.75 for 1 star
                     if att.stars >= 2:

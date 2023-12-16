@@ -262,7 +262,7 @@ class BasicPlayer(AwaitLoader):
                 return_document=ReturnDocument.AFTER
                 )
             self._attributes.war_elo = player['war_elo']
-            bot_client.coc_data_log.info(f"{self}: war_elo changed to {self.war_elo}.")
+            bot_client.coc_data_log.info(f"{self}: war_elo adjusted by {amount}. New: {self.war_elo}.")
 
     ##################################################
     #####
