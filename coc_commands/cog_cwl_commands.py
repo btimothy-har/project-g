@@ -141,7 +141,10 @@ class ClanWarLeagues(commands.Cog):
 
                 elo_gain += (att.defender.town_hall - att.attacker.town_hall)
             
-            adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
+            if player.war_elo > 0:
+                adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
+            else:
+                adj_elo = round(elo_gain,3) - 3
             await player.adjust_war_elo(adj_elo)
         
         if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:

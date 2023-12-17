@@ -581,8 +581,7 @@ class CWLRosterMenu(DefaultView):
                 value=a.tag,
                 emoji=a.town_hall.emoji,
                 description=f"{round(a.hero_strength_pct)}% "
-                    + f"| " + f"{round(a.hero_strength_pct)}% "
-                    + f"| " + f"{round(a.spell_strength_pct)}% "
+                    + f"| " + f"ELO {a.war_elo} "
                     + (f"| Current Roster: {self.get_league_player(a.tag).roster_clan.name[:12]}" if self.get_league_player(a.tag).roster_clan else f"| {CWLLeagueGroups.get_description_no_emoji(self.get_league_player(a.tag).league_group)}"),
                 default=False)
                 for a in sampled_players
@@ -733,7 +732,7 @@ class CWLRosterMenu(DefaultView):
         all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
         eligible_participants = sorted(
             [p for p in participants if eligible_for_rostering(p) and pred_members_only(p) and pred_max_heroes_only(p) and pred_max_offense_only(p) and pred_townhall_levels(p) and pred_not_yet_rostered(p) and pred_registration_group(p)],
-            key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True
+            key=lambda x:(x.town_hall.level,x.hero_strength,x.war_elo),reverse=True
             )
         return all_participants, eligible_participants
 
@@ -742,7 +741,7 @@ class CWLRosterMenu(DefaultView):
         
         participants_not_rostered = [p for p in eligible_participants if p.roster_clan is None]
         unrostered_players = await self.client.fetch_many_players(*[p.tag for p in participants_not_rostered])
-        unrostered_players.sort(key=lambda p:(p.town_hall.level,p.hero_strength),reverse=True)
+        unrostered_players.sort(key=lambda p:(p.town_hall.level,p.hero_strength,p.war_elo),reverse=True)
 
         a_iter = AsyncIter(unrostered_players)
         async for p in a_iter:

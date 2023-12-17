@@ -288,7 +288,10 @@ class WarLeagueClan(BasicClan):
             }
         query = bot_client.coc_db.db__war_league_player.find(q_doc,{'_id':1,'tag':1})
         self.participants = [await WarLeaguePlayer(db_player['tag'],self.season) async for db_player in query]
-        self.avg_elo = round(sum([p.war_elo for p in self.participants])/len(self.participants),2)
+        try:
+            self.avg_elo = round(sum([p.war_elo for p in self.participants])/len(self.participants),2)
+        except ZeroDivisionError:
+            self.avg_elo = 0
         return self.participants
     
     ##################################################
@@ -525,7 +528,10 @@ class WarLeaguePlayer(BasicPlayer):
                     elo_gain += (att.defender.town_hall - att.attacker.town_hall)
         
         await self.league_clan.get_participants()
-        adj_elo = round((elo_gain * (self.league_clan.avg_elo / self.war_elo)),3) - 3
+        if self.war_elo > 0:
+            adj_elo = round((elo_gain * (self.league_clan.avg_elo / self.war_elo)),3) - 3
+        else:
+            adj_elo = round(elo_gain,3) - 3
         return adj_elo
 
     async def register(self,discord_user:int,league_group:int):
