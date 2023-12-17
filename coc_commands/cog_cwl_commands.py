@@ -11,7 +11,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aPlayer
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aPlayer, BasicPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 
@@ -403,6 +403,23 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.cwl_information(interaction)
 
         await interaction.followup.send(embed=embed,ephemeral=True)
+    
+    @commands.command(name="resetelo")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def command_cwlresetelo(self,ctx):
+        """
+        [Owner-only] Resets the ELO of all CWL Players.
+        """
+
+        q_doc = {'war_elo': {'$ne': 0}}
+        query = bot_client.coc_db.db__player.find(q_doc)
+        
+        async for q in query:
+            player = await BasicPlayer(q['_id'])
+            await player.reset_war_elo()
+
+        await ctx.reply("Done.")
 
     @commands.command(name="cwlelo")
     @commands.is_owner()
@@ -422,14 +439,12 @@ class ClanWarLeagues(commands.Cog):
 
         w_iter = AsyncIter(war_list)
         async for war in w_iter:
-            bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
             clan = None
             if war.clan_1.is_alliance_clan:
                 clan = war.clan_1
             elif war.clan_2.is_alliance_clan:
                 clan = war.clan_2
             if clan:
-                bot_client.coc_main_log.info(f"Adjusting ELO for {war}")
                 await self.war_elo_adjustment(clan,war)
         
         await ctx.reply("Done.")
