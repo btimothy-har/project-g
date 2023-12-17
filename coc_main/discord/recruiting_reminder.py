@@ -250,7 +250,7 @@ class RecruitingReminder():
 
             webhook = await get_bot_webhook(bot_client.bot,self.channel)
             if isinstance(self.channel,discord.Thread):
-                msg = await webhook.edit_message(
+                await webhook.edit_message(
                     message_id=self.active_reminder,
                     content=getattr(self.remind_user,'mention',''),
                     embed=post_embed,
@@ -258,13 +258,12 @@ class RecruitingReminder():
                     thread=self.channel
                     )
             else:
-                msg = await webhook.edit_message(
+                await webhook.edit_message(
                     message_id=self.active_reminder,
                     content=getattr(self.remind_user,'mention',''),
                     embed=post_embed,
                     view=view
                     )
-            await self.update_active_reminder(msg.id)
 
 class RecruitingPostPrompt(discord.ui.View):
     def __init__(self,post_id:str):

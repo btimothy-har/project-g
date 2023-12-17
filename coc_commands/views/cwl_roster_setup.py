@@ -85,8 +85,6 @@ class CWLRosterMenu(DefaultView):
         else:
             await self.ctx.send(embed=timeout_embed,view=None)
         self.stop_menu()
-
-        await asyncio.gather(*(cwl_player.reset_roster_clan() for cwl_player in self.modified_to_save))
     
     ##################################################
     ### MENUS START
