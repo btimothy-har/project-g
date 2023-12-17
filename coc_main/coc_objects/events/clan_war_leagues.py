@@ -189,7 +189,7 @@ class WarLeagueClan(BasicClan):
         self._name = db.get('name',super().name) if db else super().name
 
         self.is_participating = db.get('is_participating',False) if db else False
-        self.roster_open = db.get('roster_open',False) if db else False
+        self.roster_open = db.get('roster_open',False) if db else True
 
         self.league_group_id = db.get('league_group',None) if db else None
 
