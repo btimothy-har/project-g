@@ -620,6 +620,29 @@ class aWarAttack():
         if pendulum.now() < self.war.end_time or self._new_destruction is None:
             self.compute_attack_stats()
         return self._new_destruction
+
+    @property
+    def elo_effect(self) -> int:
+        eff = 0
+        if self.war.type == ClanWarType.CWL:
+            if self.stars >= 1:
+                eff += 1
+            if self.stars >= 2:
+                eff += 1
+            if self.stars >= 3:
+                eff += 2
+            eff += (self.defender.town_hall - self.attacker.town_hall)
+        
+        if self.war.type == ClanWarType.RANDOM:
+            if self.defender.town_hall == self.attacker.town_hall:
+                eff -= 1
+                if self.stars >= 1:
+                    eff += 0.25
+                if self.stars >= 2:
+                    eff += 0.5
+                if self.stars >= 3:
+                    eff += 0.75
+        return eff
     
     def compute_attack_stats(self):
         base_stars = 0

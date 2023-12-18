@@ -57,7 +57,8 @@
 #     'roster_clan': string,
 #     'league_clan': string,
 #     'league_group': int,
-#     'townhall': int
+#     'townhall': int,
+#     'elo_change': float,
 #     }
 
 ##################################################

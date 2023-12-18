@@ -132,25 +132,22 @@ class ClanWarLeagues(commands.Cog):
             elo_gain = 0
             att_iter = AsyncIter(player.attacks)
             async for att in att_iter:
-                if att.stars >= 1:
-                    elo_gain += 1
-                if att.stars >= 2:
-                    elo_gain += 1
-                if att.stars >= 3:
-                    elo_gain += 2
-
-                elo_gain += (att.defender.town_hall - att.attacker.town_hall)
-            
+                elo_gain += att.elo_effect
+                
             if player.war_elo > 0:
                 adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
             else:
                 adj_elo = round(elo_gain,3) - 3
+            league_player = await WarLeaguePlayer(player.tag,league_group.season)
+            await league_player.set_elo_change(adj_elo)
             await player.adjust_war_elo(adj_elo)
         
         if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:
             league_clan = league_group.get_clan(clan.tag)
 
             if not league_clan:
+                return
+            if not league_clan.is_participating:
                 return
         
             clan_roster = await league_clan.get_participants()
@@ -170,18 +167,14 @@ class ClanWarLeagues(commands.Cog):
         if war.type != ClanWarType.RANDOM:
             return
         
+        if not clan.is_alliance_clan:
+            return
+        
         async def player_elo_adjustment(player:aWarPlayer):
             elo_gain = 0
             att_iter = AsyncIter(player.attacks)
             async for att in att_iter:
-                if att.defender.town_hall == att.attacker.town_hall:
-                    elo_gain += -1
-                    if att.stars >= 1:
-                        elo_gain += 0.25 # -0.75 for 1 star
-                    if att.stars >= 2:
-                        elo_gain += 0.5 # -0.25 for 2 star
-                    if att.stars >= 3:
-                        elo_gain += 0.75 # +0.5 for 3 star
+                elo_gain += att.elo_effect
             await player.adjust_war_elo(elo_gain)
         
         bot_client.coc_main_log.info(f"ELO for {war}")
@@ -406,51 +399,6 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.cwl_information(interaction)
 
         await interaction.followup.send(embed=embed,ephemeral=True)
-    
-    @commands.command(name="resetelo")
-    @commands.is_owner()
-    @commands.guild_only()
-    async def command_cwlresetelo(self,ctx):
-        """
-        [Owner-only] Resets the ELO of all CWL Players.
-        """
-
-        q_doc = {'war_elo': {'$ne': 0}}
-        query = bot_client.coc_db.db__player.find(q_doc)
-        
-        async for q in query:
-            player = await BasicPlayer(q['_id'])
-            await player.reset_war_elo()
-
-        await ctx.reply("Done.")
-
-    @commands.command(name="cwlelo")
-    @commands.is_owner()
-    @commands.guild_only()
-    async def command_cwlelo(self,ctx):
-        """
-        [Owner-only] Adjusts the ELO of all CWL Players.
-        """
-        date = pendulum.datetime(2023,12,1)
-        q_doc = {
-            'type': 'random',
-            'state': 'warEnded',
-            'preparation_start_time': {'$gte': date.int_timestamp},
-            }
-        query = bot_client.coc_db.db__clan_war.find(q_doc)
-        war_list = [await aClanWar(w['_id']) async for w in query]
-
-        w_iter = AsyncIter(war_list)
-        async for war in w_iter:
-            clan = None
-            if war.clan_1.is_alliance_clan:
-                clan = war.clan_1
-            elif war.clan_2.is_alliance_clan:
-                clan = war.clan_2
-            if clan:
-                await self.war_elo_adjustment(clan,war)
-        
-        await ctx.reply("Done.")
     
     ##################################################
     ### CWL / SETUP

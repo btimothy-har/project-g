@@ -451,6 +451,7 @@ class WarLeaguePlayer(BasicPlayer):
         
         #This is the league group that the player has registered to participate in.
         self.league_group = db.get('league_group',0) if db else 0
+        self.elo_change = db.get('elo_change',0) if db else 0
     
     ##################################################
     ### GLOBAL ATTRIBUTES
@@ -512,6 +513,9 @@ class WarLeaguePlayer(BasicPlayer):
     ### PLAYER METHODS
     ##################################################
     async def estimate_elo(self):
+        if self.elo_change != 0:
+            return self.elo_change
+        
         elo_gain = 0
         w_iter = AsyncIter(self.war_log)
         async for war in w_iter:
@@ -533,6 +537,20 @@ class WarLeaguePlayer(BasicPlayer):
         else:
             adj_elo = round(elo_gain,3) - 3
         return adj_elo
+    
+    async def set_elo_change(self,chg:float):
+        async with self._lock:
+            self.elo_change = chg
+            await bot_client.coc_db.db__war_league_player.update_one(
+                {'_id':self.db_id},
+                {'$set':{
+                    'season':self.season.id,
+                    'tag':self.tag,
+                    'elo_change':self.elo_change
+                    }},
+                upsert=True
+                )
+            bot_client.coc_data_log.info(f"{str(self)}: ELO Change: {self.elo_change}")
 
     async def register(self,discord_user:int,league_group:int):
         async with self._lock:

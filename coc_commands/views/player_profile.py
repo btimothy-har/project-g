@@ -327,8 +327,10 @@ class PlayerProfileMenu(DefaultView):
                 )
             embed.add_field(
                 name=f"{war_member.clan.emoji} {war_member.clan.clean_name} vs {war_member.opponent.clean_name}",
-                value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
-                    + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
+                value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`"
+                    + (f"\u3000{EmojisUI.ELO} `{round(sum([att.elo_effect for att in war_member.attacks]),1):^3}`\n" if war_member.clan.is_alliance_clan else "\n")
+                    + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if war.start_time < pendulum.now() < war.end_time else "")
+                    + (f"*War Starts <t:{war.start_time.int_timestamp}:R>.*\n" if war.start_time > pendulum.now() else "")
                     + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
                     + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
                     + "\u200b",
