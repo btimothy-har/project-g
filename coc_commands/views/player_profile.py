@@ -65,7 +65,7 @@ class PlayerProfileMenu(DefaultView):
         self.add_item(self.warlog_button)
         self.add_item(self.raidlog_button)
         self.add_item(self.trooplevels_button)
-        self.add_item(self.rushed_button)
+        self.add_item(self.blacksmith_button)
         self._build_dynamic_menu()
     
     @property
