@@ -312,19 +312,31 @@ class BaseVaultMenu(DefaultView):
         base = self.all_bases[self.base_index]
         price = calculate_price(base.town_hall)
 
-        if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
-            embed3 = await eclipse_embed(
-                context=interaction,
-                message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name()}.",
-                success=False
-                )
+        if self.user.id not in base.claims:
+            if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
+                embed3 = await eclipse_embed(
+                    context=interaction,
+                    message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name()}. You have {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.",
+                    success=False
+                    )
+            else:
+                await base.add_claim(self.user.id)
+                embed3 = await self._send_base_link_embed()
+                if not embed3:
+                    embed3 = await eclipse_embed(
+                        context=interaction,
+                        message=f"This base has been added to your vault.",
+                        success=True
+                        )
+                await bank.withdraw_credits(self.user,price)
+                embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
+        
         else:
-            await base.add_claim(self.user.id)
             embed3 = await self._send_base_link_embed()
             if not embed3:
                 embed3 = await eclipse_embed(
                     context=interaction,
-                    message=f"This base has been added to your vault.",
+                    message=f"I've sent you the base link via DMs.",
                     success=True
                     )
             
@@ -444,8 +456,10 @@ class BaseVaultMenu(DefaultView):
 
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
-            value=f"**You have claimed this base.\n\u200b**"
-                if self.user.id in show_base.claims else f"\nTo claim this Base to your Vault, use the {EmojisUI.DOWNLOAD} button. Claiming costs {calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}.\n\u200b",
+            value=f"**You have claimed this base. Claiming again will cost nothing.\n\u200b**"
+                if self.user.id in show_base.claims else 
+                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n\n"
+                f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
             inline=False
             )
         
