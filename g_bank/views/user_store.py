@@ -275,7 +275,7 @@ class UserStore(DefaultView):
         await interaction.response.defer()
         currency = await bank.get_currency_name()
 
-        if not self.current_item.can_i_buy(self.guild.get_member(interaction.user.id)):
+        if not self.current_item.can_i_buy(self.guild.get_member(interaction.user.id)) or not await bank.can_spend(self.guild.get_member(interaction.user.id),self.current_item.price):
             embed = await clash_embed(
                 context=self.ctx,
                 message=f"You cannot purchase **{self.current_item.name}**.",
