@@ -399,13 +399,11 @@ class Bank(commands.Cog):
             if not member:
                 return
             
-            distribute = False            
-            if getattr(old_player.clan,'is_alliance_clan',False):
-                distribute = True
-            if getattr(new_player.clan,'is_alliance_clan',False):
-                distribute = True
+            target_clan = new_player.clan if new_player.clan else old_player.clan
 
-            if not distribute:
+            if not target_clan:
+                return
+            if not target_clan.is_alliance_clan:
                 return
             
             old_ach = old_player.get_achievement(achievement.name)
@@ -416,17 +414,25 @@ class Bank(commands.Cog):
             total_reward = round((10 * (increment // 1000)) * membership_multiplier)
 
             if total_reward > 0:
-                await bank.deposit_credits(member,total_reward)
+                event_start = pendulum.datetime(2023,12,22,7,0,0)
+                event_end = pendulum.datetime(2023,12,25,7,0,0)
+
+                if event_start <= pendulum.now() <= event_end:
+                    mult = 2 if target_clan.tag == "#2L90QPRL9" else 1
+                else:
+                    mult = 1
+                    
+                await bank.deposit_credits(member,total_reward * mult)
                 await self.current_account.withdraw(
-                    amount = total_reward,
+                    amount = total_reward * mult,
                     user_id = self.bot.user.id,
-                    comment = f"Capital Gold Bonus for {new_player.name} ({new_player.tag}): {increment}"
+                    comment = f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): {increment}"
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
-                    amount=total_reward,
-                    comment=f"Capital Gold Bonus for {new_player.name} ({new_player.tag}): Donated {increment:,} Gold."
+                    amount=total_reward * mult,
+                    comment=f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): Donated {increment:,} Gold to {target_clan.name}."
                     )
     
     ############################################################

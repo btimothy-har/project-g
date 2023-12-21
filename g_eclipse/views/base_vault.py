@@ -407,17 +407,20 @@ class BaseVaultMenu(DefaultView):
         curr = await bank.get_currency_name()
 
         base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
-            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from TH9 {EmojisTownHall.get(9)} to TH16 {EmojisTownHall.get(16)}. "
+            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
             + f"Bases are refreshed periodically, and expire after a certain period of time:"
             + f"\n- For the current highest TH: after 4 month(s)"
             + f"\n- For the second and third highest TH: after 9 month(s)"
             + f"\n- All other THs: after 12 month(s)"
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
-            + f"\n\n**__Claiming Bases__**"
+            + f"\n\n**__Getting Base Links__**"
             + f"\n- Base Links are provided as-is. Supercell expires base links from time to time, and you may occassionally encounter expired links."
-            + f"\n- To get a base link, you need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH, reducing by TH level."
+            + f"\n- To get a base link, you will need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH. Lower TH levels cost less."
             + f"\n- Once claimed, the base link is sent to your DMs and added to your Personal Vault."
-            + f"\n- Claims are permanent until you remove them." 
+            + f"\n\n**__Personal Vault__**"
+            + f"\n- Bases that you have claimed are added to your personal vault. You may retrieve their base links at any time from here."
+            + f"\n- You may delete claims from your personal vault."
+            + f"\n- Bases in your personal vault are not subject to the expiration, unless you delete the claim."
             )        
         embed = await eclipse_embed(
             context=self.ctx,
@@ -456,9 +459,9 @@ class BaseVaultMenu(DefaultView):
 
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
-            value=f"**You have claimed this base. Claiming again will cost nothing.\n\u200b**"
+            value=f"**You have already claimed this base.**\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b**"
                 if self.user.id in show_base.claims else 
-                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n\n"
+                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n"
                 f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
             inline=False
             )
