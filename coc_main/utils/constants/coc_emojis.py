@@ -7,6 +7,7 @@ class EmojisClash:
     CLANGAMES = "<:ClanGames:834063648494190602>"
     CAPITALRAID = "<:CapitalRaids:1109470302452326551>"
     LABORATORY = "<:laboratory:1044904659917209651>"
+    BLACKSMITH = "<:Smithy:1187488001006248047>"
     BOOKFIGHTING = "<:TotalTroopStrength:827730290491129856>"
     BOOKSPELLS = "<:TotalSpellStrength:827730290294259793>"
     BOOKHEROES = "<:TotalHeroStrength:827730291149635596>"
@@ -174,6 +175,28 @@ class EmojisHeroes:
     @classmethod
     def get(cls, hero:str):
         return getattr(cls, hero.replace(" ","_").upper(), '')
+
+class EmojisEquipment:
+    GIANT_GAUNTLET = "<:giant_gauntlet:1187485991678791730>"
+    RAGE_GEM = "<:rage_gem:1187485928600637452>"
+    ARCHER_PUPPET = "<:archer_puppet:1187485921252229291>"
+    BARBARIAN_PUPPET = "<:barbarian_puppet:1187485912041525268>"
+    EARTHQUAKE_BOOTS = "<:earthquake_boots:1187485878105415720>"
+    ETERNAL_TOME = "<:eternal_tome:1187485867099557999>"
+    HEALER_PUPPET = "<:healer_puppet:1187485857792409682>"
+    HEALING_TOME = "<:healing_tome:1187485849043087390>"
+    RAGE_VIAL = "<:rage_vial:1187485844412563506>"
+    LIFE_GEM = "<:life_gem:1187485836242071653>"
+    GIANT_ARROW = "<:giant_arrow:1187485830604914798>"
+    ROYAL_GEM = "<:royal_gem:1187485826855206943>"
+    INVISIBILITY_VIAL = "<:invisibility_vial:1187485821557821450>"
+    SEEKING_SHIELD = "<:seeking_shield:1187485811088818277>"
+    VAMPSTACHE = "<:vampstache:1187485806437347378>"
+
+    @classmethod
+    def get(cls, equipment:str):
+        return getattr(cls, equipment.replace(" ","_").upper(), '')
+
 
 class EmojisPets:
     LASSI = "<:LASSI:1037000160246509639>"

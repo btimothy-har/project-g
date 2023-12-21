@@ -14,7 +14,7 @@ from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed, s_convert_seconds_to_str
 from coc_main.utils.constants.ui_emojis import EmojisUI
-from coc_main.utils.constants.coc_constants import EmojisClash, EmojisLeagues, EmojisTownHall, WarResult
+from coc_main.utils.constants.coc_constants import EmojisClash, EmojisLeagues, EmojisTownHall, WarResult, EmojisEquipment
 
 bot_client = BotClashClient()
 
@@ -50,9 +50,9 @@ class PlayerProfileMenu(DefaultView):
             emoji=EmojisClash.LABORATORY,
             style=discord.ButtonStyle.gray
             )
-        self.rushed_button = DiscordButton(
-            function=self._callback_rushedtroops,
-            emoji=EmojisUI.RUNNING,
+        self.blacksmith_button = DiscordButton(
+            function=self._callback_heroequipment,
+            emoji=EmojisClash.BLACKSMITH,
             style=discord.ButtonStyle.gray
             )
         
@@ -129,7 +129,7 @@ class PlayerProfileMenu(DefaultView):
         self.warlog_button.disabled = False
         self.raidlog_button.disabled = False
         self.trooplevels_button.disabled = False
-        self.rushed_button.disabled = False
+        self.blacksmith_button.disabled = False
 
         self.current_page = "summary"
         embed = await self._summary_embed()
@@ -142,7 +142,7 @@ class PlayerProfileMenu(DefaultView):
         self.warlog_button.disabled = True
         self.raidlog_button.disabled = False
         self.trooplevels_button.disabled = False
-        self.rushed_button.disabled = False
+        self.blacksmith_button.disabled = False
 
         self.current_page = "warlog"
         embed = await self._warlog_embed()
@@ -155,7 +155,7 @@ class PlayerProfileMenu(DefaultView):
         self.warlog_button.disabled = False
         self.raidlog_button.disabled = True
         self.trooplevels_button.disabled = False
-        self.rushed_button.disabled = False
+        self.blacksmith_button.disabled = False
 
         self.current_page = "raidlog"
         embed = await self._raidlog_embed()
@@ -168,23 +168,23 @@ class PlayerProfileMenu(DefaultView):
         self.warlog_button.disabled = False
         self.raidlog_button.disabled = False
         self.trooplevels_button.disabled = True
-        self.rushed_button.disabled = False
+        self.blacksmith_button.disabled = False
 
         self.current_page = "trooplevels"
         embed = await self._laboratorylevels_embed()
         await interaction.edit_original_response(embed=embed,view=self)
 
-    async def _callback_rushedtroops(self,interaction:discord.Interaction,button:DiscordButton):
+    async def _callback_heroequipment(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
         self.summary_button.disabled = False
         self.warlog_button.disabled = False
         self.raidlog_button.disabled = False
         self.trooplevels_button.disabled = False
-        self.rushed_button.disabled = True
+        self.blacksmith_button.disabled = True
 
-        self.current_page = "rushedtroops"
-        embed = await self._rushedlaboratory_embed()
+        self.current_page = "blacksmith"
+        embed = await self._blacksmith_embed()
         await interaction.edit_original_response(embed=embed,view=self)
     
     async def _callback_select_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
@@ -213,8 +213,8 @@ class PlayerProfileMenu(DefaultView):
             embed = await self._raidlog_embed()
         elif self.current_page == "trooplevels":
             embed = await self._laboratorylevels_embed()
-        elif self.current_page == "rushedtroops":
-            embed = await self._rushedlaboratory_embed()
+        elif self.current_page == "blacksmith":
+            embed = await self._blacksmith_embed()
         else:
             embed = await self._summary_embed()
         
@@ -458,118 +458,46 @@ class PlayerProfileMenu(DefaultView):
             embed.add_field(name="Dark Elixir Spells",value="\n".join(darkelixir_spell_list)+"\n\u200b",inline=False)
         return embed
 
-    async def _rushedlaboratory_embed(self):
+    async def _blacksmith_embed(self):
         player = self.current_account
 
         embed = await clash_embed(
             context=self.ctx,
-            title=f"Rushed Levels: {player}",
-            message=f"*All levels based on: {EmojisTownHall.get(player.town_hall.level)} TH {player.town_hall.level}*\n\n"
-                + f"**Rushed Percentages**\n"
-                + f"Troops: {player.troop_rushed_pct}%\n"
-                + f"Spells: {player.spell_rushed_pct}%\n"
-                + f"Heroes: {player.hero_rushed_pct}%\n"
-                + f"Overall: **{player.overall_rushed_pct}%**\n"
-                + f"\u200b"
+            title=f"Hero Equipment: {player}",
+            message=f"Max levels are provided as the maximum possible in-game, not by Townhall level."
             )
         
-        if len([hero for hero in player.heroes if hero.is_rushed]) > 0:
-            hero_list = []
-            for i, hero in enumerate([hero for hero in player.heroes if hero.is_rushed]):
-                hero_t = f"{hero.emoji}`{str(hero.level) + ' / ' + str(hero.max_level): ^7}`"
-                if i % 2 == 0:
-                    hero_list.append(hero_t)
-                else:
-                    hero_list[-1] += "\u200b" + hero_t
+        if player.town_hall.level >= 8:
+            eq_list = [f"{EmojisEquipment.get(e)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Barbarian King']
             embed.add_field(
-                name=f"Heroes ({len([hero for hero in player.heroes if hero.is_rushed])})",
-                value="\n".join(hero_list)+"\n\u200b",
-                inline=False
-                )
-            
-        if len([pet for pet in player.pets if pet.is_rushed]) > 0:
-            pet_list = []
-            for i, pet in enumerate([pet for pet in player.pets if pet.is_rushed]):
-                pet_t = f"{pet.emoji}`{str(pet.level) + ' / ' + str(pet.max_level): ^7}`"
-                if i % 2 == 0:
-                    pet_list.append(pet_t)
-                else:
-                    pet_list[-1] += "\u200b" + pet_t
-            embed.add_field(
-                name=f"Hero Pets ({len([pet for pet in player.pets if pet.is_rushed])})",
-                value="\n".join(pet_list)+"\n\u200b",
+                name=f"**Barbarian King**",
+                value="\n".join(eq_list)+"\n\u200b",
                 inline=False
                 )
         
-        if len([troop for troop in player.elixir_troops if troop.is_rushed]) > 0:
-            troop_list = []
-            for i, troop in enumerate([troop for troop in player.elixir_troops if troop.is_rushed],start=1):
-                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.max_level): ^7}`"
-                if i % 3 == 1:
-                    troop_list.append(troop_t)
-                else:
-                    troop_list[-1] += troop_t
+        if player.town_hall.level >= 9:
+            eq_list = [f"{EmojisEquipment.get(e)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Archer Queen']
             embed.add_field(
-                name=f"Elixir Troops ({len([troop for troop in player.elixir_troops if troop.is_rushed])})",
-                value="\n".join(troop_list)+"\n\u200b",
+                name=f"**Archer Queen**",
+                value="\n".join(eq_list)+"\n\u200b",
                 inline=False
                 )
         
-        if len([troop for troop in player.darkelixir_troops if troop.is_rushed]) > 0:
-            troop_list = []
-            for i, troop in enumerate([troop for troop in player.darkelixir_troops if troop.is_rushed],start=1):
-                troop_t = f"{troop.emoji}`{str(troop.level) + ' / ' + str(troop.max_level): ^7}`"
-                if i % 3 == 1:
-                    troop_list.append(troop_t)
-                else:
-                    troop_list[-1] += troop_t
+        if player.town_hall.level >= 11:
+            eq_list = [f"{EmojisEquipment.get(e)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Grand Warden']
             embed.add_field(
-                name=f"Dark Elixir Troops ({len([troop for troop in player.darkelixir_troops if troop.is_rushed])})",
-                value="\n".join(troop_list)+"\n\u200b",
+                name=f"**Grand Warden**",
+                value="\n".join(eq_list)+"\n\u200b",
                 inline=False
                 )
         
-        if len([siege_machine for siege_machine in player.siege_machines if siege_machine.is_rushed]) > 0:
-            siege_machine_list = []
-            for i, siege_machine in enumerate([siege_machine for siege_machine in player.siege_machines if siege_machine.is_rushed],start=1):
-                siege_machine_t = f"{siege_machine.emoji}`{str(siege_machine.level) + ' / ' + str(siege_machine.max_level): ^7}`"
-                if i % 3 == 1:
-                    siege_machine_list.append(siege_machine_t)
-                else:
-                    siege_machine_list[-1] += siege_machine_t
+        if player.town_hall.level >= 13:
+            eq_list = [f"{EmojisEquipment.get(e)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Royal Champion']
             embed.add_field(
-                name=f"Siege Machines ({len([siege_machine for siege_machine in player.siege_machines if siege_machine.is_rushed])})",
-                value="\n".join(siege_machine_list)+"\n\u200b",
+                name=f"**Royal Champion**",
+                value="\n".join(eq_list)+"\n\u200b",
                 inline=False
                 )
-        
-        if len([spell for spell in player.elixir_spells if spell.is_rushed]) > 0:
-            spell_list = []
-            for i, spell in enumerate([spell for spell in player.elixir_spells if spell.is_rushed],start=1):
-                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.max_level): ^7}`"
-                if i % 3 == 1:
-                    spell_list.append(spell_t)
-                else:
-                    spell_list[-1] += spell_t
-            embed.add_field(
-                name=f"Elixir Spells ({len([spell for spell in player.elixir_spells if spell.is_rushed])})",
-                value="\n".join(spell_list)+"\n\u200b",
-                inline=False
-                )
-        
-        if len([spell for spell in player.darkelixir_spells if spell.is_rushed]) > 0:
-            spell_list = []
-            for i, spell in enumerate([spell for spell in player.darkelixir_spells if spell.is_rushed],start=1):
-                spell_t = f"{spell.emoji}`{str(spell.level) + ' / ' + str(spell.max_level): ^7}`"
-                if i % 3 == 1:
-                    spell_list.append(spell_t)
-                else:
-                    spell_list[-1] += spell_t
-            embed.add_field(
-                name=f"Dark Elixir Spells ({len([spell for spell in player.darkelixir_spells if spell.is_rushed])})",
-                value="\n".join(spell_list)+"\n\u200b",
-                inline=False
-                )        
         return embed      
 
     def _build_dynamic_menu(self):
