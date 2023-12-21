@@ -63,7 +63,7 @@ class BaseVaultMenu(DefaultView):
     def base_unsave(self):
         return DiscordButton(
             function=self._callback_unsave_base,
-            label="Delete Bookmark",
+            label="Delete Claim",
             emoji=EmojisUI.DELETE,
             row=0
             )
@@ -438,7 +438,7 @@ class BaseVaultMenu(DefaultView):
             embed = await eclipse_embed(
                 context=self.ctx,
                 title="**Welcome to your Personal Base Vault!**",
-                message=f"This is where your bookmarked bases will be saved to, for future reference.\n**You have a total of {len(self.all_bases)} base(s) saved.**"
+                message=f"This is where your base claims will be saved to.\n**You have a total of {len(self.all_bases)} base(s) claimed.**"
                     + (f"\n\n**You don't have any bases in your personal vault.** Start by saving some bases from the Assassins Vault." if len(self.all_bases) == 0 else '')
                     + (f"\n\nRecently added bases are shown first. To view older bases, use the dropdown menu." if len(self.all_bases) > 0 else '')
                     + f"\n\u200b"
@@ -459,7 +459,7 @@ class BaseVaultMenu(DefaultView):
 
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
-            value=f"**You have already claimed this base.**\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b**"
+            value=f"**You have already claimed this base.**" + ("\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b" if not self.vault_mode else "\n\u200b")
                 if self.user.id in show_base.claims else 
                 f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n"
                 f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
