@@ -59,8 +59,7 @@ class RemoveMemberMenu(DefaultView):
                 )
             await self.ctx.followup.send(embed=no_input_embed,ephemeral=True)
             return self.stop_menu()
-
-        await self.member.load()
+        
         self.is_active = True
 
         embed = await clash_embed(context=self.ctx,message=f"{EmojisUI.LOADING} Loading...")
@@ -71,6 +70,7 @@ class RemoveMemberMenu(DefaultView):
             self.message = await self.ctx.reply(embed=embed,view=self)
 
         if self.member:
+            await self.member.load()
             #If Discord User provided, use select menu.
             await self._remove_accounts_by_select()
         else:
