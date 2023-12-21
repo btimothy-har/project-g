@@ -16,7 +16,7 @@ base_price = 5000
 max_th = 16
 
 def calculate_price(townhall:int):
-    return min(base_price - ((max_th - townhall) * 500),1000)
+    return max(base_price - ((max_th - townhall) * 500),1000)
 
 class BaseVaultMenu(DefaultView):
     def __init__(self,
@@ -54,7 +54,7 @@ class BaseVaultMenu(DefaultView):
     def base_save(self):
         return DiscordButton(
             function=self._callback_save_base,
-            label="Bookmark Base",
+            label="Claim Base",
             emoji=EmojisUI.DOWNLOAD,
             row=0
             )
@@ -316,7 +316,7 @@ class BaseVaultMenu(DefaultView):
             embed3 = await eclipse_embed(
                 context=interaction,
                 message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name()}.",
-                success=True
+                success=False
                 )
         else:
             await base.add_claim(self.user.id)
