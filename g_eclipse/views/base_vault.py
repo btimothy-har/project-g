@@ -3,7 +3,7 @@ import discord
 import pendulum
 
 from typing import *
-from redbot.core import commands
+from redbot.core import commands,bank
 
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
@@ -11,6 +11,12 @@ from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.war_base import eWarBase
 from ..components import eclipse_embed
+
+base_price = 5000
+max_th = 16
+
+def calculate_price(townhall:int):
+    return max(base_price - ((max_th - townhall) * 500),1000)
 
 class BaseVaultMenu(DefaultView):
     def __init__(self,
@@ -48,7 +54,7 @@ class BaseVaultMenu(DefaultView):
     def base_save(self):
         return DiscordButton(
             function=self._callback_save_base,
-            label="Bookmark Base",
+            label="Claim Base",
             emoji=EmojisUI.DOWNLOAD,
             row=0
             )
@@ -57,7 +63,7 @@ class BaseVaultMenu(DefaultView):
     def base_unsave(self):
         return DiscordButton(
             function=self._callback_unsave_base,
-            label="Delete Bookmark",
+            label="Delete Claim",
             emoji=EmojisUI.DELETE,
             row=0
             )
@@ -176,7 +182,7 @@ class BaseVaultMenu(DefaultView):
             value=th,
             emoji=EmojisTownHall.get(th),
             )
-            for th in range(16-1,9-1,-1)]
+            for th in [16,15,14,13,12,11,10,9]]
         
         th_select_menu = DiscordSelectMenu(
             function=self._callback_dropdown_th_select,
@@ -300,20 +306,44 @@ class BaseVaultMenu(DefaultView):
         self.ctx = interaction
 
         for item in self.children:
-            item.disabled = True        
+            item.disabled = True
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
-        await self.all_bases[self.base_index].add_claim(self.user.id)
+        base = self.all_bases[self.base_index]
+        price = calculate_price(base.town_hall)
 
+        if self.user.id not in base.claims:
+            if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
+                embed3 = await eclipse_embed(
+                    context=interaction,
+                    message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name()}. You have {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.",
+                    success=False
+                    )
+            else:
+                await base.add_claim(self.user.id)
+                embed3 = await self._send_base_link_embed()
+                if not embed3:
+                    embed3 = await eclipse_embed(
+                        context=interaction,
+                        message=f"This base has been added to your vault.",
+                        success=True
+                        )
+                await bank.withdraw_credits(self.user,price)
+                embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
+        
+        else:
+            embed3 = await self._send_base_link_embed()
+            if not embed3:
+                embed3 = await eclipse_embed(
+                    context=interaction,
+                    message=f"I've sent you the base link via DMs.",
+                    success=True
+                    )
+            
         embed1 = await self._browse_bases_embed()
         embed2 = await self._show_base_embed()
-        embed3 = await eclipse_embed(
-            context=interaction,
-            message=f"This base has been added to your bookmarks.",
-            success=True
-            )
-        embed4 = await self._send_base_link_embed()
-        embeds = [embed1,embed2,embed4] if embed4 else [embed1,embed2,embed3]
+        
+        embeds = [embed1,embed2,embed3]
 
         for item in self.children:
             item.disabled = False
@@ -374,18 +404,27 @@ class BaseVaultMenu(DefaultView):
     ### CONTENT BUILDERS
     ##################################################
     async def _base_vault_home_embed(self,no_base=None):
-        base_vault_intro = (f"Welcome to the **E.C.L.I.P.S.E. Base Vault**. "
-            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from TH9 {EmojisTownHall.get(9)} to TH16 {EmojisTownHall.get(16)}. "
-            + f"\n\nAccess to the base vault is a members' privilege. **DO NOT SHARE ANY BASE LINKS WITH ANYONE, INCLUDING FELLOW MEMBERS**."
+        curr = await bank.get_currency_name()
+
+        base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
+            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
+            + f"Bases are refreshed periodically, and expire after a certain period of time:"
+            + f"\n- For the current highest TH: after 4 month(s)"
+            + f"\n- For the second and third highest TH: after 9 month(s)"
+            + f"\n- All other THs: after 12 month(s)"
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
-            + f"\n\n**__Retrieving Bases__**"
+            + f"\n\n**__Getting Base Links__**"
             + f"\n- Base Links are provided as-is. Supercell expires base links from time to time, and you may occassionally encounter expired links."
-            + f"\n- You may bookmark bases to your Personal Vault for easy retrieval."
-            + f"\n- When bookmarking a base, you will also receive the Base Link in your DMs." 
+            + f"\n- To get a base link, you will need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH. Lower TH levels cost less."
+            + f"\n- Once claimed, the base link is sent to your DMs and added to your Personal Vault."
+            + f"\n\n**__Personal Vault__**"
+            + f"\n- Bases that you have claimed are added to your personal vault. You may retrieve their base links at any time from here."
+            + f"\n- You may delete claims from your personal vault."
+            + f"\n- Bases in your personal vault are not subject to the expiration, unless you delete the claim."
             )        
         embed = await eclipse_embed(
             context=self.ctx,
-            title="**E.C.L.I.P.S.E. Base Vault**",
+            title="**Assassins Base Vault**",
             message=(f"**We don't have any bases currently for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
@@ -399,15 +438,15 @@ class BaseVaultMenu(DefaultView):
             embed = await eclipse_embed(
                 context=self.ctx,
                 title="**Welcome to your Personal Base Vault!**",
-                message=f"This is where your bookmarked bases will be saved to, for future reference.\n**You have a total of {len(self.all_bases)} base(s) saved.**"
-                    + (f"\n\n**You don't have any bases in your personal vault.** Start by saving some bases from our Members' Vault." if len(self.all_bases) == 0 else '')
+                message=f"This is where your base claims will be saved to.\n**You have a total of {len(self.all_bases)} base(s) claimed.**"
+                    + (f"\n\n**You don't have any bases in your personal vault.** Start by saving some bases from the Assassins Vault." if len(self.all_bases) == 0 else '')
                     + (f"\n\nRecently added bases are shown first. To view older bases, use the dropdown menu." if len(self.all_bases) > 0 else '')
                     + f"\n\u200b"
                 )
         else:
             embed = await eclipse_embed(
                 context=self.ctx,
-                title="**E.C.L.I.P.S.E. Base Vault**",
+                title="**Assassins Base Vault**",
                 message=f"There are a total of **{len(self.all_bases)} bases for {EmojisTownHall.get(self.base_th)} Townhall {self.base_th}**."
                     + f"\n\nRecently added bases are shown first. To view older bases, use the dropdown menu."
                     + f"\n\u200b"
@@ -419,16 +458,20 @@ class BaseVaultMenu(DefaultView):
         embed,file = await show_base.base_embed()
 
         embed.add_field(
-            name=f"🔍 Bookmarked by: {len(show_base.claims)} member(s)",
-            value=f"**You have bookmarked this base.\n\u200b**"
-                if self.user.id in show_base.claims else f"\nTo bookmark this Base to your Vault, use the {EmojisUI.DOWNLOAD} button.\n\u200b",
+            name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
+            value=f"**You have already claimed this base.**" + ("\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b" if not self.vault_mode else "\n\u200b")
+                if self.user.id in show_base.claims else 
+                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n"
+                f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
             inline=False
             )
-        embed.add_field(
-            name="**Base Link**",
-            value=f"[Click here to open in-game.]({show_base.base_link})",
-            inline=False
-            )
+        
+        if self.user.id in show_base.claims:
+            embed.add_field(
+                name="**Base Link**",
+                value=f"[Click here to open in-game.]({show_base.base_link})",
+                inline=False
+                )
         
         if file:
             dump_message = await self.cog.dump_channel.send(f"{self.user.id} {self.user.name} @ {self.channel.mention}",file=file)
@@ -451,7 +494,7 @@ class BaseVaultMenu(DefaultView):
         except:
             return await eclipse_embed(
                 context=self.ctx,
-                message="This base has been added to your bookmarks. I couldn't send it to you by DM.",
+                message="This base has been added to your claims. I couldn't send it to you by DM.",
                 success=False
                 )
         
