@@ -182,7 +182,7 @@ class BaseVaultMenu(DefaultView):
             value=th,
             emoji=EmojisTownHall.get(th),
             )
-            for th in range(16-1,9-1,-1)]
+            for th in [16,15,14,13,12,11,10,9]]
         
         th_select_menu = DiscordSelectMenu(
             function=self._callback_dropdown_th_select,
