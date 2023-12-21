@@ -315,7 +315,7 @@ class BaseVaultMenu(DefaultView):
         if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
             embed3 = await eclipse_embed(
                 context=interaction,
-                message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name}.",
+                message=f"You don't have enough coins to claim this base. You need {price:,} {await bank.get_currency_name()}.",
                 success=True
                 )
         else:
@@ -445,7 +445,7 @@ class BaseVaultMenu(DefaultView):
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
             value=f"**You have claimed this base.\n\u200b**"
-                if self.user.id in show_base.claims else f"\nTo claim this Base to your Vault, use the {EmojisUI.DOWNLOAD} button. Claiming costs {calculate_price(show_base.town_hall)} {await bank.get_currency_name()}.\n\u200b",
+                if self.user.id in show_base.claims else f"\nTo claim this Base to your Vault, use the {EmojisUI.DOWNLOAD} button. Claiming costs {calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}.\n\u200b",
             inline=False
             )
         
