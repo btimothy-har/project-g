@@ -468,35 +468,35 @@ class PlayerProfileMenu(DefaultView):
             )
         
         if player.town_hall.level >= 8:
-            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Barbarian King']
+            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}" for e in player.equipment if e.hero == 'Barbarian King']
             embed.add_field(
                 name=f"**Barbarian King**",
                 value="\n".join(eq_list)+"\n\u200b",
-                inline=False
+                inline=True
                 )
         
         if player.town_hall.level >= 9:
-            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Archer Queen']
+            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}" for e in player.equipment if e.hero == 'Archer Queen']
             embed.add_field(
                 name=f"**Archer Queen**",
                 value="\n".join(eq_list)+"\n\u200b",
-                inline=False
+                inline=True
                 )
         
         if player.town_hall.level >= 11:
-            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Grand Warden']
+            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}" for e in player.equipment if e.hero == 'Grand Warden']
             embed.add_field(
                 name=f"**Grand Warden**",
                 value="\n".join(eq_list)+"\n\u200b",
-                inline=False
+                inline=True
                 )
         
         if player.town_hall.level >= 13:
-            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}\n" for e in player.equipment if e.hero == 'Royal Champion']
+            eq_list = [f"{EmojisEquipment.get(e.name)} {e.level} / {e.max_level}" for e in player.equipment if e.hero == 'Royal Champion']
             embed.add_field(
                 name=f"**Royal Champion**",
                 value="\n".join(eq_list)+"\n\u200b",
-                inline=False
+                inline=True
                 )
         return embed      
 
