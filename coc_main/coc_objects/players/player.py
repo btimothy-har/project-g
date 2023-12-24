@@ -175,6 +175,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
 
     @property
     def spells(self) -> List[aSpell]:
+        return []
         if not self._spells_cached:
             spells_ph = []
             for spell_name in SpellAvailability.return_all_unlocked(self.town_hall.level):
