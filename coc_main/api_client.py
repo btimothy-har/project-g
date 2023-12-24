@@ -679,16 +679,24 @@ async def clash_maintenance_complete(time_started):
 
 @coc.ClientEvents.new_season_start()
 async def end_of_trophy_season():
-    await asyncio.sleep(1800)
     client = BotClashClient()
+    client.coc_main_log.info(f"Running End of Trophy Season Rewards.")
+    await asyncio.sleep(1800)
+
     cog = client.bot.get_cog("Bank")
     if cog:
         await cog.member_legend_rewards()
+    
+    client.coc_main_log.info(f"Completed End of Trophy Season Rewards.")
 
 @coc.ClientEvents.clan_games_end()
 async def end_of_clan_games():
-    await asyncio.sleep(900)
     client = BotClashClient()
+    client.coc_main_log.info(f"Running End of Clan Games Rewards.")
+    await asyncio.sleep(900)
+
     cog = client.bot.get_cog("Bank")
     if cog:
         await cog.member_clan_games_rewards()
+    
+    client.coc_main_log.info(f"Completed End of Clan Games Rewards.")
