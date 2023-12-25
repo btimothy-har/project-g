@@ -148,5 +148,5 @@ class RaidResultsFeed(ClanDataFeed):
                 file = discord.File(fp,filename="raid_image.png")
                 return file
 
-            file = bot_client.run_in_thread(save_im,background)
+            file = await bot_client.run_in_thread(save_im,background)
             return file

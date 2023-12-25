@@ -235,7 +235,7 @@ class BasicClan(AwaitLoader):
         async with self._attributes._lock:
             self._attributes.league_clan_channel_id = channel.id
             self._attributes.league_clan_role_id = role.id
-            self.is_active_league_clan = self._attributes.is_active_league_clan = True
+            self._attributes.is_active_league_clan = True
 
             await bot_client.coc_db.db__war_league_clan_setup.update_one(
                 {'_id':self.tag},
@@ -256,7 +256,7 @@ class BasicClan(AwaitLoader):
         async with self._attributes._lock:
             self._attributes.league_clan_channel_id = 0
             self._attributes.league_clan_role_id = 0
-            self.is_active_league_clan = self._attributes.is_active_league_clan = False
+            self._attributes.is_active_league_clan = False
 
             await bot_client.coc_db.db__war_league_clan_setup.update_one(
                 {'_id':self.tag},
