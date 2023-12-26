@@ -260,8 +260,8 @@ class Bank(commands.Cog):
     async def _assistant_redeem_nitro(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."        
-        if getattr(guild,'id',0) != self.bot.bank_guild:
-            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        # if getattr(guild,'id',0) != self.bot.bank_guild:
+        #     return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
             user_id=user.id,
@@ -280,8 +280,8 @@ class Bank(commands.Cog):
         if not user:
             return "No user found."
         
-        if getattr(guild,'id',0) != self.bot.bank_guild:
-            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        # if getattr(guild,'id',0) != self.bot.bank_guild:
+        #     return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
             user_id=user.id,
