@@ -216,13 +216,10 @@ class Bank(commands.Cog):
             }
         return f"Do not change the currency text, return it as provided in the result. {user.display_name}'s bank account: {result_json}."
 
-    async def _assistant_get_member_inventory(self,bot:Red,user_id,*args,**kwargs) -> str:
-        try:
-            user = await bot.get_or_fetch_user(user_id)
-        except:
+    async def _assistant_get_member_inventory(self,user:discord.Member,*args,**kwargs) -> str:
+        bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
+        if not user:
             return "No user found."
-        
-        bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Inventory: {user.id}")
         inventory = await UserInventory(user)
 
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
