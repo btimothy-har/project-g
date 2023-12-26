@@ -277,7 +277,7 @@ class Bank(commands.Cog):
         await inventory.remove_item_from_inventory(item)
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
-    async def _assistant_redeem_goldpass(self,guild:discord.Guild,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."
         
@@ -296,6 +296,10 @@ class Bank(commands.Cog):
             goldpass_tag=redeem_tag
             )
         await inventory.remove_item_from_inventory(item)
+        embed = await ticket.get_embed()
+        m = await channel.send(embed=embed)
+        await channel.send(m.mentions)
+
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
     
     @commands.Cog.listener("on_guild_channel_create")
@@ -314,9 +318,7 @@ class Bank(commands.Cog):
         ticket = await RedemptionTicket.get_by_id(redemption_id)
         await ticket.update_channel(channel.id)
         embed = await ticket.get_embed()
-        m = await channel.send(embed=embed)
-
-        await channel.send(m.mentions)
+        await channel.send(embed=embed)
     
     @commands.Cog.listener("on_message")
     async def redemption_ticket_claim_listener(self,message:discord.Message):
