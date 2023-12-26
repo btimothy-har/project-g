@@ -219,7 +219,7 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. The account should be linked to the user's Discord Account.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Profile.",
                             "type": "string",
                             },
                         },
