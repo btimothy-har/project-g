@@ -205,7 +205,7 @@ class Bank(commands.Cog):
                             "type": "string",                            
                             },
                         "item_id": {
-                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Nitro item, prompt the user which item they want to redeem and provide that item's ID.",
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Nitro item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
                             "type": "string",                            
                             },
                         },

@@ -29,7 +29,7 @@ class InventoryItem(ShopItem):
 
     def to_json(self) -> dict:
         return {
-            'id': self.id,
+            '_id': self.id,
             'name': self.name,
             'description': self.description,
             'type': self.type,
