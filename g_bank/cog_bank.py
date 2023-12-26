@@ -201,11 +201,11 @@ class Bank(commands.Cog):
                     "type": "object",
                     "properties": {
                         "nitro_category": {
-                            "description": "The type of Nitro to redeem. Either `classic` or `basic`.",
+                            "description": "The type of Nitro to redeem. Either `classic` or `basic`. If ",
                             "type": "string",                            
                             },
                         "item_id": {
-                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one Discord Nitro item, ask which they would like to redeem and provide that item's ID.",
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Nitro item, prompt the user which item they want to redeem and provide that item's ID.",
                             "type": "string",                            
                             },
                         },
