@@ -191,15 +191,24 @@ class Bank(commands.Cog):
                 "description": "Gets a list of items in a user's inventory.",
                 "parameters": {
                     "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_redeem_nitro",
+                "description": "Allows a user to redeem Discord Nitro if they have it in their inventory.",
+                "parameters": {
+                    "type": "object",
                     "properties": {
-                        "user_id": {
-                            "type": "integer",
-                            "description": "The Discord ID of the user to get the inventory for.",
+                        "nitro_category": {
+                            "type": "string",
+                            "description": "The type of Nitro to redeem. Either `classic` or `basic`.",
                             },
                         },
-                    "required": ["user_id"],
+                    "required": ["nitro_category"],
                     },
-                }
+                },
+
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
 
@@ -217,12 +226,16 @@ class Bank(commands.Cog):
         return f"Do not change the currency text, return it as provided in the result. {user.display_name}'s bank account: {result_json}."
 
     async def _assistant_get_member_inventory(self,user:discord.Member,*args,**kwargs) -> str:
-        bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
+        bot_client.coc_main_log.info(f"Assistant: Bank: Get Inventory: {user.id}")
         if not user:
             return "No user found."
         inventory = await UserInventory(user)
-
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
+    
+    async def _assistant_redeem_nitro(self,user:discord.Member,nitro_category:str,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."
+        return f"The redemption ticket has been created for {nitro_category}."
 
     ############################################################
     #####
