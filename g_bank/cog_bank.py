@@ -73,7 +73,7 @@ class Bank(commands.Cog):
         self.bank_admins = []
         self._log_channel = 0
 
-        self._redm_log_channel = 1189120831880700014
+        self._redm_log_channel = 0 if self.bot.user.id == 1031240380487831664 else 1189120831880700014
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -257,50 +257,37 @@ class Bank(commands.Cog):
         inventory = await UserInventory(user)
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
     
-    async def _assistant_redeem_nitro(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_nitro(self,guild:discord.Guild,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
-            return "No user found."        
-        # if getattr(guild,'id',0) != self.bot.bank_guild:
-        #     return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+            return "No user found."    
+            
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
             user_id=user.id,
             item_id=item_id
             )
-        ticket_id = ticket.id
-        # while True:
-        #     await asyncio.sleep(0.5)
-        #     ticket = await RedemptionTicket.get_by_id(ticket_id)
-        #     if ticket.channel:
-        #         break
-        await channel.send(embed=await ticket.get_embed())
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
-    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_goldpass(self,guild:discord.Guild,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."
         
-        # if getattr(guild,'id',0) != self.bot.bank_guild:
-        #     return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
             user_id=user.id,
             item_id=item_id,
             goldpass_tag=redeem_tag
             )
-        ticket_id = ticket.id
-        # while True:
-        #     await asyncio.sleep(0.5)
-        #     ticket = await RedemptionTicket.get_by_id(ticket_id)
-        #     if ticket.channel:
-        #         break
-        await channel.send(embed=await ticket.get_embed())
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
     
     @commands.Cog.listener("on_guild_channel_create")
     async def redemption_ticket_listener(self,channel:discord.TextChannel):
         redemption_id = None
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
         
         async for message in channel.history(limit=1,oldest_first=True):
             for embed in message.embeds:

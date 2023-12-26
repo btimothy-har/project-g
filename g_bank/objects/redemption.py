@@ -6,6 +6,7 @@ import random
 
 from typing import *
 
+from redbot.core import commands
 from pymongo import ReturnDocument
 from collections import defaultdict
 from coc_main.api_client import BotClashClient
@@ -85,7 +86,7 @@ class RedemptionTicket():
         return guild.get_channel(self.channel_id) if self.channel_id else None
     
     @classmethod
-    async def create(cls,user_id:int,item_id:str,goldpass_tag:str=None):
+    async def create(cls,cog:commands.Cog,user_id:int,item_id:str,goldpass_tag:str=None):
         query = {
             'user_id': user_id,
             'item_id': item_id,
@@ -94,7 +95,19 @@ class RedemptionTicket():
             }
         new_ticket = await bot_client.coc_db.db__redemption.insert_one(query)
 
-        ticket = await cls.get_by_id(str(new_ticket.inserted_id))        
+        ticket_id = str(new_ticket.inserted_id)
+        await cog.redemption_log_channel.send(f"--ticket {ticket_id} {user_id}")
+
+        count = 0
+        while True:
+            count += 1
+            await asyncio.sleep(0.2)
+            ticket = await RedemptionTicket.get_by_id(ticket_id)
+            if ticket.channel:
+                break
+            if count > 20:
+                break
+
         bot_client.coc_main_log.info(f"New redemption ticket: {ticket.id}")
         return ticket
 
