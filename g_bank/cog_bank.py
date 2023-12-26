@@ -177,15 +177,31 @@ class Bank(commands.Cog):
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
-        schema = {
-            "name": "_assistant_get_member_balance",
-            "description": "Gets a user's bank balance in the Guild Bank.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
+        schemas = [
+            {
+                "name": "_assistant_get_member_balance",
+                "description": "Gets a user's bank balance in the Guild Bank.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
                 },
-            }
-        await cog.register_function(cog_name="Bank", schema=schema)
+            {
+                "name": "_assistant_get_member_inventory",
+                "description": "Gets a list of items in a user's inventory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_id": {
+                            "type": "integer",
+                            "description": "The Discord ID of the user to get the inventory for.",
+                            },
+                        },
+                    "required": ["user_id"],
+                    },
+                }
+            ]
+        await cog.register_functions(cog_name="Bank", schemas=schemas)
 
     async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
         bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
@@ -198,8 +214,18 @@ class Bank(commands.Cog):
             'balance': balance,
             'currency': await bank.get_currency_name(),
             }
-
         return f"Do not change the currency text, return it as provided in the result. {user.display_name}'s bank account: {result_json}."
+
+    async def _assistant_get_member_inventory(self,bot:Red,user_id,*args,**kwargs) -> str:
+        try:
+            user = await bot.get_or_fetch_user(user_id)
+        except:
+            return "No user found."
+        
+        bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Inventory: {user.id}")
+        inventory = await UserInventory(user)
+
+        return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
 
     ############################################################
     #####
