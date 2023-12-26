@@ -73,11 +73,15 @@ class RedemptionTicket():
     @property
     def user(self) -> Optional[discord.Member]:
         guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
+        if not guild:
+            return None
         return guild.get_member(self.user_id)
     
     @property
     def channel(self) -> Optional[discord.TextChannel]:
         guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
+        if not guild:
+            return None
         return guild.get_channel(self.channel_id) if self.channel_id else None
     
     @classmethod
