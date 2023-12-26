@@ -274,7 +274,7 @@ class Bank(commands.Cog):
         #     if ticket.channel:
         #         break
         await channel.send(embed=await ticket.get_embed())
-        return f"Your redemption ticket has been created: {ticket.channel.mention}."
+        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
     async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         if not user:
@@ -295,7 +295,7 @@ class Bank(commands.Cog):
         #     if ticket.channel:
         #         break
         await channel.send(embed=await ticket.get_embed())
-        return f"Your redemption ticket has been created: {ticket.channel.mention}."
+        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
     
     @commands.Cog.listener("on_guild_channel_create")
     async def redemption_ticket_listener(self,channel:discord.TextChannel):
