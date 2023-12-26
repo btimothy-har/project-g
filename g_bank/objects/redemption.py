@@ -105,7 +105,7 @@ class RedemptionTicket():
         return await ShopItem.get_by_id(self.item_id)
     
     async def get_embed(self):
-        gp_account = await self.coc_client.get_player(self.goldpass_tag) if self.goldpass_tag else None
+        gp_account = await self.coc_client.fetch_player(self.goldpass_tag) if self.goldpass_tag else None
         item = await self.get_item()
 
         embed = await clash_embed(
