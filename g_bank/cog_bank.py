@@ -201,15 +201,15 @@ class Bank(commands.Cog):
                     "type": "object",
                     "properties": {
                         "nitro_category": {
-                            "type": "string",
                             "description": "The type of Nitro to redeem. Either `classic` or `basic`.",
+                            "type": "string",                            
                             },
                         "item_id": {
-                            "type": "string",
                             "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID.",
+                            "type": "string",                            
                             },
                         },
-                    "required": ["nitro_category"],
+                    "required": ["nitro_category","item_id"],
                     },
                 },
 
@@ -239,7 +239,7 @@ class Bank(commands.Cog):
     async def _assistant_redeem_nitro(self,user:discord.Member,nitro_category:str,item_id:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."
-        return f"The redemption ticket has been created for {nitro_category}."
+        return f"The redemption ticket has been created for {nitro_category}. {item_id}"
 
     ############################################################
     #####
