@@ -196,20 +196,34 @@ class Bank(commands.Cog):
                 },
             {
                 "name": "_assistant_redeem_nitro",
-                "description": "Allows a user to redeem Discord Nitro if they have it in their inventory.",
+                "description": "Allows a user to redeem Discord Nitro if they have the associated item in their inventory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "nitro_category": {
-                            "description": "The type of Nitro to redeem. Either `classic` or `basic`. If ",
-                            "type": "string",                            
-                            },
                         "item_id": {
                             "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Nitro item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
                             "type": "string",                            
                             },
                         },
-                    "required": ["nitro_category","item_id"],
+                    "required": ["item_id"],
+                    },
+                },
+            {
+                "name": "_assistant_redeem_goldpass",
+                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "item_id": {
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Gold Pass item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
+                            "type": "string",
+                            },
+                        "redeem_tag": {
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. The account should be linked to the user's Discord Account.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["item_id","redeem_tag"],
                     },
                 },
 
@@ -236,10 +250,15 @@ class Bank(commands.Cog):
         inventory = await UserInventory(user)
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
     
-    async def _assistant_redeem_nitro(self,user:discord.Member,nitro_category:str,item_id:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_nitro(self,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."
-        return f"The redemption ticket has been created for {nitro_category}. {item_id}"
+        return f"The redemption ticket has been created for {item_id}."
+
+    async def _assistant_redeem_goldpass(self,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."
+        return f"The redemption ticket has been created for {item_id} {redeem_tag}."
 
     ############################################################
     #####
