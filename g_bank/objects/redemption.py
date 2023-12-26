@@ -73,6 +73,7 @@ class RedemptionTicket():
     
     @property
     def user(self) -> Optional[discord.Member]:
+        return bot_client.bot.get_user(self.user_id)
         guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
         if not guild:
             return None
@@ -80,6 +81,7 @@ class RedemptionTicket():
     
     @property
     def channel(self) -> Optional[discord.TextChannel]:
+        return bot_client.bot.get_channel(self.channel_id)
         guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
         if not guild:
             return None
@@ -118,6 +120,17 @@ class RedemptionTicket():
             )
         self.channel_id = channel_id
     
+    async def complete_redemption(self,user_id:int):
+        await bot_client.coc_db.db__redemption.update_one(
+            {'_id':self._id},
+            {'$set':{
+                'close_user': user_id,
+                'close_timestamp': pendulum.now().int_timestamp,
+                }},
+            )
+        self.close_user = user_id
+        self.close_timestamp = pendulum.now().int_timestamp
+    
     async def get_item(self) -> Optional[ShopItem]:
         return await ShopItem.get_by_id(self.item_id)
     
@@ -134,10 +147,9 @@ class RedemptionTicket():
             timestamp=self.open_timestamp,
             )
         embed.add_field(
-            name="Redeem Item:",
+            name=f"Redeeming: {item.name}",
             value=f"`{self.item_id}`"
-                + f"\n**{item.name}**"
                 + f"\n{item.description}",
-            inline=False,
+            inline=True,
             )
         return embed

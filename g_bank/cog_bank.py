@@ -264,11 +264,17 @@ class Bank(commands.Cog):
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
+        item = await ShopItem.get_by_id(item_id)
+        inventory = await UserInventory(user)
+        if not inventory.has_item(item):
+            return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
+
         ticket = await RedemptionTicket.create(
             self,
             user_id=user.id,
             item_id=item_id
             )
+        await inventory.remove_item_from_inventory(item)
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
     async def _assistant_redeem_goldpass(self,guild:discord.Guild,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
@@ -278,16 +284,22 @@ class Bank(commands.Cog):
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
+        item = await ShopItem.get_by_id(item_id)
+        inventory = await UserInventory(user)
+        if not inventory.has_item(item):
+            return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
+        
         ticket = await RedemptionTicket.create(
             self,
             user_id=user.id,
             item_id=item_id,
             goldpass_tag=redeem_tag
             )
+        await inventory.remove_item_from_inventory(item)
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
     
     @commands.Cog.listener("on_guild_channel_create")
-    async def redemption_ticket_listener(self,channel:discord.TextChannel):
+    async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
         redemption_id = None
         await asyncio.sleep(1)
         
@@ -302,7 +314,32 @@ class Bank(commands.Cog):
         ticket = await RedemptionTicket.get_by_id(redemption_id)
         await ticket.update_channel(channel.id)
         embed = await ticket.get_embed()
-        await channel.send(embed=embed)
+        m = await channel.send(embed=embed)
+
+        await channel.send(m.mentions)
+    
+    @commands.Cog.listener("on_message")
+    async def redemption_ticket_claim_listener(self,message:discord.Message):
+        if not message.guild:
+            return        
+        if message.guild.id != self.bot.bank_guild:
+            return        
+        if len(message.embeds) == 0:
+            return
+        
+        redemption_id = None
+        async for message in message.channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Redemption ID":                    
+                    redemption_id = embed.description
+                    break
+        if not redemption_id:
+            return
+        
+        # ticket = await RedemptionTicket.get_by_id(redemption_id)
+        # await ticket.update_channel(channel.id)
+        # embed = await ticket.get_embed()
+        # await channel.send(embed=embed)
 
     ############################################################
     #####

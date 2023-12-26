@@ -55,7 +55,7 @@ class UserInventory(AwaitLoader):
         self.inventory = []
     
     def _assistant_json(self) -> List[dict]:
-        return [i.to_json() for i in self.inventory]
+        return [i.to_json() for i in self.inventory if i.type in ['cash']]
     
     async def load(self):
         query = await bot_client.coc_db.db__user_inventory.find_one({'_id':self.user.id})
