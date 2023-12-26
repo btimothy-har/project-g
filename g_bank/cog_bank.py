@@ -34,6 +34,7 @@ from coc_main.utils.autocomplete import autocomplete_clans_coleader
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
 from .objects.item import ShopItem
+from .objects.redemption import RedemptionTicket
 from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
@@ -63,6 +64,7 @@ class Bank(commands.Cog):
 
     def __init__(self,bot:Red):
         self.bot = bot
+        self.bot.bank_guild = 1132581106571550831
 
         self.bot.coc_bank_path = f"{cog_data_path(self)}/reports"
         if not os.path.exists(self.bot.coc_bank_path):
@@ -70,6 +72,8 @@ class Bank(commands.Cog):
 
         self.bank_admins = []
         self._log_channel = 0
+
+        self._redm_log_channel = 1189120831880700014
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -128,6 +132,10 @@ class Bank(commands.Cog):
     @property
     def log_channel(self) -> discord.TextChannel:
         return self.bot.get_channel(self._log_channel)
+    
+    @property
+    def redemption_log_channel(self) -> discord.TextChannel:
+        return self.bot.get_channel(self._redm_log_channel)
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -219,14 +227,13 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Profile.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Account.",
                             "type": "string",
                             },
                         },
                     "required": ["item_id","redeem_tag"],
                     },
                 },
-
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
 
@@ -250,15 +257,63 @@ class Bank(commands.Cog):
         inventory = await UserInventory(user)
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
     
-    async def _assistant_redeem_nitro(self,user:discord.Member,item_id:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_nitro(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
-            return "No user found."
-        return f"The redemption ticket has been created for {item_id}."
+            return "No user found."        
+        if getattr(guild,'id',0) != self.bot.bank_guild:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        
+        ticket = await RedemptionTicket.create(
+            user_id=user.id,
+            item_id=item_id
+            )
+        ticket_id = ticket.id
+        while True:
+            await asyncio.sleep(0.5)
+            ticket = await RedemptionTicket.get_by_id(ticket_id)
+            if ticket.channel:
+                break
+        await channel.send(embed=await ticket.get_embed())
+        return f"Your redemption ticket has been created: {ticket.channel.mention}."
 
-    async def _assistant_redeem_goldpass(self,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."
-        return f"The redemption ticket has been created for {item_id} {redeem_tag}."
+        
+        if getattr(guild,'id',0) != self.bot.bank_guild:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        
+        ticket = await RedemptionTicket.create(
+            user_id=user.id,
+            item_id=item_id,
+            goldpass_tag=redeem_tag
+            )
+        ticket_id = ticket.id
+        while True:
+            await asyncio.sleep(0.5)
+            ticket = await RedemptionTicket.get_by_id(ticket_id)
+            if ticket.channel:
+                break
+        await channel.send(embed=await ticket.get_embed())
+        return f"Your redemption ticket has been created: {ticket.channel.mention}."
+    
+    @commands.Cog.listener("on_guild_channel_create")
+    async def redemption_ticket_listener(self,channel:discord.TextChannel):
+        redemption_id = None
+        await asyncio.sleep(2)
+        
+        async for message in channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Redemption ID":                    
+                    redemption_id = embed.description
+                    break
+
+        if not redemption_id:
+            return        
+        ticket = await RedemptionTicket.get_by_id(redemption_id)
+        await ticket.update_channel(channel.id)
+        embed = await ticket.get_embed()
+        await channel.send(embed=embed)
 
     ############################################################
     #####

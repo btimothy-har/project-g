@@ -186,8 +186,7 @@ class ClashOfClansTasks(commands.Cog):
                     application_id = embed.description
                     break
         if not application_id:
-            return
-        
+            return        
         await listener_user_application(channel, application_id)
     
     ############################################################
