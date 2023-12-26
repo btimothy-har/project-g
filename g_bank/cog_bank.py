@@ -268,11 +268,11 @@ class Bank(commands.Cog):
             item_id=item_id
             )
         ticket_id = ticket.id
-        while True:
-            await asyncio.sleep(0.5)
-            ticket = await RedemptionTicket.get_by_id(ticket_id)
-            if ticket.channel:
-                break
+        # while True:
+        #     await asyncio.sleep(0.5)
+        #     ticket = await RedemptionTicket.get_by_id(ticket_id)
+        #     if ticket.channel:
+        #         break
         await channel.send(embed=await ticket.get_embed())
         return f"Your redemption ticket has been created: {ticket.channel.mention}."
 
@@ -289,11 +289,11 @@ class Bank(commands.Cog):
             goldpass_tag=redeem_tag
             )
         ticket_id = ticket.id
-        while True:
-            await asyncio.sleep(0.5)
-            ticket = await RedemptionTicket.get_by_id(ticket_id)
-            if ticket.channel:
-                break
+        # while True:
+        #     await asyncio.sleep(0.5)
+        #     ticket = await RedemptionTicket.get_by_id(ticket_id)
+        #     if ticket.channel:
+        #         break
         await channel.send(embed=await ticket.get_embed())
         return f"Your redemption ticket has been created: {ticket.channel.mention}."
     
