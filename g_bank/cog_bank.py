@@ -196,7 +196,7 @@ class Bank(commands.Cog):
                 },
             {
                 "name": "_assistant_redeem_nitro",
-                "description": "Allows a user to redeem Discord Nitro if they have it in their inventory. If a user has more than one Discord Nitro item, always ask which they would like to redeem.",
+                "description": "Allows a user to redeem Discord Nitro if they have it in their inventory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -205,7 +205,7 @@ class Bank(commands.Cog):
                             "type": "string",                            
                             },
                         "item_id": {
-                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID.",
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one Discord Nitro item, ask which they would like to redeem and provide that item's ID.",
                             "type": "string",                            
                             },
                         },
