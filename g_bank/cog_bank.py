@@ -265,6 +265,7 @@ class Bank(commands.Cog):
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
+            self,
             user_id=user.id,
             item_id=item_id
             )
@@ -278,6 +279,7 @@ class Bank(commands.Cog):
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
         
         ticket = await RedemptionTicket.create(
+            self,
             user_id=user.id,
             item_id=item_id,
             goldpass_tag=redeem_tag
