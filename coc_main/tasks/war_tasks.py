@@ -38,8 +38,13 @@ class DefaultWarTasks():
     async def _war_found(clan:aClan,war:aClanWar):
         try:
             await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
+
+            if clan.is_active_league_clan and war.type == ClanWarType.CWL:
+                return
             
-            war_clan = war.get_clan(clan.tag)            
+            war_clan = war.get_clan(clan.tag)
+            opponent = war.get_opponent(clan.tag)
+            
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             if clan_links and len(clan_links) > 0:
                 link_iter = AsyncIter(clan_links)
@@ -54,7 +59,10 @@ class DefaultWarTasks():
                     async for m in m_iter:
                         user = link.guild.get_member(m.discord_user)
                         if user and link.clan_war_role not in user.roles:
-                            await user.add_roles(link.clan_war_role)
+                            await user.add_roles(
+                                link.clan_war_role,
+                                reason=f"War Found: {clan.name} vs {opponent.name}"
+                                )
 
         except asyncio.CancelledError:
             return
@@ -71,7 +79,12 @@ class DefaultWarTasks():
                     text=f"{clan.abbreviation} declare war!"
                     )
             
-            war_clan = war.get_clan(clan.tag)            
+            if clan.is_active_league_clan and war.type == ClanWarType.CWL:
+                return
+            
+            war_clan = war.get_clan(clan.tag)
+            opponent = war.get_opponent(clan.tag)
+
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             if clan_links and len(clan_links) > 0:
                 link_iter = AsyncIter(clan_links)
@@ -83,7 +96,10 @@ class DefaultWarTasks():
                     async for m in m_iter:
                         user = link.guild.get_member(m.discord_user)
                         if user and link.clan_war_role not in user.roles:
-                            await user.add_roles(link.clan_war_role)
+                            await user.add_roles(
+                                link.clan_war_role,
+                                reason=f"War Start: {clan.name} vs {opponent.name}"
+                                )
 
         except asyncio.CancelledError:
             return
