@@ -193,6 +193,9 @@ class RecruitingReminder():
     async def send_reminder(self):
         now = pendulum.now()
         send = False
+        if self.lock.locked():
+            return None
+        
         async with self.lock:
             if self.last_posted is None:
                 send = True
@@ -254,7 +257,7 @@ class RecruitingReminder():
                     view=view
                     )
                 await self.update_active_reminder(msg.id)
-            
+
             bot_client.coc_main_log.info(f"Refreshed Recruiting Reminder for {self.ad_name}.")
 
 class RecruitingPostPrompt(discord.ui.View):
