@@ -109,6 +109,14 @@ class RecruitingReminder():
             return self.last_posted.add(minutes=self.interval)
         return self.last_posted.add(hours=self.interval)
     
+    async def fetch_message(self) -> Optional[discord.Message]:
+        if self.channel and self.active_reminder:
+            try:
+                return await self.channel.fetch_message(self.active_reminder)
+            except discord.NotFound:
+                pass
+        return None
+    
     ##################################################
     ### CREATE / DELETE
     ##################################################
@@ -160,14 +168,12 @@ class RecruitingReminder():
         async with self.lock:
             try:
                 if self.active_reminder:
-                    webhook = await get_bot_webhook(bot_client.bot,self.channel)
-                    if isinstance(self.channel,discord.Thread):
-                        await webhook.delete_message(
-                            self.active_reminder,
-                            thread=self.channel
-                            )
-                    else:
-                        await webhook.delete_message(self.active_reminder)
+                    msg = await self.fetch_message()
+                    if msg:
+                        try:
+                            await msg.delete()
+                        except:
+                            pass
                 self.is_active = False
             except:
                 pass
@@ -205,26 +211,11 @@ class RecruitingReminder():
                 post_embed = await self.embed()
                 view = RecruitingPostPrompt(self.id)
 
-                webhook = await get_bot_webhook(bot_client.bot,self.channel)
-                if isinstance(self.channel,discord.Thread):
-                    msg = await webhook.send(
-                        wait=True,
-                        username=bot_client.bot.user.name,
-                        avatar_url=bot_client.bot.user.display_avatar.url,
-                        content=getattr(self.remind_user,'mention',''),
-                        embed=post_embed,
-                        view=view,
-                        thread=self.channel,
-                        )
-                else:
-                    msg = await webhook.send(
-                        wait=True,
-                        username=bot_client.bot.user.name,
-                        avatar_url=bot_client.bot.user.display_avatar.url,
-                        content=getattr(self.remind_user,'mention',''),
-                        embed=post_embed,
-                        view=view,
-                        )
+                msg = await self.channel.send(
+                    content=getattr(self.remind_user,'mention',''),
+                    embed=post_embed,
+                    view=view
+                    )
                 await self.update_active_reminder(msg.id)
                 bot_client.coc_main_log.info(f"Recruiting Reminder sent for {self.ad_name}.")
         
@@ -248,22 +239,22 @@ class RecruitingReminder():
             post_embed = await self.embed()
             view = RecruitingPostPrompt(self.id)
 
-            webhook = await get_bot_webhook(bot_client.bot,self.channel)
-            if isinstance(self.channel,discord.Thread):
-                await webhook.edit_message(
-                    message_id=self.active_reminder,
-                    content=getattr(self.remind_user,'mention',''),
-                    embed=post_embed,
-                    view=view,
-                    thread=self.channel
-                    )
-            else:
-                await webhook.edit_message(
-                    message_id=self.active_reminder,
+            msg = await self.fetch_message()
+            if not msg:
+                return
+            try:
+                await msg.edit(
                     content=getattr(self.remind_user,'mention',''),
                     embed=post_embed,
                     view=view
                     )
+            except:
+                msg = await self.channel.send(
+                    content=getattr(self.remind_user,'mention',''),
+                    embed=post_embed,
+                    view=view
+                    )
+                await self.update_active_reminder(msg.id)
 
 class RecruitingPostPrompt(discord.ui.View):
     def __init__(self,post_id:str):
