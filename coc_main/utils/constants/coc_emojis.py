@@ -26,6 +26,7 @@ class EmojisClash:
     DESTRUCTION = "<:destruction:1112279414223425586>"
     CAPITALTROPHY = "<:capital_trophy:1079625435001933865>"
     WARLEAGUETROPHY = "<:war_league_trophy:1126180852326481921>"
+    GOLDPASS = "<:GoldPass:834093287106674698>"
 
 class EmojisTownHall:
     TH1 = "<:01:1037000998566240256>"

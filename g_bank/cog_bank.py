@@ -34,6 +34,7 @@ from coc_main.utils.autocomplete import autocomplete_clans_coleader
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
 from .objects.item import ShopItem
+from .objects.redemption import RedemptionTicket
 from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
@@ -69,7 +70,12 @@ class Bank(commands.Cog):
             os.makedirs(self.bot.coc_bank_path)
 
         self.bank_admins = []
+        self._bank_guild = 1132581106571550831 if self.bot.user.id == 1031240380487831664 else 680798075685699691
+
         self._log_channel = 0
+
+        self._redm_log_channel = 1189491279449575525 if self.bot.user.id == 1031240380487831664 else 1189120831880700014
+        self._bank_admin_role = 1189481989984751756 if self.bot.user.id == 1031240380487831664 else 1123175083272327178
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -84,7 +90,6 @@ class Bank(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
     
     async def cog_load(self):
-        self.bank_admins = await self.config.admins()
         try:
             self.use_rewards = await self.config.use_rewards()
         except:
@@ -94,6 +99,7 @@ class Bank(commands.Cog):
         except:
             self._log_channel = 0
 
+        self.bank_admins = await self.config.admins()
         asyncio.create_task(self.start_cog())
     
     async def start_cog(self):
@@ -101,6 +107,15 @@ class Bank(commands.Cog):
             if getattr(bot_client,'_is_initialized',False):
                 break
             await asyncio.sleep(1)
+        
+        u_iter = AsyncIter(self.bank_admins)
+        async for user_id in u_iter:
+            guild_user = self.bank_guild.get_member(user_id)
+            if not guild_user:
+                continue
+            admin_role = self.bank_guild.get_role(self._bank_admin_role)
+            if admin_role and admin_role not in guild_user.roles:
+                await guild_user.add_roles(admin_role)
 
         self.current_account = await MasterAccount('current')
         self.sweep_account = await MasterAccount('sweep')
@@ -124,10 +139,18 @@ class Bank(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return self.bot.get_cog("ClashOfClansClient")
+    
+    @property
+    def bank_guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self._bank_guild)
 
     @property
-    def log_channel(self) -> discord.TextChannel:
+    def log_channel(self) -> Optional[discord.TextChannel]:
         return self.bot.get_channel(self._log_channel)
+    
+    @property
+    def redemption_log_channel(self) -> discord.TextChannel:
+        return self.bot.get_channel(self._redm_log_channel)
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -177,15 +200,57 @@ class Bank(commands.Cog):
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
-        schema = {
-            "name": "_assistant_get_member_balance",
-            "description": "Gets a user's bank balance in the Guild Bank.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
+        schemas = [
+            {
+                "name": "_assistant_get_member_balance",
+                "description": "Gets a user's bank balance in the Guild Bank.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
                 },
-            }
-        await cog.register_function(cog_name="Bank", schema=schema)
+            {
+                "name": "_assistant_get_member_inventory",
+                "description": "Gets a list of items in a user's inventory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_redeem_nitro",
+                "description": "Allows a user to redeem Discord Nitro if they have the associated item in their inventory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "item_id": {
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Nitro item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
+                            "type": "string",                            
+                            },
+                        },
+                    "required": ["item_id"],
+                    },
+                },
+            {
+                "name": "_assistant_redeem_goldpass",
+                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "item_id": {
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Gold Pass item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
+                            "type": "string",
+                            },
+                        "redeem_tag": {
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Account.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["item_id","redeem_tag"],
+                    },
+                },
+            ]
+        await cog.register_functions(cog_name="Bank", schemas=schemas)
 
     async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
         bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
@@ -198,8 +263,109 @@ class Bank(commands.Cog):
             'balance': balance,
             'currency': await bank.get_currency_name(),
             }
-
         return f"Do not change the currency text, return it as provided in the result. {user.display_name}'s bank account: {result_json}."
+
+    async def _assistant_get_member_inventory(self,user:discord.Member,*args,**kwargs) -> str:
+        bot_client.coc_main_log.info(f"Assistant: Bank: Get Inventory: {user.id}")
+        if not user:
+            return "No user found."
+        inventory = await UserInventory(user)
+        return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
+    
+    async def _assistant_redeem_nitro(self,guild:discord.Guild,user:discord.Member,item_id:str,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."    
+            
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+        
+        item = await ShopItem.get_by_id(item_id)
+        inventory = await UserInventory(user)
+        if not inventory.has_item(item):
+            return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
+
+        ticket = await RedemptionTicket.create(
+            self,
+            user_id=user.id,
+            item_id=item_id
+            )
+        await inventory.remove_item_from_inventory(item)
+        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
+
+    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+        if not user:
+            return "No user found."
+        
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+        
+        item = await ShopItem.get_by_id(item_id)
+        inventory = await UserInventory(user)
+        if not inventory.has_item(item):
+            return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
+        
+        ticket = await RedemptionTicket.create(
+            self,
+            user_id=user.id,
+            item_id=item_id,
+            goldpass_tag=redeem_tag
+            )
+        embed = await ticket.get_embed()
+        m = await channel.send(embed=embed)
+        await channel.send(m.mentions)
+
+        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
+    
+    @commands.Cog.listener("on_guild_channel_create")
+    async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
+        redemption_id = None
+        await asyncio.sleep(1)
+        
+        async for message in channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Redemption ID":                    
+                    redemption_id = embed.description
+                    break
+
+        if not redemption_id:
+            return        
+        ticket = await RedemptionTicket.get_by_id(redemption_id)
+        await ticket.update_channel(channel.id)
+        embed = await ticket.get_embed()
+        await channel.send(embed=embed)
+    
+    @commands.Cog.listener("on_message")
+    async def redemption_ticket_claim_listener(self,message:discord.Message):
+        if not message.guild:
+            return        
+        if message.guild.id != self.bank_guild.id:
+            return
+        
+        redemption_id = None
+        async for message in message.channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Redemption ID":                    
+                    redemption_id = embed.description
+                    break
+        if not redemption_id:
+            return
+        
+        ticket = await RedemptionTicket.get_by_id(redemption_id)
+        inventory = await UserInventory(message.guild.get_member(ticket.user_id))
+        item = await ShopItem.get_by_id(ticket.item_id)
+        
+        if message.author.id == 722196398635745312:
+            if message.content.startswith("Redemption completed by:"):
+                if len(message.mentions) == 0:
+                    return await message.reply(f"Could not find a completing user. Please try again.")
+
+                redemption_user = message.mentions[0].id                
+                await ticket.complete_redemption(redemption_user)
+                await inventory.remove_item_from_inventory(item)
+            
+            if message.content.startswith("Redemption ticket re-opened."):
+                await ticket.reverse_redemption()
+                await inventory.add_item_to_inventory(item)
 
     ############################################################
     #####
@@ -671,15 +837,6 @@ class Bank(commands.Cog):
         guild_only=True
         )
     
-    @commands.command(name="runtax")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_run_tax(self,ctx:commands.Context):
-        await ctx.tick()
-        await self.apply_bank_taxes()
-        await self.month_end_sweep()
-        await ctx.reply("Taxes have been applied and the month-end sweep has been completed.")
-    
     ##################################################
     ### BALANCE
     ##################################################
@@ -868,11 +1025,17 @@ class Bank(commands.Cog):
         """
         
         if member.id in self.bank_admins:
-            return await ctx.reply(f"{member.display_name} is already a Bank Admin.")
+            return await ctx.reply(f"{member.mention} is already a Bank Admin.")
         
         self.bank_admins.append(member.id)
-        await ctx.reply(f"{member.display_name} is now a Bank Admin.")
-        await self.config.admins.set(self.bank_admins)        
+        await ctx.reply(f"{member.mention} is now a Bank Admin.")
+
+        admin_role = self.bank_guild.get_role(self._bank_admin_role)
+        if admin_role and admin_role not in member.roles:
+            await member.add_roles(admin_role)
+
+        await self.config.admins.set(self.bank_admins)
+        await ctx.tick()
     
     ##################################################
     ### BANK / DELADMIN
@@ -886,11 +1049,17 @@ class Bank(commands.Cog):
         """
         
         if member.id not in self.bank_admins:
-            return await ctx.reply(f"{member.display_name} is not a Bank Admin.")            
+            return await ctx.reply(f"{member.mention} is not a Bank Admin.")            
         
         self.bank_admins.remove(member.id)
-        await ctx.reply(f"{member.display_name} is no longer a Bank Admin.")
-        await self.config.admins.set(self.bank_admins)        
+        await ctx.reply(f"{member.mention} is no longer a Bank Admin.")
+
+        admin_role = self.bank_guild.get_role(self._bank_admin_role)
+        if admin_role and admin_role in member.roles:
+            await member.remove_roles(admin_role)
+
+        await self.config.admins.set(self.bank_admins)
+        await ctx.tick()
     
     ##################################################
     ### BANK / SHOWADMIN
@@ -1570,66 +1739,6 @@ class Bank(commands.Cog):
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
-
-    ##################################################
-    ### USER REDEEM
-    ##################################################
-    @commands.command(name="redeem")
-    @commands.guild_only()
-    async def command_item_redeem(self,ctx:commands.Context):
-        """
-        Redeems an item from your inventory!
-        """
-
-        inv = await UserInventory(ctx.author)
-        inv_check = len([i for i in inv.inventory if i.guild_id == ctx.guild.id]) > 0
-
-        if not inv_check:
-            return await ctx.reply("You don't have any items to redeem from this server.")
-        
-        # Assassins Guild
-        if ctx.guild.id == 1132581106571550831:
-            role = ctx.guild.get_role(1163325808941727764)
-            await ctx.author.add_roles(role)
-            return await ctx.reply(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
-        
-        # ARIX
-        if ctx.guild.id == 688449973553201335:
-            role = ctx.guild.get_role(1163327086262485094)
-            await ctx.author.add_roles(role)
-            return await ctx.reply(f"Please open a ticket in <#798930079111053372> to redeem your item!")
-
-        return await ctx.reply("This server doesn't have a redeemable item.")
-
-    @app_commands.command(
-        name="redeem",
-        description="Redeems an item from your inventory!"
-        )
-    @app_commands.guild_only()
-    async def app_command_redeem_user(self,interaction:discord.Interaction):        
-        
-        await interaction.response.defer()
-        member = interaction.guild.get_member(interaction.user.id)
-
-        inv = await UserInventory(member)
-        inv_check = len([i for i in inv.inventory if i.guild_id == interaction.guild.id]) > 0
-
-        if not inv_check:
-            return await interaction.followup.send("You don't have any items to redeem from this server.")
-        
-        # Assassins Guild
-        if interaction.guild.id == 1132581106571550831:
-            role = interaction.guild.get_role(1163325808941727764)
-            await member.add_roles(role)
-            return await interaction.followup.send(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
-        
-        # ARIX
-        if interaction.guild.id == 688449973553201335:
-            role = interaction.guild.get_role(1163327086262485094)
-            await member.add_roles(role)
-            return await interaction.followup.send(f"Please open a ticket in <#798930079111053372> to redeem your item!")
-        
-        return await interaction.followup.send("This server doesn't have a redeemable item.")
     
     ##################################################
     ### SHOP ITEM GROUP

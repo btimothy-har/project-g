@@ -1,6 +1,7 @@
 import asyncio
 import pendulum
 import copy
+import coc
 
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
@@ -13,8 +14,10 @@ from ..exceptions import InvalidTag, ClashAPIError
 
 from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
+from ..discord.member import aMember
 from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
+from ..discord.clan_link import ClanGuildLink
 
 bot_client = client()
 default_sleep = 60
@@ -33,12 +36,80 @@ class ClanTasks():
         return bot_client.bot.get_cog('ClashOfClansClient')
     
     @staticmethod
-    async def clan_member_join(member:aPlayer,clan:aClan):
-        await ClanMemberFeed.member_join(clan,member)
+    async def member_join_visitor_role(player:coc.ClanMember,clan:aClan):
+        bot_client.coc_main_log.info(f"Checking Visitor Role for Joining {clan.name}: {player.name} ({player.tag})")
+
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(player.tag)
+
+        if n_player.discord_user:
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                async for link in link_iter:
+                    if not link.guild:
+                        continue
+                    if not link.visitor_role:
+                        continue
+                    
+                    discord_user = link.guild.get_member(n_player.discord_user)
+                    if not discord_user:
+                        continue
+
+                    bot_client.coc_main_log.info(f"{link.guild.name} Checking Visitor Role for Joining {clan.name}: {player.name} ({player.tag})")
+
+                    member = await aMember(discord_user.id,link.guild.id)
+                    await member.load()
+
+                    if clan.tag not in [c.tag for c in member.home_clans]:
+                        await discord_user.add_roles(
+                            link.visitor_role,
+                            reason=f"Joined {clan.name}: {n_player.name} ({n_player.tag})"
+                            )
 
     @staticmethod
-    async def clan_member_leave(member:aPlayer,clan:aClan):
-        await ClanMemberFeed.member_leave(clan,member)
+    async def clan_member_join(player:coc.ClanMember,clan:aClan):    
+        await ClanMemberFeed.member_join(clan,player)
+
+    @staticmethod
+    async def member_leave_visitor_role(player:coc.ClanMember,clan:aClan):
+        bot_client.coc_main_log.info(f"Checking Visitor Role for Leaving {clan.name}: {player.name} ({player.tag})")
+
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(player.tag)
+
+        if n_player.discord_user:
+            member = await aMember(n_player.discord_user)
+            await member.load()
+
+            member_accounts = await client.fetch_many_players(member.account_tags)            
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+            
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                async for link in link_iter:
+                    if not link.guild:
+                        continue
+                    if not link.visitor_role:
+                        continue
+
+                    discord_user = link.guild.get_member(n_player.discord_user)
+                    if not discord_user:
+                        continue
+
+                    bot_client.coc_main_log.info(f"{link.guild.name} Checking Visitor Role for Leaving {clan.name}: {player.name} ({player.tag})")
+                    all_clans = [a.clan for a in member_accounts if a.clan]
+
+                    if clan.tag not in [c.tag for c in all_clans] and link.visitor_role in discord_user.roles:                    
+                        await discord_user.remove_roles(
+                            link.visitor_role,
+                            reason=f"Left {clan.name}: {n_player.name} ({n_player.tag})"
+                            )
+    
+    @staticmethod
+    async def clan_member_leave(player:coc.ClanMember,clan:aClan):       
+        await ClanMemberFeed.member_leave(clan,player)
     
     @staticmethod
     async def clan_donation_change(old_clan:aClan,new_clan:aClan):
@@ -54,9 +125,17 @@ class ClanTasks():
 class ClanLoop(TaskLoop):
     _instance = None
 
-    _clan_events = [ClanTasks.clan_donation_change]
-    _member_join_events = [ClanTasks.clan_member_join]
-    _member_leave_events = [ClanTasks.clan_member_leave]
+    _clan_events = [
+        ClanTasks.clan_donation_change
+        ]
+    _member_join_events = [
+        ClanTasks.clan_member_join,
+        ClanTasks.member_join_visitor_role
+        ]
+    _member_leave_events = [
+        ClanTasks.clan_member_leave,
+        ClanTasks.member_leave_visitor_role
+        ]
 
     def __new__(cls):
         if cls._instance is None:

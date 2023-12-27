@@ -26,6 +26,15 @@ class InventoryItem(ShopItem):
     def __init__(self,item:dict,quantity:int):        
         self.quantity = quantity
         super().__init__(item)
+
+    def to_json(self) -> dict:
+        return {
+            '_id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'type': self.type,
+            'inventory_quantity': self.quantity,
+            }
     
     @classmethod
     async def get(cls,item_id:str,quantity:int):
@@ -44,6 +53,9 @@ class UserInventory(AwaitLoader):
     def __init__(self,discord_user:Union[discord.User,discord.Member]):
         self.user = discord_user
         self.inventory = []
+    
+    def _assistant_json(self) -> List[dict]:
+        return [i.to_json() for i in self.inventory if i.type in ['cash']]
     
     async def load(self):
         query = await bot_client.coc_db.db__user_inventory.find_one({'_id':self.user.id})
@@ -149,7 +161,11 @@ class UserInventory(AwaitLoader):
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
-                inventory_text += f"\nRedeem this in: {item.guild.name}"
+                if ctx.author.id == self.user.id:
+                    if item.type in ['basic']:
+                        inventory_text += f"\nBought this from: {item.guild.name}"
+                    if item.type in ['cash']:
+                        inventory_text += f"\nRedeem this in: The Assassins Guild"
                 inventory_text += f"\n{item.description}"
 
         embed = await clash_embed(
