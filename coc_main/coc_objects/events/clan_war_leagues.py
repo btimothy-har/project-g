@@ -632,12 +632,17 @@ class WarLeaguePlayer(BasicPlayer):
     
     async def save_roster_clan(self):
         async with self._lock:
-            db = await bot_client.coc_db.db__war_league_player.find_one({'_id':self.db_id},{'roster_clan':1})
-            roster_clan = await WarLeagueClan(db['roster_clan'],self.season) if db and db.get('roster_clan',None) else None
+            db = await bot_client.coc_db.db__war_league_player.find_one(
+                {'_id':self.db_id},
+                {'roster_clan':1}
+                )
+            clan_tag = db['roster_clan'] if db and db.get('roster_clan',None) else None
+            if clan_tag:
+                roster_clan = await WarLeagueClan(clan_tag,self.season)
 
-            if roster_clan and getattr(roster_clan,'tag',None) != getattr(self.roster_clan,'tag',None):
-                if not roster_clan.roster_open:
-                    return
+                if roster_clan and getattr(roster_clan,'tag',None) != getattr(self.roster_clan,'tag',None):
+                    if not roster_clan.roster_open:
+                        return
             
             await bot_client.coc_db.db__war_league_player.update_one(
                 {'_id':self.db_id},
@@ -650,7 +655,7 @@ class WarLeaguePlayer(BasicPlayer):
                 )
             bot_client.coc_data_log.info(
                 f"{str(self)} was rostered in CWL: {self.roster_clan.name} ({self.roster_clan.tag})."
-            )
+                )
     
     async def finalize(self):        
         async with self._lock:
