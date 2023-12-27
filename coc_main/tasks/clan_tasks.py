@@ -80,6 +80,10 @@ class ClanTasks():
         n_player = await client.fetch_player(player.tag)
 
         if n_player.discord_user:
+            member = await aMember(n_player.discord_user)
+            await member.load()
+
+            member_accounts = await client.fetch_many_players(member.account_tags)            
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             
             if clan_links and len(clan_links) > 0:
@@ -95,11 +99,8 @@ class ClanTasks():
                         continue
 
                     bot_client.coc_main_log.info(f"{link.guild.name} Checking Visitor Role for Leaving {clan.name}: {player.name} ({player.tag})")
+                    all_clans = [a.clan for a in member_accounts if a.clan]
 
-                    member = await aMember(n_player.discord_user,link.guild.id)
-                    await member.load()
-
-                    all_clans = [a.clan for a in member.accounts if a.clan]
                     if clan.tag not in [c.tag for c in all_clans] and link.visitor_role in discord_user.roles:                    
                         await discord_user.remove_roles(
                             link.visitor_role,
@@ -124,9 +125,17 @@ class ClanTasks():
 class ClanLoop(TaskLoop):
     _instance = None
 
-    _clan_events = [ClanTasks.clan_donation_change]
-    _member_join_events = [ClanTasks.clan_member_join,ClanTasks.member_join_visitor_role]
-    _member_leave_events = [ClanTasks.clan_member_leave,ClanTasks.member_leave_visitor_role]
+    _clan_events = [
+        ClanTasks.clan_donation_change
+        ]
+    _member_join_events = [
+        ClanTasks.clan_member_join,
+        ClanTasks.member_join_visitor_role
+        ]
+    _member_leave_events = [
+        ClanTasks.clan_member_leave,
+        ClanTasks.member_leave_visitor_role
+        ]
 
     def __new__(cls):
         if cls._instance is None:
