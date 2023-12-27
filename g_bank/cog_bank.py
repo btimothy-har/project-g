@@ -276,8 +276,8 @@ class Bank(commands.Cog):
         if not user:
             return "No user found."    
             
-        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
-            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
         
         item = await ShopItem.get_by_id(item_id)
         inventory = await UserInventory(user)
@@ -296,8 +296,8 @@ class Bank(commands.Cog):
         if not user:
             return "No user found."
         
-        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bot.bank_guild:
-            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. Join here: discord.gg/hUSSsFneb2"
+        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
+            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
         
         item = await ShopItem.get_by_id(item_id)
         inventory = await UserInventory(user)
@@ -338,7 +338,7 @@ class Bank(commands.Cog):
     async def redemption_ticket_claim_listener(self,message:discord.Message):
         if not message.guild:
             return        
-        if message.guild.id != self.bot.bank_guild:
+        if message.guild.id != self.bank_guild.id:
             return
         
         redemption_id = None

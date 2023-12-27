@@ -56,10 +56,12 @@ class ClanGuildLink():
         link_id = {'guild':guild.id,'tag':clan_tag}
         await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
-            {
-                'tag':clan_tag,
-                'guild_id':guild.id,
-                'member_role':member_role.id,
+            {'$set':
+                {
+                    'tag':clan_tag,
+                    'guild_id':guild.id,
+                    'member_role':member_role.id,
+                    }
                 },
             upsert=True
             )
@@ -70,10 +72,12 @@ class ClanGuildLink():
         link_id = {'guild':guild.id,'tag':clan_tag}
         await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
-            {
-                'tag':clan_tag,
-                'guild_id':guild.id,
-                'elder_role':elder_role.id,
+            {'$set':
+                {
+                    'tag':clan_tag,
+                    'guild_id':guild.id,
+                    'elder_role':elder_role.id,
+                    }
                 },
             upsert=True
             )
@@ -84,10 +88,12 @@ class ClanGuildLink():
         link_id = {'guild':guild.id,'tag':clan_tag}
         await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
-            {
-                'tag':clan_tag,
-                'guild_id':guild.id,
-                'coleader_role':coleader_role.id,
+            {'$set':
+                {
+                    'tag':clan_tag,
+                    'guild_id':guild.id,
+                    'coleader_role':coleader_role.id,
+                    }
                 },
             upsert=True
             )
@@ -98,10 +104,12 @@ class ClanGuildLink():
         link_id = {'guild':guild.id,'tag':clan_tag}
         await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
-            {
-                'tag':clan_tag,
-                'guild_id':guild.id,
-                'visitor_role':visitor_role.id,
+            {'$set':
+                {
+                    'tag':clan_tag,
+                    'guild_id':guild.id,
+                    'visitor_role':visitor_role.id,
+                    }
                 },
             upsert=True
             )
@@ -112,10 +120,12 @@ class ClanGuildLink():
         link_id = {'guild':guild.id,'tag':clan_tag}
         await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
-            {
-                'tag':clan_tag,
-                'guild_id':guild.id,
-                'clan_war_role':clan_war_role.id,
+            {'$set':
+                {
+                    'tag':clan_tag,
+                    'guild_id':guild.id,
+                    'clan_war_role':clan_war_role.id,
+                    }
                 },
             upsert=True
             )
