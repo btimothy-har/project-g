@@ -109,7 +109,7 @@ class ClashOfClansTasks(commands.Cog):
 
         await bot_client.bot.wait_until_ready()
         
-        asyncio.create_task(self.start_recruiting_loop())
+        #asyncio.create_task(self.start_recruiting_loop())
         self._player_queue_task = asyncio.create_task(self.player_queue_task())
         self._clan_queue_task = asyncio.create_task(self.clan_queue_task())        
         self.clash_season_check.start()
