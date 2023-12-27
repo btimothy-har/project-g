@@ -2,6 +2,7 @@ import discord
 
 from typing import *
 from async_property import async_cached_property
+from redbot.core.utils import AsyncIter, bounded_gather
 
 from ..api_client import BotClashClient as client
 from ..coc_objects.clans.clan import BasicClan
@@ -22,7 +23,7 @@ class ClanGuildLink():
         return None
     
     @classmethod
-    async def get_links_for_clan(cls,clan_tag:str):
+    async def get_links_for_clan(cls,clan_tag:str) -> List['ClanGuildLink']:
         query = bot_client.coc_db.db__clan_guild_link.find(
             {
                 'tag':clan_tag
@@ -31,7 +32,7 @@ class ClanGuildLink():
         return [cls(link) async for link in query]
 
     @classmethod
-    async def get_for_guild(cls,guild_id:int):
+    async def get_for_guild(cls,guild_id:int) -> List['ClanGuildLink']:
         query = bot_client.coc_db.db__clan_guild_link.find(
             {
                 'guild_id':guild_id
@@ -47,25 +48,77 @@ class ClanGuildLink():
         self._elder_role = database_dict.get('elder_role',0)
         self._coleader_role = database_dict.get('coleader_role',0)
 
-    @classmethod
-    async def create(cls,
-        clan_tag:str,
-        guild:discord.Guild,
-        member_role:discord.Role,
-        elder_role:discord.Role,
-        coleader_role:discord.Role):
+        self._clan_war_role = database_dict.get('clan_war_role',0)
+        self._visitor_role = database_dict.get('visitor_role',0)
 
+    @classmethod
+    async def link_member_role(cls,clan_tag:str,guild:discord.Guild,member_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.insert_one(
+        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+            {'_id':link_id},
             {
-            '_id':link_id,
-            'tag':clan_tag,
-            'guild_id':guild.id,
-            'member_role':member_role.id,
-            'elder_role':elder_role.id,
-            'coleader_role':coleader_role.id
-        }
-        )
+                'tag':clan_tag,
+                'guild_id':guild.id,
+                'member_role':member_role.id,
+                },
+            upsert=True
+            )
+        return await cls.get_link(clan_tag,guild.id)
+
+    @classmethod
+    async def link_elder_role(cls,clan_tag:str,guild:discord.Guild,elder_role:discord.Role):
+        link_id = {'guild':guild.id,'tag':clan_tag}
+        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+            {'_id':link_id},
+            {
+                'tag':clan_tag,
+                'guild_id':guild.id,
+                'elder_role':elder_role.id,
+                },
+            upsert=True
+            )
+        return await cls.get_link(clan_tag,guild.id)
+    
+    @classmethod
+    async def link_coleader_role(cls,clan_tag:str,guild:discord.Guild,coleader_role:discord.Role):
+        link_id = {'guild':guild.id,'tag':clan_tag}
+        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+            {'_id':link_id},
+            {
+                'tag':clan_tag,
+                'guild_id':guild.id,
+                'coleader_role':coleader_role.id,
+                },
+            upsert=True
+            )
+        return await cls.get_link(clan_tag,guild.id)
+    
+    @classmethod
+    async def link_visitor_role(cls,clan_tag:str,guild:discord.Guild,visitor_role:discord.Role):
+        link_id = {'guild':guild.id,'tag':clan_tag}
+        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+            {'_id':link_id},
+            {
+                'tag':clan_tag,
+                'guild_id':guild.id,
+                'visitor_role':visitor_role.id,
+                },
+            upsert=True
+            )
+        return await cls.get_link(clan_tag,guild.id)
+    
+    @classmethod
+    async def link_clan_war_role(cls,clan_tag:str,guild:discord.Guild,clan_war_role:discord.Role):
+        link_id = {'guild':guild.id,'tag':clan_tag}
+        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+            {'_id':link_id},
+            {
+                'tag':clan_tag,
+                'guild_id':guild.id,
+                'clan_war_role':clan_war_role.id,
+                },
+            upsert=True
+            )
         return await cls.get_link(clan_tag,guild.id)
     
     @classmethod
@@ -100,3 +153,27 @@ class ClanGuildLink():
         if self.guild: 
             return self.guild.get_role(self._coleader_role)
         return None
+    
+    @property
+    def visitor_role(self) -> discord.Role:
+        if self.guild: 
+            return self.guild.get_role(self._visitor_role)
+        return None
+
+    @property
+    def clan_war_role(self) -> discord.Role:
+        if self.guild: 
+            return self.guild.get_role(self._clan_war_role)
+        return None
+
+    async def reset_clan_war_role(self,reason:str=None):
+        if not self.clan_war_role:
+            return        
+        m_iter = AsyncIter(self.clan_war_role.members)
+        async for member in m_iter:
+            if reason:
+                await member.remove_roles(
+                    self.clan_war_role,
+                    reason=reason)
+            else:
+                await member.remove_roles(self.clan_war_role)

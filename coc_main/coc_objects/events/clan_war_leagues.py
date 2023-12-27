@@ -674,7 +674,7 @@ class WarLeaguePlayer(BasicPlayer):
                     pass
                 else:
                     await member.add_roles(
-                        *[cwl_role],
+                        cwl_role,
                         reason='CWL Roster Finalized'
                         )
     

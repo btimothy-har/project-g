@@ -15,6 +15,7 @@ from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
 from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
+from ..discord.clan_link import ClanGuildLink
 
 bot_client = client()
 default_sleep = 60
@@ -34,10 +35,43 @@ class ClanTasks():
     
     @staticmethod
     async def clan_member_join(member:aPlayer,clan:aClan):
+        if member.discord_user and getattr(member.home_clan,'tag',None) == clan.tag:
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                async for link in link_iter:
+                    if not link.guild:
+                        continue
+                    if not link.visitor_role:
+                        continue
+                    discord_member = link.guild.get_member(member.discord_user)
+                    if discord_member:
+                        await discord_member.add_roles(
+                            link.visitor_role,
+                            reason=f"Joined {clan.name}: {member.name} ({member.tag})"
+                            )
         await ClanMemberFeed.member_join(clan,member)
 
     @staticmethod
     async def clan_member_leave(member:aPlayer,clan:aClan):
+        if member.discord_user and getattr(member.home_clan,'tag',None) == clan.tag:
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+            
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                async for link in link_iter:
+                    if not link.guild:
+                        continue
+                    if not link.visitor_role:
+                        continue
+                    discord_member = link.guild.get_member(member.discord_user)
+                    if discord_member:
+                        await discord_member.remove_roles(
+                            link.visitor_role,
+                            reason=f"Left {clan.name}: {member.name} ({member.tag})"
+                            )
+
         await ClanMemberFeed.member_leave(clan,member)
     
     @staticmethod

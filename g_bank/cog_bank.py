@@ -310,7 +310,6 @@ class Bank(commands.Cog):
             item_id=item_id,
             goldpass_tag=redeem_tag
             )
-        await inventory.remove_item_from_inventory(item)
         embed = await ticket.get_embed()
         m = await channel.send(embed=embed)
         await channel.send(m.mentions)
@@ -352,17 +351,21 @@ class Bank(commands.Cog):
             return
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
+        inventory = await UserInventory(message.guild.get_member(ticket.user_id))
+        item = await ShopItem.get_by_id(ticket.item_id)
         
         if message.author.id == 722196398635745312:
             if message.content.startswith("Redemption completed by:"):
                 if len(message.mentions) == 0:
-                    return await message.reply(f"Could not a completing user. Please try again.")
+                    return await message.reply(f"Could not find a completing user. Please try again.")
 
                 redemption_user = message.mentions[0].id                
                 await ticket.complete_redemption(redemption_user)
+                await inventory.remove_item_from_inventory(item)
             
             if message.content.startswith("Redemption ticket re-opened."):
                 await ticket.reverse_redemption()
+                await inventory.add_item_to_inventory(item)
 
     ############################################################
     #####
@@ -1022,10 +1025,10 @@ class Bank(commands.Cog):
         """
         
         if member.id in self.bank_admins:
-            return await ctx.reply(f"{member.display_name} is already a Bank Admin.")
+            return await ctx.reply(f"{member.mention} is already a Bank Admin.")
         
         self.bank_admins.append(member.id)
-        await ctx.reply(f"{member.display_name} is now a Bank Admin.")
+        await ctx.reply(f"{member.mention} is now a Bank Admin.")
 
         admin_role = self.bank_guild.get_role(self._bank_admin_role)
         if admin_role and admin_role not in member.roles:
@@ -1046,10 +1049,10 @@ class Bank(commands.Cog):
         """
         
         if member.id not in self.bank_admins:
-            return await ctx.reply(f"{member.display_name} is not a Bank Admin.")            
+            return await ctx.reply(f"{member.mention} is not a Bank Admin.")            
         
         self.bank_admins.remove(member.id)
-        await ctx.reply(f"{member.display_name} is no longer a Bank Admin.")
+        await ctx.reply(f"{member.mention} is no longer a Bank Admin.")
 
         admin_role = self.bank_guild.get_role(self._bank_admin_role)
         if admin_role and admin_role in member.roles:

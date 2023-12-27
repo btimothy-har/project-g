@@ -73,7 +73,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             'is_alliance_member': self.is_member,
             'alliance_clan': self.home_clan.to_json() if self.home_clan else None,
             'clan': self.clan.to_json() if self.clan else None,
-            'town_hall_level': self.town_hall_level
+            'town_hall': self.town_hall_level
             }
     
     def hero_json(self) -> dict:

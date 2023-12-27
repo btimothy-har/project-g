@@ -16,6 +16,7 @@ from ..utils.constants.coc_constants import WarResult, ClanWarType
 from ..coc_objects.clans.clan import aClan
 from ..coc_objects.events.clan_war import aClanWar
 from ..discord.feeds.reminders import EventReminder
+from ..discord.clan_link import ClanGuildLink
 
 bot_client = client()
 default_sleep = 60
@@ -36,8 +37,25 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_found(clan:aClan,war:aClanWar):
         try:
-            tasks = [bot_client.player_queue.put(m.tag) for m in war.members]
-            await bounded_gather(*tasks,limit=1)
+            await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
+            
+            war_clan = war.get_clan(clan.tag)            
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                
+                async for link in link_iter:
+                    if not link.guild:
+                        continue
+                    if not link.clan_war_role:
+                        continue
+                    
+                    m_iter = AsyncIter(war_clan.members)
+                    async for m in m_iter:
+                        user = link.guild.get_member(m.discord_user)
+                        if user and link.clan_war_role not in user.roles:
+                            await user.add_roles(link.clan_war_role)
+
         except asyncio.CancelledError:
             return
         except Exception:
@@ -52,6 +70,21 @@ class DefaultWarTasks():
                     cooldown=60,
                     text=f"{clan.abbreviation} declare war!"
                     )
+            
+            war_clan = war.get_clan(clan.tag)            
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                
+                async for link in link_iter:
+                    if not link.clan_war_role:
+                        continue                        
+                    m_iter = AsyncIter(war_clan.members)
+                    async for m in m_iter:
+                        user = link.guild.get_member(m.discord_user)
+                        if user and link.clan_war_role not in user.roles:
+                            await user.add_roles(link.clan_war_role)
+
         except asyncio.CancelledError:
             return
         except Exception:
@@ -60,6 +93,12 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_ended(clan:aClan,war:aClanWar):
         try:
+            clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
+            if clan_links and len(clan_links) > 0:
+                link_iter = AsyncIter(clan_links)
+                async for link in link_iter:
+                    await link.reset_clan_war_role()
+
             await asyncio.sleep(120)
             client = DefaultWarTasks._get_client()
 
