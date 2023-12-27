@@ -834,15 +834,6 @@ class Bank(commands.Cog):
         guild_only=True
         )
     
-    @commands.command(name="runtax")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_run_tax(self,ctx:commands.Context):
-        await ctx.tick()
-        await self.apply_bank_taxes()
-        await self.month_end_sweep()
-        await ctx.reply("Taxes have been applied and the month-end sweep has been completed.")
-    
     ##################################################
     ### BALANCE
     ##################################################
@@ -1035,7 +1026,13 @@ class Bank(commands.Cog):
         
         self.bank_admins.append(member.id)
         await ctx.reply(f"{member.display_name} is now a Bank Admin.")
-        await self.config.admins.set(self.bank_admins)        
+
+        admin_role = self.bank_guild.get_role(self._bank_admin_role)
+        if admin_role and admin_role not in member.roles:
+            await member.add_roles(admin_role)
+
+        await self.config.admins.set(self.bank_admins)
+        await ctx.tick()
     
     ##################################################
     ### BANK / DELADMIN
@@ -1053,7 +1050,13 @@ class Bank(commands.Cog):
         
         self.bank_admins.remove(member.id)
         await ctx.reply(f"{member.display_name} is no longer a Bank Admin.")
-        await self.config.admins.set(self.bank_admins)        
+
+        admin_role = self.bank_guild.get_role(self._bank_admin_role)
+        if admin_role and admin_role in member.roles:
+            await member.remove_roles(admin_role)
+
+        await self.config.admins.set(self.bank_admins)
+        await ctx.tick()
     
     ##################################################
     ### BANK / SHOWADMIN
