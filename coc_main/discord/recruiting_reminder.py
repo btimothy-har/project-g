@@ -92,7 +92,7 @@ class RecruitingReminder():
         return self.guild.get_member(self.remind_user_id)
     
     @property
-    def active_reminder(self) -> int:
+    def active_reminder(self) -> Optional[int]:
         if not self.active_reminder_id or self.active_reminder_id == 0:
             return None
         return self.active_reminder_id
@@ -138,16 +138,15 @@ class RecruitingReminder():
         return await cls.get_by_id(new_post.inserted_id)
 
     async def update_active_reminder(self,reminder_id:int):
-        async with self.lock:
-            self.active_reminder_id = reminder_id
-            await bot_client.coc_db.db__recruiting_post.update_one(
-                {'_id':self._id},
-                {'$set': 
-                    {'active_reminder':self.active_reminder_id}
-                },
-                upsert=True
-                )
-            bot_client.coc_main_log.info(f"{self.ad_name} {self.id} updated active reminder to {self.active_reminder_id}.")
+        self.active_reminder_id = reminder_id
+        await bot_client.coc_db.db__recruiting_post.update_one(
+            {'_id':self._id},
+            {'$set': 
+                {'active_reminder':self.active_reminder_id}
+            },
+            upsert=True
+            )
+        bot_client.coc_main_log.info(f"{self.ad_name} {self.id} updated active reminder to {self.active_reminder_id}.")
     
     async def completed(self,user:discord.User):
         async with self.lock:
@@ -255,6 +254,8 @@ class RecruitingReminder():
                     view=view
                     )
                 await self.update_active_reminder(msg.id)
+            
+            bot_client.coc_main_log.info(f"Refreshed Recruiting Reminder for {self.ad_name}.")
 
 class RecruitingPostPrompt(discord.ui.View):
     def __init__(self,post_id:str):
