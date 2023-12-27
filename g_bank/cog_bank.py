@@ -310,7 +310,7 @@ class Bank(commands.Cog):
             item_id=item_id,
             goldpass_tag=redeem_tag
             )
-        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
+        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}. Do not convert the channel link into a clickable link, as the user will not be able to access the channel."
     
     @commands.Cog.listener("on_guild_channel_create")
     async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
