@@ -212,6 +212,12 @@ class EventReminder():
         return cls(query) if query else None
     
     @classmethod
+    async def get_all(cls) -> List['EventReminder']:
+        query = bot_client.coc_db.db__clan_event_reminder.find({})
+        reminders = [cls(r) async for r in query]
+        return reminders
+    
+    @classmethod
     async def create_war_reminder(cls,
         clan:aClan,
         channel:Union[discord.TextChannel,discord.Thread],

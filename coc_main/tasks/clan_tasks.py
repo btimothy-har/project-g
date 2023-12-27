@@ -12,11 +12,11 @@ from ..api_client import BotClashClient as client
 from ..cog_coc_client import ClashOfClansClient
 from ..exceptions import InvalidTag, ClashAPIError
 
-from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
 from ..discord.member import aMember
-from ..discord.feeds.donations import ClanDonationFeed
+from ..discord.feeds.donations import ClanDonationFeed, ClanDataFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
+from ..discord.feeds.reminders import EventReminder
 from ..discord.clan_link import ClanGuildLink
 
 bot_client = client()
@@ -163,6 +163,12 @@ class ClanLoop(TaskLoop):
         async for guild in guild_iter:
             links = await ClanGuildLink.get_for_guild(guild.id)
             tags.extend([link.tag for link in links])
+
+        feeds = await ClanDataFeed.get_all()
+        tags.extend([feed.tag for feed in feeds])
+
+        reminders = await EventReminder.get_all()
+        tags.extend([reminder.tag for reminder in reminders])
 
         self._tags = set(tags)
         self._last_db_update = pendulum.now()

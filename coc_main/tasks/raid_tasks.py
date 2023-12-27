@@ -14,7 +14,8 @@ from ..exceptions import InvalidTag, ClashAPIError
 from ..coc_objects.clans.clan import aClan
 from ..coc_objects.events.raid_weekend import aRaidWeekend
 from ..discord.feeds.reminders import EventReminder
-from ..discord.feeds.raid_results import RaidResultsFeed
+from ..discord.feeds.raid_results import RaidResultsFeed, ClanDataFeed
+from ..discord.clan_link import ClanGuildLink
 
 bot_client = client()
 default_sleep = 60
@@ -113,6 +114,19 @@ class ClanRaidLoop(TaskLoop):
 
         tags.extend([clan.tag for clan in await client.get_registered_clans()])
         tags.extend([clan.tag for clan in await client.get_alliance_clans()])
+
+        guild_iter = AsyncIter(bot_client.bot.guilds)
+        async for guild in guild_iter:
+            links = await ClanGuildLink.get_for_guild(guild.id)
+            tags.extend([link.tag for link in links])
+        
+        feeds = await ClanDataFeed.get_all()
+        tags.extend([feed.tag for feed in feeds])
+
+        reminders = await EventReminder.get_all()
+        tags.extend([reminder.tag for reminder in reminders])
+
+
         self._tags = set(tags)
         self._last_db_update = pendulum.now()
     

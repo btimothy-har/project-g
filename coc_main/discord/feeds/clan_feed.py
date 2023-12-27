@@ -28,6 +28,11 @@ class ClanDataFeed():
         else:
             query = bot_client.coc_db.db__clan_data_feed.find({'tag':clan.tag})
         return [cls(q) async for q in query]
+    
+    @classmethod
+    async def get_all(cls) -> List['ClanDataFeed']:        
+        query = bot_client.coc_db.db__clan_data_feed.find({})
+        return [cls(q) async for q in query]
 
     @classmethod
     async def create_feed(cls,
@@ -47,6 +52,7 @@ class ClanDataFeed():
 
     def __init__(self,database:dict):
         self._id = str(database['_id'])
+        self.tag = database['tag']
         self.type = database['type']
         self.guild_id = database['guild_id']
         self.channel_id = database['channel_id']

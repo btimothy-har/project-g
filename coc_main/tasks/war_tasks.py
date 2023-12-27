@@ -17,6 +17,7 @@ from ..coc_objects.clans.clan import aClan
 from ..coc_objects.events.clan_war import aClanWar
 from ..discord.feeds.reminders import EventReminder
 from ..discord.clan_link import ClanGuildLink
+from ..discord.feeds.clan_feed import ClanDataFeed
 
 bot_client = client()
 default_sleep = 60
@@ -44,7 +45,7 @@ class DefaultWarTasks():
             
             war_clan = war.get_clan(clan.tag)
             opponent = war.get_opponent(clan.tag)
-            
+
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             if clan_links and len(clan_links) > 0:
                 link_iter = AsyncIter(clan_links)
@@ -230,6 +231,18 @@ class ClanWarLoop(TaskLoop):
         tags.extend([clan.tag for clan in await client.get_registered_clans()])
         tags.extend([clan.tag for clan in await client.get_alliance_clans()])
         tags.extend([clan.tag for clan in await client.get_war_league_clans()])
+
+        guild_iter = AsyncIter(bot_client.bot.guilds)
+        async for guild in guild_iter:
+            links = await ClanGuildLink.get_for_guild(guild.id)
+            tags.extend([link.tag for link in links])
+        
+        feeds = await ClanDataFeed.get_all()
+        tags.extend([feed.tag for feed in feeds])
+
+        reminders = await EventReminder.get_all()
+        tags.extend([reminder.tag for reminder in reminders])
+
         self._tags = set(tags)
         self._last_db_update = pendulum.now()
 
