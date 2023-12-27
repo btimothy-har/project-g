@@ -259,8 +259,7 @@ class Clans(commands.Cog):
     ##################################################
     ### FIND-CLAN (ALIAS: CLAN INFO)
     ##################################################
-    async def helper_find_clan(self,context:Union[commands.Context,discord.Interaction],clan_tag:str) -> Tuple[discord.Embed,Optional[ClanLinkMenu]]:
-        
+    async def helper_find_clan(self,context:Union[commands.Context,discord.Interaction],clan_tag:str) -> Tuple[discord.Embed,Optional[ClanLinkMenu]]:        
         clan = await self.client.fetch_clan(tag=clan_tag)
         if not clan:
             embed = await clash_embed(

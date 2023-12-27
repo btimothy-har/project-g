@@ -13,6 +13,7 @@ from ..exceptions import InvalidTag, ClashAPIError
 
 from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
+from ..discord.member import aMember
 from ..discord.feeds.donations import ClanDonationFeed
 from ..discord.feeds.member_movement import ClanMemberFeed
 from ..discord.clan_link import ClanGuildLink
@@ -34,8 +35,8 @@ class ClanTasks():
         return bot_client.bot.get_cog('ClashOfClansClient')
     
     @staticmethod
-    async def clan_member_join(member:aPlayer,clan:aClan):
-        if member.discord_user and getattr(member.home_clan,'tag',None) == clan.tag:
+    async def clan_member_join(player:aPlayer,clan:aClan):
+        if player.discord_user:
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
 
             if clan_links and len(clan_links) > 0:
@@ -45,17 +46,25 @@ class ClanTasks():
                         continue
                     if not link.visitor_role:
                         continue
-                    discord_member = link.guild.get_member(member.discord_user)
-                    if discord_member:
-                        await discord_member.add_roles(
+                    
+                    discord_user = link.guild.get_member(player.discord_user)
+                    if not discord_user:
+                        continue
+
+                    member = await aMember(player.discord_user,link.guild.id)
+                    await member.load()
+
+                    if clan.tag not in [c.tag for c in member.home_clans]:
+                        await discord_user.add_roles(
                             link.visitor_role,
                             reason=f"Joined {clan.name}: {member.name} ({member.tag})"
                             )
-        await ClanMemberFeed.member_join(clan,member)
+                        
+        await ClanMemberFeed.member_join(clan,player)
 
     @staticmethod
-    async def clan_member_leave(member:aPlayer,clan:aClan):
-        if member.discord_user and getattr(member.home_clan,'tag',None) == clan.tag:
+    async def clan_member_leave(player:aPlayer,clan:aClan):
+        if player.discord_user:
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             
             if clan_links and len(clan_links) > 0:
@@ -65,14 +74,21 @@ class ClanTasks():
                         continue
                     if not link.visitor_role:
                         continue
-                    discord_member = link.guild.get_member(member.discord_user)
-                    if discord_member:
-                        await discord_member.remove_roles(
+
+                    discord_user = link.guild.get_member(player.discord_user)
+                    if not discord_user:
+                        continue
+
+                    member = await aMember(player.discord_user,link.guild.id)
+                    await member.load()
+
+                    all_clans = [a.clan for a in member.accounts if a.clan]
+                    if clan.tag not in [c.tag for c in all_clans] and link.visitor_role in discord_user.roles:                    
+                        await discord_user.remove_roles(
                             link.visitor_role,
                             reason=f"Left {clan.name}: {member.name} ({member.tag})"
                             )
-
-        await ClanMemberFeed.member_leave(clan,member)
+        await ClanMemberFeed.member_leave(clan,player)
     
     @staticmethod
     async def clan_donation_change(old_clan:aClan,new_clan:aClan):
