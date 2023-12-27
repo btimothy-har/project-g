@@ -64,16 +64,18 @@ class Bank(commands.Cog):
 
     def __init__(self,bot:Red):
         self.bot = bot
-        self.bot.bank_guild = 1132581106571550831
 
         self.bot.coc_bank_path = f"{cog_data_path(self)}/reports"
         if not os.path.exists(self.bot.coc_bank_path):
             os.makedirs(self.bot.coc_bank_path)
 
         self.bank_admins = []
+        self._bank_guild = 1132581106571550831 if self.bot.user.id == 1031240380487831664 else 680798075685699691
+
         self._log_channel = 0
 
-        self._redm_log_channel = 0 if self.bot.user.id == 1031240380487831664 else 1189120831880700014
+        self._redm_log_channel = 1189491279449575525 if self.bot.user.id == 1031240380487831664 else 1189120831880700014
+        self._bank_admin_role = 1189481989984751756 if self.bot.user.id == 1031240380487831664 else 1123175083272327178
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -88,7 +90,6 @@ class Bank(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
     
     async def cog_load(self):
-        self.bank_admins = await self.config.admins()
         try:
             self.use_rewards = await self.config.use_rewards()
         except:
@@ -98,6 +99,7 @@ class Bank(commands.Cog):
         except:
             self._log_channel = 0
 
+        self.bank_admins = await self.config.admins()
         asyncio.create_task(self.start_cog())
     
     async def start_cog(self):
@@ -105,6 +107,15 @@ class Bank(commands.Cog):
             if getattr(bot_client,'_is_initialized',False):
                 break
             await asyncio.sleep(1)
+        
+        u_iter = AsyncIter(self.bank_admins)
+        async for user_id in u_iter:
+            guild_user = self.bank_guild.get_member(user_id)
+            if not guild_user:
+                continue
+            admin_role = self.bank_guild.get_role(self._bank_admin_role)
+            if admin_role and admin_role not in guild_user.roles:
+                await guild_user.add_roles(admin_role)
 
         self.current_account = await MasterAccount('current')
         self.sweep_account = await MasterAccount('sweep')
@@ -128,9 +139,13 @@ class Bank(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return self.bot.get_cog("ClashOfClansClient")
+    
+    @property
+    def bank_guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self._bank_guild)
 
     @property
-    def log_channel(self) -> discord.TextChannel:
+    def log_channel(self) -> Optional[discord.TextChannel]:
         return self.bot.get_channel(self._log_channel)
     
     @property
@@ -325,8 +340,6 @@ class Bank(commands.Cog):
         if not message.guild:
             return        
         if message.guild.id != self.bot.bank_guild:
-            return        
-        if len(message.embeds) == 0:
             return
         
         redemption_id = None
@@ -338,10 +351,18 @@ class Bank(commands.Cog):
         if not redemption_id:
             return
         
-        # ticket = await RedemptionTicket.get_by_id(redemption_id)
-        # await ticket.update_channel(channel.id)
-        # embed = await ticket.get_embed()
-        # await channel.send(embed=embed)
+        ticket = await RedemptionTicket.get_by_id(redemption_id)
+        
+        if message.author.id == 722196398635745312:
+            if message.content.startswith("Redemption completed by:"):
+                if len(message.mentions) == 0:
+                    return await message.reply(f"Could not a completing user. Please try again.")
+
+                redemption_user = message.mentions[0].id                
+                await ticket.complete_redemption(redemption_user)
+            
+            if message.content.startswith("Redemption ticket re-opened."):
+                await ticket.reverse_redemption()
 
     ############################################################
     #####
@@ -1712,66 +1733,6 @@ class Bank(commands.Cog):
         if not gift:
             return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
-
-    ##################################################
-    ### USER REDEEM
-    ##################################################
-    @commands.command(name="redeem")
-    @commands.guild_only()
-    async def command_item_redeem(self,ctx:commands.Context):
-        """
-        Redeems an item from your inventory!
-        """
-
-        inv = await UserInventory(ctx.author)
-        inv_check = len([i for i in inv.inventory if i.guild_id == ctx.guild.id]) > 0
-
-        if not inv_check:
-            return await ctx.reply("You don't have any items to redeem from this server.")
-        
-        # Assassins Guild
-        if ctx.guild.id == 1132581106571550831:
-            role = ctx.guild.get_role(1163325808941727764)
-            await ctx.author.add_roles(role)
-            return await ctx.reply(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
-        
-        # ARIX
-        if ctx.guild.id == 688449973553201335:
-            role = ctx.guild.get_role(1163327086262485094)
-            await ctx.author.add_roles(role)
-            return await ctx.reply(f"Please open a ticket in <#798930079111053372> to redeem your item!")
-
-        return await ctx.reply("This server doesn't have a redeemable item.")
-
-    @app_commands.command(
-        name="redeem",
-        description="Redeems an item from your inventory!"
-        )
-    @app_commands.guild_only()
-    async def app_command_redeem_user(self,interaction:discord.Interaction):        
-        
-        await interaction.response.defer()
-        member = interaction.guild.get_member(interaction.user.id)
-
-        inv = await UserInventory(member)
-        inv_check = len([i for i in inv.inventory if i.guild_id == interaction.guild.id]) > 0
-
-        if not inv_check:
-            return await interaction.followup.send("You don't have any items to redeem from this server.")
-        
-        # Assassins Guild
-        if interaction.guild.id == 1132581106571550831:
-            role = interaction.guild.get_role(1163325808941727764)
-            await member.add_roles(role)
-            return await interaction.followup.send(f"Please open a ticket in <#1148464443676700693> to redeem your item!")
-        
-        # ARIX
-        if interaction.guild.id == 688449973553201335:
-            role = interaction.guild.get_role(1163327086262485094)
-            await member.add_roles(role)
-            return await interaction.followup.send(f"Please open a ticket in <#798930079111053372> to redeem your item!")
-        
-        return await interaction.followup.send("This server doesn't have a redeemable item.")
     
     ##################################################
     ### SHOP ITEM GROUP

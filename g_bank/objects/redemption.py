@@ -2,7 +2,6 @@ import asyncio
 import pendulum
 import bson
 import discord
-import random
 
 from typing import *
 
@@ -72,20 +71,20 @@ class RedemptionTicket():
         self.close_user = database_entry.get('close_user',None)
     
     @property
+    def lock(self) -> asyncio.Lock:
+        return self._locks[self.id]
+    
+    @property
+    def bank_cog(self) -> commands.Cog:
+        return bot_client.bot.get_cog("Bank")
+    
+    @property
     def user(self) -> Optional[discord.Member]:
-        return bot_client.bot.get_user(self.user_id)
-        guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
-        if not guild:
-            return None
-        return guild.get_member(self.user_id)
+        return self.bank_cog.bank_guild.get_member(self.user_id)
     
     @property
     def channel(self) -> Optional[discord.TextChannel]:
-        return bot_client.bot.get_channel(self.channel_id)
-        guild = bot_client.bot.get_guild(bot_client.bot.bank_guild)
-        if not guild:
-            return None
-        return guild.get_channel(self.channel_id) if self.channel_id else None
+        return self.bank_cog.bank_guild.get_channel(self.channel_id)
     
     @classmethod
     async def create(cls,cog:commands.Cog,user_id:int,item_id:str,goldpass_tag:str=None):
@@ -109,27 +108,49 @@ class RedemptionTicket():
                 break
             if count > 20:
                 break
-
         bot_client.coc_main_log.info(f"New redemption ticket: {ticket.id}")
         return ticket
 
     async def update_channel(self,channel_id:int):
-        await bot_client.coc_db.db__redemption.update_one(
-            {'_id':self._id},
-            {'$set':{'channel_id': channel_id}},
-            )
-        self.channel_id = channel_id
+        async with self.lock:
+            await bot_client.coc_db.db__redemption.update_one(
+                {'_id':self._id},
+                {'$set':{'channel_id': channel_id}},
+                )
+            self.channel_id = channel_id
     
-    async def complete_redemption(self,user_id:int):
-        await bot_client.coc_db.db__redemption.update_one(
-            {'_id':self._id},
-            {'$set':{
-                'close_user': user_id,
-                'close_timestamp': pendulum.now().int_timestamp,
-                }},
-            )
-        self.close_user = user_id
-        self.close_timestamp = pendulum.now().int_timestamp
+    async def complete_redemption(self,user_id:int) -> 'RedemptionTicket':
+        async with self.lock:
+            ticket = await RedemptionTicket.get_by_id(self.id)
+
+            if not ticket.close_user:
+                new_doc = await bot_client.coc_db.db__redemption.find_one_and_update(
+                    {'_id':self._id},
+                    {'$set':{
+                        'close_user': user_id,
+                        'close_timestamp': pendulum.now().int_timestamp,
+                        }},
+                    return_document=ReturnDocument.AFTER
+                    )
+                self.close_user = new_doc['close_user']
+                self.close_timestamp = pendulum.from_timestamp(new_doc['close_timestamp'])            
+        return self
+    
+    async def reverse_redemption(self) -> 'RedemptionTicket':
+        async with self.lock:
+            ticket = await RedemptionTicket.get_by_id(self.id)
+            
+            if ticket.close_user:
+                await bot_client.coc_db.db__redemption.update_one(
+                    {'_id':self._id},
+                    {'$set':{
+                        'close_user': None,
+                        'close_timestamp': None,
+                        }},
+                    )
+                self.close_user = None
+                self.close_timestamp = None
+        return self
     
     async def get_item(self) -> Optional[ShopItem]:
         return await ShopItem.get_by_id(self.item_id)
