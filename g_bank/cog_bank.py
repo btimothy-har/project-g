@@ -335,33 +335,37 @@ class Bank(commands.Cog):
         if not message.guild:
             return        
         if message.guild.id != self.bank_guild.id:
+            return        
+        if message.author.id != 722196398635745312:
             return
         
+        bot_client.coc_main_log.info(f"{message.id} Redemption Ticket Claim: {message.content}")
+        
         redemption_id = None
-        async for message in message.channel.history(limit=1,oldest_first=True):
-            for embed in message.embeds:
+        async for m in message.channel.history(limit=1,oldest_first=True):
+            for embed in m.embeds:
                 if embed.footer.text == "Redemption ID":                    
                     redemption_id = embed.description
                     break
         if not redemption_id:
+            bot_client.coc_main_log.info(f"{message.id} Redemption Ticket Claim: Did not find redemption ID.")
             return
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
         inventory = await UserInventory(message.guild.get_member(ticket.user_id))
         item = await ShopItem.get_by_id(ticket.item_id)
         
-        if message.author.id == 722196398635745312:
-            if message.content.startswith("Redemption marked as fulfilled by"):
-                if len(message.mentions) == 0:
-                    return await message.reply(f"Could not find a completing user. Please try again.")
+        if message.content.startswith("Redemption marked as fulfilled by"):
+            if len(message.mentions) == 0:
+                return await message.reply(f"Could not find a completing user. Please try again.")
 
-                redemption_user = message.mentions[0].id                
-                await ticket.complete_redemption(redemption_user)
-                await inventory.remove_item_from_inventory(item)
-            
-            if message.content.startswith("Fulfillment reversed by"):
-                await ticket.reverse_redemption()
-                await inventory.add_item_to_inventory(item)
+            redemption_user = message.mentions[0].id                
+            await ticket.complete_redemption(redemption_user)
+            await inventory.remove_item_from_inventory(item)
+        
+        if message.content.startswith("Fulfillment reversed by"):
+            await ticket.reverse_redemption()
+            await inventory.add_item_to_inventory(item)
 
     ############################################################
     #####
