@@ -114,7 +114,7 @@ class ClanExcelExport():
             row += 1
 
             if self.season.is_current:
-                stats = m.current_season
+                stats = await m.get_current_season()
             else:
                 stats = await m.get_season_stats(self.season)
 

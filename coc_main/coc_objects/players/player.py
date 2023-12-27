@@ -447,9 +447,9 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
                 await asyncio.gather(*tasks)
 
     async def get_current_season(self) -> aPlayerSeason:
-        return await aPlayerSeason(self.tag,bot_client.current_season)
+        return await self.get_season_stats(bot_client.current_season)
     
-    async def get_season_stats(self,season:aClashSeason):
+    async def get_season_stats(self,season:aClashSeason) -> aPlayerSeason:
         return await aPlayerSeason(self.tag,season)
             
     async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
