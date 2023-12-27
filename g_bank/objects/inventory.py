@@ -7,7 +7,7 @@ from typing import *
 from async_property import AwaitLoader
 from collections import defaultdict
 
-from redbot.core import bank
+from redbot.core import bank, commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
@@ -158,10 +158,16 @@ class UserInventory(AwaitLoader):
 
     async def get_embed(self,ctx):
         inventory_text = ""
+        user = None
+        if isinstance(ctx,commands.Context):
+            user = ctx.author
+        if isinstance(ctx,discord.Interaction):
+            user = ctx.user
+        
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
-                if ctx.author.id == self.user.id:
+                if getattr(user,'id',None) == self.user.id:
                     if item.type in ['basic']:
                         inventory_text += f"\nBought this from: {item.guild.name}"
                     if item.type in ['cash']:
@@ -177,4 +183,3 @@ class UserInventory(AwaitLoader):
             timestamp=pendulum.now()
             )
         return embed
-        
