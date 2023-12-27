@@ -161,7 +161,11 @@ class UserInventory(AwaitLoader):
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
-                inventory_text += f"\nRedeem this in: {item.guild.name}"
+                if ctx.author.id == self.user.id:
+                    if item.type in ['basic']:
+                        inventory_text += f"\nBought this from: {item.guild.name}"
+                    if item.type in ['cash']:
+                        inventory_text += f"\nRedeem this in: The Assassins Guild"
                 inventory_text += f"\n{item.description}"
 
         embed = await clash_embed(
