@@ -289,7 +289,6 @@ class Bank(commands.Cog):
             user_id=user.id,
             item_id=item_id
             )
-        await inventory.remove_item_from_inventory(item)
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
     async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
@@ -310,10 +309,6 @@ class Bank(commands.Cog):
             item_id=item_id,
             goldpass_tag=redeem_tag
             )
-        embed = await ticket.get_embed()
-        m = await channel.send(embed=embed)
-        await channel.send(m.mentions)
-
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
     
     @commands.Cog.listener("on_guild_channel_create")
@@ -355,7 +350,7 @@ class Bank(commands.Cog):
         item = await ShopItem.get_by_id(ticket.item_id)
         
         if message.author.id == 722196398635745312:
-            if message.content.startswith("Redemption completed by:"):
+            if message.content.startswith("Redemption marked as fulfilled by"):
                 if len(message.mentions) == 0:
                     return await message.reply(f"Could not find a completing user. Please try again.")
 
@@ -363,7 +358,7 @@ class Bank(commands.Cog):
                 await ticket.complete_redemption(redemption_user)
                 await inventory.remove_item_from_inventory(item)
             
-            if message.content.startswith("Redemption ticket re-opened."):
+            if message.content.startswith("Fulfillment reversed by"):
                 await ticket.reverse_redemption()
                 await inventory.add_item_to_inventory(item)
 
