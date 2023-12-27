@@ -93,9 +93,9 @@ class RecruitingReminder():
     
     @property
     def active_reminder(self) -> int:
-        if self.active_reminder_id or self.active_reminder_id == 0:
+        if not self.active_reminder_id or self.active_reminder_id == 0:
             return None
-        return self.active_reminder_id   
+        return self.active_reminder_id
     
     @property
     def next_reminder(self) -> Optional[pendulum.DateTime]:
