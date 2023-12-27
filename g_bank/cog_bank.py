@@ -70,12 +70,12 @@ class Bank(commands.Cog):
             os.makedirs(self.bot.coc_bank_path)
 
         self.bank_admins = []
-        self._bank_guild = 1132581106571550831 if self.bot.user.id == 1031240380487831664 else 680798075685699691
+        self._bank_guild = 1132581106571550831 if bot.user.id == 1031240380487831664 else 680798075685699691
 
         self._log_channel = 0
 
-        self._redm_log_channel = 1189491279449575525 if self.bot.user.id == 1031240380487831664 else 1189120831880700014
-        self._bank_admin_role = 1189481989984751756 if self.bot.user.id == 1031240380487831664 else 1123175083272327178
+        self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
+        self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -107,15 +107,6 @@ class Bank(commands.Cog):
             if getattr(bot_client,'_is_initialized',False):
                 break
             await asyncio.sleep(1)
-        
-        u_iter = AsyncIter(self.bank_admins)
-        async for user_id in u_iter:
-            guild_user = self.bank_guild.get_member(user_id)
-            if not guild_user:
-                continue
-            admin_role = self.bank_guild.get_role(self._bank_admin_role)
-            if admin_role and admin_role not in guild_user.roles:
-                await guild_user.add_roles(admin_role)
 
         self.current_account = await MasterAccount('current')
         self.sweep_account = await MasterAccount('sweep')
@@ -125,7 +116,17 @@ class Bank(commands.Cog):
         PlayerLoop.add_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.add_achievement_event(self.capital_contribution_rewards)        
         ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
-        ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)        
+        ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
+
+        await self.bot.wait_until_red_ready()
+        u_iter = AsyncIter(self.bank_admins)
+        async for user_id in u_iter:
+            guild_user = self.bank_guild.get_member(user_id)
+            if not guild_user:
+                continue
+            admin_role = self.bank_guild.get_role(self._bank_admin_role)
+            if admin_role and admin_role not in guild_user.roles:
+                await guild_user.add_roles(admin_role)      
     
     async def cog_unload(self):
         PlayerLoop.remove_player_event(self.member_th_progress_reward)

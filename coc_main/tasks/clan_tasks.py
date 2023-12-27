@@ -37,8 +37,6 @@ class ClanTasks():
     
     @staticmethod
     async def member_join_visitor_role(player:coc.ClanMember,clan:aClan):
-        bot_client.coc_main_log.info(f"Checking Visitor Role for Joining {clan.name}: {player.name} ({player.tag})")
-
         client = ClanTasks._get_client()
         n_player = await client.fetch_player(player.tag)
 
@@ -57,8 +55,6 @@ class ClanTasks():
                     if not discord_user:
                         continue
 
-                    bot_client.coc_main_log.info(f"{link.guild.name} Checking Visitor Role for Joining {clan.name}: {player.name} ({player.tag})")
-
                     member = await aMember(discord_user.id,link.guild.id)
                     await member.load()
 
@@ -74,8 +70,6 @@ class ClanTasks():
 
     @staticmethod
     async def member_leave_visitor_role(player:coc.ClanMember,clan:aClan):
-        bot_client.coc_main_log.info(f"Checking Visitor Role for Leaving {clan.name}: {player.name} ({player.tag})")
-
         client = ClanTasks._get_client()
         n_player = await client.fetch_player(player.tag)
 
@@ -97,10 +91,8 @@ class ClanTasks():
                     discord_user = link.guild.get_member(n_player.discord_user)
                     if not discord_user:
                         continue
-
-                    bot_client.coc_main_log.info(f"{link.guild.name} Checking Visitor Role for Leaving {clan.name}: {player.name} ({player.tag})")
+                    
                     all_clans = [a.clan for a in member_accounts if a.clan]
-
                     if clan.tag not in [c.tag for c in all_clans] and link.visitor_role in discord_user.roles:                    
                         await discord_user.remove_roles(
                             link.visitor_role,
