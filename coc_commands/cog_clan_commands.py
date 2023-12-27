@@ -797,14 +797,14 @@ class Clans(commands.Cog):
         elder_role="The Role to assign to Elders and above.",
         member_role="The Role to assign to registered Members. Only applicable if this is a Guild Clan.",
         visitor_role="The Role to assign to all in-game members, if linked to a Discord user.",
-        war_role="The Role to assign to all in-game members who are participating in the current Clan War.")
+        clan_war_role="The Role to assign to all in-game members who are participating in the current Clan War.")
     async def app_subcommand_link_clan(self,interaction:discord.Interaction,
         clan:str,
         coleader_role:Optional[discord.Role]=None,
         elder_role:Optional[discord.Role]=None,
         member_role:Optional[discord.Role]=None,
         visitor_role:Optional[discord.Role]=None,
-        war_role:Optional[discord.Role]=None):
+        clan_war_role:Optional[discord.Role]=None):
         
         await interaction.response.defer()
         
@@ -816,7 +816,7 @@ class Clans(commands.Cog):
                 + (f"**Elder Role:** {elder_role.mention}\n" if elder_role else "")
                 + (f"**Member Role:** {member_role.mention}\n" if member_role else "")
                 + (f"**Visitor Role:** {visitor_role.mention}\n" if visitor_role else "")
-                + (f"**Clan War Role:** {war_role.mention}" if war_role else ""),
+                + (f"**Clan War Role:** {clan_war_role.mention}" if clan_war_role else ""),
             thumbnail=select_clan.badge)
         confirm_view = MenuConfirmation(interaction)
 
@@ -853,8 +853,8 @@ class Clans(commands.Cog):
                 await ClanGuildLink.link_coleader_role(clan_tag=select_clan.tag,guild=interaction.guild,coleader_role=coleader_role)
             if visitor_role:
                 await ClanGuildLink.link_visitor_role(clan_tag=select_clan.tag,guild=interaction.guild,visitor_role=visitor_role)
-            if war_role:
-                await ClanGuildLink.link_clan_war_role(clan_tag=select_clan.tag,guild=interaction.guild,war_role=war_role)
+            if clan_war_role:
+                await ClanGuildLink.link_clan_war_role(clan_tag=select_clan.tag,guild=interaction.guild,clan_war_role=clan_war_role)
 
             link = await ClanGuildLink.get_link(select_clan.tag,interaction.guild.id) 
             complete_embed = await clash_embed(
@@ -864,7 +864,7 @@ class Clans(commands.Cog):
                     + f"\n**Elder Role:** {getattr(link.elder_role,'mention','Not Linked')}"
                     + f"\n**Member Role:** {getattr(link.member_role,'mention','Not Linked')}"
                     + f"\n**Visitor Role:** {getattr(link.visitor_role,'mention','Not Linked')}"
-                    + f"\n**Clan War Role:** {getattr(link.war_role,'mention','Not Linked')}",
+                    + f"\n**Clan War Role:** {getattr(link.clan_war_role,'mention','Not Linked')}",
                 url=select_clan.share_link,
                 success=True,
                 thumbnail=select_clan.badge)

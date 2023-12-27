@@ -1,6 +1,7 @@
 import asyncio
 import pendulum
 import copy
+import coc
 
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
@@ -35,8 +36,12 @@ class ClanTasks():
         return bot_client.bot.get_cog('ClashOfClansClient')
     
     @staticmethod
-    async def clan_member_join(player:aPlayer,clan:aClan):
-        if player.discord_user:
+    async def clan_member_join(player:coc.Player,clan:aClan):
+
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(player.tag)
+
+        if n_player.discord_user:
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
 
             if clan_links and len(clan_links) > 0:
@@ -47,24 +52,28 @@ class ClanTasks():
                     if not link.visitor_role:
                         continue
                     
-                    discord_user = link.guild.get_member(player.discord_user)
+                    discord_user = link.guild.get_member(n_player.discord_user)
                     if not discord_user:
                         continue
 
-                    member = await aMember(player.discord_user,link.guild.id)
+                    member = await aMember(n_player.discord_user,link.guild.id)
                     await member.load()
 
                     if clan.tag not in [c.tag for c in member.home_clans]:
                         await discord_user.add_roles(
                             link.visitor_role,
-                            reason=f"Joined {clan.name}: {member.name} ({member.tag})"
+                            reason=f"Joined {clan.name}: {n_player.name} ({n_player.tag})"
                             )
                         
         await ClanMemberFeed.member_join(clan,player)
 
     @staticmethod
-    async def clan_member_leave(player:aPlayer,clan:aClan):
-        if player.discord_user:
+    async def clan_member_leave(player:coc.Player,clan:aClan):
+        
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(player.tag)
+
+        if n_player.discord_user:
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             
             if clan_links and len(clan_links) > 0:
@@ -75,18 +84,18 @@ class ClanTasks():
                     if not link.visitor_role:
                         continue
 
-                    discord_user = link.guild.get_member(player.discord_user)
+                    discord_user = link.guild.get_member(n_player.discord_user)
                     if not discord_user:
                         continue
 
-                    member = await aMember(player.discord_user,link.guild.id)
+                    member = await aMember(n_player.discord_user,link.guild.id)
                     await member.load()
 
                     all_clans = [a.clan for a in member.accounts if a.clan]
                     if clan.tag not in [c.tag for c in all_clans] and link.visitor_role in discord_user.roles:                    
                         await discord_user.remove_roles(
                             link.visitor_role,
-                            reason=f"Left {clan.name}: {member.name} ({member.tag})"
+                            reason=f"Left {clan.name}: {n_player.name} ({n_player.tag})"
                             )
         await ClanMemberFeed.member_leave(clan,player)
     
