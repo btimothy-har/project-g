@@ -63,7 +63,6 @@ class CWLSeasonSetup(DefaultView):
     ### START / STOP CALL
     ##################################################
     async def start(self):
-
         cwl_clans = await self.client.get_war_league_clans()
         if len(cwl_clans) == 0:
             embed = await clash_embed(
