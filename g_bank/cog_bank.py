@@ -243,7 +243,7 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Account.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Account. Do not provide a value unless the user has provided you explicitly with an account to redeem the Gold Pass on.",
                             "type": "string",
                             },
                         },
@@ -339,8 +339,6 @@ class Bank(commands.Cog):
         if message.author.id != 722196398635745312:
             return
         
-        bot_client.coc_main_log.info(f"{message.id} Redemption Ticket Claim: {message.content}")
-        
         redemption_id = None
         async for m in message.channel.history(limit=1,oldest_first=True):
             for embed in m.embeds:
@@ -348,7 +346,6 @@ class Bank(commands.Cog):
                     redemption_id = embed.description
                     break
         if not redemption_id:
-            bot_client.coc_main_log.info(f"{message.id} Redemption Ticket Claim: Did not find redemption ID.")
             return
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
