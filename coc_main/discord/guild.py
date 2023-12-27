@@ -61,7 +61,8 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        linked_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        fetch_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        linked_clans = [c for c in fetch_clans if c.is_alliance_clan]
         
         embeds = []
         if self.id == 688449973553201335:
@@ -120,7 +121,8 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        all_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        fetch_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
+        all_clans = [c for c in fetch_clans if c.is_alliance_clan]
         
         if self.id == 688449973553201335:
             arix_rank = {

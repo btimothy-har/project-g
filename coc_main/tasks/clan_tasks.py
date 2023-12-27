@@ -158,6 +158,12 @@ class ClanLoop(TaskLoop):
         tags.extend([clan.tag for clan in await client.get_registered_clans()])
         tags.extend([clan.tag for clan in await client.get_alliance_clans()])
         tags.extend([clan.tag for clan in await client.get_war_league_clans()])
+
+        guild_iter = AsyncIter(bot_client.bot.guilds)
+        async for guild in guild_iter:
+            links = await ClanGuildLink.get_for_guild(guild.id)
+            tags.extend([link.tag for link in links])
+
         self._tags = set(tags)
         self._last_db_update = pendulum.now()
     
