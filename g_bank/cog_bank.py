@@ -986,7 +986,7 @@ class Bank(commands.Cog):
     @app_commands.command(name="balance",
         description="Display your current Bank Balance.")
     @app_commands.guild_only()
-    @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
+    @app_commands.autocomplete(clan=autocomplete_clans_coleader)
     @app_commands.describe(
         user="Select a User to view balances for. Only usable by Bank Admins.",
         clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
@@ -997,7 +997,7 @@ class Bank(commands.Cog):
         if clan:
             s_clan = await self.client.fetch_clan(clan)
             embed = await self.helper_show_balance(interaction,s_clan)
-            
+
         elif user:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You do not have permission to view other users' balances.")
