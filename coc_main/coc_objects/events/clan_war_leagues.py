@@ -363,7 +363,7 @@ class WarLeagueClan(BasicClan):
                     }
                 },
                 upsert=True)
-            bot_client.coc_data_log.info(f"{str(self)} opened roster for CWL.")
+            bot_client.coc_data_log.info(f"{str(self)} closed roster for CWL.")
         
         except:
             raise
@@ -373,6 +373,9 @@ class WarLeagueClan(BasicClan):
 
     async def finalize_roster(self) -> bool:
         async with self._lock:
+            if not self.roster_open:
+                return False
+            
             await self.close_roster(skip_lock=True)
             participants = await self.get_participants()
             if len(participants) < 15:
@@ -699,7 +702,10 @@ class WarLeaguePlayer(BasicPlayer):
                     await member.add_roles(
                         cwl_role,
                         reason='CWL Roster Finalized'
-                        )
+                        )            
+            bot_client.coc_data_log.info(
+                f"{str(self)}: Roster finalized in {getattr(self.roster_clan,'name','No Clan')} {'(' + getattr(self.roster_clan,'tag',None + ')')}."
+                )
     
     ##################################################
     ### CLASS / STATIC METHODS

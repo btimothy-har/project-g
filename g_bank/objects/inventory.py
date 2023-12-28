@@ -167,12 +167,17 @@ class UserInventory(AwaitLoader):
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
+                inventory_text += f"\n{item.description}"
                 if getattr(user,'id',None) == self.user.id:
                     if item.type in ['basic']:
-                        inventory_text += f"\nBought this from: {item.guild.name}"
+                        inventory_text += f"\nPurchased from: {item.guild.name}"
                     if item.type in ['cash']:
                         inventory_text += f"\nRedeem this in: The Assassins Guild"
-                inventory_text += f"\n{item.description}"
+                    if item.subscription:
+                        expiry = await item.compute_user_expiry(self.user.id)
+                        if expiry:
+                            inventory_text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
+                
 
         embed = await clash_embed(
             context=ctx,

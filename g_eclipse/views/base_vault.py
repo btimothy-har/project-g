@@ -32,6 +32,21 @@ class BaseVaultMenu(DefaultView):
         super().__init__(context,timeout=900)
     
     @property
+    def has_pass(self) -> bool:
+        cog = self.bot.get_cog("ECLIPSE")
+        if not cog.vault_pass_guild:
+            return False
+        if not cog.vault_pass:
+            return False
+        
+        guild_user = cog.vault_pass_guild.get_member(self.user.id)
+        if not guild_user:
+            return False
+        if cog.vault_pass in guild_user.roles:
+            return True
+        return False
+    
+    @property
     def home_button(self):
         return DiscordButton(
             function=self._callback_home,
@@ -310,7 +325,7 @@ class BaseVaultMenu(DefaultView):
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
         base = self.all_bases[self.base_index]
-        price = calculate_price(base.town_hall)
+        price = 0 if self.has_pass else calculate_price(base.town_hall)
 
         if self.user.id not in base.claims:
             if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
@@ -328,8 +343,9 @@ class BaseVaultMenu(DefaultView):
                         message=f"This base has been added to your vault.",
                         success=True
                         )
-                await bank.withdraw_credits(self.user,price)
-                embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
+                if price > 0:
+                    await bank.withdraw_credits(self.user,price)
+                    embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
         
         else:
             embed3 = await self._send_base_link_embed()
@@ -407,15 +423,17 @@ class BaseVaultMenu(DefaultView):
         curr = await bank.get_currency_name()
 
         base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
-            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
+            + f"\n\nWe have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
             + f"Bases are refreshed periodically, and expire after a certain period of time:"
-            + f"\n- For the current highest TH: after 4 month(s)"
-            + f"\n- For the second and third highest TH: after 9 month(s)"
-            + f"\n- All other THs: after 12 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th)} TH{max_th}: after 4 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th-1)} TH{max_th-1}: after 6 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th-2)} TH{max_th-2}: after 9 month(s)"
+            + f"\n- Other THs: after 12 month(s)"
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
             + f"\n\n**__Getting Base Links__**"
             + f"\n- Base Links are provided as-is. Supercell expires base links from time to time, and you may occassionally encounter expired links."
             + f"\n- To get a base link, you will need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH. Lower TH levels cost less."
+            + f"\n- Purchasing a Vault Pass lets you access bases for free for a limited period. Vault Passes can only be purchased from The Assassins Guild."
             + f"\n- Once claimed, the base link is sent to your DMs and added to your Personal Vault."
             + f"\n\n**__Personal Vault__**"
             + f"\n- Bases that you have claimed are added to your personal vault. You may retrieve their base links at any time from here."
@@ -425,7 +443,7 @@ class BaseVaultMenu(DefaultView):
         embed = await eclipse_embed(
             context=self.ctx,
             title="**Assassins Base Vault**",
-            message=(f"**We don't have any bases currently for Townhall {no_base}.**\n\n" if no_base else '')
+            message=(f"## **Oops!\nWe currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
                 + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
@@ -457,12 +475,16 @@ class BaseVaultMenu(DefaultView):
         show_base = self.all_bases[self.base_index]
         embed,file = await show_base.base_embed()
 
+        if self.has_pass:
+            price_text = f"Claiming this base is free thanks to your Vault Pass!\n\u200b"
+        else:
+            price_text = f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b"
+
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
             value=f"**You have already claimed this base.**" + ("\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b" if not self.vault_mode else "\n\u200b")
                 if self.user.id in show_base.claims else 
-                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n"
-                f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
+                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n{price_text}",
             inline=False
             )
         

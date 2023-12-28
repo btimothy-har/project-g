@@ -6,6 +6,7 @@ import pendulum
 import xlsxwriter
 
 from typing import *
+from discord.ext import tasks
 
 from redbot.core import Config, commands, app_commands, bank
 from redbot.core.bot import Red
@@ -77,6 +78,8 @@ class Bank(commands.Cog):
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
 
+        self._subscription_lock = asyncio.Lock()
+
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
             "use_rewards":False,
@@ -126,9 +129,12 @@ class Bank(commands.Cog):
                 continue
             admin_role = self.bank_guild.get_role(self._bank_admin_role)
             if admin_role and admin_role not in guild_user.roles:
-                await guild_user.add_roles(admin_role)      
+                await guild_user.add_roles(admin_role)
+        
+        self.subscription_item_expiry.start()
     
     async def cog_unload(self):
+        self.subscription_item_expiry.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -211,6 +217,14 @@ class Bank(commands.Cog):
                     },
                 },
             {
+                "name": "_assistant_get_store_redeemables",
+                "description": "Returns all redeemable items in the Guild's Store, and their parameters.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
                 "name": "_assistant_get_member_inventory",
                 "description": "Gets a list of items in a user's inventory.",
                 "parameters": {
@@ -252,6 +266,14 @@ class Bank(commands.Cog):
                 },
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
+    
+    async def _assistant_get_store_redeemables(self,guild:discord.Guild,*args,**kwargs) -> str:
+        items = await ShopItem.get_by_guild(guild.id)
+
+        redeemable_items = [i for i in items if i.type in ['cash'] and i.show_in_store]
+        result_json = [i._assistant_json() for i in redeemable_items]
+        
+        return f"The following redeemable items are currently registered in {guild.name}'s Store: {result_json}."
 
     async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
         bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")
@@ -787,6 +809,65 @@ class Bank(commands.Cog):
         a_iter = AsyncIter(members)
         tasks = [_distribute_rewards(player) async for player in a_iter]
         await bounded_gather(*tasks,return_exceptions=True,limit=1)
+    
+    ############################################################
+    ############################################################
+    ##### SUBSCRIPTION EXPIRY
+    ############################################################
+    ############################################################    
+    @tasks.loop(minutes=1.0)
+    async def subscription_item_expiry(self):
+        if self._subscription_lock.locked():
+            return
+        
+        async with self._subscription_lock:
+            items = await ShopItem.get_subscription_items()
+
+            i_iter = AsyncIter(items)
+            async for item in i_iter:
+                try:
+                    if not item.guild:
+                        continue
+
+                    u_iter = AsyncIter(list(item.subscription_log.items()))
+                    async for user_id,timestamp in u_iter:
+                        try:
+                            user = item.guild.get_member(int(user_id))
+                            if not user:
+                                continue
+
+                            expiry_time = await item.compute_user_expiry(user.id)
+
+                            if expiry_time and pendulum.now() >= expiry_time:
+                                if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
+                                    if item.assigns_role in user.roles:
+                                        await user.remove_roles(
+                                            item.assigns_role,
+                                            reason="Role Item expired."
+                                            )
+                                else:
+                                    inventory = await UserInventory(user)
+                                    await inventory.remove_item_from_inventory(item)
+                                
+                                await item.expire_item(user)
+                                try:
+                                    await user.send(f"Your {item.name} has expired.")
+                                except:
+                                    pass
+                        
+                        except Exception as exc:
+                            await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."
+                                + f"```{exc}```")
+                            bot_client.coc_main_log.exception(
+                                f"Error expiring Shop Item {item.id} {item.name} for {user_id}."
+                                )
+                
+                except Exception as exc:
+                    await self.bot.send_to_owners(f"An error while expiring Shop Items. Check logs for details."
+                        + f"```{exc}```")
+                    bot_client.coc_main_log.exception(
+                        f"Error expiring Shop Item {item.id} {item.name}."
+                        )
 
     ############################################################
     ############################################################
@@ -812,7 +893,23 @@ class Bank(commands.Cog):
     ##### - shop-items / restock
     #####    
     ############################################################
-    ############################################################
+    ############################################################    
+    @commands.command(name="colorexp")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def bulk_update_colorexp(self,ctx:commands.Context):
+        count = 0
+
+        items = await ShopItem.get_by_guild_category(1132581106571550831,'Discord Colors')
+        i_iter = AsyncIter(items)
+        async for item in i_iter:
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':item._id},
+                {'$set':{'subscription_duration':720}}
+                )
+            count += 1
+
+        await ctx.reply(f"Updated {count} items.")
     
     ##################################################
     ### PARENT COMMAND GROUPS
@@ -889,16 +986,28 @@ class Bank(commands.Cog):
     @app_commands.command(name="balance",
         description="Display your current Bank Balance.")
     @app_commands.guild_only()
-    @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
+    @app_commands.autocomplete(clan=autocomplete_clans_coleader)
     @app_commands.describe(
-        select_user="Select a User to view balances for. Only usable by Bank Admins.",
-        select_clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
-    async def app_command_bank_balance(self,interaction:discord.Interaction,select_user:Optional[discord.Member]=None,select_clan:Optional[str]=None):        
-        await interaction.response.defer()
+        user="Select a User to view balances for. Only usable by Bank Admins.",
+        clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
+    async def app_command_bank_balance(self,interaction:discord.Interaction,user:Optional[discord.Member]=None,clan:Optional[str]=None):        
+        
+        await interaction.response.defer(ephemeral=True)
 
-        if select_clan:
-            clan = await self.client.fetch_clan(select_clan)
-            embed = await self.helper_show_balance(interaction,clan)
+        if clan:
+            s_clan = await self.client.fetch_clan(clan)
+            embed = await self.helper_show_balance(interaction,s_clan)
+
+        elif user:
+            if not is_bank_admin(interaction):
+                return await interaction.followup.send("You do not have permission to view other users' balances.")
+            
+            member = await aMember(user.id,interaction.guild.id)
+            embed = await clash_embed(
+                context=interaction,
+                message=f"{user.mention} has **{await bank.get_balance(member.discord_member):,} {await bank.get_currency_name()}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
+                timestamp=pendulum.now()
+                )
         else:
             embed = await self.helper_show_balance(interaction)
 

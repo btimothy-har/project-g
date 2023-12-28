@@ -239,7 +239,7 @@ class UserStore(DefaultView):
         purchase_button = self.purchase_button
         inventory = await UserInventory(interaction.user)
 
-        if self.current_item.type in ['cash'] and inventory.has_item(self.current_item):
+        if inventory.has_item(self.current_item) and (self.current_item.type in ['cash'] or self.current_item.subscription):
             purchase_button.disabled = True
             purchase_button.label = f"You can only have 1 of this item."
             purchase_button.style = discord.ButtonStyle.grey
@@ -321,12 +321,7 @@ class UserStore(DefaultView):
             message=f"**You have: {bal:,} {currency}**\n"
                 + f"```{self.current_item.name}```"
                 )
-
-        item_embed.add_field(
-            name="Category",
-            value=f"{self.current_item.category}",
-            inline=False
-            )        
+        
         item_embed.add_field(
             name="Price",
             value=f"{self.current_item.price:,} {currency}",
@@ -338,15 +333,28 @@ class UserStore(DefaultView):
             inline=True
             )
         item_embed.add_field(
+            name="Expires",
+            value=f"{self.current_item.subscription_duration} day(s)" if self.current_item.subscription else "Never",
+            inline=True
+            )
+        
+        
+        item_embed.add_field(
+            name="Category",
+            value=f"{self.current_item.category}",
+            inline=True
+            )      
+        item_embed.add_field(
             name="Requires",
             value=f"{self.current_item.required_role.mention if self.current_item.required_role else 'None'}",
             inline=True
-            )        
+            )
+          
         item_embed.add_field(
             name="Description",
             value=f"{self.current_item.description}",
             inline=False
-            )
+            )        
                 
         if self.current_item.type in ['basic','cash']:
             item_embed.add_field(

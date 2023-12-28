@@ -140,6 +140,7 @@ class ClashServerConfig(commands.Cog):
     ##### - serversetup / application / delete
     ##### - serversetup / clocks / toggleevents
     ##### - serversetup / clocks / togglechannels
+    ##### - serversetup / create-thread
     ##### - recruiting-reminders / list
     ##### - recruiting-reminders / add
     ##### - recruiting-reminders / edit
@@ -221,6 +222,35 @@ class ClashServerConfig(commands.Cog):
                 inline=False
                 )
         await interaction.edit_original_response(embed=embed,view=None)
+    
+    ##################################################
+    ### SERVERSETUP / CREATE-THREAD
+    ##################################################    
+    @command_group_guildset.command(name="create-thread")
+    @commands.guild_only()
+    @commands.admin()
+    async def subcommand_group_create_forum_thread(self,ctx,channel:discord.ForumChannel,title:str,message:str):
+        """
+        Creates a new Forum Thread in the specified Forum Channel.
+        """
+        thread, msg = await channel.create_thread(
+            name=title,
+            content=message
+            )
+        await ctx.reply(f"Thread created: {thread.jump_url}")
+    
+    @app_command_group_guildset.command(name="create-thread",
+        description="Creates a new Forum Thread in the specified Forum Channel.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    async def sub_appcommand_create_forum_thread(self,interaction:discord.Interaction,channel:discord.ForumChannel,title:str,message:str):
+        
+        await interaction.response.defer()
+        thread, msg = await channel.create_thread(
+            name=title,
+            content=message
+            )
+        await interaction.followup.send(f"Thread created: {thread.jump_url}")
     
     ##################################################
     ### SERVERSETUP / PANEL
