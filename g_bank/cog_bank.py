@@ -217,6 +217,14 @@ class Bank(commands.Cog):
                     },
                 },
             {
+                "name": "_assistant_get_store_redeemables",
+                "description": "Returns all redeemable items in the Guild's Store, and their parameters.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
                 "name": "_assistant_get_member_inventory",
                 "description": "Gets a list of items in a user's inventory.",
                 "parameters": {
@@ -258,6 +266,14 @@ class Bank(commands.Cog):
                 },
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
+    
+    async def _assistant_get_store_redeemables(self,guild:discord.Guild,*args,**kwargs) -> str:
+        items = await ShopItem.get_by_guild(guild.id)
+
+        redeemable_items = [i for i in items if i.type in ['cash'] and i.available_in_store]
+        result_json = [i._assistant_json() for i in redeemable_items]
+        
+        return f"The following redeemable items are currently registered in {guild.name}'s Store: {result_json}."
 
     async def _assistant_get_member_balance(self,user:discord.Member,*args,**kwargs) -> str:
         bot_client.coc_main_log.info(f"Assistant: Bank: Get Member Balance: {user.id}")

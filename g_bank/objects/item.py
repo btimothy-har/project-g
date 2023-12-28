@@ -127,6 +127,20 @@ class ShopItem():
             return self.id == other.id
         return False
     
+    def _assistant_json(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'type': self.type,
+            'price': self.price,
+            'category': self.category,
+            'requires_role': self.required_role.name if self.required_role else None,
+            'available_stock': self.stock,
+            'assigns_role': self.assigns_role.name if self.assigns_role else None,
+            'expires_after_in_days': self.subscription_duration,
+            }
+    
     @property
     def lock(self) -> asyncio.Lock:
         return self._locks[self.id]
