@@ -832,7 +832,7 @@ class Bank(commands.Cog):
                                 else:
                                     inventory = await UserInventory(user)
                                     await inventory.remove_item_from_inventory(item)
-                                    
+
                                 await item.expire_item(user)
                         
                         except Exception as exc:
@@ -874,6 +874,23 @@ class Bank(commands.Cog):
     #####    
     ############################################################
     ############################################################
+    
+    @commands.command(name="colorexp")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def bulk_update_colorexp(self,ctx:commands.Context):
+        count = 0
+
+        items = await ShopItem.get_by_guild_category(1132581106571550831,'Discord Colors')
+        i_iter = AsyncIter(items)
+        async for item in i_iter:
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':item._id},
+                {'$set':{'subscription_duration':720}}
+                )
+            count += 1
+
+        await ctx.reply(f"Updated {count} items.")
     
     ##################################################
     ### PARENT COMMAND GROUPS

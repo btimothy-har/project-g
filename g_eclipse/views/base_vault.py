@@ -20,13 +20,15 @@ def calculate_price(townhall:int):
 
 class BaseVaultMenu(DefaultView):
     def __init__(self,
-        context:Union[commands.Context,discord.Interaction]):
+        context:Union[commands.Context,discord.Interaction],
+        has_pass:bool=False):
         
         self.vault_mode = False
         self.base_th = 0
         self.base_index = 0
         self.all_bases = []
         self.base_selector = []
+        self.has_pass = has_pass
 
         self.base_select_menu = None
         super().__init__(context,timeout=900)
@@ -310,7 +312,7 @@ class BaseVaultMenu(DefaultView):
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
         base = self.all_bases[self.base_index]
-        price = calculate_price(base.town_hall)
+        price = 0 if self.has_pass else calculate_price(base.town_hall)
 
         if self.user.id not in base.claims:
             if not await bank.can_spend(self.bot.get_user(interaction.user.id),price):
@@ -328,8 +330,9 @@ class BaseVaultMenu(DefaultView):
                         message=f"This base has been added to your vault.",
                         success=True
                         )
-                await bank.withdraw_credits(self.user,price)
-                embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
+                if price > 0:
+                    await bank.withdraw_credits(self.user,price)
+                    embed3.description += f"\n\nYou have {await bank.get_balance(self.user):,} {await bank.get_currency_name()} left."
         
         else:
             embed3 = await self._send_base_link_embed()
@@ -457,12 +460,16 @@ class BaseVaultMenu(DefaultView):
         show_base = self.all_bases[self.base_index]
         embed,file = await show_base.base_embed()
 
+        if self.has_pass:
+            price_text = f"Claiming this base is free thanks to your Vault Pass!\n\u200b"
+        else:
+            price_text = f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b"
+
         embed.add_field(
             name=f"🔍 Claimed by: {len(show_base.claims)} member(s)",
             value=f"**You have already claimed this base.**" + ("\nYou may claim again for free to receive the Base Link in your DMs.\n\u200b" if not self.vault_mode else "\n\u200b")
                 if self.user.id in show_base.claims else 
-                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n"
-                f"Claiming will cost: **{calculate_price(show_base.town_hall):,} {await bank.get_currency_name()}**. You have: {await bank.get_balance(self.user):,} {await bank.get_currency_name()}.\n\u200b",
+                f"\nTo claim this Base, use the {EmojisUI.DOWNLOAD} button.\n{price_text}",
             inline=False
             )
         

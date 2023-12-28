@@ -5,10 +5,13 @@ import pendulum
 import os
 import urllib
 
+from typing import *
+
 from discord.ext import tasks
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
+from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
@@ -18,6 +21,7 @@ from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_si
 from coc_main.utils.checks import is_member
 
 from g_bank.objects.inventory import UserInventory
+from g_bank.objects.item import ShopItem
 
 from .views.base_vault import BaseVaultMenu
 from .objects.war_base import eWarBase
@@ -127,7 +131,24 @@ class ECLIPSE(commands.Cog):
     ##### - eclipse
     #####
     ############################################################
-    ############################################################
+    ############################################################    
+    async def check_base_pass(self,user:Union[discord.User,discord.Member]) -> bool:
+        chk = False
+
+        if self.bot.user.id == 828838353977868368:
+            items = await ShopItem.get_by_guild(680798075685699691) #bkt hub
+        else:
+            items = await ShopItem.get_by_guild(1132581106571550831) #assassins
+        
+        find_pass = [i for i in items if i.name.startswith("Vault Pass")]
+        if len(find_pass) > 0:
+            inventory = await UserInventory(user)
+            i_iter = AsyncIter(find_pass)
+            async for item in i_iter:
+                if inventory.has_item(item):
+                    chk = True
+                    break
+        return chk
 
     ##################################################
     ### BASE VAULT
@@ -148,8 +169,9 @@ class ECLIPSE(commands.Cog):
                 )
             await ctx.reply(embed=embed,delete_after=60)
             return
-
-        menu = BaseVaultMenu(ctx)
+        
+        chk = await self.check_base_pass(ctx.author)
+        menu = BaseVaultMenu(ctx,chk)
         await menu.start()
     
     @app_commands.command(name="eclipse",
@@ -168,9 +190,10 @@ class ECLIPSE(commands.Cog):
                 timestamp=pendulum.now()
                 )
             await interaction.followup.send(embed=embed,ephemeral=True)
-            return
-
-        menu = BaseVaultMenu(interaction)
+            return       
+        
+        chk = await self.check_base_pass(interaction.user)
+        menu = BaseVaultMenu(interaction,chk)
         await menu.start()
     
     @commands.command(name="addbase")
