@@ -391,13 +391,13 @@ class AddItem(DefaultView):
     def add_subscription_duration_modal(self):
         m = DiscordModal(
             function=self._add_item_main,
-            title=f"Subscription Duration",
+            title=f"Add Auto-Expiry",
             )
         m.reference = 'subscription'
 
         duration = discord.ui.TextInput(
-            label="Duration (in hours)",
-            placeholder="1 day = 24 hours",
+            label="Expiration Period (in hours)",
+            placeholder="To remove, enter 0.",
             max_length=30,
             style=discord.TextStyle.short,
             required=True

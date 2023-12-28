@@ -819,13 +819,17 @@ class Bank(commands.Cog):
                             if not user:
                                 continue
 
-                            expiry_time = pendulum.from_timestamp(timestamp).add(hours=item.subscription_duration)
+                            if self.bot.user.id == 828838353977868368:
+                                expiry_time = pendulum.from_timestamp(timestamp).add(minutes=item.subscription_duration)
+                            else:
+                                expiry_time = pendulum.from_timestamp(timestamp).add(hours=item.subscription_duration)
+                                
                             if pendulum.now() >= expiry_time:
-                                if item.type == 'role' and item.assigns_role:
+                                if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                                     if item.assigns_role in user.roles:
                                         await user.remove_roles(
                                             item.assigns_role,
-                                            reason="Subscription Expired."
+                                            reason="Role Item expired."
                                             )
                                 else:
                                     inventory = await UserInventory(user)
