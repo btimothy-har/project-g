@@ -145,15 +145,6 @@ class AddItem(DefaultView):
             reference='cash'
             )
     @property
-    def add_subscription_duration(self):
-        return DiscordButton(
-            function=self._add_subscription_duration,
-            label="Role (Add-Only)",
-            style=discord.ButtonStyle.grey,
-            row=2,
-            reference='roleadd'
-            )
-    @property
     def add_roleadd_item_button(self):
         return DiscordButton(
             function=self._add_item_start,
@@ -234,6 +225,9 @@ class AddItem(DefaultView):
         await self._add_item_main(interaction,modal)
     
     async def _add_item_main(self,interaction:discord.Interaction,component:Union[DiscordButton,DiscordSelectMenu,DiscordModal]):
+        if getattr(component,'reference',None) == 'subscription_modal':
+            return await interaction.response.send_modal(self.add_subscription_duration_modal)
+
         if not interaction.response.is_done():
             await interaction.response.defer()
         
@@ -247,6 +241,10 @@ class AddItem(DefaultView):
 
         if getattr(component,'reference',None) == 'randomitems':
             self.new_item.random_items = component.values
+        
+        if getattr(component,'reference',None) == 'subscription_modal':
+            duration = int(component.children[0].value)
+            self.new_item.subscription_duration = duration
         
         self.clear_items()
         save_button = self.save_item_button
@@ -282,14 +280,7 @@ class AddItem(DefaultView):
     #     await interaction.response.defer()
     #     self.new_item.buy_message = modal.children[0].value
     #     await self._add_item_main(interaction,modal)
-    
-    async def _add_subscription_duration(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.send_modal(self.add_subscription_duration_modal)
-    
-    async def _add_subscription_duration_callback(self,interaction:discord.Interaction,modal:DiscordModal):
-        duration = int(modal.children[0].value)
-        self.new_item.subscription_duration = duration
-    
+  
     async def _save_item(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
@@ -402,6 +393,8 @@ class AddItem(DefaultView):
             function=self._add_subscription_duration_callback,
             title=f"Subscription Duration",
             )
+        m.reference = 'subscription_modal'
+
         duration = discord.ui.TextInput(
             label="Duration (in hours)",
             placeholder="1 day = 24 hours",
@@ -444,6 +437,16 @@ class AddItem(DefaultView):
     #         )
     #     m.add_item(name_field)   
         return m
+    
+    @property
+    def add_subscription_duration(self):
+        return DiscordButton(
+            function=self._add_item_main,
+            label="Add Auto-Expiry",
+            style=discord.ButtonStyle.grey,
+            row=2,
+            reference='subscription_modal'
+            )
 
     @property
     def required_role_selector(self):
