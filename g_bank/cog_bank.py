@@ -832,7 +832,8 @@ class Bank(commands.Cog):
                                 else:
                                     inventory = await UserInventory(user)
                                     await inventory.remove_item_from_inventory(item)
-                                    await item.expire_item(user)
+                                    
+                                await item.expire_item(user)
                         
                         except Exception as exc:
                             await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."

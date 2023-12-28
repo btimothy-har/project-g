@@ -187,7 +187,7 @@ class ShopItem():
                 if str(user.id) not in self.subscription_log:
                     self.subscription_log[str(user.id)] = pendulum.now().timestamp()
 
-                    item = await bot_client.coc_db.db__shop_item.update_one(
+                    await bot_client.coc_db.db__shop_item.update_one(
                         {'_id':self._id},
                         {'$set':
                             {'subscription_log':self.subscription_log}
@@ -204,7 +204,15 @@ class ShopItem():
     
     async def expire_item(self,user:discord.Member):
         async with self.lock:
-            del self.subscription_log[str(user.id)]
+            doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
+            self.subscription_log = doc.get('subscription_log',{})
+            del self.subscription_log[str(user.id)]            
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set':
+                    {'subscription_log':self.subscription_log}
+                    }
+                )
             bot_client.coc_main_log.info(f"{self.id} {self.name} expired for {user.id} {user.name}.")
 
     async def restock(self,quantity:int=1):
