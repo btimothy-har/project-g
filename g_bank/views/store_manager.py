@@ -297,7 +297,7 @@ class AddItem(DefaultView):
                 + f"\n**Requires**: `{getattr(item.required_role,'mention',None)}`"
                 + f"\n**Category**: `{item.category}`"
                 + f"\n**Description**: `{item.description}`"
-                + (f"\n\n**Assigns Role**: `{getattr(item.associated_role,'mention',None)}`" if item.type in ['role'] else "")
+                + (f"\n\n**Assigns Role**: `{getattr(item.assigns_role,'mention',None)}`" if item.type in ['role'] else "")
                 + (f"\n**Add-only**: `{True if not item.bidirectional else False}`" if item.type in ['role'] else "")
                 + (f"\n**Exclusive**: `{item.exclusive_role}`" if item.type in ['role'] else "")
                 )
