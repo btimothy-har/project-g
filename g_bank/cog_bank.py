@@ -270,7 +270,7 @@ class Bank(commands.Cog):
     async def _assistant_get_store_redeemables(self,guild:discord.Guild,*args,**kwargs) -> str:
         items = await ShopItem.get_by_guild(guild.id)
 
-        redeemable_items = [i for i in items if i.type in ['cash'] and i.available_in_store]
+        redeemable_items = [i for i in items if i.type in ['cash'] and i.show_in_store]
         result_json = [i._assistant_json() for i in redeemable_items]
         
         return f"The following redeemable items are currently registered in {guild.name}'s Store: {result_json}."
