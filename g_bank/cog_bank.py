@@ -903,12 +903,21 @@ class Bank(commands.Cog):
         items = await ShopItem.get_by_guild_category(1132581106571550831,'Discord Colors')
         i_iter = AsyncIter(items)
         async for item in i_iter:
+            if not item.assigns_role:
+                continue
+
+            u_iter = AsyncIter(item.assigns_role.members)
+            async for member in u_iter:
+                item.subscription_log[str(member.id)] = pendulum.now().int_timestamp
+
             await bot_client.coc_db.db__shop_item.update_one(
                 {'_id':item._id},
-                {'$set':{'subscription_duration':720}}
-                )
+                {'$set':{
+                    'subscription_duration':60,
+                    'subscription_log':item.subscription_log
+                    }
+                })
             count += 1
-
         await ctx.reply(f"Updated {count} items.")
     
     ##################################################
