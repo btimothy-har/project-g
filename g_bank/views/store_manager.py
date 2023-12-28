@@ -242,7 +242,7 @@ class AddItem(DefaultView):
         if getattr(component,'reference',None) == 'randomitems':
             self.new_item.random_items = component.values
         
-        if getattr(component,'reference',None) == 'subscription_modal':
+        if getattr(component,'reference',None) == 'subscription':
             duration = int(component.children[0].value)
             self.new_item.subscription_duration = duration
         
@@ -393,7 +393,7 @@ class AddItem(DefaultView):
             function=self._add_item_main,
             title=f"Subscription Duration",
             )
-        m.reference = 'subscription_modal'
+        m.reference = 'subscription'
 
         duration = discord.ui.TextInput(
             label="Duration (in hours)",
