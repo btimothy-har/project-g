@@ -134,6 +134,7 @@ class Bank(commands.Cog):
         self.subscription_item_expiry.start()
     
     async def cog_unload(self):
+        self.subscription_item_expiry.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -819,7 +820,7 @@ class Bank(commands.Cog):
                             if not user:
                                 continue
 
-                            expiry_time = await item.get_expiry_time(user.id)
+                            expiry_time = await item.compute_user_expiry(user.id)
 
                             if expiry_time and pendulum.now() >= expiry_time:
                                 if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
