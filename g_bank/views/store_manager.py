@@ -145,6 +145,15 @@ class AddItem(DefaultView):
             reference='cash'
             )
     @property
+    def add_subscription_duration(self):
+        return DiscordButton(
+            function=self._add_subscription_duration,
+            label="Role (Add-Only)",
+            style=discord.ButtonStyle.grey,
+            row=2,
+            reference='roleadd'
+            )
+    @property
     def add_roleadd_item_button(self):
         return DiscordButton(
             function=self._add_item_start,
@@ -258,6 +267,9 @@ class AddItem(DefaultView):
         
         if self.new_item.type == 'random':
             self.add_item(self.random_item_selector)
+        
+        elif not self.new_item.bidirectional:
+            self.add_item(self.add_subscription_duration)
 
         embed = await self.add_item_creation_embed()
         await interaction.edit_original_response(embed=embed,view=self)
@@ -271,6 +283,13 @@ class AddItem(DefaultView):
     #     self.new_item.buy_message = modal.children[0].value
     #     await self._add_item_main(interaction,modal)
     
+    async def _add_subscription_duration(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.send_modal(self.add_subscription_duration_modal)
+    
+    async def _add_subscription_duration_callback(self,interaction:discord.Interaction,modal:DiscordModal):
+        duration = int(modal.children[0].value)
+        self.new_item.subscription_duration = duration
+    
     async def _save_item(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
@@ -280,14 +299,16 @@ class AddItem(DefaultView):
             title=f"**Add Item: {self.guild.name}**",
             message="```Item Added```"
                 + f"\n\n**Type**: `{item.type}`"
-                + (f"\n**Add-only**: `{True if not item.bidirectional else False}`" if item.type in ['role'] else "")
-                + (f"\n**Exclusive**: `{item.exclusive_role}`" if item.type in ['role'] else "")
                 + f"\n\n**Name**: `{item.name}`"
                 + f"\n**Price**: `{item.price:,}`"
                 + f"\n**Stock**: `{item.stock}`"
+                + f"\n**Expiry**: `{f'{item.subscription_duration} hours' if item.subscription_duration > 0 else 'Never'}`"
+                + f"\n**Requires**: `{getattr(item.required_role,'mention',None)}`"
                 + f"\n**Category**: `{item.category}`"
                 + f"\n**Description**: `{item.description}`"
-                + f"\n**Buy Message**: `{item.buy_message}`"
+                + (f"\n\n**Assigns Role**: `{getattr(item.associated_role,'mention',None)}`" if item.type in ['role'] else "")
+                + (f"\n**Add-only**: `{True if not item.bidirectional else False}`" if item.type in ['role'] else "")
+                + (f"\n**Exclusive**: `{item.exclusive_role}`" if item.type in ['role'] else "")
                 )
 
         self.clear_items()
@@ -303,10 +324,10 @@ class AddItem(DefaultView):
                 + f"\n\n`{'Name:':<15}` {self.new_item.name}"
                 + f"\n`{'Price:':<15}` {self.new_item.price:,}"
                 + f"\n`{'Stock:':<15}` {self.new_item.stock if self.new_item.stock != -1 else 'Infinite'}"
+                + f"\n`{'Expiry:':<15}` {f'{self.new_item.subscription_duration} hours' if self.new_item.subscription_duration > 0 else 'Never'}"
                 + f"\n`{'Requires:':<15}` {getattr(self.new_item.required_role,'mention',None)}"
                 + f"\n`{'Category:':<15}` {self.new_item.category}"
                 + f"\n`{'Description:':<15}` {self.new_item.description}"
-                + (f"\n\n`{'Buy Message:':<15}` {self.new_item.buy_message}" if self.new_item.type in ['cash','basic'] else "")
                 + (f"\n\n`{'Assigns Role:':<15}` {getattr(self.new_item.associated_role,'mention',None)}" if self.new_item.type in ['role'] else "")
                 + (f"\n`{'Add-only:':<15}` {True if not self.new_item.bidirectional else False}" if self.new_item.type in ['role'] else "")
                 + (f"\n`{'Exclusive:':<15}` {self.new_item.exclusive}" if self.new_item.type in ['role'] else "")
@@ -373,7 +394,23 @@ class AddItem(DefaultView):
         m.add_item(stock_field)
         m.add_item(category_field)
         m.add_item(description_field)        
-        return m   
+        return m
+    
+    @property
+    def add_subscription_duration_modal(self):
+        m = DiscordModal(
+            function=self._add_subscription_duration_callback,
+            title=f"Subscription Duration",
+            )
+        duration = discord.ui.TextInput(
+            label="Duration (in hours)",
+            placeholder="1 day = 24 hours",
+            max_length=30,
+            style=discord.TextStyle.short,
+            required=True
+            )        
+        m.add_item(duration)    
+        return m
 
     @property
     def save_item_button(self):

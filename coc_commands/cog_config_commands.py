@@ -233,7 +233,6 @@ class ClashServerConfig(commands.Cog):
         """
         Creates a new Forum Thread in the specified Forum Channel.
         """
-
         thread, msg = await channel.create_thread(
             name=title,
             content=message

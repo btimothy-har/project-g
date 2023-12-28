@@ -37,7 +37,6 @@
 ##### DISCORD PANELS
 #####
 ##################################################
-
 # db__guild_clan_panel = {
 #     '_id': { 'guild': int, 'channel': int },
 #     'server_id': int,

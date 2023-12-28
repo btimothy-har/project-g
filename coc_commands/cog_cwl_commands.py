@@ -307,7 +307,7 @@ class ClanWarLeagues(commands.Cog):
         embed = await clash_embed(
             context=context,
             title=f"Clan War Leagues with The Assassins Guild",
-            message=f"In the Guild, our clans collaborate together in the monthly Clan War Leagues."
+            message=f"In the Guild, our clans collaborate together in the monthly Clan War Leagues. "
                 + f"As a member of the Guild, you'll be able to play in a League that best suits your interest and/or skill level."
                 + f"\n\nThe information below details what a typical CWL season will look like."
                 + f"\n\u200b",
@@ -323,13 +323,13 @@ class ClanWarLeagues(commands.Cog):
             name="**About League Groups**",
             value="When registering for CWL, you are required to register individual accounts to a **League Group**."
                 + "\n\nLeague Groups provide a gauge to assist with rostering. The League Group you sign up for represents the **highest** league you are willing to play in. "
-                + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
+                + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Guild needs."
                 + "\n\nThere are currently 4 League Groups available:"
                 + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
                 + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
                 + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
-                + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
+                + "\n\nIf you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
                 + "\n\u200b",
             inline=False
             )
@@ -342,17 +342,26 @@ class ClanWarLeagues(commands.Cog):
             inline=False
             )
         embed.add_field(
+            name="**Rostering**",
+            value="Based on your indicated League Group and War Rank, you will be rostered into one of our CWL Clans for the CWL period."
+                + f"\n\n> **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
+                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster with the `/mycwl` command."
+                + "\n\n**Once rosters are published, your registration cannot be modified further. If you cannot participate in CWL, please contact a Leader immediately.**"
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
             name="**The War Rank System**",
             value=f"You might see the following icon on some of your player profiles: {EmojisUI.ELO}. This is your **War Rank**."
                 + f"\n\nWar Ranks are used for rostering players of equal Townhall and Hero Levels. The higher your War Rank, the more likely you will be rostered as close to your League Group as possible."
                 + "\n"
-                + f"\n__Rank Points are gained by playing in CWL.__"
+                + f"\n__Rank Points are gained by playing in CWL with our official CWL clans.__"
                 + f"\n- You lose -3 rank points for every war you are rostered in."
                 + f"\n- You gain: +1 for a 1-star hit, +2 for a 2-star hit, +4 for a 3-star hit."
                 + f"\n- For a hit against a different TH level, you gain/lose points based on the difference in TH levels."
                 + f"\n- Your final rank point gain/loss will be adjusted by the average Rank of your War Clan."
                 + "\n"
-                + f"\n__You can also gain Rank Points from regular wars.__"
+                + f"\n__You can also gain Rank Points from regular wars with our Guild Clans.__"
                 + f"\n- Only attacks against equivalent TH opponents count."
                 + f"\n- -1 for a 0-star hit"
                 + f"\n- -0.75 for a 1-star hit"
@@ -362,19 +371,20 @@ class ClanWarLeagues(commands.Cog):
             inline=False
             )
         embed.add_field(
-            name="**Rostering**",
-            value="Based on your indicated League Group and War Rank, you will be rostered into one of our CWL Clans for the CWL period. **You will be required to move to your rostered CWL Clan for the duration of the CWL period.**"
-                + "\n\nRosters will typically be published 1-2 days before the start of CWL. You will be able to view your roster with the `/mycwl` command."
-                + "\n\n**Important:** Once rosters are published, your registration cannot be modified further. If you cannot participate in CWL, please contact a Leader immediately."
-                + "\n\u200b",
-            inline=False
-            )
-        embed.add_field(
             name="**Useful Commands**",
             value=f"**/mycwl** - Manage your CWL Signups, Rosters, Stats."
                 + f"\n**/cwl info** - Shows this page!"
                 + f"\n**/cwl clan roster** - Shows a League Clan's CWL Roster."
                 + f"\n**/cwl clan group** - Shows a League Clan's CWL Group."
+                + "\n\u200b",
+            inline=False
+            )
+        embed.add_field(
+            name="**FAQs**",
+            value=f"**Q:** Will participating in Lazy CWL affect my War Rank?"
+                + f"\n**A:** Yes. Lazy CWL is identical to regular CWL, and so your War Rank will be affected. You can minimize your War Rank loss by going for safe-2 attacks."
+                + f"\n\n**Q:** If I have a low rank, will I be banned from CWL?"
+                + f"\n**A:** No. We do not ban players from CWL based on their War Rank. However, we do use War Rank to assist with rostering, and so you may be rostered in a lower league than your League Group."
                 + "\n\u200b",
             inline=False
             )

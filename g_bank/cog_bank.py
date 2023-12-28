@@ -6,6 +6,7 @@ import pendulum
 import xlsxwriter
 
 from typing import *
+from discord.ext import tasks
 
 from redbot.core import Config, commands, app_commands, bank
 from redbot.core.bot import Red
@@ -77,6 +78,8 @@ class Bank(commands.Cog):
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
 
+        self._subscription_lock = asyncio.Lock()
+
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
             "use_rewards":False,
@@ -126,7 +129,9 @@ class Bank(commands.Cog):
                 continue
             admin_role = self.bank_guild.get_role(self._bank_admin_role)
             if admin_role and admin_role not in guild_user.roles:
-                await guild_user.add_roles(admin_role)      
+                await guild_user.add_roles(admin_role)
+        
+        self.subscription_item_expiry.start()
     
     async def cog_unload(self):
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
@@ -787,6 +792,59 @@ class Bank(commands.Cog):
         a_iter = AsyncIter(members)
         tasks = [_distribute_rewards(player) async for player in a_iter]
         await bounded_gather(*tasks,return_exceptions=True,limit=1)
+    
+    ############################################################
+    ############################################################
+    ##### SUBSCRIPTION EXPIRY
+    ############################################################
+    ############################################################    
+    @tasks.loop(minutes=1.0)
+    async def subscription_item_expiry(self):
+        if self._subscription_lock.locked():
+            return
+        
+        async with self._subscription_lock:
+            items = await ShopItem.get_subscription_items()
+
+            i_iter = AsyncIter(items)
+            async for item in i_iter:
+                try:
+                    if not item.guild:
+                        continue
+
+                    u_iter = AsyncIter(item.subscription_log.items())
+                    async for user_id,timestamp in u_iter:
+                        try:
+                            user = item.guild.get_member(int(user_id))
+                            if not user:
+                                continue
+
+                            expiry_time = pendulum.from_timestamp(timestamp).add(hours=item.subscription_duration)
+                            if pendulum.now() >= expiry_time:
+                                if item.type == 'role' and item.assigns_role:
+                                    if item.assigns_role in user.roles:
+                                        await user.remove_roles(
+                                            item.assigns_role,
+                                            reason="Subscription Expired."
+                                            )
+                                else:
+                                    inventory = await UserInventory(user)
+                                    await inventory.remove_item_from_inventory(item)
+                                    await item.expire_item(user)
+                        
+                        except Exception as exc:
+                            await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."
+                                + f"```{exc}```")
+                            bot_client.coc_main_log.exception(
+                                f"Error expiring Shop Item {item.id} {item.name} for {user_id}."
+                                )
+                
+                except Exception as exc:
+                    await self.bot.send_to_owners(f"An error while expiring Shop Items. Check logs for details."
+                        + f"```{exc}```")
+                    bot_client.coc_main_log.exception(
+                        f"Error expiring Shop Item {item.id} {item.name}."
+                        )
 
     ############################################################
     ############################################################

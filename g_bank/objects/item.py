@@ -34,7 +34,8 @@ bot_client = BotClashClient()
 #   'disabled': bool,
 #   'role_id': int,
 #   'bidirectional_role': bool,
-#   'random_items': [ string ]
+#   'random_items': [ string ],
+#   'subscription_duration': int,
 #   }
 
 class ShopItem():
@@ -56,7 +57,9 @@ class ShopItem():
         'disabled',
         'role_id',
         'bidirectional_role',
-        'random_items'
+        'random_items',
+        'subscription_duration',
+        'subscription_log'
         ]
 
     @classmethod
@@ -65,6 +68,16 @@ class ShopItem():
         if query:
             return cls(query)
         return None
+    
+    @classmethod
+    async def get_subscription_items(cls) -> List['ShopItem']:
+        query = bot_client.coc_db.db__shop_item.find(
+            {
+                'subscription_duration':{'$gt':0},
+                'disabled':False
+                }
+            )
+        return [cls(item) async for item in query]
 
     @classmethod
     async def get_by_guild(cls,guild_id:int):        
@@ -100,6 +113,9 @@ class ShopItem():
         self.bidirectional_role = database_entry.get('bidirectional_role',False)
         
         self.random_items = database_entry.get('random_items',[])
+        
+        self.subscription_duration = database_entry.get('subscription_duration',0)
+        self.subscription_log = database_entry.get('subscription_log',{})
     
     def __str__(self):
         return f"{self.type.capitalize()} Item: {self.name} (Price: {self.price:,})"
@@ -128,6 +144,9 @@ class ShopItem():
     @property
     def required_role(self) -> Optional[discord.Role]:
         return self.guild.get_role(self._required_role)
+    @property
+    def subscription(self) -> bool:
+        return self.subscription_duration > 0
     
     def can_i_buy(self,member:discord.Member) -> bool:
         if self.disabled:
@@ -156,6 +175,11 @@ class ShopItem():
                     return_document=ReturnDocument.AFTER
                     )
                 self._stock = item['stock']
+    
+    async def expire_item(self,user:discord.Member):
+        async with self.lock:
+            del self.subscription_log[str(user.id)]
+            bot_client.coc_main_log.info(f"{self.id} {self.name} expired for {user.id} {user.name}.")
 
     async def restock(self,quantity:int=1):
         async with self.lock:
@@ -247,6 +271,9 @@ class NewShopItem():
         self.bidirectional = False
 
         self.random_items = None
+
+        self.subscription = False
+        self.subscription_duration = 0
     
     @property
     def ready_to_save(self):
@@ -280,6 +307,8 @@ class NewShopItem():
             required_role=getattr(self.required_role,'id',None),
             role_id=getattr(self.associated_role,'id',None),
             bidirectional_role=self.bidirectional,
-            random_items=self.random_items
+            random_items=self.random_items,
+            subscription=self.subscription,
+            subscription_duration=self.subscription_duration
             )
         return item

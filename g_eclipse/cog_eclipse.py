@@ -17,6 +17,8 @@ from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu
 from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_size
 from coc_main.utils.checks import is_member
 
+from g_bank.objects.inventory import UserInventory
+
 from .views.base_vault import BaseVaultMenu
 from .objects.war_base import eWarBase
 from .components import eclipse_embed

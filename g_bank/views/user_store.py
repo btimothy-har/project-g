@@ -239,7 +239,7 @@ class UserStore(DefaultView):
         purchase_button = self.purchase_button
         inventory = await UserInventory(interaction.user)
 
-        if self.current_item.type in ['cash'] and inventory.has_item(self.current_item):
+        if inventory.has_item(self.current_item) and (self.current_item.type in ['cash'] or self.current_item.subscription):
             purchase_button.disabled = True
             purchase_button.label = f"You can only have 1 of this item."
             purchase_button.style = discord.ButtonStyle.grey
