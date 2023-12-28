@@ -333,25 +333,28 @@ class UserStore(DefaultView):
             inline=True
             )
         item_embed.add_field(
-            name="Requires",
-            value=f"{self.current_item.required_role.mention if self.current_item.required_role else 'None'}",
-            inline=True
-            )
-        item_embed.add_field(
-            name="Category",
-            value=f"{self.current_item.category}",
-            inline=True
-            )        
-        item_embed.add_field(
-            name="Description",
-            value=f"{self.current_item.description}",
-            inline=True
-            )
-        item_embed.add_field(
             name="Expires",
             value=f"{self.current_item.subscription_duration} hour(s)" if self.current_item.subscription else "Never",
             inline=True
             )
+        
+        
+        item_embed.add_field(
+            name="Category",
+            value=f"{self.current_item.category}",
+            inline=True
+            )      
+        item_embed.add_field(
+            name="Requires",
+            value=f"{self.current_item.required_role.mention if self.current_item.required_role else 'None'}",
+            inline=True
+            )
+          
+        item_embed.add_field(
+            name="Description",
+            value=f"{self.current_item.description}",
+            inline=False
+            )        
                 
         if self.current_item.type in ['basic','cash']:
             item_embed.add_field(
