@@ -131,7 +131,7 @@ class CWLRosterMenu(DefaultView):
 
         tasks = [player.save_roster_clan() for player in self.modified_to_save]
         await bounded_gather(*tasks)
-        self.modified_to_save = []
+        self._modified_to_save = []
 
         self.all_participants = await WarLeaguePlayer.signups_by_season(self.season)
         await self.add_main_menu()
@@ -231,7 +231,7 @@ class CWLRosterMenu(DefaultView):
                 break
             player = self.get_league_player(t)
             player.roster_clan = self.clan
-            self.modified_to_save.append(player)
+            self._modified_to_save.append(player)
             
         embeds = await self.clan_embed()
         await self.add_player_menu()
@@ -247,7 +247,7 @@ class CWLRosterMenu(DefaultView):
         async for t in tags:
             player = self.get_league_player(t)
             player.roster_clan = None
-            self.modified_to_save.append(player)
+            self._modified_to_save.append(player)
        
         embeds = await self.clan_embed()
         await self.add_main_menu()
@@ -745,7 +745,7 @@ class CWLRosterMenu(DefaultView):
         async for p in a_iter:
             cwl_player = self.get_league_player(p.tag)
             cwl_player.roster_clan = self.clan
-            self.modified_to_save.append(cwl_player)
+            self._modified_to_save.append(cwl_player)
 
             clan_participants = [p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag]
             if len(clan_participants) >= max_participants:
