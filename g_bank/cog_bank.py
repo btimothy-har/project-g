@@ -988,23 +988,24 @@ class Bank(commands.Cog):
     @app_commands.guild_only()
     @app_commands.autocomplete(select_clan=autocomplete_clans_coleader)
     @app_commands.describe(
-        select_user="Select a User to view balances for. Only usable by Bank Admins.",
-        select_clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
-    async def app_command_bank_balance(self,interaction:discord.Interaction,select_user:Optional[discord.Member]=None,select_clan:Optional[str]=None):        
+        user="Select a User to view balances for. Only usable by Bank Admins.",
+        clan="Select a Clan to view balances for. Only usable by Clan Leaders and Co-Leaders.")
+    async def app_command_bank_balance(self,interaction:discord.Interaction,user:Optional[discord.Member]=None,clan:Optional[str]=None):        
         
         await interaction.response.defer(ephemeral=True)
 
-        if select_clan:
-            clan = await self.client.fetch_clan(select_clan)
-            embed = await self.helper_show_balance(interaction,clan)
-        elif select_user:
+        if clan:
+            s_clan = await self.client.fetch_clan(clan)
+            embed = await self.helper_show_balance(interaction,s_clan)
+            
+        elif user:
             if not is_bank_admin(interaction):
                 return await interaction.followup.send("You do not have permission to view other users' balances.")
             
-            member = await aMember(select_user.id,interaction.guild.id)
+            member = await aMember(user.id,interaction.guild.id)
             embed = await clash_embed(
                 context=interaction,
-                message=f"{select_user.display_name} has **{await bank.get_balance(member.discord_member):,} {await bank.get_currency_name()}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
+                message=f"{user.mention} has **{await bank.get_balance(member.discord_member):,} {await bank.get_currency_name()}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
                 timestamp=pendulum.now()
                 )
         else:
