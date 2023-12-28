@@ -467,7 +467,7 @@ class AddItem(DefaultView):
             placeholder="Select a Role to grant on purchase.",
             min_values=1,
             max_values=1,
-            row=1
+            row=3
             )
         role_select.reference = 'associatedrole'
         return role_select
@@ -489,7 +489,7 @@ class AddItem(DefaultView):
             options=select_options,
             min_values=2,
             max_values=len(select_options),
-            row=1,
+            row=3,
             reference='randomitems'
             )
         return item_select
