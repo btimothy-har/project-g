@@ -171,7 +171,7 @@ class ShopItem():
             if bot_client.bot.user.id == 828838353977868368:
                 expiry_time = pendulum.from_timestamp(timestamp).add(minutes=self.subscription_duration)
             else:
-                expiry_time = pendulum.from_timestamp(timestamp).add(hours=self.subscription_duration)
+                expiry_time = pendulum.from_timestamp(timestamp).add(days=self.subscription_duration)
             return expiry_time
         return None
 

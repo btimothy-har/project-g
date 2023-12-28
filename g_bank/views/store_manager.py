@@ -293,7 +293,7 @@ class AddItem(DefaultView):
                 + f"\n\n**Name**: `{item.name}`"
                 + f"\n**Price**: `{item.price:,}`"
                 + f"\n**Stock**: `{item.stock}`"
-                + f"\n**Expiry**: `{f'{item.subscription_duration} hours' if item.subscription_duration > 0 else 'Never'}`"
+                + f"\n**Expiry**: `{f'{item.subscription_duration} days' if item.subscription_duration > 0 else 'Never'}`"
                 + f"\n**Requires**: `{getattr(item.required_role,'mention',None)}`"
                 + f"\n**Category**: `{item.category}`"
                 + f"\n**Description**: `{item.description}`"
@@ -315,7 +315,7 @@ class AddItem(DefaultView):
                 + f"\n\n`{'Name:':<15}` {self.new_item.name}"
                 + f"\n`{'Price:':<15}` {self.new_item.price:,}"
                 + f"\n`{'Stock:':<15}` {self.new_item.stock if self.new_item.stock != -1 else 'Infinite'}"
-                + f"\n`{'Expiry:':<15}` {f'{self.new_item.subscription_duration} hours' if self.new_item.subscription_duration > 0 else 'Never'}"
+                + f"\n`{'Expiry:':<15}` {f'{self.new_item.subscription_duration} days' if self.new_item.subscription_duration > 0 else 'Never'}"
                 + f"\n`{'Requires:':<15}` {getattr(self.new_item.required_role,'mention',None)}"
                 + f"\n`{'Category:':<15}` {self.new_item.category}"
                 + f"\n`{'Description:':<15}` {self.new_item.description}"
@@ -396,7 +396,7 @@ class AddItem(DefaultView):
         m.reference = 'subscription'
 
         duration = discord.ui.TextInput(
-            label="Expiration Period (in hours)",
+            label="Expiration Period (in days)",
             placeholder="To remove, enter 0.",
             max_length=30,
             style=discord.TextStyle.short,

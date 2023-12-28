@@ -334,7 +334,7 @@ class UserStore(DefaultView):
             )
         item_embed.add_field(
             name="Expires",
-            value=f"{self.current_item.subscription_duration} hour(s)" if self.current_item.subscription else "Never",
+            value=f"{self.current_item.subscription_duration} day(s)" if self.current_item.subscription else "Never",
             inline=True
             )
         
