@@ -412,14 +412,15 @@ class BaseVaultMenu(DefaultView):
         base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
             + f"\n\nWe have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
             + f"Bases are refreshed periodically, and expire after a certain period of time:"
-            + f"\n- For {EmojisTownHall.get(max_th)} TH{max_th}: after 4 month(s)"
-            + f"\n- For {EmojisTownHall.get(max_th-1)} TH{max_th-1}: after 6 month(s)"
-            + f"\n- For {EmojisTownHall.get(max_th-2)} TH{max_th-2}: after 9 month(s)"
-            + f"\n- All other THs: after 12 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th)} TH{max_th}: after 4 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th-1)} TH{max_th-1}: after 6 month(s)"
+            + f"\n- {EmojisTownHall.get(max_th-2)} TH{max_th-2}: after 9 month(s)"
+            + f"\n- Other THs: after 12 month(s)"
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
             + f"\n\n**__Getting Base Links__**"
             + f"\n- Base Links are provided as-is. Supercell expires base links from time to time, and you may occassionally encounter expired links."
             + f"\n- To get a base link, you will need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH. Lower TH levels cost less."
+            + f"\n- Purchasing a Vault Pass lets you access bases for free for a limited period."
             + f"\n- Once claimed, the base link is sent to your DMs and added to your Personal Vault."
             + f"\n\n**__Personal Vault__**"
             + f"\n- Bases that you have claimed are added to your personal vault. You may retrieve their base links at any time from here."
@@ -429,7 +430,7 @@ class BaseVaultMenu(DefaultView):
         embed = await eclipse_embed(
             context=self.ctx,
             title="**Assassins Base Vault**",
-            message=(f"### **We don't have any bases currently for Townhall {no_base}.**\n\n" if no_base else '')
+            message=(f"## **Oops! We currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
                 + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
