@@ -390,7 +390,7 @@ class AddItem(DefaultView):
     @property
     def add_subscription_duration_modal(self):
         m = DiscordModal(
-            function=self._add_subscription_duration_callback,
+            function=self._add_item_main,
             title=f"Subscription Duration",
             )
         m.reference = 'subscription_modal'
