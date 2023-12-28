@@ -57,7 +57,9 @@ class eWarBase(AwaitLoader):
     async def by_townhall_level(cls,townhall:int):
         if townhall == max_th:
             cutoff = pendulum.now().subtract(months=4).int_timestamp
-        elif townhall == max_th - 1 or townhall == max_th - 2:
+        elif townhall == max_th - 1:
+            cutoff = pendulum.now().subtract(months=6).int_timestamp
+        elif townhall == max_th - 2:
             cutoff = pendulum.now().subtract(months=9).int_timestamp
         else:
             cutoff = pendulum.now().subtract(months=12).int_timestamp
