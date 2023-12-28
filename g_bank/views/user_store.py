@@ -321,12 +321,7 @@ class UserStore(DefaultView):
             message=f"**You have: {bal:,} {currency}**\n"
                 + f"```{self.current_item.name}```"
                 )
-
-        item_embed.add_field(
-            name="Category",
-            value=f"{self.current_item.category}",
-            inline=False
-            )        
+        
         item_embed.add_field(
             name="Price",
             value=f"{self.current_item.price:,} {currency}",
@@ -341,11 +336,21 @@ class UserStore(DefaultView):
             name="Requires",
             value=f"{self.current_item.required_role.mention if self.current_item.required_role else 'None'}",
             inline=True
+            )
+        item_embed.add_field(
+            name="Category",
+            value=f"{self.current_item.category}",
+            inline=True
             )        
         item_embed.add_field(
             name="Description",
             value=f"{self.current_item.description}",
-            inline=False
+            inline=True
+            )
+        item_embed.add_field(
+            name="Expires",
+            value=f"{self.current_item.subscription_duration} hour(s)" if self.current_item.subscription else "Never",
+            inline=True
             )
                 
         if self.current_item.type in ['basic','cash']:
