@@ -112,7 +112,7 @@ class UserInventory(AwaitLoader):
             )
             await self.load()
 
-    async def purchase_item(self,item:ShopItem):
+    async def purchase_item(self,item:ShopItem,free_purchase:bool=False):
         member = item.guild.get_member(self.user.id)
         await item.purchase(member)
 
@@ -144,6 +144,8 @@ class UserInventory(AwaitLoader):
                 
                 await member.add_roles(item.assigns_role)
         
+        if free_purchase:
+            return item
         await bank.withdraw_credits(self.user,item.price)
         return item
 

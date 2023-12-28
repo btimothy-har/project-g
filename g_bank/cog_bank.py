@@ -40,7 +40,7 @@ from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
 from .checks import is_bank_admin, is_payday_server, is_coleader_or_bank_admin
-from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items, autocomplete_redeem_items
 
 from mee6rank.mee6rank import Mee6Rank
 
@@ -894,31 +894,6 @@ class Bank(commands.Cog):
     #####    
     ############################################################
     ############################################################    
-    @commands.command(name="colorexp")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def bulk_update_colorexp(self,ctx:commands.Context):
-        count = 0
-
-        items = await ShopItem.get_by_guild_category(1132581106571550831,'Discord Colors')
-        i_iter = AsyncIter(items)
-        async for item in i_iter:
-            if not item.assigns_role:
-                continue
-
-            u_iter = AsyncIter(item.assigns_role.members)
-            async for member in u_iter:
-                item.subscription_log[str(member.id)] = pendulum.now().int_timestamp
-
-            await bot_client.coc_db.db__shop_item.update_one(
-                {'_id':item._id},
-                {'$set':{
-                    'subscription_duration':60,
-                    'subscription_log':item.subscription_log
-                    }
-                })
-            count += 1
-        await ctx.reply(f"Updated {count} items.")
     
     ##################################################
     ### PARENT COMMAND GROUPS
@@ -1897,7 +1872,7 @@ class Bank(commands.Cog):
     @app_commands.check(is_admin)
     @app_commands.autocomplete(item=autocomplete_distribute_items)
     @app_commands.describe(
-        item="Select an item to distribute. Only Basic items can be distributed.",
+        item="Select an item to distribute.",
         user="Select a user to distribute to."
         )
     async def app_command_distribute_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
@@ -1911,9 +1886,9 @@ class Bank(commands.Cog):
         get_item = await ShopItem.get_by_id(item)
 
         inventory = await UserInventory(user)
-        await inventory.add_item_to_inventory(get_item)
+        await inventory.purchase_item(get_item,True)
 
-        return await interaction.followup.send(f"1x **{get_item.name}** has been added to {user.mention}'s inventory.",ephemeral=True)
+        return await interaction.followup.send(f"1x **{get_item.name}** has been distributed to {user.mention}.",ephemeral=True)
 
     @app_command_group_shopitem.command(
         name="distribute-all",
@@ -1925,7 +1900,6 @@ class Bank(commands.Cog):
         item="Select an item to distribute. Only Basic items can be distributed."
         )
     async def app_command_distribute_all_item(self,interaction:discord.Interaction,item:str):
-
         await interaction.response.defer(ephemeral=True)
         count = 0
         u_iter = AsyncIter(interaction.client.users)
@@ -1935,7 +1909,7 @@ class Bank(commands.Cog):
             count += 1
             get_item = await ShopItem.get_by_id(item)
             inventory = await UserInventory(user)
-            await inventory.add_item_to_inventory(get_item)
+            await inventory.purchase_item(get_item,True)
 
         return await interaction.followup.send(f"1x **{get_item.name}** has been added to {count} users.",ephemeral=True)
 
@@ -1960,7 +1934,7 @@ class Bank(commands.Cog):
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_distribute_items)
+    @app_commands.autocomplete(item=autocomplete_redeem_items)
     @app_commands.describe(
         item="Select an item to redeem.",
         user="Select a user to redeem from."

@@ -144,9 +144,9 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
     try:
         items = await ShopItem.get_by_guild(interaction.guild.id)
         if interaction.user.id in interaction.client.owner_ids:
-            guild_items = [i for i in items if i.type in ['basic','cash']]
+            guild_items = [i for i in items]
         else:
-            guild_items = [i for i in items if i.type == 'basic']
+            guild_items = [i for i in items if i.type != 'cash']
 
         if not current:
             selection = guild_items
@@ -164,6 +164,28 @@ async def autocomplete_distribute_items(interaction:discord.Interaction,current:
             ]
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_distribute_items")
+
+async def autocomplete_redeem_items(interaction:discord.Interaction,current:str):
+    try:
+        items = await ShopItem.get_by_guild(interaction.guild.id)        
+        guild_items = [i for i in items if i.type == 'basic']
+
+        if not current:
+            selection = guild_items
+            return [app_commands.Choice(
+                name=f"{item}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+        else:
+            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
+            return [app_commands.Choice(
+                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
+                value=item.id)
+            for item in random.sample(selection,min(len(selection),5))
+            ]
+    except Exception:
+        bot_client.coc_main_log.exception("Error in autocomplete_redeem_items")
 
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
