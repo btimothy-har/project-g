@@ -812,19 +812,16 @@ class Bank(commands.Cog):
                     if not item.guild:
                         continue
 
-                    u_iter = AsyncIter(item.subscription_log.items())
+                    u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
                             user = item.guild.get_member(int(user_id))
                             if not user:
                                 continue
 
-                            if self.bot.user.id == 828838353977868368:
-                                expiry_time = pendulum.from_timestamp(timestamp).add(minutes=item.subscription_duration)
-                            else:
-                                expiry_time = pendulum.from_timestamp(timestamp).add(hours=item.subscription_duration)
-                                
-                            if pendulum.now() >= expiry_time:
+                            expiry_time = await item.get_expiry_time(user.id)
+
+                            if expiry_time and pendulum.now() >= expiry_time:
                                 if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                                     if item.assigns_role in user.roles:
                                         await user.remove_roles(

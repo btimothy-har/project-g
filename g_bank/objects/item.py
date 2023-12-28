@@ -164,6 +164,16 @@ class ShopItem():
             elif self.role_id in [r.id for r in member.roles]:
                 return False
         return True
+    
+    async def compute_user_expiry(self,user_id:int) -> Optional[pendulum.DateTime]:
+        timestamp = self.subscription_log.get(str(user_id),None)
+        if timestamp:
+            if self.bot.user.id == 828838353977868368:
+                expiry_time = pendulum.from_timestamp(timestamp).add(minutes=self.subscription_duration)
+            else:
+                expiry_time = pendulum.from_timestamp(timestamp).add(hours=self.subscription_duration)
+            return expiry_time
+        return None
 
     async def purchase(self,user:discord.Member,quantity:int=1):        
         async with self.lock:
