@@ -325,8 +325,11 @@ class WarLeagueClan(BasicClan):
                 upsert=True)
             bot_client.coc_data_log.info(f"{str(self)} was removed from CWL.")
 
-    async def open_roster(self):
-        async with self._lock:
+    async def open_roster(self,skip_lock:bool=False):
+        if not skip_lock:
+            await self._lock.acquire()
+
+        try:
             self.roster_open = True
             await bot_client.coc_db.db__war_league_clan.update_one(
                 {'_id':self.db_id},
@@ -338,9 +341,18 @@ class WarLeagueClan(BasicClan):
                 },
                 upsert=True)
             bot_client.coc_data_log.info(f"{str(self)} opened roster for CWL.")
+        
+        except:
+            raise
+
+        finally:
+            if not skip_lock:
+                self._lock.release()
     
-    async def close_roster(self):
-        async with self._lock:
+    async def close_roster(self,skip_lock:bool=False):
+        if not skip_lock:
+            await self._lock.acquire()        
+        try:
             self.roster_open = False
             await bot_client.coc_db.db__war_league_clan.update_one(
                 {'_id':self.db_id},
@@ -352,13 +364,19 @@ class WarLeagueClan(BasicClan):
                 },
                 upsert=True)
             bot_client.coc_data_log.info(f"{str(self)} opened roster for CWL.")
+        
+        except:
+            raise
+        finally:
+            if not skip_lock:
+                self._lock.release()
 
     async def finalize_roster(self) -> bool:
         async with self._lock:
-            await self.close_roster()
+            await self.close_roster(skip_lock=True)
             participants = await self.get_participants()
             if len(participants) < 15:
-                await self.open_roster()
+                await self.open_roster(skip_lock=True)
                 return False
 
             role = self.league_clan_role
