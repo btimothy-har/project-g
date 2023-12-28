@@ -410,10 +410,10 @@ class BaseVaultMenu(DefaultView):
         curr = await bank.get_currency_name()
 
         base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
-            + f"\n\nHere in the Base Vault, we have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
+            + f"\n\nWe have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
             + f"Bases are refreshed periodically, and expire after a certain period of time:"
-            + f"\n- For the current highest TH: after 4 month(s)"
-            + f"\n- For the second and third highest TH: after 9 month(s)"
+            + f"\n- For {EmojisTownHall.get(max_th)} TH{max_th}: after 4 month(s)"
+            + f"\n- For {EmojisTownHall.get(max_th-1)} TH{max_th-1} and {EmojisTownHall.get(max_th-2)} TH{max_th-2}: after 9 month(s)"
             + f"\n- All other THs: after 12 month(s)"
             + f"\n\n**It is your responsibility to ensure that no one else in Clan Wars are using the same base as you.**"
             + f"\n\n**__Getting Base Links__**"
@@ -428,7 +428,7 @@ class BaseVaultMenu(DefaultView):
         embed = await eclipse_embed(
             context=self.ctx,
             title="**Assassins Base Vault**",
-            message=(f"**We don't have any bases currently for Townhall {no_base}.**\n\n" if no_base else '')
+            message=(f"### **We don't have any bases currently for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
                 + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
