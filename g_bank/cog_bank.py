@@ -832,8 +832,12 @@ class Bank(commands.Cog):
                                 else:
                                     inventory = await UserInventory(user)
                                     await inventory.remove_item_from_inventory(item)
-
+                                
                                 await item.expire_item(user)
+                                try:
+                                    await user.send(f"Your {item.name} has expired.")
+                                except:
+                                    pass
                         
                         except Exception as exc:
                             await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."
@@ -873,8 +877,7 @@ class Bank(commands.Cog):
     ##### - shop-items / restock
     #####    
     ############################################################
-    ############################################################
-    
+    ############################################################    
     @commands.command(name="colorexp")
     @commands.guild_only()
     @commands.is_owner()

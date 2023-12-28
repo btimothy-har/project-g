@@ -8,7 +8,7 @@ import urllib
 from typing import *
 
 from discord.ext import tasks
-from redbot.core import commands, app_commands
+from redbot.core import Config, commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 from redbot.core.utils import AsyncIter
@@ -60,6 +60,13 @@ class ECLIPSE(commands.Cog):
         if not os.path.exists(self.bot.base_image_path):
             os.makedirs(self.bot.base_image_path)
 
+        self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
+        default_global = {
+            "vault_pass_guild": 0,
+            "vault_pass_role": 0,
+            }
+        self.config.register_global(**default_global)
+
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
@@ -71,26 +78,30 @@ class ECLIPSE(commands.Cog):
     @property
     def dump_channel(self) -> discord.TextChannel:
         return self.bot.get_channel(self._dump_channel)
+    
+    @property
+    def vault_pass_guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self._vault_pass_guild)
+    
+    @property
+    def vault_pass(self) -> Optional[discord.Role]:
+        if self.vault_pass_guild:
+            return self.vault_pass_guild.get_role(self._vault_pass_role)
+        return None
 
     async def cog_load(self):        
         self.delete_dump_messages.start()
+        try:
+            self._vault_pass_guild = await self.config.vault_pass_guild()
+        except:
+            self._vault_pass_guild = 0
+        try:
+            self._vault_pass_role = await self.config.vault_pass_role()
+        except:
+            self._vault_pass_role = 0
     
     async def cog_unload(self):
         self.delete_dump_messages.cancel()
-    
-    async def clear_dump_messages(self):
-        async with self._dump_lock:
-            if not self.dump_channel:
-                return            
-            async for message in self.dump_channel.history(limit=30):
-                try:
-                    if message.author.id == self.bot.user.id:
-                        if message.id in self.dump_messages:
-                            self.dump_messages.remove(message.id)
-                        await message.delete()
-                except Exception:
-                    bot_client.coc_main_log.exception(f"Error deleting ECLIPSE Dump Message {message.id} in {self.dump_channel.id}.")
-                    continue
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -122,7 +133,21 @@ class ECLIPSE(commands.Cog):
     async def delete_dump_messages(self):
         if self._dump_lock.locked():
             return
-        await self.clear_dump_messages()        
+        await self.clear_dump_messages()
+
+    async def clear_dump_messages(self):
+        async with self._dump_lock:
+            if not self.dump_channel:
+                return            
+            async for message in self.dump_channel.history(limit=30):
+                try:
+                    if message.author.id == self.bot.user.id:
+                        if message.id in self.dump_messages:
+                            self.dump_messages.remove(message.id)
+                        await message.delete()
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error deleting ECLIPSE Dump Message {message.id} in {self.dump_channel.id}.")
+                    continue    
     
     ############################################################
     ############################################################
@@ -131,24 +156,33 @@ class ECLIPSE(commands.Cog):
     ##### - eclipse
     #####
     ############################################################
-    ############################################################    
-    async def check_base_pass(self,user:Union[discord.User,discord.Member]) -> bool:
-        chk = False
+    ############################################################                
+    @commands.group(name="eclipseset")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_group_eclipseset(self,ctx):
+        """
+        Config for E.C.L.I.P.S.E.
+        """
+        if not ctx.invoked_subcommand:
+            pass
+                
+    @command_group_eclipseset.command(name="vaultpass")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_eclipseset_vaultpass(self,ctx:commands.Context,role:discord.Role):
+        """
+        [Owner only] Assign a Role as a Vault Pass.
+        """
 
-        if self.bot.user.id == 828838353977868368:
-            items = await ShopItem.get_by_guild(680798075685699691) #bkt hub
-        else:
-            items = await ShopItem.get_by_guild(1132581106571550831) #assassins
-        
-        find_pass = [i for i in items if i.name.startswith("Vault Pass")]
-        if len(find_pass) > 0:
-            inventory = await UserInventory(user)
-            i_iter = AsyncIter(find_pass)
-            async for item in i_iter:
-                if inventory.has_item(item):
-                    chk = True
-                    break
-        return chk
+        self._vault_pass_guild = role.guild.id
+        self._vault_pass_role = role.id
+        await ctx.reply(f"Vault Pass set to {role.name} `{role.id}`.")
+
+        await self.config.vault_pass_guild.set(role.guild.id)
+        await self.config.vault_pass_role.set(role.id)
+
+        await ctx.tick()        
 
     ##################################################
     ### BASE VAULT
@@ -159,7 +193,7 @@ class ECLIPSE(commands.Cog):
     async def command_eclipse_base_vault(self,ctx):
         """
         Access the E.C.L.I.P.S.E. Base Vault.
-        """    
+        """
         if isinstance(ctx.channel,discord.Thread):
             embed = await eclipse_embed(
                 context=ctx,

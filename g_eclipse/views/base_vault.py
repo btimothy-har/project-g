@@ -20,18 +20,31 @@ def calculate_price(townhall:int):
 
 class BaseVaultMenu(DefaultView):
     def __init__(self,
-        context:Union[commands.Context,discord.Interaction],
-        has_pass:bool=False):
+        context:Union[commands.Context,discord.Interaction]):
         
         self.vault_mode = False
         self.base_th = 0
         self.base_index = 0
         self.all_bases = []
         self.base_selector = []
-        self.has_pass = has_pass
 
         self.base_select_menu = None
         super().__init__(context,timeout=900)
+    
+    @property
+    def has_pass(self) -> bool:
+        cog = self.bot.get_cog("ECLIPSE")
+        if not cog.vault_pass_guild:
+            return False
+        if not cog.vault_pass:
+            return False
+        
+        guild_user = cog.vault_pass_guild.get_member(self.user.id)
+        if not guild_user:
+            return False
+        if cog.vault_pass in guild_user.roles:
+            return True
+        return False
     
     @property
     def home_button(self):
@@ -420,7 +433,7 @@ class BaseVaultMenu(DefaultView):
             + f"\n\n**__Getting Base Links__**"
             + f"\n- Base Links are provided as-is. Supercell expires base links from time to time, and you may occassionally encounter expired links."
             + f"\n- To get a base link, you will need to claim a base. Claiming a base costs 5,000 {curr} for the highest TH. Lower TH levels cost less."
-            + f"\n- Purchasing a Vault Pass lets you access bases for free for a limited period."
+            + f"\n- Purchasing a Vault Pass lets you access bases for free for a limited period. Vault Passes can only be purchased from The Assassins Guild."
             + f"\n- Once claimed, the base link is sent to your DMs and added to your Personal Vault."
             + f"\n\n**__Personal Vault__**"
             + f"\n- Bases that you have claimed are added to your personal vault. You may retrieve their base links at any time from here."
@@ -430,7 +443,7 @@ class BaseVaultMenu(DefaultView):
         embed = await eclipse_embed(
             context=self.ctx,
             title="**Assassins Base Vault**",
-            message=(f"## **Oops! We currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
+            message=(f"## **Oops!\nWe currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
                 + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
