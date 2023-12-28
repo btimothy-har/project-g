@@ -197,16 +197,14 @@ class ShopItem():
             if self.subscription:
                 doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
                 self.subscription_log = doc.get('subscription_log',{})
+                self.subscription_log[str(user.id)] = pendulum.now().timestamp()
 
-                if str(user.id) not in self.subscription_log:
-                    self.subscription_log[str(user.id)] = pendulum.now().timestamp()
-
-                    await bot_client.coc_db.db__shop_item.update_one(
-                        {'_id':self._id},
-                        {'$set':
-                            {'subscription_log':self.subscription_log}
-                            }
-                        )
+                await bot_client.coc_db.db__shop_item.update_one(
+                    {'_id':self._id},
+                    {'$set':
+                        {'subscription_log':self.subscription_log}
+                        }
+                    )
 
             if self._stock > 0:
                 item = await bot_client.coc_db.db__shop_item.find_one_and_update(
