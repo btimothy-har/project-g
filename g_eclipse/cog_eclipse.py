@@ -204,8 +204,7 @@ class ECLIPSE(commands.Cog):
             await ctx.reply(embed=embed,delete_after=60)
             return
         
-        chk = await self.check_base_pass(ctx.author)
-        menu = BaseVaultMenu(ctx,chk)
+        menu = BaseVaultMenu(ctx)
         await menu.start()
     
     @app_commands.command(name="eclipse",
@@ -226,8 +225,7 @@ class ECLIPSE(commands.Cog):
             await interaction.followup.send(embed=embed,ephemeral=True)
             return       
         
-        chk = await self.check_base_pass(interaction.user)
-        menu = BaseVaultMenu(interaction,chk)
+        menu = BaseVaultMenu(interaction)
         await menu.start()
     
     @commands.command(name="addbase")
