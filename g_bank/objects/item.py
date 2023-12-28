@@ -2,6 +2,7 @@ import asyncio
 import bson
 import discord
 import random
+import pendulum
 
 from typing import *
 
@@ -36,6 +37,7 @@ bot_client = BotClashClient()
 #   'bidirectional_role': bool,
 #   'random_items': [ string ],
 #   'subscription_duration': int,
+#   'subscription_log': { user_id: int }
 #   }
 
 class ShopItem():
@@ -168,6 +170,20 @@ class ShopItem():
             if not self.can_i_buy(user):
                 raise CannotPurchase(self)
 
+            if self.subscription:
+                doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
+                self.subscription_log = doc.get('subscription_log',{})
+
+                if str(user.id) not in self.subscription_log:
+                    self.subscription_log[str(user.id)] = pendulum.now().timestamp()
+
+                    item = await bot_client.coc_db.db__shop_item.update_one(
+                        {'_id':self._id},
+                        {'$set':
+                            {'subscription_log':self.subscription_log}
+                            }
+                        )
+
             if self._stock > 0:
                 item = await bot_client.coc_db.db__shop_item.find_one_and_update(
                     {'_id':self._id},
@@ -243,7 +259,8 @@ class ShopItem():
                 'disabled':False,
                 'role_id':kwargs.get('role_id') if kwargs.get('role_id') else 0,
                 'bidirectional_role':kwargs.get('bidirectional_role') if kwargs.get('bidirectional_role') else False,
-                'random_items':kwargs.get('random_items') if kwargs.get('random_items') else []
+                'random_items':kwargs.get('random_items') if kwargs.get('random_items') else [],
+                'subscription_duration':kwargs.get('subscription_duration') if kwargs.get('subscription_duration') else 0,
                 }
             )
         item = await cls.get_by_id(str(new_item.inserted_id))
@@ -272,7 +289,6 @@ class NewShopItem():
 
         self.random_items = None
 
-        self.subscription = False
         self.subscription_duration = 0
     
     @property
@@ -308,7 +324,6 @@ class NewShopItem():
             role_id=getattr(self.associated_role,'id',None),
             bidirectional_role=self.bidirectional,
             random_items=self.random_items,
-            subscription=self.subscription,
             subscription_duration=self.subscription_duration
             )
         return item
