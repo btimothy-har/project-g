@@ -273,10 +273,16 @@ class ClanWarLeagues(commands.Cog):
         
         if clan.league_group_id:
             roster = await clan.compute_lineup_stats()
+            return_info = [p.assistant_cwl_json() for p in roster]
+            unique_users = list(set([p.discord_user for p in roster]))
+
+            return f"The roster for {clan.name} in {self.active_war_league_season.description} has {len(return_info)} players with {len(unique_users)} unique persons. This is the locked in-game roster and cannot be changed. The members are: {return_info}"
         else:
             roster = await clan.get_participants()
-        return_info = [p.assistant_cwl_json() for p in roster]
-        return f"The roster for {clan.name} in {self.active_war_league_season.description} is: {return_info}"
+            return_info = [p.assistant_cwl_json() for p in roster]
+            unique_users = list(set([p.discord_user for p in roster]))
+
+            return f"The roster for {clan.name} in {self.active_war_league_season.description} has {len(return_info)} players with {len(unique_users)} unique persons. This is a pre-start roster and might be subject to changes. The members are: {return_info}"
 
     async def _assistant_get_user_participation_information(self,user:discord.Member,*args,**kwargs) -> str:
         registered_accounts = await WarLeaguePlayer.get_by_user(self.active_war_league_season,user.id,True)
