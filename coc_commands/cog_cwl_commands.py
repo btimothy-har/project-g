@@ -227,9 +227,9 @@ class ClanWarLeagues(commands.Cog):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "clan_tag": {
+                        "clan_name_or_tag": {
                             "type": "string",
-                            "description": "The Clan Tag of the Clan to get the roster for.",
+                            "description": "The Clan Name or Tag of the Clan to get the roster for.",
                             },
                         },
                     "required": ["clan_tag"]
@@ -264,8 +264,19 @@ class ClanWarLeagues(commands.Cog):
         return_info = [c.assistant_cwl_json() for c in clans]
         return f"The following Clans are participating in CWL for {self.active_war_league_season.description}: {return_info}"
     
-    async def _assistant_get_clan_roster_information(self,clan_tag:str,*args,**kwargs) -> str:
-        clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
+    async def _assistant_get_clan_roster_information(self,clan_name_or_tag:str,*args,**kwargs) -> str:
+        q_doc = {
+            '$or':[
+                {'tag':{'$regex':f'^{clan_name_or_tag}',"$options":"i"}},
+                {'name':{'$regex':f'^{clan_name_or_tag}',"$options":"i"}}
+                ]
+            }
+        find_clan = await bot_client.coc_db.db__clan.find_one(q_doc)
+        if not find_clan:
+            return f"Could not find a clan with the name or tag `{clan_name_or_tag}`."
+        
+        clan = await WarLeagueClan(find_clan['_id'],self.active_war_league_season)
+        
         if not clan.is_participating:
             return f"{clan.title} is not participating in CWL for {self.active_war_league_season.description}."
         if clan.roster_open:
