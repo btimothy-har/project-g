@@ -98,28 +98,42 @@ class Clans(commands.Cog):
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
-        schema = {
-            "name": "_assistant_get_clan_information",
-            "description": "Returns a list of Clans matching the input, with detailed information in JSON.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "clan": {
-                        "description": "Clan Name or Abbreviation. An abbreviation is a 2 or 3 alphanumeric string.",
-                        "type": "string",
+        schemas = [
+            {
+                "name": "_assistant_get_clan_named",
+                "description": "Searches the database for Clans by a given name or abbreviation string. Returns a list of matches.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clan_name_or_abbreviation": {
+                            "description": "Clan Name or Abbreviation. Not caps sensitive.",
+                            "type": "string",
+                            },
                         },
+                    "required": ["clan_name_or_abbreviation"],
                     },
-                "required": ["clan"],
                 },
-            }
-        await cog.register_function(cog_name="Clans", schema=schema)
+            ]
+        await cog.register_functions(cog_name="Clans", schema=schemas)
     
-    async def _assistant_get_clan_information(self,clan:str,*args,**kwargs) -> str:
-        alliance_clans = await self.client.get_alliance_clans()
-        find_clan = [c for c in alliance_clans if clan.lower() in c.name.lower() or clan.lower() in c.abbreviation.lower()]
+    async def _assistant_get_clan_named(self,clan_name_or_abbreviation:str,*args,**kwargs) -> str:
+        q_doc = {
+            '$or':[
+                {'name':{'$regex':f'^{clan_name_or_abbreviation}',"$options":"i"}},
+                {'abbreviation':{'$regex':f'^{clan_name_or_abbreviation}',"$options":"i"}}
+                ]
+            }
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__player.aggregate(pipeline)
 
-        ret_clans = [c.to_json() for c in find_clan]
-        return ret_clans
+        clan_tags = [c['_id'] async for c in query]
+        clans = await self.client.fetch_many_clans(*clan_tags)
+
+        ret_clans = [c.to_json() for c in clans]
+        return f"Found {len(ret_clans)} Clans matching `{clan_name_or_abbreviation}`. Clans: {ret_clans}"
     
     ##################################################
     ### CLAN ABBREVIATION LISTENER
