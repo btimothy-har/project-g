@@ -11,17 +11,13 @@ from discord.ext import tasks
 from redbot.core import Config, commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
-from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 
 from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu
 from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_size
-from coc_main.utils.checks import is_member
-
-from g_bank.objects.inventory import UserInventory
-from g_bank.objects.item import ShopItem
+from coc_main.utils.checks import is_member, is_owner
 
 from .views.base_vault import BaseVaultMenu
 from .objects.war_base import eWarBase
@@ -228,10 +224,45 @@ class ECLIPSE(commands.Cog):
         menu = BaseVaultMenu(interaction)
         await menu.start()
     
-    @commands.command(name="addbase")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_add_base(self,ctx,base_link:str):
+    @app_commands.command(name="add-base",
+        description="[Owner-only] Add a Base to the E.C.L.I.P.S.E. Base Vault.")
+    @app_commands.guild_only()
+    @app_commands.check(is_owner)
+    @app_commands.choices(base_source=[
+        app_commands.Choice(name="RH Base Building",value="<:RHBB:1041627382018211900> RH Base Building"),
+        app_commands.Choice(name="Blueprint Base Building",value="<:BPBB:1043081040090107968> Blueprint Base Building")
+        ])
+    @app_commands.choices(base_source=[
+        app_commands.Choice(name="War Base: Anti-3 Star",value="War Base: Anti-3 Star"),
+        app_commands.Choice(name="War Base: Anti-2 Star",value="War Base: Anti-2 Star"),
+        app_commands.Choice(name="Legends Base",value="Legends Base"),
+        app_commands.Choice(name="Trophy/Farm Base",value="Trophy/Farm Base")
+        ])
+    async def appcommand_eclipse_add_base(self,
+        interaction:discord.Interaction,
+        base_link:str,
+        base_source:str,
+        base_builder:Optional[str],
+        base_type:str,
+        defensive_cc:str,
+        builder_notes:Optional[str],
+        base_image:discord.Attachment):
+
+        await interaction.response.defer(ephemeral=True)
+
+        new_base = await eWarBase.new_base(
+            base_link=base_link,
+            source=base_source,
+            base_builder=base_builder,
+            base_type=base_type,
+            defensive_cc=defensive_cc,
+            notes=builder_notes,
+            image_attachment=base_image)
+
+        embed,image = await new_base.base_embed()
+        embed.add_field(name="Base Link",value=new_base.base_link)
+
+        return await interaction.followup.send(content="Base Added!",embed=embed,attachments=[image])
 
         timeout_embed = await eclipse_embed(context=ctx,message=f"Operation timed out.",success=False,timestamp=pendulum.now())
 
