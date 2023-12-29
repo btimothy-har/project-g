@@ -127,7 +127,7 @@ class Clans(commands.Cog):
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__player.aggregate(pipeline)
+        query = bot_client.coc_db.db__clan.aggregate(pipeline)
 
         clan_tags = [c['_id'] async for c in query]
         clans = await self.client.fetch_many_clans(*clan_tags)
