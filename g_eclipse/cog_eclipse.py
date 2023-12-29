@@ -232,7 +232,7 @@ class ECLIPSE(commands.Cog):
         app_commands.Choice(name="RH Base Building",value="<:RHBB:1041627382018211900> RH Base Building"),
         app_commands.Choice(name="Blueprint Base Building",value="<:BPBB:1043081040090107968> Blueprint Base Building")
         ])
-    @app_commands.choices(base_source=[
+    @app_commands.choices(base_type=[
         app_commands.Choice(name="War Base: Anti-3 Star",value="War Base: Anti-3 Star"),
         app_commands.Choice(name="War Base: Anti-2 Star",value="War Base: Anti-2 Star"),
         app_commands.Choice(name="Legends Base",value="Legends Base"),
