@@ -114,7 +114,7 @@ class Clans(commands.Cog):
                     },
                 },
             ]
-        await cog.register_functions(cog_name="Clans", schema=schemas)
+        await cog.register_functions(cog_name="Clans", schemas=schemas)
     
     async def _assistant_get_clan_named(self,clan_name_or_abbreviation:str,*args,**kwargs) -> str:
         q_doc = {
