@@ -241,7 +241,7 @@ class ECLIPSE(commands.Cog):
     async def _get_builder_notes(self,interaction:discord.Interaction,modal:DiscordModal):
         await interaction.response.defer(ephemeral=True)
         modal.notes = modal.children[0].value if len(modal.children[0].value) > 0 else "*"
-        await modal.stop()
+        modal.stop()
     
     @app_commands.command(name="add-base",
         description="[Owner-only] Add a Base to the E.C.L.I.P.S.E. Base Vault.")
@@ -260,10 +260,10 @@ class ECLIPSE(commands.Cog):
     async def appcommand_eclipse_add_base(self,
         interaction:discord.Interaction,
         base_link:str,
-        base_source:str,
+        base_image:discord.Attachment,
         base_type:str,
         defensive_cc:str,
-        base_image:discord.Attachment,
+        base_source:str,
         base_builder:Optional[str] = "*"):
 
         modal = self.builder_notes_modal
