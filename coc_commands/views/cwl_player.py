@@ -512,7 +512,7 @@ class CWLPlayerMenu(DefaultView):
                 if embed_1_ct < 10:
                     embed.add_field(
                         name=f"{EmojisUI.ELO} {cwl_account.war_elo:,}\u3000**{player.title}**",
-                        value=f"{CWLLeagueGroups.get_description(cwl_account.league_group)}"
+                        value=(f"{CWLLeagueGroups.get_description(cwl_account.league_group)}" if cwl_account.league_group > 0 else "")
                             + (f"\n**{EmojisLeagues.get(cwl_account.roster_clan.league)} [{cwl_account.roster_clan.name} {cwl_account.roster_clan.tag}]({cwl_account.roster_clan.share_link})**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open else "")
                             + (f"\n{EmojisUI.TASK_WARNING} **Please move to your CWL Clan before CWL starts.**" if cwl_account.roster_clan and not cwl_account.roster_clan.roster_open and cwl_account.roster_clan.tag != getattr(player.clan,'tag',None) else "")
                             + f"\n{player.hero_description}"

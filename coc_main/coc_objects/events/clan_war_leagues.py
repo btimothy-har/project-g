@@ -182,6 +182,19 @@ class WarLeagueClan(BasicClan):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
+    def assistant_cwl_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'abbreviation': self.abbreviation,
+            'name': self.name,
+            'level': self.level,
+            'share_link': self.share_link,
+            'season': self.season.description,
+            'clan_war_league': self.league,
+            'is_participating': self.is_participating,
+            'roster_open': self.roster_open
+            }
+    
     async def load(self):
         await BasicClan.load(self)
         db = await bot_client.coc_db.db__war_league_clan.find_one({'_id':self.db_id})
@@ -453,6 +466,26 @@ class WarLeaguePlayer(BasicPlayer):
     @property
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
+    
+    def assistant_cwl_json(self) -> dict:
+        if self.is_registered:
+            return {
+                'tag': self.tag,
+                'name': self.name,
+                'townhall': self.town_hall_level,
+                'is_registered': self.is_registered,
+                'registered_group': CWLLeagueGroups.get_description_no_emoji(self.league_group),
+                'roster_clan': f"{self.roster_clan.name} {self.roster_clan.tag}" if getattr(self.roster_clan,'roster_open',False) else None,
+                'discord_user': self.discord_user,
+                'rank_change': self.elo_change
+                }
+        else:
+            return {
+                'tag': self.tag,
+                'name': self.name,
+                'townhall': self.town_hall_level,
+                'is_registered': self.is_registered
+                }
     
     async def load(self):
         await BasicPlayer.load(self)

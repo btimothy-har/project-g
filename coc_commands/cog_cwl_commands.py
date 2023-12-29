@@ -191,7 +191,7 @@ class ClanWarLeagues(commands.Cog):
         schemas = [
             {
                 "name": "_assistant_get_cwl_season",
-                "description": "Identifies the next upcoming season for the Clan War Leagues (CWL).",
+                "description": "Identifies the next current or upcoming season for the Clan War Leagues (CWL).",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -204,7 +204,45 @@ class ClanWarLeagues(commands.Cog):
                     "type": "object",
                     "properties": {},
                     },
-                }
+                },
+            {
+                "name": "_assistant_get_cwl_clans",
+                "description": "Returns all official Clan War League Clans for The Assassins Guild.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_participating_cwl_clans",
+                "description": "Returns only the Clans participating in the current or upcoming Clan War Leagues.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_clan_roster_information",
+                "description": "Returns the War Roster for a Clan participating in the current or upcoming Clan War Leagues. Multiple accounts may be registered to the same discord_user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clan_tag": {
+                            "type": "string",
+                            "description": "The Clan Tag of the Clan to get the roster for.",
+                            },
+                        },
+                    "required": ["clan_tag"]
+                    },
+                },
+            {
+                "name": "_assistant_get_user_participation_information",
+                "description": "Returns the accounts belonging to the active user which are registered for Clan War Leagues. Multiple accounts may be registered to the same discord_user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                    },
+                },
             ]
         await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
     
@@ -215,6 +253,38 @@ class ClanWarLeagues(commands.Cog):
         info = await self.cwl_information()
         x = info.to_dict()
         return f"CWL Information: {x}"
+    
+    async def _assistant_get_cwl_clans(self,*args,**kwargs) -> str:
+        clans = await self.client.get_war_league_clans()
+        return_info = [c.assistant_cwl_json() for c in clans]
+        return f"The following Clans are registered as official Clan War League clans: {return_info}"
+    
+    async def _assistant_get_participating_cwl_clans(self,*args,**kwargs) -> str:
+        clans = await WarLeagueClan.participating_by_season(self.active_war_league_season)
+        return_info = [c.assistant_cwl_json() for c in clans]
+        return f"The following Clans are participating in CWL for {self.active_war_league_season.description}: {return_info}"
+    
+    async def _assistant_get_clan_roster_information(self,clan_tag:str,*args,**kwargs) -> str:
+        clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
+        if not clan.is_participating:
+            return f"{clan.title} is not participating in CWL for {self.active_war_league_season.description}."
+        if clan.roster_open:
+            return f"{clan.title}'s CWL Roster has not been finalized and cannot be communicated yet."
+        
+        if clan.league_group:
+            roster = await clan.compute_lineup_stats()
+        else:
+            roster = await clan.get_participants()
+        return_info = [p.assistant_cwl_json() for p in roster]
+        return f"The roster for {clan.name} in {self.active_war_league_season.description} is: {return_info}"
+
+    async def _assistant_get_user_participation_information(self,user:discord.Member,*args,**kwargs) -> str:
+        registered_accounts = await WarLeaguePlayer.get_by_user(self.active_war_league_season,user.id,True)
+        if len(registered_accounts) == 0:
+            return f"{user.display_name} does not have any accounts registered in CWL for {self.active_war_league_season.description}."
+        
+        return_info = [p.assistant_cwl_json() for p in registered_accounts]
+        return f"{user.display_name}'s registered accounts for {self.active_war_league_season.description} are: {return_info}"
     
     ############################################################
     ############################################################
