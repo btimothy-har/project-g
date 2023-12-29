@@ -269,7 +269,7 @@ class ECLIPSE(commands.Cog):
         modal = self.builder_notes_modal
         await interaction.response.send_modal(modal)
 
-        wait = modal.wait()
+        wait = await modal.wait()
         if not wait:
             return await interaction.followup.send(content="Did not receive a response.",ephemeral=True)
         
