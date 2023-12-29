@@ -734,7 +734,10 @@ class WarLeaguePlayer(BasicPlayer):
             q_doc = {
                 'season':season.id,
                 'discord_user':user_id,
-                'registered':True
+                '$or': [
+                    {'registered': True},
+                    {'roster_clan': {'$exists': True, '$ne': ''}}
+                    ]
                 }
         else:
             q_doc = {
