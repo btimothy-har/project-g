@@ -270,7 +270,7 @@ class ECLIPSE(commands.Cog):
         await interaction.response.send_modal(modal)
 
         wait = await modal.wait()
-        if not wait:
+        if wait:
             return await interaction.followup.send(content="Did not receive a response.",ephemeral=True)
         
         new_base = await eWarBase.new_base(
