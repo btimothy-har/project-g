@@ -15,7 +15,7 @@ from redbot.core.data_manager import cog_data_path
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu
+from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu, DiscordModal
 from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_size
 from coc_main.utils.checks import is_member, is_owner
 
@@ -224,6 +224,25 @@ class ECLIPSE(commands.Cog):
         menu = BaseVaultMenu(interaction)
         await menu.start()
     
+    @property
+    def builder_notes_modal(self) -> DiscordModal:
+        m = DiscordModal(
+            function=self._get_builder_notes,
+            title=f"Builder Notes",
+            )
+        field = discord.ui.TextInput(
+            label="Specify Builder Notes",
+            style=discord.TextStyle.long,
+            required=False
+            )
+        m.add_item(field)
+        return m
+
+    async def _get_builder_notes(self,interaction:discord.Interaction,modal:DiscordModal):
+        await interaction.response.defer(ephemeral=True)
+        modal.notes = modal.items[0].value if len(modal.items[0].value) > 0 else "*"
+        await modal.stop()
+    
     @app_commands.command(name="add-base",
         description="[Owner-only] Add a Base to the E.C.L.I.P.S.E. Base Vault.")
     @app_commands.guild_only()
@@ -242,21 +261,25 @@ class ECLIPSE(commands.Cog):
         interaction:discord.Interaction,
         base_link:str,
         base_source:str,
-        base_builder:Optional[str],
         base_type:str,
         defensive_cc:str,
-        builder_notes:Optional[str],
-        base_image:discord.Attachment):
+        base_image:discord.Attachment,
+        base_builder:Optional[str] = "*"):
 
-        await interaction.response.defer(ephemeral=True)
+        modal = self.builder_notes_modal
+        await interaction.response.send_modal(modal)
 
+        wait = modal.wait()
+        if not wait:
+            return await interaction.followup.send(content="Did not receive a response.",ephemeral=True)
+        
         new_base = await eWarBase.new_base(
             base_link=base_link,
             source=base_source,
             base_builder=base_builder,
             base_type=base_type,
             defensive_cc=defensive_cc,
-            notes=builder_notes,
+            notes=modal.notes,
             image_attachment=base_image)
 
         embed,image = await new_base.base_embed()
