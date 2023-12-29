@@ -285,7 +285,7 @@ class ECLIPSE(commands.Cog):
         embed,image = await new_base.base_embed()
         embed.add_field(name="Base Link",value=new_base.base_link)
 
-        return await interaction.followup.send(content="Base Added!",embed=embed,attachments=[image])
+        return await interaction.followup.send(content="Base Added!",embed=embed,files=[image])
 
         timeout_embed = await eclipse_embed(context=ctx,message=f"Operation timed out.",success=False,timestamp=pendulum.now())
 
