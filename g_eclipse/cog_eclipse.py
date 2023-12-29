@@ -240,7 +240,7 @@ class ECLIPSE(commands.Cog):
 
     async def _get_builder_notes(self,interaction:discord.Interaction,modal:DiscordModal):
         await interaction.response.defer(ephemeral=True)
-        modal.notes = modal.items[0].value if len(modal.items[0].value) > 0 else "*"
+        modal.notes = modal.children[0].value if len(modal.children[0].value) > 0 else "*"
         await modal.stop()
     
     @app_commands.command(name="add-base",
