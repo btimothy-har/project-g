@@ -446,6 +446,19 @@ class Bank(commands.Cog):
                     user_id=self.bot.user.id,
                     comment=f"EOS to {clan.tag} {clan.name}."
                     )
+        
+        owner = self.bot.get_user(self.bot.owner_ids[0])
+        owner_bal = await bank.get_balance(owner)
+
+        if owner_bal > 0:
+            await bank.withdraw_credits(owner,owner_bal)
+            as_clan = await self.client.from_clan_abbreviation("AS")
+            clan_account = await ClanAccount(as_clan)
+            await clan_account.deposit(
+                amount=owner_bal,
+                user_id=self.bot.user.id,
+                comment="EOS from Owner."
+                )
                 
         query_members = await bot_client.coc_db.db__player.find({'is_member':True}).to_list(length=None)
         await self.current_account.deposit(

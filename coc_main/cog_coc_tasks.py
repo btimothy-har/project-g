@@ -270,7 +270,6 @@ class ClashOfClansTasks(commands.Cog):
 
                 bank_cog = bot_client.bot.get_cog('Bank')
                 if bank_cog:
-                    await bank_cog.member_legend_rewards()
                     await bank_cog.apply_bank_taxes()
                     await bank_cog.month_end_sweep()
         
