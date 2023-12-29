@@ -271,7 +271,7 @@ class ClanWarLeagues(commands.Cog):
         if clan.roster_open:
             return f"{clan.title}'s CWL Roster has not been finalized and cannot be communicated yet."
         
-        if clan.league_group:
+        if clan.league_group_id:
             roster = await clan.compute_lineup_stats()
         else:
             roster = await clan.get_participants()
