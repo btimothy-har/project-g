@@ -207,7 +207,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_cwl_clans",
-                "description": "Returns all official Clan War League Clans for The Assassins Guild.",
+                "description": "Returns all official Clan War League Clans for The Assassins Guild. Capitalization can be ignored when identifying clans.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -215,7 +215,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_participating_cwl_clans",
-                "description": "Returns only the Clans participating in the current or upcoming Clan War Leagues.",
+                "description": "Returns only the Clans participating in the current or upcoming Clan War Leagues. Capitalization can be ignored when identifying clans.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -223,7 +223,7 @@ class ClanWarLeagues(commands.Cog):
                 },
             {
                 "name": "_assistant_get_clan_roster_information",
-                "description": "Returns the War Roster for a Clan participating in the current or upcoming Clan War Leagues. Multiple accounts may be registered to the same discord_user.",
+                "description": "Returns the War Roster for a Clan participating in the current or upcoming Clan War Leagues. Capitalization can be ignored when identifying clans. Multiple accounts may be registered to the same discord_user.",
                 "parameters": {
                     "type": "object",
                     "properties": {
