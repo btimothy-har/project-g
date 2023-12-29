@@ -475,7 +475,7 @@ class WarLeaguePlayer(BasicPlayer):
                 'townhall': self.town_hall_level,
                 'is_registered': self.is_registered,
                 'registered_group': CWLLeagueGroups.get_description_no_emoji(self.league_group),
-                'roster_clan': f"{self.roster_clan.name} {self.roster_clan.tag}" if getattr(self.roster_clan,'roster_open',False) else None,
+                'roster_clan': f"{self.roster_clan.name} {self.roster_clan.tag}" if not getattr(self.roster_clan,'roster_open',True) else 'Not Yet Rostered',
                 'discord_user': self.discord_user,
                 'rank_change': self.elo_change
                 }
