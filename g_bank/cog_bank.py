@@ -266,7 +266,7 @@ class Bank(commands.Cog):
                 },
             {
                 "name": "_prompt_user_account",
-                "description": "Use this to prompts a user to select one of their linked Clash of Clans Accounts.",
+                "description": "Use this when you need to prompt a user to select one of their linked Clash of Clans Accounts.",
                 "parameters": {
                     "type": "object",
                     "properties": {
