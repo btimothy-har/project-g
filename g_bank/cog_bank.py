@@ -335,14 +335,16 @@ class Bank(commands.Cog):
         fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
 
-        if len(fetch_all_accounts) == 0:
-            return f"The user {user.name} (ID: {user.id}) does not have any linked accounts."
+        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 7]
+
+        if len(eligible_accounts) == 0:
+            return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."
         
-        if len(fetch_all_accounts) == 1:
-            return f"The user selected the account: {fetch_all_accounts[0].overview_json()}."
+        if len(eligible_accounts) == 1:
+            return f"The user selected the account: {eligible_accounts[0].overview_json()}."
         
         else:
-            view = ClashAccountSelector(user,fetch_all_accounts)
+            view = ClashAccountSelector(user,eligible_accounts)
             embed = await clash_embed(context=self.bot,message=message,timestamp=pendulum.now())
             await channel.send(
                 content=user.mention,
