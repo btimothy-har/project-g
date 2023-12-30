@@ -257,7 +257,7 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only provide this value if the user has explicitly provided an account to redeem the Gold Pass on.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Optional - only provide this value if the user has explicitly provided an account to redeem the Gold Pass on. If the user has not provided an account, the user will be prompted later.",
                             "type": "string",
                             },
                         },
