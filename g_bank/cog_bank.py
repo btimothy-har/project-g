@@ -248,7 +248,7 @@ class Bank(commands.Cog):
                 },
             {
                 "name": "_assistant_redeem_goldpass",
-                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
+                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -257,7 +257,7 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on.",
                             "type": "string",
                             },
                         },
