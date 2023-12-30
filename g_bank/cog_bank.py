@@ -209,6 +209,20 @@ class Bank(commands.Cog):
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
             {
+                "name": "_prompt_user_account",
+                "description": "Use this when you need to prompt a user to select one of their linked Clash of Clans Accounts.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "description": "The question or message to prompt the user with.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["message"],
+                    },
+                },
+            {
                 "name": "_assistant_get_member_balance",
                 "description": "Gets a user's bank balance in the Guild Bank.",
                 "parameters": {
@@ -263,21 +277,7 @@ class Bank(commands.Cog):
                         },
                     "required": ["item_id","redeem_tag"],
                     },
-                },
-            {
-                "name": "_prompt_user_account",
-                "description": "Use this when you need to prompt a user to select one of their linked Clash of Clans Accounts.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "message": {
-                            "description": "The question or message to prompt the user with.",
-                            "type": "string",
-                            },
-                        },
-                    "required": ["message"],
-                    },
-                },
+                }            
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
     
