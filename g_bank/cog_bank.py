@@ -328,7 +328,7 @@ class Bank(commands.Cog):
             )
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
-    async def _prompt_user_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
+    async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
         await member.load()
         
