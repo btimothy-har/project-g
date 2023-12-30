@@ -221,15 +221,16 @@ class GuildUtility(commands.Cog):
     @app_commands.command(name="remindme",
         description="Never forget! Create a reminder with optional text.")
     @app_commands.describe(
-        time="When to be reminded (e.g. 1h, 15mins)",
         message="What would you like to be reminded of?",
+        time="When to be reminded (e.g. 1h, 15mins)",
         repeat="How often to repeat this reminder? (e.g. 1h, 1 day)")
-    async def app_command_remindme_(self,interaction:discord.Interaction,time:str,message:str,repeat:Optional[str]=None):
+    async def app_command_remindme_(self,interaction:discord.Interaction,message:str,time:Optional[str]=None,repeat:Optional[str]=None):
         
         context = await Context.from_interaction(interaction)
-        text = f"in {time} to {message}"
         if repeat:
-            text += f" every {repeat}"
+            text += f" every {repeat} to {message}"
+        else:
+            text = f"in {time} to {message}"
         await context.invoke(self.bot.get_command("remindme"),time_and_optional_text=text)
     
     @app_commands.command(name="reminders",

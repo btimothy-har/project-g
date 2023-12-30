@@ -26,7 +26,7 @@ from coc_main.tasks.player_tasks import PlayerLoop
 from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.tasks.raid_tasks import ClanRaidLoop
 
-from coc_main.utils.components import clash_embed, MenuPaginator
+from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin, is_owner
@@ -247,6 +247,20 @@ class Bank(commands.Cog):
                     },
                 },
             {
+                "name": "_prompt_user_reward_account",
+                "description": "Use this when you need to prompt a user to select one of their Clash of Clans Accounts to redeem an in-game item on. This filters to only accounts of Townhall Level 7 or higher.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "description": "The question or message to prompt the user with.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["message"],
+                    },
+                },            
+            {
                 "name": "_assistant_redeem_goldpass",
                 "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
                 "parameters": {
@@ -257,13 +271,13 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Only accounts of Townhall Level 7 or higher are eligible. Prompt the user with a list of accounts linked to their Discord Account. Do not provide a value unless the user has provided you explicitly with an account to redeem the Gold Pass on.",
+                            "description": "The Clash of Clans account to receive the Gold Pass on, identified by the Player Tag. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
                             "type": "string",
                             },
                         },
                     "required": ["item_id","redeem_tag"],
                     },
-                },
+                }            
             ]
         await cog.register_functions(cog_name="Bank", schemas=schemas)
     
@@ -314,25 +328,64 @@ class Bank(commands.Cog):
             )
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
+    async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
+        member = aMember(user.id)
+        await member.load()
+        
+        fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
+
+        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 7]
+
+        if len(eligible_accounts) == 0:
+            return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."
+        
+        if len(eligible_accounts) == 1:
+            return f"The user selected the account: {eligible_accounts[0].overview_json()}."
+        
+        else:
+            view = ClashAccountSelector(user,eligible_accounts)
+            embed = await clash_embed(context=self.bot,message=message,timestamp=pendulum.now())
+            await channel.send(
+                content=user.mention,
+                embed=embed,
+                view=view
+                )
+            wait = await view.wait()
+            if wait or not view.selected_account:
+                return f"The user did not respond or cancelled process."
+            
+            select_account = await self.client.fetch_player(view.selected_account)
+            return f"The user selected the account: {select_account.overview_json()}."
+
     async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
-        if not user:
-            return "No user found."
+        try:
+            if not user:
+                return "No user found."
+            
+            if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
+                return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+            
+            item = await ShopItem.get_by_id(item_id)
+            inventory = await UserInventory(user)
+            if not inventory.has_item(item):
+                return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
+            
+            redeem_account = await self.client.fetch_player(redeem_tag)
+            if not redeem_account or redeem_account.town_hall.level < 7:
+                return f"The account {redeem_tag} is not eligible for Gold Pass redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            
+            ticket = await RedemptionTicket.create(
+                self,
+                user_id=user.id,
+                item_id=item_id,
+                goldpass_tag=redeem_tag
+                )
+            return f"The redemption ticket for {user} on {redeem_account.name} has been created: {getattr(ticket.channel,'mention','No channel')}. Do not convert the channel link into a clickable link, as the user will not be able to access the channel."
         
-        if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
-            return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
-        
-        item = await ShopItem.get_by_id(item_id)
-        inventory = await UserInventory(user)
-        if not inventory.has_item(item):
-            return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
-        
-        ticket = await RedemptionTicket.create(
-            self,
-            user_id=user.id,
-            item_id=item_id,
-            goldpass_tag=redeem_tag
-            )
-        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}. Do not convert the channel link into a clickable link, as the user will not be able to access the channel."
+        except Exception as e:
+            bot_client.coc_main_log.exception(f"Assistant: Bank: Redeem Gold Pass")
+            return f"An error occurred: {e}"
     
     @commands.Cog.listener("on_guild_channel_create")
     async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
@@ -849,6 +902,9 @@ class Bank(commands.Cog):
                             if not user:
                                 continue
 
+                            if item.type == 'role' and item.assigns_role not in user.roles:
+                                await item.expire_item(user)
+
                             expiry_time = await item.compute_user_expiry(user.id)
 
                             if expiry_time and pendulum.now() >= expiry_time:
@@ -1007,7 +1063,6 @@ class Bank(commands.Cog):
                 )
         else:
             embed = await self.helper_show_balance(interaction)
-
         await interaction.edit_original_response(embed=embed)        
     
     ##################################################
@@ -2309,3 +2364,45 @@ class Bank(commands.Cog):
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
         await get_item.restock(amount)
         await interaction.followup.send(f"Restocked {get_item} by {amount}. New stock: {get_item.stock}.",ephemeral=True)
+
+class ClashAccountSelector(discord.ui.View):
+    def __init__(self,user:discord.User,list_of_accounts:List[aPlayer]):
+        
+        self.user = user
+        self.list_of_accounts = list_of_accounts
+        self.selected_account = None
+
+        select_options = [discord.SelectOption(
+            label=f"{account.name} | {account.tag}",
+            value=account.tag,
+            description=f"{account.clan_description}",
+            emoji=account.town_hall.emoji)
+            for account in list_of_accounts]
+
+        dropdown = DiscordSelectMenu(
+            function=self.callback_select_account,
+            options=select_options[:25],
+            placeholder="Select an account...",
+            min_values=1,
+            max_values=1
+            )
+
+        super().__init__(timeout=90)
+        self.add_item(dropdown)
+    
+    async def callback_select_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
+        await interaction.response.defer()
+        self.selected_account = menu.values[0]
+        await interaction.edit_original_response(view=None)
+        self.stop()
+    
+    async def interaction_check(self,interaction:discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                content="This doesn't belong to you!", ephemeral=True
+                )
+            return False
+        return True
+    
+    async def on_timeout(self):
+        self.stop()

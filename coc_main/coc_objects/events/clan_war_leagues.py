@@ -747,7 +747,7 @@ class WarLeaguePlayer(BasicPlayer):
                         reason='CWL Roster Finalized'
                         )            
             bot_client.coc_data_log.info(
-                f"{str(self)}: Roster finalized in {getattr(self.roster_clan,'name','No Clan')} {'(' + getattr(self.roster_clan,'tag',None + ')')}."
+                f"{str(self)}: Roster finalized in {getattr(self.roster_clan,'name','No Clan')}" + (f" ({getattr(self.roster_clan,'tag',None)})" if getattr(self.roster_clan,'tag',None) else '') + "."
                 )
     
     ##################################################
