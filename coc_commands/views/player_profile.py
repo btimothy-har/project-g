@@ -316,14 +316,9 @@ class PlayerProfileMenu(DefaultView):
 
             war_member = war.get_member(player.tag)
             war_attacks = sorted(war_member.attacks,key=lambda x:(x.order))
-            war_defenses = sorted(war_member.defenses,key=lambda x:(x.order))
             attack_str = "\n".join(
                 [f"{EmojisClash.ATTACK}\u3000{EmojisTownHall.get(att.attacker.town_hall)} vs {EmojisTownHall.get(att.defender.town_hall)}\u3000{EmojisClash.STAR} `{att.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{att.destruction:>3}%`"
                 for att in war_attacks]
-                )
-            defense_str = "\n".join(
-                [f"{EmojisClash.DEFENSE}\u3000{EmojisTownHall.get(defe.attacker.town_hall)} vs {EmojisTownHall.get(defe.defender.town_hall)}\u3000{EmojisClash.STAR} `{defe.stars:^3}`\u3000{EmojisClash.DESTRUCTION} `{defe.destruction:>3}%`"
-                for defe in war_defenses]
                 )
             embed.add_field(
                 name=f"{war_member.clan.emoji} {war_member.clan.clean_name} vs {war_member.opponent.clean_name}",
@@ -332,7 +327,6 @@ class PlayerProfileMenu(DefaultView):
                     + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"*War Starts <t:{war.start_time.int_timestamp}:R>.*\n" if war.start_time > pendulum.now() else "")
                     + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
-                    + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
                     + "\u200b",
                 inline=False
                 )
