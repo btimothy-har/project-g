@@ -209,20 +209,6 @@ class Bank(commands.Cog):
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
             {
-                "name": "_prompt_user_account",
-                "description": "Use this when you need to prompt a user to select one of their linked Clash of Clans Accounts.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "message": {
-                            "description": "The question or message to prompt the user with.",
-                            "type": "string",
-                            },
-                        },
-                    "required": ["message"],
-                    },
-                },
-            {
                 "name": "_assistant_get_member_balance",
                 "description": "Gets a user's bank balance in the Guild Bank.",
                 "parameters": {
@@ -260,6 +246,20 @@ class Bank(commands.Cog):
                     "required": ["item_id"],
                     },
                 },
+            {
+                "name": "_prompt_user_reward_account",
+                "description": "Use this when you need to prompt a user to select one of their Clash of Clans Accounts to redeem an in-game item on. This filters to only accounts of Townhall Level 7 or higher.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "description": "The question or message to prompt the user with.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["message"],
+                    },
+                },            
             {
                 "name": "_assistant_redeem_goldpass",
                 "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
