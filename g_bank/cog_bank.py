@@ -257,11 +257,25 @@ class Bank(commands.Cog):
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. Optional - only provide this value if the user has explicitly provided an account to redeem the Gold Pass on. If the user has not provided an account, the user will be prompted later.",
+                            "description": "The tag of the Clash of Clans account to receive the Gold Pass on. If not provided by the user, prompt them to select one of their linked Clash of Clans accounts.",
                             "type": "string",
                             },
                         },
-                    "required": ["item_id"],
+                    "required": ["item_id","redeem_tag"],
+                    },
+                },
+            {
+                "name": "_prompt_user_account",
+                "description": "Use this to prompts a user to select one of their linked Clash of Clans Accounts.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "description": "The question or message to prompt the user with.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["message"],
                     },
                 },
             ]
@@ -314,7 +328,35 @@ class Bank(commands.Cog):
             )
         return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
 
-    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:Optional[str]=None,*args,**kwargs) -> str:
+    async def _prompt_user_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
+        member = aMember(user.id)
+        await member.load()
+        
+        fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
+
+        if len(fetch_all_accounts) == 0:
+            return f"The user {user.name} (ID: {user.id}) does not have any linked accounts."
+        
+        if len(fetch_all_accounts) == 1:
+            return f"The user selected the account: {fetch_all_accounts[0].overview_json()}."
+        
+        else:
+            view = ClashAccountSelector(user,fetch_all_accounts)
+            embed = await clash_embed(context=self.bot,message=message,timestamp=pendulum.now())
+            await channel.send(
+                content=user.mention,
+                embed=embed,
+                view=view
+                )
+            wait = await view.wait()
+            if wait or not view.selected_account:
+                return f"The user did not respond or cancelled process."
+            
+            select_account = await self.client.fetch_player(view.selected_account)
+            return f"The user selected the account: {select_account.overview_json()}."
+
+    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         try:
             if not user:
                 return "No user found."
@@ -327,41 +369,10 @@ class Bank(commands.Cog):
             if not inventory.has_item(item):
                 return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
             
-            if redeem_tag:
-                redeem_account = await self.client.fetch_player(redeem_tag)
-                if not redeem_account or redeem_account.town_hall.level < 7:
-                    return f"The account {redeem_tag} is not eligible for Gold Pass redemption. Accounts must be valid and of Townhall Level 7 or higher."
-            
-            if not redeem_tag:
-                member = aMember(user.id)
-                await member.load()
-                fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
-                eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 7]
-                eligible_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
-
-                if len(eligible_accounts) == 0:
-                    return f"The user {user.name} (ID: {user.id}) does not have any eligible accounts for redemption. Accounts need to be Townhall Level 7 or higher."
-                
-                if len(eligible_accounts) == 1:
-                    redeem_tag = eligible_accounts[0].tag
-                else:
-                    view = ClashAccountSelector(user,eligible_accounts)
-                    embed = await clash_embed(
-                        context=self.bot,
-                        message=f"Please select the account you wish to redeem the Gold Pass on.",
-                        timestamp=pendulum.now()
-                        )
-                    await channel.send(
-                        content=user.mention,
-                        embed=embed,
-                        view=view
-                        )
-                    wait = await view.wait()
-                    if wait or not view.selected_account:
-                        return f"The user did not respond or cancelled the redemption process."
-                    redeem_tag = view.selected_account
-                
             redeem_account = await self.client.fetch_player(redeem_tag)
+            if not redeem_account or redeem_account.town_hall.level < 7:
+                return f"The account {redeem_tag} is not eligible for Gold Pass redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            
             ticket = await RedemptionTicket.create(
                 self,
                 user_id=user.id,
