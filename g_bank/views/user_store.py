@@ -5,11 +5,14 @@ from typing import *
 from functools import cached_property
 
 from redbot.core import commands, bank
+from coc_main.api_client import BotClashClient
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.item import ShopItem
 from ..objects.inventory import UserInventory
+
+bot_client = BotClashClient()
 
 class UserStore(DefaultView):
     def __init__(self,
@@ -241,6 +244,7 @@ class UserStore(DefaultView):
                     self.current_item._stock = 0
                 else:
                     self.current_item._stock = 1
+                bot_client.coc_main_log.info(f"Randomised stock for {self.current_item.name}. New stock: {self.current_item._stock}")
 
         item_embed = await self.get_item_embed()
         user = self.guild.get_member(interaction.user.id)
