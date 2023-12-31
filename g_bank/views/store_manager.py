@@ -249,7 +249,7 @@ class AddItem(DefaultView):
             duration = int(component.children[0].value)
             self.new_item.subscription_duration = duration
         
-        if getattr(component,'reference',None) == 'subscription':
+        if getattr(component,'reference',None) == 'buymessage':
             self.new_item.buy_message = component.children[0].value
         
         self.clear_items()
