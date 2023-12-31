@@ -898,17 +898,17 @@ class Bank(commands.Cog):
 
                     if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                         async with item.lock:
-                            item = await ShopItem.get_by_id(item.id)
                             if len(item.assigns_role.members) > 0:
-                                m_iter = AsyncIter(item.assigns_role.members)
-                                bot_client.coc_main_log.info(f"{item.id} log: {item.subscription_log}")
-                                u_keys = list(item.subscription_log.keys())
+                                all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
 
+                                all_subscribed_users = []
+                                item_iter = AsyncIter(all_role_items)
+                                async for i in item_iter:
+                                    all_subscribed_users.extend(list(i.subscription_log.keys()))
+                                
+                                m_iter = AsyncIter(item.assigns_role.members)
                                 async for member in m_iter:
-                                    bot_client.coc_main_log.info(f"{item.id} log2: {u_keys}")
-                                    t = str(member.id) not in u_keys
-                                    if t:
-                                        bot_client.coc_main_log.info(f"{item.id} log2.5: {str(member.id)} {u_keys}")
+                                    if str(member.id) not in all_subscribed_users:
                                         await member.remove_roles(
                                             item.assigns_role,
                                             reason="User does not have a valid subscription."

@@ -99,6 +99,16 @@ class ShopItem():
         query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'category':category,'disabled':False})
         return [cls(item) async for item in query]
 
+    @classmethod
+    async def get_by_role_assigned(cls,guild_id:int,role_id:int):
+        query = bot_client.coc_db.db__shop_item.find(
+            {
+                'guild_id':guild_id,
+                'role_id':role_id
+                }
+            )
+        return [cls(item) async for item in query]
+
     def __init__(self,database_entry:dict):        
         self._id = database_entry['_id']
         self.id = str(database_entry['_id'])
