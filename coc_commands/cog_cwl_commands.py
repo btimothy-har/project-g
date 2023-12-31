@@ -177,7 +177,6 @@ class ClanWarLeagues(commands.Cog):
                 elo_gain += att.elo_effect
             await player.adjust_war_elo(elo_gain)
         
-        bot_client.coc_main_log.info(f"ELO for {war}")
         war_clan = war.get_clan(clan.tag)
         p_iter = AsyncIter(war_clan.members)
         tasks = [player_elo_adjustment(p) async for p in p_iter]

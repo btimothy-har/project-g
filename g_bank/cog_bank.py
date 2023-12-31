@@ -382,12 +382,13 @@ class Bank(commands.Cog):
         else:
             view = ClashAccountSelector(user,eligible_accounts)
             embed = await clash_embed(context=self.bot,message=message,timestamp=pendulum.now())
-            await channel.send(
+            m = await channel.send(
                 content=user.mention,
                 embed=embed,
                 view=view
                 )
             wait = await view.wait()
+            await m.delete()
             if wait or not view.selected_account:
                 return f"The user did not respond or cancelled process."
             
