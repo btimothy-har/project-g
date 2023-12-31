@@ -919,11 +919,13 @@ class Bank(commands.Cog):
                                 continue
 
                             if item.type == 'role' and item.assigns_role not in user.roles:
+                                bot_client.coc_main_log.info(f"log3: {item.subscription_log}")
                                 await item.expire_item(user)
 
                             expiry_time = await item.compute_user_expiry(user.id)
 
                             if expiry_time and pendulum.now() >= expiry_time:
+                                bot_client.coc_main_log.info(f"log4: {item.subscription_log}")
                                 if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                                     if item.assigns_role in user.roles:
                                         await user.remove_roles(
@@ -934,6 +936,7 @@ class Bank(commands.Cog):
                                     inventory = await UserInventory(user)
                                     await inventory.remove_item_from_inventory(item)
                                 
+                                bot_client.coc_main_log.info(f"log5: {item.subscription_log}")
                                 await item.expire_item(user)
                                 try:
                                     await user.send(f"Your {item.name} has expired.")
