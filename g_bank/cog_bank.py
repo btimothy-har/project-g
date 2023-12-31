@@ -887,7 +887,6 @@ class Bank(commands.Cog):
             return
         
         async with self._subscription_lock:
-            bot_client.coc_main_log.info(f"Subscription Expiry Loop")
             items = await ShopItem.get_subscription_items()
 
             i_iter = AsyncIter(items)
@@ -917,22 +916,16 @@ class Bank(commands.Cog):
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
-                            try:
-                                user = await item.guild.fetch_member(int(user_id))
-                            except:
-                                user = None
-
+                            user = item.guild.get_member(int(user_id))
                             if not user:
                                 continue
 
                             if item.type == 'role' and item.assigns_role.id not in [r.id for r in user.roles]:
-                                bot_client.coc_main_log.info(f"{item.id} log3: {item.subscription_log}")
                                 await item.expire_item(user)
 
                             expiry_time = await item.compute_user_expiry(user.id)
 
                             if expiry_time and pendulum.now() >= expiry_time:
-                                bot_client.coc_main_log.info(f"{item.id} log4: {item.subscription_log}")
                                 if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                                     if item.assigns_role in user.roles:
                                         await user.remove_roles(
@@ -943,7 +936,6 @@ class Bank(commands.Cog):
                                     inventory = await UserInventory(user)
                                     await inventory.remove_item_from_inventory(item)
                                 
-                                bot_client.coc_main_log.info(f"{item.id} log5: {item.subscription_log}")
                                 await item.expire_item(user)
                                 try:
                                     await user.send(f"Your {item.name} has expired.")
@@ -963,7 +955,6 @@ class Bank(commands.Cog):
                     bot_client.coc_main_log.exception(
                         f"Error expiring Shop Item {item.id} {item.name}."
                         )
-        bot_client.coc_main_log.info(f"Subscription Expiry Loop completed")
 
     ############################################################
     ############################################################
