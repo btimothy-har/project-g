@@ -182,6 +182,19 @@ class WarLeagueClan(BasicClan):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
+    def assistant_cwl_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'abbreviation': self.abbreviation,
+            'name': self.name,
+            'level': self.level,
+            'share_link': self.share_link,
+            'season': self.season.description,
+            'clan_war_league': self.league,
+            'is_participating': self.is_participating,
+            'roster_open': self.roster_open
+            }
+    
     async def load(self):
         await BasicClan.load(self)
         db = await bot_client.coc_db.db__war_league_clan.find_one({'_id':self.db_id})
@@ -454,14 +467,36 @@ class WarLeaguePlayer(BasicPlayer):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
+    def assistant_cwl_json(self) -> dict:
+        if self.is_registered:
+            return {
+                'tag': self.tag,
+                'name': self.name,
+                'townhall': self.town_hall_level,
+                'is_registered': self.is_registered,
+                'registered_group': CWLLeagueGroups.get_description_no_emoji(self.league_group),
+                'roster_clan': f"{self.roster_clan.name} {self.roster_clan.tag}" if not getattr(self.roster_clan,'roster_open',True) else 'Not Yet Rostered',
+                'discord_user': self.discord_user,
+                'rank_change': self.elo_change
+                }
+        else:
+            return {
+                'tag': self.tag,
+                'name': self.name,
+                'townhall': self.town_hall_level,
+                'is_registered': self.is_registered
+                }
+    
     async def load(self):
         await BasicPlayer.load(self)
         db = await bot_client.coc_db.db__war_league_player.find_one({'_id':self.db_id})
 
         self._name = db.get('name',super().name) if db else super().name
-        self._discord_user = db.get('discord_user',super().discord_user) if db else super().discord_user
-        self.town_hall = db.get('townhall',super().town_hall_level) if db else super().town_hall_level
 
+        user = db.get('discord_user',None) if db else None
+        self._discord_user = user if user else super().discord_user
+
+        self.town_hall = db.get('townhall',super().town_hall_level) if db else super().town_hall_level
         self.is_registered = db.get('registered',False) if db else False
         
         roster_clan_tag = db.get('roster_clan',None) if db else None
@@ -473,6 +508,12 @@ class WarLeaguePlayer(BasicPlayer):
         #This is the league group that the player has registered to participate in.
         self.league_group = db.get('league_group',0) if db else 0
         self.elo_change = db.get('elo_change',0) if db else 0
+
+        if self.is_registered and self.roster_clan and not db.get('discord_user',None):
+            await bot_client.coc_db.db__war_league_player.update_one(
+                {'_id':self.db_id},
+                {'$set':{'discord_user':super().discord_user}},
+                )
     
     ##################################################
     ### GLOBAL ATTRIBUTES
@@ -624,7 +665,8 @@ class WarLeaguePlayer(BasicPlayer):
                     'season':self.season.id,
                     'tag':self.tag,
                     'registered':self.is_registered,
-                    'roster_clan':getattr(self.roster_clan,'tag',None)
+                    'roster_clan':getattr(self.roster_clan,'tag',None),
+                    'discord_user':self.discord_user,
                     }},
                 upsert=True
                 )
@@ -645,7 +687,8 @@ class WarLeaguePlayer(BasicPlayer):
                     'tag':self.tag,
                     'registered':self.is_registered,
                     'league_group':self.league_group,
-                    'roster_clan':getattr(self.roster_clan,'tag',None)
+                    'roster_clan':getattr(self.roster_clan,'tag',None),
+                    'discord_user':None
                     }},
                 upsert=True
                 )
@@ -734,7 +777,7 @@ class WarLeaguePlayer(BasicPlayer):
             q_doc = {
                 'season':season.id,
                 'discord_user':user_id,
-                'registered':True
+                'registered': True
                 }
         else:
             q_doc = {
