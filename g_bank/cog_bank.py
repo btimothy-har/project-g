@@ -887,6 +887,7 @@ class Bank(commands.Cog):
             return
         
         async with self._subscription_lock:
+            bot_client.coc_main_log.info(f"Subscription Expiry Loop")
             items = await ShopItem.get_subscription_items()
 
             i_iter = AsyncIter(items)
@@ -956,6 +957,7 @@ class Bank(commands.Cog):
                     bot_client.coc_main_log.exception(
                         f"Error expiring Shop Item {item.id} {item.name}."
                         )
+        bot_client.coc_main_log.info(f"Subscription Expiry Loop completed")
 
     ############################################################
     ############################################################
