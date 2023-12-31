@@ -120,7 +120,10 @@ class UserInventory(AwaitLoader):
             item = await item.random_select()
 
         if item.type in ['basic','cash']:
-            await self.add_item_to_inventory(item)
+            if item.buy_message and len(item.buy_message) > 0:
+                await member.send(item.buy_message)
+            else:
+                await self.add_item_to_inventory(item)
         
         if item.type in ['role']:
             if item.bidirectional_role:
@@ -138,7 +141,8 @@ class UserInventory(AwaitLoader):
                     roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
 
                     #remove_role_from_user
-                    async for role in AsyncIter(roles_from_similar_items):
+                    r_iter = AsyncIter(roles_from_similar_items)
+                    async for role in r_iter:
                         if role in member.roles:
                             await member.remove_roles(role)
                 
@@ -169,7 +173,7 @@ class UserInventory(AwaitLoader):
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
-                inventory_text += f"\n{item.description}"
+                inventory_text += (f"\n{item.description}" if len(item.description) > 0 else "")
                 if getattr(user,'id',None) == self.user.id:
                     if item.type in ['basic']:
                         inventory_text += f"\nPurchased from: {item.guild.name}"
@@ -179,14 +183,29 @@ class UserInventory(AwaitLoader):
                         expiry = await item.compute_user_expiry(self.user.id)
                         if expiry:
                             inventory_text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
-                
 
         embed = await clash_embed(
             context=ctx,
             title=f"{self.user.display_name}'s Inventory",
             message=f"**Total Items:** {len(self.inventory)}"
-                + inventory_text,
+                + inventory_text
+                + f"\n\u200b",
             thumbnail=self.user.display_avatar.with_static_format('png'),
             timestamp=pendulum.now()
             )
+        
+        subscribed_roles = await ShopItem.get_subscribed_roles_for_user(self.user.id)
+        if len(subscribed_roles) > 0:
+            text = ""
+            r_iter = AsyncIter(subscribed_roles)
+            async for role in r_iter:
+                expiry = await role.compute_user_expiry(self.user.id)
+                text += f"\n**{role.name}**"
+                text += f"\nGrants: {getattr(role.assigns_role,'mention','Unknown')}"
+                text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
+                text += "\n\u200b"
+            embed.add_field(
+                name="You are also subscribed to the following roles.",
+                value=text,
+                )
         return embed

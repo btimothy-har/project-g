@@ -227,6 +227,9 @@ class AddItem(DefaultView):
     async def _add_item_main(self,interaction:discord.Interaction,component:Union[DiscordButton,DiscordSelectMenu,DiscordModal]):
         if getattr(component,'reference',None) == 'subscription_modal':
             return await interaction.response.send_modal(self.add_subscription_duration_modal)
+        
+        if getattr(component,'reference',None) == 'buymessage_modal':
+            return await interaction.response.send_modal(self.buy_message_modal)
 
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -246,6 +249,9 @@ class AddItem(DefaultView):
             duration = int(component.children[0].value)
             self.new_item.subscription_duration = duration
         
+        if getattr(component,'reference',None) == 'buymessage':
+            self.new_item.buy_message = component.children[0].value
+        
         self.clear_items()
         save_button = self.save_item_button
         if not self.new_item.ready_to_save:
@@ -257,8 +263,8 @@ class AddItem(DefaultView):
         
         self.add_item(self.required_role_selector)
 
-        # if self.new_item.type in ['cash','basic']:
-        #     self.add_item(self.buy_message_button)
+        if self.new_item.type in ['cash','basic']:
+            self.add_item(self.buy_message_button)
 
         if self.new_item.type in ['role']:
             self.add_item(self.associated_role_selector)
@@ -271,15 +277,6 @@ class AddItem(DefaultView):
 
         embed = await self.add_item_creation_embed()
         await interaction.edit_original_response(embed=embed,view=self)
-    
-    # async def _send_buy_message_modal(self,interaction:discord.Interaction,button:DiscordButton):        
-    #     self.new_item = NewShopItem(interaction.guild_id)
-    #     await interaction.response.send_modal(self.buy_message_modal)
-    
-    # async def _buy_message_modal_callback(self,interaction:discord.Interaction,modal:DiscordModal):
-    #     await interaction.response.defer()
-    #     self.new_item.buy_message = modal.children[0].value
-    #     await self._add_item_main(interaction,modal)
   
     async def _save_item(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
@@ -319,6 +316,7 @@ class AddItem(DefaultView):
                 + f"\n`{'Requires:':<15}` {getattr(self.new_item.required_role,'mention',None)}"
                 + f"\n`{'Category:':<15}` {self.new_item.category}"
                 + f"\n`{'Description:':<15}` {self.new_item.description}"
+                + (f"\n\n`{'Buy Message:':<15}`\n {self.new_item.buy_message}" if self.new_item.type in ['cash','basic'] else "")
                 + (f"\n\n`{'Assigns Role:':<15}` {getattr(self.new_item.associated_role,'mention',None)}" if self.new_item.type in ['role'] else "")
                 + (f"\n`{'Add-only:':<15}` {True if not self.new_item.bidirectional else False}" if self.new_item.type in ['role'] else "")
                 + (f"\n`{'Exclusive:':<15}` {self.new_item.exclusive}" if self.new_item.type in ['role'] else "")
@@ -386,6 +384,52 @@ class AddItem(DefaultView):
         m.add_item(category_field)
         m.add_item(description_field)        
         return m
+
+    @property
+    def save_item_button(self):
+        return DiscordButton(
+            function=self._save_item,
+            label="Save Item",
+            emoji=EmojisUI.TASK_CHECK,
+            style=discord.ButtonStyle.grey,
+            reference='saveitem'
+            )
+
+    @property
+    def buy_message_button(self):
+        return DiscordButton(
+            function=self._add_item_main,
+            label="Add Buy Message",
+            style=discord.ButtonStyle.grey,
+            row=2,
+            reference='buymessage_modal'
+            )
+
+    @property
+    def buy_message_modal(self):
+        m = DiscordModal(
+            function=self._add_item_main,
+            title=f"Set Buy Message",
+            )
+        m.reference = 'buymessage'
+        msg_field = discord.ui.TextInput(
+            label="Set Message",
+            placeholder="Sent to the user via DMs on purchase. Item will not be added to inventory.",
+            style=discord.TextStyle.long,
+            required=True
+            )
+        m.add_item(msg_field)   
+        return m
+    
+    @property
+    def add_subscription_duration(self):
+        return DiscordButton(
+            function=self._add_item_main,
+            label="Add Auto-Expiry",
+            style=discord.ButtonStyle.grey,
+            row=2,
+            reference='subscription_modal'
+            )
     
     @property
     def add_subscription_duration_modal(self):
@@ -404,49 +448,6 @@ class AddItem(DefaultView):
             )        
         m.add_item(duration)    
         return m
-
-    @property
-    def save_item_button(self):
-        return DiscordButton(
-            function=self._save_item,
-            label="Save Item",
-            emoji=EmojisUI.TASK_CHECK,
-            style=discord.ButtonStyle.grey,
-            reference='saveitem'
-            )
-
-    # @property
-    # def buy_message_button(self):
-    #     return DiscordButton(
-    #         function=self._send_buy_message_modal,
-    #         label="Set Buy Message",
-    #         style=discord.ButtonStyle.grey,
-    #         )
-
-    # @property
-    # def buy_message_modal(self):
-    #     m = DiscordModal(
-    #         function=self._buy_message_modal_callback,
-    #         title=f"Set Buy Message",
-    #         )
-    #     name_field = discord.ui.TextInput(
-    #         label="Set Message",
-    #         placeholder="The Buy Message is sent to the user when they purchase this item.",
-    #         style=discord.TextStyle.short,
-    #         required=True
-    #         )
-    #     m.add_item(name_field)   
-        return m
-    
-    @property
-    def add_subscription_duration(self):
-        return DiscordButton(
-            function=self._add_item_main,
-            label="Add Auto-Expiry",
-            style=discord.ButtonStyle.grey,
-            row=2,
-            reference='subscription_modal'
-            )
 
     @property
     def required_role_selector(self):

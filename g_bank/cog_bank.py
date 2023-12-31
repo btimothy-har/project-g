@@ -26,7 +26,7 @@ from coc_main.tasks.player_tasks import PlayerLoop
 from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.tasks.raid_tasks import ClanRaidLoop
 
-from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu
+from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin, is_owner
@@ -40,7 +40,7 @@ from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
 from .checks import is_bank_admin, is_payday_server, is_coleader_or_bank_admin
-from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items, autocomplete_redeem_items
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_redeem_items
 
 from mee6rank.mee6rank import Mee6Rank
 
@@ -205,6 +205,20 @@ class Bank(commands.Cog):
         embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
         await self.log_channel.send(embed=embed)
     
+    async def redemption_terms_conditions(self):
+        embed = await clash_embed(
+            context=self.bot,
+            title=f"**Redemption Terms & Conditions**",
+            message=f"1. All redemptions cannot be reversed and are not exchangeable or refundable."
+                + f"\n2. Redemptions **can** take up to 72 hours (3 days) to be fulfilled. Please be patient. Begging or pestering the staff will not expedite the process."
+                + f"\n3. In the event where an item is commercially unavailable, we reserve the right to offer you equivalent alternatives." 
+                + f"\n4. You are required to provide confirmation of item receipt. In the absence of valid confirmation, your redemption is assumed to be fulfilled."
+                + f"\n5. We reserve the right to withhold any redemption without reason or explanation."
+                + "\n\u200b",
+            timestamp=pendulum.now()
+            )
+        return embed
+    
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
@@ -261,17 +275,17 @@ class Bank(commands.Cog):
                     },
                 },            
             {
-                "name": "_assistant_redeem_goldpass",
-                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
+                "name": "_assistant_redeem_clashofclans",
+                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "item_id": {
-                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Gold Pass item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The Clash of Clans account to receive the Gold Pass on, identified by the Player Tag. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
+                            "description": "The Clash of Clans account to receive the Gold Pass or Gems on, identified by the Player Tag. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
                             "type": "string",
                             },
                         },
@@ -309,7 +323,7 @@ class Bank(commands.Cog):
         inventory = await UserInventory(user)
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
     
-    async def _assistant_redeem_nitro(self,guild:discord.Guild,user:discord.Member,item_id:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_nitro(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."    
             
@@ -321,12 +335,34 @@ class Bank(commands.Cog):
         if not inventory.has_item(item):
             return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
 
+        embed = await self.redemption_terms_conditions()
+        embed.add_field(
+            name="**For Discord Nitro Redemptions**",
+            value=f"1. Nitro redemptions are sent via Discord DMs. Keep your DMs open to receive your redemption."
+                + f"\n2. You **must** accept the Discord Nitro gift before expiration. We are not obligated to re-send any expired gifts."
+                + f"\n3. In the event you are unable to use your Nitro Gift due to subscription conflicts, your Gift will be stored as Credit in your Discord account."
+                + f"\n4. Discord Terms & Conditions are applicable.",
+            inline=False
+            )
+        view = AssistantConfirmation(user)
+        message = await channel.send(
+            content=f"{user.mention}, please review and accept the following Terms and Conditions before proceeding with your redemption.",
+            embed=embed,
+            view=view
+            )
+        wait = await view.wait()
+        await message.delete()
+        if wait:
+            return f"{user.display_name} did not respond."
+        if not view.confirmation:
+            return f"{user.display_name} cancelled the redemption."
+
         ticket = await RedemptionTicket.create(
             self,
             user_id=user.id,
             item_id=item_id
             )
-        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
+        return f"The redemption ticket for {user.display_name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
@@ -346,19 +382,20 @@ class Bank(commands.Cog):
         else:
             view = ClashAccountSelector(user,eligible_accounts)
             embed = await clash_embed(context=self.bot,message=message,timestamp=pendulum.now())
-            await channel.send(
+            m = await channel.send(
                 content=user.mention,
                 embed=embed,
                 view=view
                 )
             wait = await view.wait()
+            await m.delete()
             if wait or not view.selected_account:
                 return f"The user did not respond or cancelled process."
             
             select_account = await self.client.fetch_player(view.selected_account)
             return f"The user selected the account: {select_account.overview_json()}."
 
-    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_clashofclans(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         try:
             if not user:
                 return "No user found."
@@ -373,7 +410,30 @@ class Bank(commands.Cog):
             
             redeem_account = await self.client.fetch_player(redeem_tag)
             if not redeem_account or redeem_account.town_hall.level < 7:
-                return f"The account {redeem_tag} is not eligible for Gold Pass redemption. Accounts must be valid and of Townhall Level 7 or higher."
+                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            
+            embed = await self.redemption_terms_conditions()
+            embed.add_field(
+                name="**For Gold Pass or Gem Pack Redemptions**",
+                value=f"1. We use **[Codashop](https://www.codashop.com)** to purchase redemptions. This is a 3rd party licensed by Supercell. If you are not comfortable with this, please do not proceed."
+                    + f"\n2. Your Clash of Clans account must be linked to a valid Supercell ID."
+                    + f"\n3. The receipt of purchase serves as confirmation of redemption, regardless of whether you have received the item in-game."
+                    + f"\n4. The following Terms & Conditions are applicable: Supercell, Codashop, Discord.",
+                inline=False
+                )
+            
+            view = AssistantConfirmation(user)
+            message = await channel.send(
+                content=f"{user.mention}, please review and accept the following Terms and Conditions before proceeding with your redemption.",
+                embed=embed,
+                view=view
+                )
+            wait = await view.wait()
+            await message.delete()
+            if wait:
+                return f"{user.display_name} did not respond."
+            if not view.confirmation:
+                return f"{user.display_name} cancelled the redemption."
             
             ticket = await RedemptionTicket.create(
                 self,
@@ -381,7 +441,7 @@ class Bank(commands.Cog):
                 item_id=item_id,
                 goldpass_tag=redeem_tag
                 )
-            return f"The redemption ticket for {user} on {redeem_account.name} has been created: {getattr(ticket.channel,'mention','No channel')}. Do not convert the channel link into a clickable link, as the user will not be able to access the channel."
+            return f"The redemption ticket for {user.display_name} on {redeem_account.name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
         
         except Exception as e:
             bot_client.coc_main_log.exception(f"Assistant: Bank: Redeem Gold Pass")
@@ -881,7 +941,7 @@ class Bank(commands.Cog):
     ##### SUBSCRIPTION EXPIRY
     ############################################################
     ############################################################    
-    @tasks.loop(minutes=1.0)
+    @tasks.loop(seconds=5.0)
     async def subscription_item_expiry(self):
         if self._subscription_lock.locked():
             return
@@ -895,6 +955,24 @@ class Bank(commands.Cog):
                     if not item.guild:
                         continue
 
+                    if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
+                        async with item.lock:
+                            if len(item.assigns_role.members) > 0:
+                                all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
+
+                                all_subscribed_users = []
+                                item_iter = AsyncIter(all_role_items)
+                                async for i in item_iter:
+                                    all_subscribed_users.extend(list(i.subscription_log.keys()))
+                                
+                                m_iter = AsyncIter(item.assigns_role.members)
+                                async for member in m_iter:
+                                    if str(member.id) not in all_subscribed_users:
+                                        await member.remove_roles(
+                                            item.assigns_role,
+                                            reason="User does not have a valid subscription."
+                                            )
+                                        
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
@@ -902,7 +980,7 @@ class Bank(commands.Cog):
                             if not user:
                                 continue
 
-                            if item.type == 'role' and item.assigns_role not in user.roles:
+                            if item.type == 'role' and item.assigns_role.id not in [r.id for r in user.roles]:
                                 await item.expire_item(user)
 
                             expiry_time = await item.compute_user_expiry(user.id)
@@ -2252,77 +2330,134 @@ class Bank(commands.Cog):
     
     ##################################################
     ### SHOP ITEM / SHOW
-    ################################################## 
-    @command_group_shop_item.command(name="show")   
-    @commands.admin()
-    @commands.guild_only()
-    async def subcommand_shop_item_show(self,ctx:commands.Context,item_id:str):
-        """
-        Displays a Shop Item in the Store.
-
-        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
-        """
-        item = await ShopItem.get_by_id(item_id)
-        if not item:
-            return await ctx.reply("I couldn't find that item.")
-        await item.unhide()
-        await ctx.tick()
-    
-    @app_command_group_shopitem.command(
-        name="show",
-        description="Displays a Shop Item in the Store."
-        )
-    @app_commands.guild_only()
-    @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_show_store_items)
-    @app_commands.describe(
-        item="Select a Shop Item to display."
-        )        
-    async def app_command_show_item(self,interaction:discord.Interaction,item:str):
-        
-        await interaction.response.defer(ephemeral=True)
-        get_item = await ShopItem.get_by_id(item)
-        if not item:
-            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        await get_item.unhide()
-        await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
-
     ##################################################
-    ### SHOP ITEM / HIDE
-    ################################################## 
-    @command_group_shop_item.command(name="hide")   
+    async def build_change_description_modal(self,new_description:str=None,new_buy_msg:str=None):
+        async def save_input(interaction:discord.Interaction,modal:DiscordModal):
+            await interaction.response.defer()
+            c_iter = AsyncIter(modal.children)
+            async for item in c_iter:
+                if item.label == "Description":
+                    modal.new_description = item.value
+                if item.label == "Buy Message":
+                    modal.new_buy_message = item.value            
+            modal.stop()
+        
+        modal = DiscordModal(
+            function=save_input,
+            title="Edit Shop Item",
+            )
+        if new_description:
+            modal.add_field(
+                label="Description",
+                style=discord.TextStyle.short,
+                placeholder="The new Decription to use for this item.",
+                default=new_description,
+                required=True,
+                min_length=1
+                )
+        if new_buy_msg:
+            modal.add_field(
+                label="Buy Message",
+                style=discord.TextStyle.long,
+                placeholder="The new Buy Message to use for this item.",
+                default=new_buy_msg,
+                required=True,
+                min_length=1
+                )
+        return modal
+
+    @command_group_shop_item.command(name="edit")   
     @commands.admin()
     @commands.guild_only()
-    async def subcommand_shop_item_hide(self,ctx:commands.Context,item_id:str):
+    async def subcommand_shop_edit_item(self,ctx:commands.Context):
         """
-        Hides a Shop Item in the Store.
+        Edits a Shop Item in the Store.
 
-        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        The following parameters can be edited:
+        - Show in Store
+        - Category
+        - Description
+        - Required Role
+        - Buy Message
         """
-        item = await ShopItem.get_by_id(item_id)
-        if not item:
-            return await ctx.reply("I couldn't find that item.")
-        await item.hide()
-        await ctx.tick()
+        await ctx.reply(f"Use the Slash Command `/shop-manage edit` to do this action.")
     
     @app_command_group_shopitem.command(
-        name="hide",
-        description="Hides a Shop Item in the Store."
+        name="edit",
+        description="Edits a Shop Item in the Store. Not all parameters can be edited."
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_hide_store_items)
+    @app_commands.autocomplete(item=autocomplete_store_items)
     @app_commands.describe(
-        item="Select a Shop Item to hide."
-        )        
-    async def app_command_hide_item(self,interaction:discord.Interaction,item:str):
+        item="Select a Shop Item to edit.",
+        show_in_store="Change whether the item is shown in the store.",
+        category="Change the category of the item.",
+        description="Change the description of the item.",
+        required_role="Change the required role to purchase the item.",
+        buy_message="Change the message sent when the item is purchased. Only applicable for basic items."
+        )
+    @app_commands.choices(show_in_store=[
+        app_commands.Choice(name="True",value=2),
+        app_commands.Choice(name="False",value=1)
+        ])
+    async def app_command_edit_item(self,
+        interaction:discord.Interaction,
+        item:str,
+        show_in_store:Optional[int]=0,
+        category:Optional[str]=None,
+        description:Optional[str]=None,
+        required_role:Optional[discord.Role]=None,
+        buy_message:Optional[str]=None,
+        ):
+
+        new_description = None
+        new_buy_msg = None
+                
+        if description or buy_message:
+            modal = await self.build_change_description_modal(
+                new_description=description,
+                new_buy_msg=buy_message
+                )
+            await interaction.response.send_modal(modal)
+
+            wait = await modal.wait()
+            if wait:
+                await interaction.followup.send(f"Did not receive a response.",ephemeral=True)
+            
+            new_description = getattr(modal,'new_description',None)
+            new_buy_msg = getattr(modal,'new_buy_message',None)
+
+        else:            
+            await interaction.response.defer(ephemeral=True)
         
-        await interaction.response.defer(ephemeral=True)
         get_item = await ShopItem.get_by_id(item)
         if not item:
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        await get_item.hide()
-        await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
+
+        if show_in_store > 0:            
+            if show_in_store == 2:
+                await get_item.unhide()
+                await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
+            else:
+                await get_item.hide()
+                await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
+        
+        if category:            
+            await get_item.edit(category=category)
+            await interaction.followup.send(f"Updated {get_item.name} category to {category}.",ephemeral=True)
+        
+        if new_description:            
+            await get_item.edit(description=new_description)
+            await interaction.followup.send(f"Updated {get_item.name} description.",ephemeral=True)
+        
+        if new_buy_msg:
+            await get_item.edit(buy_message=new_buy_msg)
+            await interaction.followup.send(f"Updated {get_item.name} buy message.",ephemeral=True)
+        
+        if required_role:            
+            await get_item.edit(required_role=required_role.id)
+            await interaction.followup.send(f"Updated {get_item.name} required role to {required_role.mention}.",ephemeral=True)
     
     ##################################################
     ### SHOP ITEM / RESTOCK
@@ -2357,7 +2492,6 @@ class Bank(commands.Cog):
         amount="The amount to restock."
         )        
     async def app_command_restock_item(self,interaction:discord.Interaction,item:str,amount:int):
-        
         await interaction.response.defer(ephemeral=True)
         get_item = await ShopItem.get_by_id(item)
         if not get_item:
@@ -2405,4 +2539,61 @@ class ClashAccountSelector(discord.ui.View):
         return True
     
     async def on_timeout(self):
+        self.stop()
+
+class AssistantConfirmation(discord.ui.View):
+    def __init__(self,user:discord.User):
+
+        self.confirmation = None
+        self.user = user
+
+        self.yes_button = DiscordButton(
+            function=self.yes_callback,
+            label="Yes, I accept.",
+            emoji=EmojisUI.YES,
+            style=discord.ButtonStyle.green,
+            )
+        self.no_button = DiscordButton(
+            function=self.no_callback,
+            label="No, I do not accept.",
+            emoji=EmojisUI.NO,
+            style=discord.ButtonStyle.grey,
+            )
+
+        super().__init__(timeout=120)
+
+        self.add_item(self.yes_button)
+        self.add_item(self.no_button)
+    
+    ##################################################
+    ### OVERRIDE BUILT IN METHODS
+    ##################################################
+    async def interaction_check(self, interaction:discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                content="This doesn't belong to you!", ephemeral=True
+                )
+            return False
+        return True
+
+    async def on_timeout(self):
+        self.clear_items()
+        self.stop()
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item):
+        self.stop()
+    
+    ##################################################
+    ### CALLBACKS
+    ##################################################
+    async def yes_callback(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.confirmation = True
+        await interaction.edit_original_response(view=None)
+        self.stop()
+    
+    async def no_callback(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.confirmation = False
+        await interaction.edit_original_response(view=None)
         self.stop()

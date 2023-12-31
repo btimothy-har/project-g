@@ -74,9 +74,17 @@ class ShopItem():
     @classmethod
     async def get_subscription_items(cls) -> List['ShopItem']:
         query = bot_client.coc_db.db__shop_item.find(
+            {'subscription_duration':{'$gt':0}}
+            )
+        return [cls(item) async for item in query]
+    
+    @classmethod
+    async def get_subscribed_roles_for_user(cls,user_id:int) -> List['ShopItem']:
+        key_dict = f'subscription_log.{user_id}'
+        query = bot_client.coc_db.db__shop_item.find(
             {
-                'subscription_duration':{'$gt':0},
-                'disabled':False
+                key_dict:{'$exists':True},
+                'type':'role'
                 }
             )
         return [cls(item) async for item in query]
@@ -89,6 +97,16 @@ class ShopItem():
     @classmethod
     async def get_by_guild_category(cls,guild_id:int,category:str):        
         query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'category':category,'disabled':False})
+        return [cls(item) async for item in query]
+
+    @classmethod
+    async def get_by_role_assigned(cls,guild_id:int,role_id:int):
+        query = bot_client.coc_db.db__shop_item.find(
+            {
+                'guild_id':guild_id,
+                'role_id':role_id
+                }
+            )
         return [cls(item) async for item in query]
 
     def __init__(self,database_entry:dict):        
@@ -128,6 +146,17 @@ class ShopItem():
         return False
     
     def _assistant_json(self) -> dict:
+        stock = 0
+        if self.type == 'cash' and self._stock > 0:
+            factor = max((20-self._stock),1)
+            rand = random.randint(1,factor)
+            if rand != 1:
+                stock = 0
+            else:
+                stock = 1
+        else:
+            stock = self.stock
+
         return {
             'id': self.id,
             'name': self.name,
@@ -136,7 +165,7 @@ class ShopItem():
             'price': self.price,
             'category': self.category,
             'requires_role': self.required_role.name if self.required_role else None,
-            'available_stock': self.stock,
+            'available_stock': stock,
             'assigns_role': self.assigns_role.name if self.assigns_role else None,
             'expires_after_in_days': self.subscription_duration,
             }
@@ -270,6 +299,35 @@ class ShopItem():
 
         chosen_item = random.choices(eligible_items, pick_weights, k=1)[0]
         return chosen_item
+
+    async def edit(self,**kwargs):
+        if kwargs.get('category'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'category':kwargs['category']}}
+                )
+            self.category = kwargs['category']
+        
+        if kwargs.get('description'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'description':kwargs['description']}}
+                )
+            self.description = kwargs['description']
+        
+        if kwargs.get('buy_message'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'buy_message':kwargs['buy_message']}}
+                )
+            self.buy_message = kwargs['buy_message']
+        
+        if kwargs.get('required_role'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'required_role':kwargs['required_role']}}
+                )
+            self._required_role = kwargs['required_role'] 
     
     @classmethod
     async def create(cls,**kwargs):        
