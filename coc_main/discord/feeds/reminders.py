@@ -125,7 +125,7 @@ class EventReminder():
         if self._lock.locked():
             return
         async with self._lock:
-            if self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder:
+            if self.guild and self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder: 
                 a_iter = AsyncIter(players)
                 async for rem_player in a_iter:
                     try:
