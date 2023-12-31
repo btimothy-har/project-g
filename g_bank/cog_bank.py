@@ -900,11 +900,11 @@ class Bank(commands.Cog):
                             item = await ShopItem.get_by_id(item.id)
                             if len(item.assigns_role.members) > 0:
                                 m_iter = AsyncIter(item.assigns_role.members)
-                                bot_client.coc_main_log.info(item.subscription_log)
+                                bot_client.coc_main_log.info(f"log: {item.subscription_log}")
                                 u_keys = list(item.subscription_log.keys())
 
                                 async for member in m_iter:
-                                    bot_client.coc_main_log.info(u_keys)
+                                    bot_client.coc_main_log.info(f"log2: {u_keys}")
                                     if str(member.id) not in u_keys:
                                         await member.remove_roles(
                                             item.assigns_role,
