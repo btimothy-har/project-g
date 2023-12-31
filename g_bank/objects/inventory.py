@@ -173,7 +173,7 @@ class UserInventory(AwaitLoader):
         if len(self.inventory) > 0:
             for item in self.inventory:
                 inventory_text += f"\n\n**{item.name}** x{item.quantity}"
-                inventory_text += f"\n{item.description}"
+                inventory_text += (f"\n{item.description}" if len(item.description) > 0 else "")
                 if getattr(user,'id',None) == self.user.id:
                     if item.type in ['basic']:
                         inventory_text += f"\nPurchased from: {item.guild.name}"
@@ -200,8 +200,8 @@ class UserInventory(AwaitLoader):
             r_iter = AsyncIter(subscribed_roles)
             async for role in r_iter:
                 expiry = await role.compute_user_expiry(self.user.id)
-                text += f"**{role.name}**"
-                text += f"\nGrants Role: {getattr(role.assigns_role,'mention','Unknown')}"
+                text += f"\n**{role.name}**"
+                text += f"\nGrants: {getattr(role.assigns_role,'mention','Unknown')}"
                 text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
                 text += "\n\u200b"
             embed.add_field(
