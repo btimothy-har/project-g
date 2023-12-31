@@ -881,7 +881,7 @@ class Bank(commands.Cog):
     ##### SUBSCRIPTION EXPIRY
     ############################################################
     ############################################################    
-    @tasks.loop(minutes=1.0)
+    @tasks.loop(seconds=5.0)
     async def subscription_item_expiry(self):
         if self._subscription_lock.locked():
             return
@@ -898,16 +898,18 @@ class Bank(commands.Cog):
                     if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                         async with item.lock:
                             item = await ShopItem.get_by_id(item.id)
-                            u_keys = list(item.subscription_log.keys())
-                            m_iter = AsyncIter(item.assigns_role.members)
+                            if len(item.assigns_role.members) > 0:
+                                m_iter = AsyncIter(item.assigns_role.members)
+                                bot_client.coc_main_log.info(item.subscription_log)
+                                u_keys = list(item.subscription_log.keys())
 
-                            async for member in m_iter:
-                                bot_client.coc_main_log.info(u_keys)
-                                if str(member.id) not in u_keys:
-                                    await member.remove_roles(
-                                        item.assigns_role,
-                                        reason="User does not have a valid subscription."
-                                        )
+                                async for member in m_iter:
+                                    bot_client.coc_main_log.info(u_keys)
+                                    if str(member.id) not in u_keys:
+                                        await member.remove_roles(
+                                            item.assigns_role,
+                                            reason="User does not have a valid subscription."
+                                            )
                                         
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
