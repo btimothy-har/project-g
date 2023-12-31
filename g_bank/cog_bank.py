@@ -897,6 +897,7 @@ class Bank(commands.Cog):
 
                     if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
                         async with item.lock:
+                            item = await ShopItem.get_by_id(item.id)
                             u_keys = list(item.subscription_log.keys())
                             m_iter = AsyncIter(item.assigns_role.members)
 
