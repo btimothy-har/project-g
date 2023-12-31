@@ -84,14 +84,14 @@ async def autocomplete_store_items_restock(interaction:discord.Interaction,curre
         if not current:
             selection = guild_items
             return [app_commands.Choice(
-                name=f"{item}",
+                name=f"[{item.type.capitalize()} Item] {item.name} | Price: {item.price} | Stock: {item.stock}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
             selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
-                name=f"{item.type.capitalize()} {item.name} | Price: {item.price} | Stock: {item.stock}",
+                name=f"[{item.type.capitalize()} Item] {item.name} | Price: {item.price} | Stock: {item.stock}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
