@@ -234,9 +234,9 @@ class UserStore(DefaultView):
             await interaction.response.defer()
         
         if menu:
-            self.current_item = [i for i in self.store_items if i.id == menu.values[0]][0]
+            self.current_item = await ShopItem.get_by_id(menu.values[0])
             if self.current_item.type == 'cash' and self.current_item._stock > 0:
-                rand = random.randint(1,max((10-self.current_item._stock),0))
+                rand = random.randint(1,max((10-self.current_item._stock),1))
                 if rand != 1:
                     self.current_item._stock = 0
                 else:
