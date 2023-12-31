@@ -69,7 +69,7 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
         else:
             selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
             return [app_commands.Choice(
-                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
+                name=f"[{item.type.capitalize()} Item] {item.name} | Price: {item.price}",
                 value=item.id)
             for item in random.sample(selection,min(len(selection),5))
             ]
