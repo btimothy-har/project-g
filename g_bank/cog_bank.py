@@ -2266,6 +2266,7 @@ class Bank(commands.Cog):
     ##################################################
     async def build_change_description_modal(self,new_description:str=None,new_buy_msg:str=None):
         async def save_input(interaction:discord.Interaction,modal:DiscordModal):
+            await interaction.response.defer()
             c_iter = AsyncIter(modal.children)
             async for item in c_iter:
                 if item.label == "Description":
