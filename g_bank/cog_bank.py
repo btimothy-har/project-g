@@ -919,7 +919,7 @@ class Bank(commands.Cog):
                             if not user:
                                 continue
 
-                            if item.type == 'role' and item.assigns_role not in user.roles:
+                            if item.type == 'role' and item.assigns_role.id not in [r.id for r in user.roles]:
                                 bot_client.coc_main_log.info(f"{item.id} log3: {item.subscription_log}")
                                 await item.expire_item(user)
 
