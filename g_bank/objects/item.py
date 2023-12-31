@@ -128,6 +128,16 @@ class ShopItem():
         return False
     
     def _assistant_json(self) -> dict:
+        stock = 0
+        if self.type == 'cash' and self._stock > 0:
+            rand = random.randint(1,20)
+            if rand == 20:
+                stock = self.stock
+            else:
+                stock = 0
+        else:
+            stock = self.stock
+
         return {
             'id': self.id,
             'name': self.name,
@@ -136,7 +146,7 @@ class ShopItem():
             'price': self.price,
             'category': self.category,
             'requires_role': self.required_role.name if self.required_role else None,
-            'available_stock': self.stock,
+            'available_stock': stock,
             'assigns_role': self.assigns_role.name if self.assigns_role else None,
             'expires_after_in_days': self.subscription_duration,
             }
@@ -270,6 +280,35 @@ class ShopItem():
 
         chosen_item = random.choices(eligible_items, pick_weights, k=1)[0]
         return chosen_item
+
+    async def edit(self,**kwargs):
+        if kwargs.get('category'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'category':kwargs['category']}}
+                )
+            self.category = kwargs['category']
+        
+        if kwargs.get('description'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'description':kwargs['description']}}
+                )
+            self.description = kwargs['description']
+        
+        if kwargs.get('buy_message'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'buy_message':kwargs['buy_message']}}
+                )
+            self.buy_message = kwargs['buy_message']
+        
+        if kwargs.get('required_role'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'required_role':kwargs['required_role']}}
+                )
+            self._required_role = kwargs['required_role'] 
     
     @classmethod
     async def create(cls,**kwargs):        

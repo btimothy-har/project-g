@@ -1,4 +1,5 @@
 import discord
+import random
 
 from typing import *
 from functools import cached_property
@@ -231,9 +232,14 @@ class UserStore(DefaultView):
         
         if menu:
             self.current_item = [i for i in self.store_items if i.id == menu.values[0]][0]
+            if self.current_item.type == 'cash' and self.current_item._stock > 0:
+                rand = random.randint(1,20)
+                if rand != 20:
+                    self.current_item._stock = 0
+                else:
+                    self.current_item._stock = 1
 
         item_embed = await self.get_item_embed()
-
         user = self.guild.get_member(interaction.user.id)
 
         purchase_button = self.purchase_button
@@ -262,7 +268,7 @@ class UserStore(DefaultView):
                 else:
                     purchase_button.label = "You cannot purchase this item."
                 purchase_button.style = discord.ButtonStyle.grey
-        
+
         self.clear_items()
         self.add_item(purchase_button)
         self.add_item(self.home_button)
@@ -275,21 +281,23 @@ class UserStore(DefaultView):
         await interaction.response.defer()
         currency = await bank.get_currency_name()
 
-        if not self.current_item.can_i_buy(self.guild.get_member(interaction.user.id)) or not await bank.can_spend(self.guild.get_member(interaction.user.id),self.current_item.price):
+        item = await ShopItem.get_by_id(self.current_item.id)
+
+        if not item.can_i_buy(self.guild.get_member(interaction.user.id)) or not await bank.can_spend(self.guild.get_member(interaction.user.id),item.price):
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"You cannot purchase **{self.current_item.name}**.",
+                message=f"You cannot purchase **{item.name}**.",
                 success=False
                 )
             return await interaction.followup.send(embed=embed,ephemeral=True)
         
         user_inv = await UserInventory(interaction.user)
-        buy_item = await user_inv.purchase_item(self.current_item)
+        buy_item = await user_inv.purchase_item(item)
 
-        purchase_msg = f"Congratulations! You spent {self.current_item.price} {currency} to purchase 1x **{self.current_item.name}**."
+        purchase_msg = f"Congratulations! You spent {item.price} {currency} to purchase 1x **{item.name}**."
 
         if self.current_item.type == 'random':
-            purchase_msg += f"\n\nYou received 1x **{buy_item.name}** from {self.current_item.name}."
+            purchase_msg += f"\n\nYou received 1x **{buy_item.name}** from {item.name}."
         
         if buy_item.type == 'role':
             if not buy_item.bidirectional_role:
@@ -299,8 +307,12 @@ class UserStore(DefaultView):
                     purchase_msg += f"\n\nThe {buy_item.assigns_role.mention} role was removed."
                 else:
                     purchase_msg += f"\n\nYou received the {buy_item.assigns_role.mention} role."
+                    
         elif buy_item.type in ['basic','cash']:
-            purchase_msg += f"\n\n1x **{buy_item.name}** was added to your inventory."
+            if buy_item.buy_message and len(buy_item.buy_message) > 0:
+                purchase_msg += f"\n\nCheck your DMs for additional information."
+            else:
+                purchase_msg += f"\n\n1x **{buy_item.name}** was added to your inventory."
         
         embed = await clash_embed(
             context=self.ctx,
@@ -337,8 +349,6 @@ class UserStore(DefaultView):
             value=f"{self.current_item.subscription_duration} day(s)" if self.current_item.subscription else "Never",
             inline=True
             )
-        
-        
         item_embed.add_field(
             name="Category",
             value=f"{self.current_item.category}",

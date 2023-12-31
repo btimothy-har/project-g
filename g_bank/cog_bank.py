@@ -26,7 +26,7 @@ from coc_main.tasks.player_tasks import PlayerLoop
 from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.tasks.raid_tasks import ClanRaidLoop
 
-from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu
+from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin, is_owner
@@ -895,6 +895,17 @@ class Bank(commands.Cog):
                     if not item.guild:
                         continue
 
+                    if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
+                        u_keys = list(item.subscription_log.keys())
+                        m_iter = AsyncIter(item.assigns_role.members)
+
+                        async for member in m_iter:
+                            if str(member.id) not in u_keys:
+                                await member.remove_roles(
+                                    item.assigns_role,
+                                    reason="User does not have a valid subscription."
+                                    )
+                                        
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
@@ -2252,77 +2263,133 @@ class Bank(commands.Cog):
     
     ##################################################
     ### SHOP ITEM / SHOW
-    ################################################## 
-    @command_group_shop_item.command(name="show")   
+    ##################################################
+    async def build_change_description_modal(self,new_description:str=None,new_buy_msg:str=None):
+        async def save_input(interaction:discord.Interaction,modal:DiscordModal):
+            c_iter = AsyncIter(modal.children)
+            async for item in c_iter:
+                if item.label == "Description":
+                    modal.new_description = item.value
+                if item.label == "Buy Message":
+                    modal.new_buy_message = item.value            
+            modal.stop()
+        
+        modal = DiscordModal(
+            function=save_input,
+            title="Edit Shop Item",
+            )
+        if new_description:
+            modal.add_field(
+                label="Description",
+                style=discord.TextStyle.long,
+                placeholder="The new Decription to use for this item.",
+                default=new_description,
+                required=True,
+                min_length=1
+                )
+        if new_buy_msg:
+            modal.add_field(
+                label="Buy Message",
+                style=discord.TextStyle.long,
+                placeholder="The new Buy Message to use for this item.",
+                default=new_buy_msg,
+                required=True,
+                min_length=1
+                )
+        return modal
+
+    @command_group_shop_item.command(name="edit")   
     @commands.admin()
     @commands.guild_only()
-    async def subcommand_shop_item_show(self,ctx:commands.Context,item_id:str):
+    async def subcommand_shop_edit_item(self,ctx:commands.Context):
         """
-        Displays a Shop Item in the Store.
+        Edits a Shop Item in the Store.
 
-        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
+        The following parameters can be edited:
+        - Show in Store
+        - Category
+        - Description
+        - Required Role
+        - Buy Message
         """
-        item = await ShopItem.get_by_id(item_id)
-        if not item:
-            return await ctx.reply("I couldn't find that item.")
-        await item.unhide()
-        await ctx.tick()
+        await ctx.reply(f"Use the Slash Command `/shop-manage edit` to do this action.")
     
     @app_command_group_shopitem.command(
-        name="show",
-        description="Displays a Shop Item in the Store."
+        name="edit",
+        description="Edits a Shop Item in the Store. Not all parameters can be edited."
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
     @app_commands.autocomplete(item=autocomplete_show_store_items)
     @app_commands.describe(
-        item="Select a Shop Item to display."
-        )        
-    async def app_command_show_item(self,interaction:discord.Interaction,item:str):
-        
-        await interaction.response.defer(ephemeral=True)
-        get_item = await ShopItem.get_by_id(item)
-        if not item:
-            return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        await get_item.unhide()
-        await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
-
-    ##################################################
-    ### SHOP ITEM / HIDE
-    ################################################## 
-    @command_group_shop_item.command(name="hide")   
-    @commands.admin()
-    @commands.guild_only()
-    async def subcommand_shop_item_hide(self,ctx:commands.Context,item_id:str):
-        """
-        Hides a Shop Item in the Store.
-
-        Uses the system ID to identify Shop Items. If you're not sure what this is, use the Slash Command.
-        """
-        item = await ShopItem.get_by_id(item_id)
-        if not item:
-            return await ctx.reply("I couldn't find that item.")
-        await item.hide()
-        await ctx.tick()
-    
-    @app_command_group_shopitem.command(
-        name="hide",
-        description="Hides a Shop Item in the Store."
+        item="Select a Shop Item to edit.",
+        show_in_store="Change whether the item is shown in the store.",
+        category="Change the category of the item.",
+        description="Change the description of the item.",
+        required_role="Change the required role to purchase the item.",
+        buy_message="Change the message sent when the item is purchased. Only applicable for basic items."
         )
-    @app_commands.guild_only()
-    @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_hide_store_items)
-    @app_commands.describe(
-        item="Select a Shop Item to hide."
-        )        
-    async def app_command_hide_item(self,interaction:discord.Interaction,item:str):
+    @app_commands.choices(show_in_store=[
+        app_commands.Choice(name="True",value=2),
+        app_commands.Choice(name="False",value=1)
+        ])
+    async def app_command_edit_item(self,
+        interaction:discord.Interaction,
+        item:str,
+        show_in_store:Optional[int]=0,
+        category:Optional[str]=None,
+        description:Optional[str]=None,
+        required_role:Optional[discord.Role]=None,
+        buy_message:Optional[str]=None,
+        ):
+
+        new_description = None
+        new_buy_msg = None
+                
+        if description or buy_message:
+            modal = await self.build_change_description_modal(
+                new_description=description,
+                new_buy_msg=buy_message
+                )
+            await interaction.response.send_modal(modal)
+
+            wait = await modal.wait()
+            if wait:
+                await interaction.followup.send(f"Did not receive a response.",ephemeral=True)
+            
+            new_description = getattr(modal,'new_description',None)
+            new_buy_msg = getattr(modal,'new_buy_message',None)
+
+        else:            
+            await interaction.response.defer(ephemeral=True)
         
-        await interaction.response.defer(ephemeral=True)
         get_item = await ShopItem.get_by_id(item)
         if not item:
             return await interaction.followup.send("I couldn't find that item.",ephemeral=True)
-        await get_item.hide()
-        await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
+
+        if show_in_store > 0:            
+            if show_in_store == 2:
+                await get_item.unhide()
+                await interaction.followup.send(f"{get_item.name} is now enabled in the Guild Store.",ephemeral=True)
+            else:
+                await get_item.hide()
+                await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
+        
+        if category:            
+            await get_item.edit(category=category)
+            await interaction.followup.send(f"Updated {get_item.name} category to {category}.",ephemeral=True)
+        
+        if new_description:            
+            await get_item.edit(description=new_description)
+            await interaction.followup.send(f"Updated {get_item.name} description.",ephemeral=True)
+        
+        if new_buy_msg:
+            await get_item.edit(buy_message=new_buy_msg)
+            await interaction.followup.send(f"Updated {get_item.name} buy message.",ephemeral=True)
+        
+        if required_role:            
+            await get_item.edit(required_role=required_role.id)
+            await interaction.followup.send(f"Updated {get_item.name} required role to {required_role.mention}.",ephemeral=True)
     
     ##################################################
     ### SHOP ITEM / RESTOCK

@@ -120,7 +120,10 @@ class UserInventory(AwaitLoader):
             item = await item.random_select()
 
         if item.type in ['basic','cash']:
-            await self.add_item_to_inventory(item)
+            if item.buy_message and len(item.buy_message) > 0:
+                await member.send(item.buy_message)
+            else:
+                await self.add_item_to_inventory(item)
         
         if item.type in ['role']:
             if item.bidirectional_role:
@@ -138,7 +141,8 @@ class UserInventory(AwaitLoader):
                     roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
 
                     #remove_role_from_user
-                    async for role in AsyncIter(roles_from_similar_items):
+                    r_iter = AsyncIter(roles_from_similar_items)
+                    async for role in r_iter:
                         if role in member.roles:
                             await member.remove_roles(role)
                 
@@ -179,7 +183,6 @@ class UserInventory(AwaitLoader):
                         expiry = await item.compute_user_expiry(self.user.id)
                         if expiry:
                             inventory_text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
-                
 
         embed = await clash_embed(
             context=ctx,
