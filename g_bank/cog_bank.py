@@ -40,7 +40,7 @@ from .views.store_manager import AddItem
 from .views.user_store import UserStore
 
 from .checks import is_bank_admin, is_payday_server, is_coleader_or_bank_admin
-from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_hide_store_items, autocomplete_show_store_items, autocomplete_redeem_items
+from .autocomplete import global_accounts, autocomplete_eligible_accounts, autocomplete_store_items, autocomplete_store_items_restock, autocomplete_distribute_items, autocomplete_gift_items, autocomplete_redeem_items
 
 from mee6rank.mee6rank import Mee6Rank
 
