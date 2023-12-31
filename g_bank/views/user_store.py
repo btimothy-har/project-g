@@ -274,6 +274,8 @@ class UserStore(DefaultView):
         self.add_item(self.home_button)
         self.add_item(self.close_button)
 
+        if len(self.store_categories) > 2:
+            self.add_item(self.category_select)
         self.add_item(self.item_select)        
         await interaction.edit_original_response(embed=item_embed,view=self)
     
