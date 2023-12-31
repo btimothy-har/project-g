@@ -224,6 +224,8 @@ class ShopItem():
                         {'subscription_log':self.subscription_log}
                         }
                     )
+                item = await ShopItem.get_by_id(self.id)
+                bot_client.coc_main_log.info(item.subscription_log)
 
             if self._stock > 0:
                 item = await bot_client.coc_db.db__shop_item.find_one_and_update(
