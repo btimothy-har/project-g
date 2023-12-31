@@ -247,7 +247,6 @@ class UserStore(DefaultView):
                     self.current_item._stock = 1
                 bot_client.coc_main_log.info(f"Randomised stock for {self.current_item.name} (factor: {factor}). New stock: {self.current_item._stock}")
 
-        item_embed = await self.get_item_embed()
         user = self.guild.get_member(interaction.user.id)
 
         purchase_button = self.purchase_button
@@ -256,7 +255,7 @@ class UserStore(DefaultView):
         if inventory.has_item(self.current_item) and (self.current_item.type in ['cash'] or self.current_item.subscription):
             if self.current_item.type in ['cash']:
                 self.current_item._stock = 0
-                
+
             purchase_button.disabled = True
             purchase_button.label = f"You can only have 1 of this item."
             purchase_button.style = discord.ButtonStyle.grey
@@ -287,7 +286,8 @@ class UserStore(DefaultView):
 
         if len(self.store_categories) > 2:
             self.add_item(self.category_select)
-        self.add_item(self.item_select)        
+        self.add_item(self.item_select)
+        item_embed = await self.get_item_embed()
         await interaction.edit_original_response(embed=item_embed,view=self)
     
     async def _purchase_item(self,interaction:discord.Interaction,button:DiscordButton):
