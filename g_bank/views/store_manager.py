@@ -414,7 +414,7 @@ class AddItem(DefaultView):
         m.reference = 'buymessage'
         msg_field = discord.ui.TextInput(
             label="Set Message",
-            placeholder="The Buy Message is sent to the user (via DMs) when they purchase this item. If this is set, the item will not be added to their inventory.",
+            placeholder="The Buy Message sent to the user (via DMs) on purchase.",
             style=discord.TextStyle.long,
             required=True
             )
