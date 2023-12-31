@@ -26,7 +26,7 @@ from coc_main.tasks.player_tasks import PlayerLoop
 from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.tasks.raid_tasks import ClanRaidLoop
 
-from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal
+from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin, is_owner
@@ -262,7 +262,7 @@ class Bank(commands.Cog):
                 },            
             {
                 "name": "_assistant_redeem_clashofclans",
-                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory.",
+                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory. Always facilitate this transaction in a private thread.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -374,6 +374,34 @@ class Bank(commands.Cog):
             redeem_account = await self.client.fetch_player(redeem_tag)
             if not redeem_account or redeem_account.town_hall.level < 7:
                 return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            
+            embed = await clash_embed(
+                context=self.bot,
+                title=f"**Redemption Terms & Conditions**",
+                message=f"1. All redemptions cannot be reversed and are not exchangeable or refundable."
+                    + f"\n2. Redemptions **can** take up to 72 hours (3 days) to be fulfilled. Please be patient. Begging or pestering the staff will not expedite the process."
+                    + f"\n3. In the event where an item is commercially unavailable, we reserve the right to offer you equivalent alternatives." 
+                    + f"\n4. You are required to provide confirmation of item receipt. In the absence of valid confirmation, your redemption is assumed to be fulfilled."
+                    + f"\n5. We reserve the right to withhold any redemption without reason or explanation."
+                    + "<:spacer:1138755270709878834>",
+                timestamp=pendulum.now()
+                )
+            embed.add_field(
+                name="**For Gold Pass or Gem Pack Redemptions**",
+                value=f"1. We use **(Codashop)[https://www.codashop.com]** to purchase redemptions. This is a Supercell-licensed 3rd party. If you are not comfortable with this, please do not proceed."
+                    + f"\n2. Your Clash of Clans account must be linked to a valid Supercell ID."
+                    + f"\n3. The receipt of purchase serves as confirmation of redemption, regardless of whether you have received the item in-game."
+                    + f"\n4. The following Terms & Conditions are applicable: Supercell, Codashop, Discord.",
+                inline=False
+                )
+            
+            view = AssistantConfirmation(user)
+            await channel.send(content=user.mention,embed=embed,view=view)
+            wait = await view.wait()
+            if wait:
+                return f"The user did not respond."
+            if not view.confirmation:
+                return f"The user cancelled the redemption."
             
             ticket = await RedemptionTicket.create(
                 self,
@@ -2432,7 +2460,6 @@ class Bank(commands.Cog):
         amount="The amount to restock."
         )        
     async def app_command_restock_item(self,interaction:discord.Interaction,item:str,amount:int):
-        
         await interaction.response.defer(ephemeral=True)
         get_item = await ShopItem.get_by_id(item)
         if not get_item:
@@ -2480,4 +2507,61 @@ class ClashAccountSelector(discord.ui.View):
         return True
     
     async def on_timeout(self):
+        self.stop()
+
+class AssistantConfirmation(discord.ui.View):
+    def __init__(self,user:discord.User):
+
+        self.confirmation = None
+        self.user = user
+
+        self.yes_button = DiscordButton(
+            function=self.yes_callback,
+            label="",
+            emoji=EmojisUI.YES,
+            style=discord.ButtonStyle.green,
+            )
+        self.no_button = DiscordButton(
+            function=self.no_callback,
+            label="",
+            emoji=EmojisUI.NO,
+            style=discord.ButtonStyle.grey,
+            )
+
+        super().__init__(timeout=120)
+
+        self.add_item(self.yes_button)
+        self.add_item(self.no_button)
+    
+    ##################################################
+    ### OVERRIDE BUILT IN METHODS
+    ##################################################
+    async def interaction_check(self, interaction:discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                content="This doesn't belong to you!", ephemeral=True
+                )
+            return False
+        return True
+
+    async def on_timeout(self):
+        self.clear_items()
+        self.stop()
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item):
+        self.stop()
+    
+    ##################################################
+    ### CALLBACKS
+    ##################################################
+    async def yes_callback(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.confirmation = True
+        await interaction.edit_original_response(view=None)
+        self.stop()
+    
+    async def no_callback(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
+        self.confirmation = False
+        await interaction.edit_original_response(view=None)
         self.stop()
