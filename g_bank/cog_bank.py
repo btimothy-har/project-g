@@ -2349,7 +2349,7 @@ class Bank(commands.Cog):
         if new_description:
             modal.add_field(
                 label="Description",
-                style=discord.TextStyle.long,
+                style=discord.TextStyle.short,
                 placeholder="The new Decription to use for this item.",
                 default=new_description,
                 required=True,
