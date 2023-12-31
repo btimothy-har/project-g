@@ -881,7 +881,7 @@ class Bank(commands.Cog):
     ##### SUBSCRIPTION EXPIRY
     ############################################################
     ############################################################    
-    @tasks.loop(minutes=1.0)
+    @tasks.loop(seconds=5.0)
     async def subscription_item_expiry(self):
         if self._subscription_lock.locked():
             return

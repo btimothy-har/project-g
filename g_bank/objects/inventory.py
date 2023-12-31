@@ -188,8 +188,24 @@ class UserInventory(AwaitLoader):
             context=ctx,
             title=f"{self.user.display_name}'s Inventory",
             message=f"**Total Items:** {len(self.inventory)}"
-                + inventory_text,
+                + inventory_text
+                + f"\n\u200b",
             thumbnail=self.user.display_avatar.with_static_format('png'),
             timestamp=pendulum.now()
             )
+        
+        subscribed_roles = await ShopItem.get_subscribed_roles_for_user(self.user.id)
+        if len(subscribed_roles) > 0:
+            text = ""
+            r_iter = AsyncIter(subscribed_roles)
+            async for role in r_iter:
+                expiry = await role.compute_user_expiry(self.user.id)
+                text += f"**{role.name}**"
+                text += f"\nGrants Role: {getattr(role.assigns_role,'mention','Unknown')}"
+                text += f"\nExpires: <t:{expiry.int_timestamp}:R>"
+                text += "\n\u200b"
+            embed.add_field(
+                name="You are also subscribed to the following roles.",
+                value=text,
+                )
         return embed

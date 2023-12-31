@@ -74,9 +74,17 @@ class ShopItem():
     @classmethod
     async def get_subscription_items(cls) -> List['ShopItem']:
         query = bot_client.coc_db.db__shop_item.find(
+            {'subscription_duration':{'$gt':0}}
+            )
+        return [cls(item) async for item in query]
+    
+    @classmethod
+    async def get_subscribed_roles_for_user(cls,user_id:int) -> List['ShopItem']:
+        key_dict = f'subscription_log.{user_id}'
+        query = bot_client.coc_db.db__shop_item.find(
             {
-                'subscription_duration':{'$gt':0},
-                'disabled':False
+                key_dict:{'$exists':True},
+                'type':'role'
                 }
             )
         return [cls(item) async for item in query]
