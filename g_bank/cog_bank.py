@@ -205,6 +205,20 @@ class Bank(commands.Cog):
         embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
         await self.log_channel.send(embed=embed)
     
+    async def redemption_terms_conditions(self):
+        embed = await clash_embed(
+            context=self.bot,
+            title=f"**Redemption Terms & Conditions**",
+            message=f"1. All redemptions cannot be reversed and are not exchangeable or refundable."
+                + f"\n2. Redemptions **can** take up to 72 hours (3 days) to be fulfilled. Please be patient. Begging or pestering the staff will not expedite the process."
+                + f"\n3. In the event where an item is commercially unavailable, we reserve the right to offer you equivalent alternatives." 
+                + f"\n4. You are required to provide confirmation of item receipt. In the absence of valid confirmation, your redemption is assumed to be fulfilled."
+                + f"\n5. We reserve the right to withhold any redemption without reason or explanation."
+                + "\n\u200b",
+            timestamp=pendulum.now()
+            )
+        return embed
+    
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
@@ -262,7 +276,7 @@ class Bank(commands.Cog):
                 },            
             {
                 "name": "_assistant_redeem_clashofclans",
-                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory. Always facilitate this transaction in a private thread.",
+                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -309,7 +323,7 @@ class Bank(commands.Cog):
         inventory = await UserInventory(user)
         return f"The user {user.name} (ID: {user.id}) has the following items in their inventory: {inventory._assistant_json()}."
     
-    async def _assistant_redeem_nitro(self,guild:discord.Guild,user:discord.Member,item_id:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_nitro(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,*args,**kwargs) -> str:
         if not user:
             return "No user found."    
             
@@ -321,12 +335,34 @@ class Bank(commands.Cog):
         if not inventory.has_item(item):
             return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
 
+        embed = await self.redemption_terms_conditions()
+        embed.add_field(
+            name="**For Discord Nitro Redemptions**",
+            value=f"1. Nitro redemptions are sent via Discord DMs. Keep your DMs open to receive your redemption."
+                + f"\n2. You **must** accept the Discord Nitro gift before expiration. We are not obligated to re-send any expired gifts."
+                + f"\n3. In the event you are unable to use your Nitro Gift due to subscription conflicts, your Gift will be stored as Credit in your Discord account."
+                + f"\n4. Discord Terms & Conditions are applicable.",
+            inline=False
+            )
+        view = AssistantConfirmation(user)
+        message = await channel.send(
+            content=f"{user.mention}, please review and accept the following Terms and Conditions before proceeding with your redemption.",
+            embed=embed,
+            view=view
+            )
+        wait = await view.wait()
+        await message.delete()
+        if wait:
+            return f"{user.display_name} did not respond."
+        if not view.confirmation:
+            return f"{user.display_name} cancelled the redemption."
+
         ticket = await RedemptionTicket.create(
             self,
             user_id=user.id,
             item_id=item_id
             )
-        return f"Your redemption ticket has been created: {getattr(ticket.channel,'mention','No channel')}."
+        return f"The redemption ticket for {user.display_name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
@@ -375,20 +411,10 @@ class Bank(commands.Cog):
             if not redeem_account or redeem_account.town_hall.level < 7:
                 return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
             
-            embed = await clash_embed(
-                context=self.bot,
-                title=f"**Redemption Terms & Conditions**",
-                message=f"1. All redemptions cannot be reversed and are not exchangeable or refundable."
-                    + f"\n2. Redemptions **can** take up to 72 hours (3 days) to be fulfilled. Please be patient. Begging or pestering the staff will not expedite the process."
-                    + f"\n3. In the event where an item is commercially unavailable, we reserve the right to offer you equivalent alternatives." 
-                    + f"\n4. You are required to provide confirmation of item receipt. In the absence of valid confirmation, your redemption is assumed to be fulfilled."
-                    + f"\n5. We reserve the right to withhold any redemption without reason or explanation."
-                    + "<:spacer:1138755270709878834>",
-                timestamp=pendulum.now()
-                )
+            embed = await self.redemption_terms_conditions()
             embed.add_field(
                 name="**For Gold Pass or Gem Pack Redemptions**",
-                value=f"1. We use **(Codashop)[https://www.codashop.com]** to purchase redemptions. This is a Supercell-licensed 3rd party. If you are not comfortable with this, please do not proceed."
+                value=f"1. We use **[Codashop](https://www.codashop.com)** to purchase redemptions. This is a 3rd party licensed by Supercell. If you are not comfortable with this, please do not proceed."
                     + f"\n2. Your Clash of Clans account must be linked to a valid Supercell ID."
                     + f"\n3. The receipt of purchase serves as confirmation of redemption, regardless of whether you have received the item in-game."
                     + f"\n4. The following Terms & Conditions are applicable: Supercell, Codashop, Discord.",
@@ -396,12 +422,17 @@ class Bank(commands.Cog):
                 )
             
             view = AssistantConfirmation(user)
-            await channel.send(content=user.mention,embed=embed,view=view)
+            message = await channel.send(
+                content=f"{user.mention}, please review and accept the following Terms and Conditions before proceeding with your redemption.",
+                embed=embed,
+                view=view
+                )
             wait = await view.wait()
+            await message.delete()
             if wait:
-                return f"The user did not respond."
+                return f"{user.display_name} did not respond."
             if not view.confirmation:
-                return f"The user cancelled the redemption."
+                return f"{user.display_name} cancelled the redemption."
             
             ticket = await RedemptionTicket.create(
                 self,
@@ -409,7 +440,7 @@ class Bank(commands.Cog):
                 item_id=item_id,
                 goldpass_tag=redeem_tag
                 )
-            return f"The redemption ticket for {user} on {redeem_account.name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
+            return f"The redemption ticket for {user.display_name} on {redeem_account.name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
         
         except Exception as e:
             bot_client.coc_main_log.exception(f"Assistant: Bank: Redeem Gold Pass")
@@ -2517,13 +2548,13 @@ class AssistantConfirmation(discord.ui.View):
 
         self.yes_button = DiscordButton(
             function=self.yes_callback,
-            label="",
+            label="Yes, I accept.",
             emoji=EmojisUI.YES,
             style=discord.ButtonStyle.green,
             )
         self.no_button = DiscordButton(
             function=self.no_callback,
-            label="",
+            label="No, I do not accept.",
             emoji=EmojisUI.NO,
             style=discord.ButtonStyle.grey,
             )
