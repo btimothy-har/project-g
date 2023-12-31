@@ -239,13 +239,12 @@ class UserStore(DefaultView):
         if menu:
             self.current_item = await ShopItem.get_by_id(menu.values[0])
             if self.current_item.type == 'cash' and self.current_item._stock > 0:
-                factor = max((10-self.current_item._stock),1)
+                factor = max((20-self.current_item._stock),1)
                 rand = random.randint(1,factor)
                 if rand != 1:
                     self.current_item._stock = 0
                 else:
                     self.current_item._stock = 1
-                bot_client.coc_main_log.info(f"Randomised stock for {self.current_item.name} (factor: {factor}). New stock: {self.current_item._stock}")
 
         user = self.guild.get_member(interaction.user.id)
 

@@ -261,17 +261,17 @@ class Bank(commands.Cog):
                     },
                 },            
             {
-                "name": "_assistant_redeem_goldpass",
-                "description": "Allows a user to redeem a Gold Pass in Clash of Clans if they have the associated item in their inventory.",
+                "name": "_assistant_redeem_clashofclans",
+                "description": "Allows a user to redeem a Gold Pass or Gems in Clash of Clans if they have the associated item in their inventory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "item_id": {
-                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible Gold Pass item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
+                            "description": "The corresponding ID of the item to redeem. Use _assistant_get_member_inventory to get the ID. If a user has more than one eligible item, prompt the user which item they want to redeem. Item IDs are for internal use, so do not display IDs to the user.",
                             "type": "string",
                             },
                         "redeem_tag": {
-                            "description": "The Clash of Clans account to receive the Gold Pass on, identified by the Player Tag. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
+                            "description": "The Clash of Clans account to receive the Gold Pass or Gems on, identified by the Player Tag. If the user does not provide an account in their request, use _prompt_user_account to prompt them to select one of their linked Clash of Clans accounts. Only accounts of Townhall Level 7 or higher are eligible.",
                             "type": "string",
                             },
                         },
@@ -358,7 +358,7 @@ class Bank(commands.Cog):
             select_account = await self.client.fetch_player(view.selected_account)
             return f"The user selected the account: {select_account.overview_json()}."
 
-    async def _assistant_redeem_goldpass(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
+    async def _assistant_redeem_clashofclans(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         try:
             if not user:
                 return "No user found."
@@ -373,7 +373,7 @@ class Bank(commands.Cog):
             
             redeem_account = await self.client.fetch_player(redeem_tag)
             if not redeem_account or redeem_account.town_hall.level < 7:
-                return f"The account {redeem_tag} is not eligible for Gold Pass redemption. Accounts must be valid and of Townhall Level 7 or higher."
+                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
             
             ticket = await RedemptionTicket.create(
                 self,
@@ -381,7 +381,7 @@ class Bank(commands.Cog):
                 item_id=item_id,
                 goldpass_tag=redeem_tag
                 )
-            return f"The redemption ticket for {user} on {redeem_account.name} has been created: {getattr(ticket.channel,'mention','No channel')}. Do not convert the channel link into a clickable link, as the user will not be able to access the channel."
+            return f"The redemption ticket for {user} on {redeem_account.name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
         
         except Exception as e:
             bot_client.coc_main_log.exception(f"Assistant: Bank: Redeem Gold Pass")
