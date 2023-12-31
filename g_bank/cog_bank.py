@@ -896,15 +896,16 @@ class Bank(commands.Cog):
                         continue
 
                     if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
-                        u_keys = list(item.subscription_log.keys())
-                        m_iter = AsyncIter(item.assigns_role.members)
+                        async with item.lock:
+                            u_keys = list(item.subscription_log.keys())
+                            m_iter = AsyncIter(item.assigns_role.members)
 
-                        async for member in m_iter:
-                            if str(member.id) not in u_keys:
-                                await member.remove_roles(
-                                    item.assigns_role,
-                                    reason="User does not have a valid subscription."
-                                    )
+                            async for member in m_iter:
+                                if str(member.id) not in u_keys:
+                                    await member.remove_roles(
+                                        item.assigns_role,
+                                        reason="User does not have a valid subscription."
+                                        )
                                         
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
