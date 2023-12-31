@@ -2320,7 +2320,7 @@ class Bank(commands.Cog):
         )
     @app_commands.guild_only()
     @app_commands.check(is_admin)
-    @app_commands.autocomplete(item=autocomplete_show_store_items)
+    @app_commands.autocomplete(item=autocomplete_store_items)
     @app_commands.describe(
         item="Select a Shop Item to edit.",
         show_in_store="Change whether the item is shown in the store.",

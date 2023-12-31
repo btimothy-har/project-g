@@ -76,48 +76,6 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_store_items")
 
-async def autocomplete_show_store_items(interaction:discord.Interaction,current:str):
-    try:
-        get_items = await ShopItem.get_by_guild(interaction.guild.id)
-        guild_items = [item for item in get_items if not item.show_in_store]
-        if not current:
-            selection = guild_items
-            return [app_commands.Choice(
-                name=f"{item}",
-                value=item.id)
-            for item in random.sample(selection,min(len(selection),5))
-            ]
-        else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
-            return [app_commands.Choice(
-                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
-                value=item.id)
-            for item in random.sample(selection,min(len(selection),5))
-            ]
-    except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_store_items")
-
-async def autocomplete_hide_store_items(interaction:discord.Interaction,current:str):
-    try:
-        get_items = await ShopItem.get_by_guild(interaction.guild.id)
-        guild_items = [item for item in get_items if item.show_in_store]
-        if not current:
-            selection = guild_items
-            return [app_commands.Choice(
-                name=f"{item}",
-                value=item.id)
-            for item in random.sample(selection,min(len(selection),5))
-            ]
-        else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
-            return [app_commands.Choice(
-                name=f"{item.type.capitalize()} {item.name} | Price: {item.price}",
-                value=item.id)
-            for item in random.sample(selection,min(len(selection),5))
-            ]
-    except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_store_items")
-
 async def autocomplete_store_items_restock(interaction:discord.Interaction,current:str):
     try:
         items = await ShopItem.get_by_guild(interaction.guild.id)
