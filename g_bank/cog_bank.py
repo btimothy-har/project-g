@@ -915,7 +915,11 @@ class Bank(commands.Cog):
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
-                            user = item.guild.get_member(int(user_id))
+                            try:
+                                user = await item.guild.fetch_member(int(user_id))
+                            except:
+                                user = None
+                                
                             if not user:
                                 continue
 
