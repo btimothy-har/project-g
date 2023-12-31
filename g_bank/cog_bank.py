@@ -906,7 +906,9 @@ class Bank(commands.Cog):
 
                                 async for member in m_iter:
                                     bot_client.coc_main_log.info(f"{item.id} log2: {u_keys}")
-                                    if str(member.id) not in u_keys:
+                                    t = str(member.id) not in u_keys
+                                    if t:
+                                        bot_client.coc_main_log.info(f"{item.id} log2.5: {str(member.id)} {u_keys}")
                                         await member.remove_roles(
                                             item.assigns_role,
                                             reason="User does not have a valid subscription."
@@ -919,7 +921,7 @@ class Bank(commands.Cog):
                                 user = await item.guild.fetch_member(int(user_id))
                             except:
                                 user = None
-                                
+
                             if not user:
                                 continue
 
