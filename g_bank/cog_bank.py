@@ -902,6 +902,7 @@ class Bank(commands.Cog):
                             m_iter = AsyncIter(item.assigns_role.members)
 
                             async for member in m_iter:
+                                bot_client.coc_main_log.info(u_keys)
                                 if str(member.id) not in u_keys:
                                     await member.remove_roles(
                                         item.assigns_role,
