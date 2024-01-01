@@ -572,5 +572,8 @@ class Players(commands.Cog):
             accounts = await self.client.fetch_many_players(*get_member.account_tags)
             view_accounts.extend(accounts)
         
+        if len(view_accounts) == 0:
+            return await interaction.followup.send(content=f"Did not find any accounts for the provided input.")
+        
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()    
