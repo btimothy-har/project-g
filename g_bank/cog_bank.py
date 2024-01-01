@@ -1172,7 +1172,7 @@ class Bank(commands.Cog):
         member = await aMember(user.id,context.guild.id)
         reward_tag = await member._get_reward_account_tag()       
         reward_account = await self.client.fetch_player(reward_tag) if reward_tag else None
-        primary_multiplier = (await self._compute_multiplier(reward_account) * 100)
+        primary_multiplier = (await self._compute_multiplier(reward_account) * 100) if reward_account else 0
 
         guild_member = self.bank_guild.get_member(user.id)
         pass_active = True if self.bank_pass_role and self.bank_pass_role in guild_member.roles else False
