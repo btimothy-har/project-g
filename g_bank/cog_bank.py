@@ -74,9 +74,13 @@ class Bank(commands.Cog):
         self._bank_guild = 1132581106571550831 if bot.user.id == 1031240380487831664 else 680798075685699691
 
         self._log_channel = 0
+        self._log_queue = asyncio.Queue()
+        self._log_task_lock = asyncio.Lock()
+        self._log_lock = asyncio.Lock()
 
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
+        self._bank_pass_role = 0
 
         self._subscription_lock = asyncio.Lock()
 
@@ -84,6 +88,7 @@ class Bank(commands.Cog):
         default_global = {
             "use_rewards":False,
             "log_channel":0,
+            "bank_pass_role":0,
             "admins":[],
             }
         self.config.register_global(**default_global)
@@ -100,7 +105,11 @@ class Bank(commands.Cog):
         try:
             self._log_channel = await self.config.log_channel()
         except:
-            self._log_channel = 0
+            self._log_channel = 0        
+        try:
+            self._bank_pass_role = await self.config.bank_pass_role()
+        except:
+            self._bank_pass_role = 0
 
         self.bank_admins = await self.config.admins()
         asyncio.create_task(self.start_cog())
@@ -132,9 +141,11 @@ class Bank(commands.Cog):
                 await guild_user.add_roles(admin_role)
         
         self.subscription_item_expiry.start()
+        self.send_bank_logs_batch.start()
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
+        self.send_bank_logs_batch.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -158,6 +169,10 @@ class Bank(commands.Cog):
     @property
     def redemption_log_channel(self) -> discord.TextChannel:
         return self.bot.get_channel(self._redm_log_channel)
+    
+    @property
+    def bank_pass_role(self) -> Optional[discord.Role]:
+        return self.bank_guild.get_role(self._bank_pass_role) if self.bank_guild else None
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -188,22 +203,15 @@ class Bank(commands.Cog):
     async def _send_log(self,user:discord.User,done_by:discord.User,amount:int,comment:str) -> discord.Embed:
         if amount == 0:
             return
-        if not self.log_channel:
-            return
         
-        currency = await bank.get_currency_name()
-        embed = await clash_embed(
-            context=self.bot,
-            message=f"`{user.id}`"
-                + f"**{user.mention}\u3000" + ("+" if amount >= 0 else "-") + f"{abs(amount):,} {currency}**",
-            success=True if amount >= 0 else False,
-            timestamp=pendulum.now()
-            )
-        embed.add_field(name="**Reason**",value=comment,inline=True)
-        embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
-
-        embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
-        await self.log_channel.send(embed=embed)
+        async with self._log_lock:
+            await self._log_queue.put({
+                'user_id': user.id,
+                'done_by_id': done_by.id,
+                'amount': amount,
+                'comment': comment,
+                'timestamp': pendulum.now().int_timestamp
+                })
     
     async def redemption_terms_conditions(self):
         embed = await clash_embed(
@@ -560,7 +568,7 @@ class Bank(commands.Cog):
                     comment=f"EOS to {clan.tag} {clan.name}."
                     )
         
-        owner = self.bot.get_user(self.bot.owner_ids[0])
+        owner = self.bot.get_user(644530507505336330)
         owner_bal = await bank.get_balance(owner)
 
         if owner_bal > 0:
@@ -625,13 +633,38 @@ class Bank(commands.Cog):
 
         await bank.bank_prune(self.bot)
         all_accounts = await bank.get_leaderboard()
-        await asyncio.gather(*(_user_tax(id) for id,account in all_accounts))            
+        await asyncio.gather(*(_user_tax(id) for id,account in all_accounts))    
     
     ############################################################
     #####
     ##### PLAYER PROGRESS REWARDS
     #####
-    ############################################################ 
+    ############################################################
+    async def _compute_multiplier(self,player:aPlayer) -> float:
+        multi = 0.0
+        if not player.discord_user:
+            return 0
+        member = aMember(player.discord_user)
+        reward_tag = await member._get_reward_account_tag()
+        
+        guild_user = self.bank_guild.get_member(player.discord_user)
+        
+        if guild_user and self.bank_pass_role in guild_user.roles:
+            if reward_tag == player.tag:
+                multi = 1.5
+            elif player.is_member:
+                multi = 1.0
+            else:
+                multi = 0.4
+        else:            
+            if reward_tag == player.tag:
+                multi = 1.0
+            elif player.is_member:
+                multi = 0.4
+            else:
+                multi = 0.2
+        return multi
+    
     async def member_th_progress_reward(self,old_player:aPlayer,new_player:aPlayer):
         if not self.use_rewards:
             return
@@ -654,17 +687,20 @@ class Bank(commands.Cog):
             reward = 20000
         
         if reward > 0:
-            await bank.deposit_credits(member,reward)
+            multi = await self._compute_multiplier(new_player)
+            new_reward = round(reward * multi)
+
+            await bank.deposit_credits(member,new_reward)
             await self.current_account.withdraw(
-                amount = reward,
+                amount = new_reward,
                 user_id = self.bot.user.id,
-                comment = f"Townhall Bonus for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
+                comment = f"Townhall Bonus (x{multi})for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
                 )
             await self._send_log(
                 user=member,
                 done_by=self.bot.user,
-                amount=reward,
-                comment=f"Townhall Bonus for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
+                amount=new_reward,
+                comment=f"Townhall Bonus (x{multi}) for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
                 )
     
     async def member_hero_upgrade_reward(self,old_player:aPlayer,new_player:aPlayer):
@@ -673,18 +709,18 @@ class Bank(commands.Cog):
             new_hero = new_player.get_hero(hero)
             upgrades = range(getattr(old_hero,'level',0)+1,new_hero.level+1)
             async for u in AsyncIter(upgrades):
-                if u > new_hero.min_level and rew > 0:
-                    await bank.deposit_credits(member,rew)
+                if u > new_hero.min_level and new_rew > 0:
+                    await bank.deposit_credits(member,new_rew)
                     await self.current_account.withdraw(
-                        amount = rew,
+                        amount = new_rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
+                        comment = f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
-                        amount=rew,
-                        comment=f"Hero Bonus for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
+                        amount=new_rew,
+                        comment=f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
                         )
                     
         if not self.use_rewards:
@@ -693,12 +729,13 @@ class Bank(commands.Cog):
             return
         member = self.bot.get_user(new_player.discord_user)
         if not member:
-            return
-        
+            return        
         if new_player.hero_strength == old_player.hero_strength:
             return
         
         rew = 1000
+        multi = await self._compute_multiplier(new_player)
+        new_rew = round(rew * multi)
         heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
         await asyncio.gather(*(_hero_reward(hero) for hero in heroes))
     
@@ -721,28 +758,28 @@ class Bank(commands.Cog):
             new_ach = new_player.get_achievement(achievement.name)            
             increment = new_ach.value - old_ach.value
 
-            membership_multiplier = 1 if new_player.is_member else non_member_multiplier
-            total_reward = round((10 * (increment // 1000)) * membership_multiplier)
+            event_start = pendulum.datetime(2023,12,22,7,0,0)
+            event_end = pendulum.datetime(2023,12,25,7,0,0)
 
-            if total_reward > 0:
-                event_start = pendulum.datetime(2023,12,22,7,0,0)
-                event_end = pendulum.datetime(2023,12,25,7,0,0)
+            default_multiplier = await self._compute_multiplier(new_player)
+            if event_start <= pendulum.now() <= event_end:
+                mult = 2 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
+            else:
+                mult = default_multiplier
+            
+            total_reward = round((10 * (increment // 1000)) * mult)
 
-                if event_start <= pendulum.now() <= event_end:
-                    mult = 2 if target_clan.tag == "#2L90QPRL9" else 1
-                else:
-                    mult = 1
-                    
+            if total_reward > 0:                    
                 await bank.deposit_credits(member,total_reward * mult)
                 await self.current_account.withdraw(
-                    amount = total_reward * mult,
+                    amount = total_reward,
                     user_id = self.bot.user.id,
                     comment = f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): {increment}"
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
-                    amount=total_reward * mult,
+                    amount=total_reward,
                     comment=f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): Donated {increment:,} Gold to {target_clan.name}."
                     )
     
@@ -753,8 +790,9 @@ class Bank(commands.Cog):
     ############################################################
     async def clan_war_ended_rewards(self,clan:aClan,war:aClanWar):
 
-        async def war_bank_rewards(player:aWarPlayer):        
-            member = self.bot.get_user(player.discord_user)
+        async def war_bank_rewards(player:aWarPlayer):
+            f_player = await self.client.fetch_player(player.tag)
+            member = self.bot.get_user(f_player.discord_user)
             if not member:
                 return
             
@@ -773,25 +811,25 @@ class Bank(commands.Cog):
                     amount=(penalty * -1),
                     comment=f"Clan War Penalty for {player.name} ({player.tag})."
                     )
-
-            membership_multiplier = 1 if player.is_member else non_member_multiplier
+            
+            multiplier = await self._compute_multiplier(f_player)
             participation = 50
             performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
             result = 100 if player.clan.result == WarResult.WON else 0
 
-            total_reward = round((participation + performance + result) * membership_multiplier)
+            total_reward = round((participation + performance + result) * multiplier)
             if total_reward > 0:
                 await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Clan War Reward for {player.name} ({player.tag})."
+                    comment = f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=total_reward,
-                    comment=f"Clan War Reward for {player.name} ({player.tag})."
+                    comment=f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
                     )
         
         if not self.use_rewards:
@@ -807,8 +845,9 @@ class Bank(commands.Cog):
             await bounded_gather(*tasks,return_exceptions=True,limit=1)
     
     async def raid_weekend_ended_rewards(self,clan:aClan,raid:aRaidWeekend):
-        async def raid_bank_rewards(player:aRaidMember):        
-            member = self.bot.get_user(player.discord_user)
+        async def raid_bank_rewards(player:aRaidMember):
+            f_player = await self.client.fetch_player(player.tag)
+            member = self.bot.get_user(f_player.discord_user)
             if not member:
                 return
             
@@ -829,21 +868,21 @@ class Bank(commands.Cog):
                     comment=f"Raid Weekend Penalty for {player.name} ({player.tag})."
                     )
             
-            membership_multiplier = 1 if player.is_member else non_member_multiplier
+            multiplier = await self._compute_multiplier(f_player)
 
-            total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * membership_multiplier)
+            total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * multiplier)
             if total_reward > 0:
                 await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Raid Weekend Reward for {player.name} ({player.tag})."
+                    comment = f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=total_reward,
-                    comment=f"Raid Weekend Reward for {player.name} ({player.tag})."
+                    comment=f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
                     )
 
         if not self.use_rewards:
@@ -871,20 +910,22 @@ class Bank(commands.Cog):
             if not member:
                 return
             
+            multiplier = await self._compute_multiplier(player)
+            
             trophies = player.legend_statistics.previous_season.trophies - 5000
-            reward = trophies * reward_per_trophy
+            reward = round((trophies * reward_per_trophy) * multiplier)
             if reward > 0:
                 await bank.deposit_credits(member,reward)
                 await self.current_account.withdraw(
                     amount=reward,
                     user_id=self.bot.user.id,
-                    comment=f"Legend Rewards for {player.name} {player.tag}. Trophies: {trophies}."
+                    comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies}."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=reward,
-                    comment=f"Legend Rewards for {player.name} {player.tag}. Trophies: {trophies:,}."
+                    comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies:,}."
                     )
         
         if not self.use_rewards:
@@ -910,19 +951,22 @@ class Bank(commands.Cog):
 
             player_season = await player.get_season_stats(bot_client.current_season)
             if player_season.clangames.clan_tag == player_season.home_clan_tag:
-                reward = round(4000 * (player_season.clangames.score / 4000))
+
+                multiplier = await self._compute_multiplier(player)
+                reward = round((4000 * (player_season.clangames.score / 4000)) * multiplier)
+
                 if reward > 0:
                     await bank.deposit_credits(member,reward)
                     await self.current_account.withdraw(
                         amount=reward,
                         user_id=self.bot.user.id,
-                        comment=f"Clan Games Rewards for {player.name} {player.tag}. Score: {player_season.clangames.score}."
+                        comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=reward,
-                        comment=f"Clan Games Rewards for {player.name} {player.tag}. Score: {player_season.clangames.score}."
+                        comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
                         )
         
         if not self.use_rewards:
@@ -940,8 +984,47 @@ class Bank(commands.Cog):
     ############################################################
     ##### SUBSCRIPTION EXPIRY
     ############################################################
-    ############################################################    
-    @tasks.loop(seconds=5.0)
+    ############################################################
+    @tasks.loop(seconds=1.0)
+    async def send_bank_logs_batch(self):
+        if self._log_task_lock.locked():
+            return
+        
+        embeds = []
+                
+        async with self._log_task_lock, self._log_lock:
+            if not self.log_channel:
+                return
+            
+            currency = await bank.get_currency_name()
+            while True:
+                size = self._log_queue.qsize()
+                if size == 0:
+                    break
+                
+                log_entry = await self._log_queue.get()
+                log_user = self.bot.get_user(log_entry['user_id'])
+                done_by = self.bot.get_user(log_entry['done_by_id'])
+            
+                embed = await clash_embed(
+                    context=self.bot,
+                    message=f"`{log_user.id}`"
+                        + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
+                    success=True if log_entry['amount'] >= 0 else False,
+                    timestamp=pendulum.from_timestamp(log_entry['timestamp'])
+                    )
+                embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
+                embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
+                embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
+                embeds.append(embed)
+
+                if len(embeds) > 10:
+                    break
+                    
+            if len(embeds) > 0:
+                await self.log_channel.send(embeds=embeds)
+
+    @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):
         if self._subscription_lock.locked():
             return
@@ -1087,14 +1170,34 @@ class Bank(commands.Cog):
             return embed       
 
         member = await aMember(user.id,context.guild.id)
+        reward_tag = await member._get_reward_account_tag()       
+        reward_account = await self.client.fetch_player(reward_tag) if reward_tag else None
+        primary_multiplier = (await self._compute_multiplier(reward_account) * 100)
+
+        guild_member = self.bank_guild.get_member(user.id)
+        pass_active = True if self.bank_pass_role and self.bank_pass_role in guild_member.roles else False
+
         embed = await clash_embed(
             context=context,
             message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
             timestamp=pendulum.now()
             )
-        if context.guild.id == 1132581106571550831:
+        
+        if context.guild.id == self.bank_guild.id:
             embed.description += "\nNext payday: "
             embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
+        
+        embed.description += "\n\u200b"
+        
+        embed.add_field(
+            name="__Reward Multipliers__",
+            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n" if pass_active else "*Boost your rewards with a Bank Pass! Get up to 50% more rewards.*\n")
+                + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
+                + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
+                + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
+                + f"\nChange your primary account with `/bank primary`.",
+            inline=True
+            )
         return embed
     
     @commands.command(name="balance",aliases=['bal'])
@@ -1223,6 +1326,28 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / TOGGLEREWARDS
     ##################################################
+    @command_group_bank.command(name="runtaxes")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_run_month_end_taxes(self,ctx:commands.Context):
+        """
+        Manually run the Month-End Tax Calculation.
+        """
+        msg = await ctx.reply("Running Month-End User Tax...")
+        await self.apply_bank_taxes()
+        await msg.edit(content="Month-End Tax Complete.")
+
+    @command_group_bank.command(name="runsweep")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_run_month_end_sweep(self,ctx:commands.Context):
+        """
+        Manually run the Month-End Sweep.
+        """
+        msg = await ctx.reply("Running Month-End Sweep...")
+        await self.month_end_sweep()
+        await msg.edit(content="Month-End Sweep Complete.")
+
     @command_group_bank.command(name="togglerewards")
     @commands.guild_only()
     @commands.is_owner()
@@ -1250,16 +1375,28 @@ class Bank(commands.Cog):
         await ctx.reply(f"Log Channel has been set to {channel.mention}.")
     
     ##################################################
-    ### BANK / SETADMIN
+    ### BANK / ADMIN
     ##################################################
-    @command_group_bank.command(name="setadmin")
+    @command_group_bank.group(name="admin")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_setadmin(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin(self,ctx:commands.Context):
         """
-        [Owner only] Add a Bank Admin.
+        [Owner-only] Commands to manage Bank Administrators.
         """
-        
+        if not ctx.invoked_subcommand:
+            pass
+    
+    ##################################################
+    ### BANK / ADMIN / SET
+    ##################################################
+    @subcommand_bank_admin.command(name="set")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_admin_set(self,ctx:commands.Context,member:discord.Member):
+        """
+        [Owner-only] Add a Bank Admin.
+        """        
         if member.id in self.bank_admins:
             return await ctx.reply(f"{member.mention} is already a Bank Admin.")
         
@@ -1274,14 +1411,14 @@ class Bank(commands.Cog):
         await ctx.tick()
     
     ##################################################
-    ### BANK / DELADMIN
+    ### BANK / ADMIN / DELETE
     ##################################################
-    @command_group_bank.command(name="deladmin")
+    @subcommand_bank_admin.command(name="delete")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_deladmin(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_delete(self,ctx:commands.Context,member:discord.Member):
         """
-        [Owner only] Deletes a Bank Admin.
+        [Owner-only] Deletes a Bank Admin.
         """
         
         if member.id not in self.bank_admins:
@@ -1298,12 +1435,12 @@ class Bank(commands.Cog):
         await ctx.tick()
     
     ##################################################
-    ### BANK / SHOWADMIN
+    ### BANK / ADMIN / SHOW
     ##################################################
-    @command_group_bank.command(name="showadmins")
+    @subcommand_bank_admin.command(name="show")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_showadmin(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_show(self,ctx:commands.Context,member:discord.Member):
         """
         [Owner only] Lists the current Bank Admins.
         """
@@ -1315,6 +1452,23 @@ class Bank(commands.Cog):
             timestamp=pendulum.now()
             )
         await ctx.reply(embed=embed)
+    
+    ##################################################
+    ### BANK / ADMIN / PASS ROLE
+    ##################################################
+    @command_group_bank.command(name="passrole")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_set_pass_role(self,ctx:commands.Context,role:discord.Role):
+        """
+        [Owner-only] Sets a role to use as the Bank Pass Role.
+        """   
+        if role.guild.id != self.bank_guild.id:
+            return await ctx.reply("Role must be from the Bank Server.")
+             
+        self._bank_pass_role = role.id
+        await self.config.bank_pass_role.set(self.bank_pass_role.id)
+        await ctx.reply(f"Bank Pass Role set to {role.name} `{role.id}`.")
 
     ##################################################
     ### BANK / GLOBALBAL
@@ -1421,6 +1575,98 @@ class Bank(commands.Cog):
             await paginate.start()
         else:
             await interaction.followup.send(embed=leaderboard[0])
+    
+    ##################################################
+    ### BANK / PRIMARY ACCOUNT
+    ##################################################
+    @command_group_bank.command(name="primary")
+    @commands.guild_only()
+    async def command_bank_set_primary_account(self,ctx:commands.Context):
+        """
+        Set the Primary Account for your Bank Rewards.
+        """        
+        
+        member = aMember(ctx.author.id,self.bank_guild.id)
+        await member.load()
+        
+        all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
+
+        if len(eligible_accounts) == 0:
+            return await ctx.reply("You don't have any eligible accounts to set as your primary account.")
+        
+        embed = await clash_embed(
+            context=ctx,
+            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+                + f"\n\nThis account:"
+                + f"\n- Must be a registered member account."
+                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Will receive Bank Rewards at a higher rate."
+                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
+            timestamp=pendulum.now()
+            )        
+        view = ClashAccountSelector(ctx.author,eligible_accounts)
+
+        msg = await ctx.reply(embed=embed,view=view)
+        wait = await view.wait()
+        if wait:
+            await msg.edit(content=f"Did not receive a response.",embed=None,view=None)
+        
+        if not view.selected_account:
+            return await msg.edit(content="You did not select an account.",embed=None,view=None)
+        
+        sel_account = await self.client.fetch_player(view.selected_account)
+        
+        chk, timestamp = await member.set_reward_account(sel_account.tag)
+        if not chk:
+            ts = pendulum.from_timestamp(timestamp)
+            nts = ts.add(days=7)
+            return await msg.edit(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
+        
+        return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
+    
+    @app_command_group_bank.command(name="primary",
+        description="Set the Primary Account for your Bank Rewards.")
+    async def app_command_bank_set_primary_account(self,interaction:discord.Interaction):
+
+        await interaction.response.defer()
+
+        member = aMember(interaction.user.id,self.bank_guild.id)
+        await member.load()
+        
+        all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
+
+        if len(eligible_accounts) == 0:
+            return await interaction.followup.send("You don't have any eligible accounts to set as your primary account.")
+        
+        embed = await clash_embed(
+            context=interaction,
+            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+                + f"\n\nThis account:"
+                + f"\n- Must be a registered member account."
+                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Will receive Bank Rewards at a higher rate."
+                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
+            timestamp=pendulum.now()
+            )        
+        view = ClashAccountSelector(interaction.user,eligible_accounts)
+
+        await interaction.followup.send(embed=embed,view=view)
+        wait = await view.wait()
+        if wait or not view.selected_account:
+            return await interaction.edit_original_response(content=f"Did not receive a response.",embed=None,view=None)
+        
+        sel_account = await self.client.fetch_player(view.selected_account)
+        chk, timestamp = await member.set_reward_account(sel_account.tag)
+        if not chk:
+            ts = pendulum.from_timestamp(timestamp)
+            nts = ts.add(days=7)
+            return await interaction.edit_original_response(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
+        
+        return await interaction.edit_original_response(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
     ##################################################
     ### BANK / TRANSACTIONS
