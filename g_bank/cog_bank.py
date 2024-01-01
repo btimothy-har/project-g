@@ -716,13 +716,13 @@ class Bank(commands.Cog):
                     await self.current_account.withdraw(
                         amount = new_rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
+                        comment = f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {u}/{new_hero.level}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=new_rew,
-                        comment=f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {new_hero.level}."
+                        comment=f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {u}/{new_hero.level}."
                         )
                     
         if not self.use_rewards:
