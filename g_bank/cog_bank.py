@@ -1158,7 +1158,7 @@ class Bank(commands.Cog):
                 + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
                 + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
                 + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
-                + f"\n\nChange your primary account with `bank set-primary`.",
+                + f"\nChange your primary account with `/bank primary`.",
             inline=True
             )
         return embed
@@ -1539,7 +1539,12 @@ class Bank(commands.Cog):
         
         embed = await clash_embed(
             context=ctx,
-            message=f"Choose from one of your accounts below as your Primary Account.",
+            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+                + f"\n\nThis account:"
+                + f"\n- Must be a registered member account."
+                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Will receive Bank Rewards at a higher rate."
+                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
             timestamp=pendulum.now()
             )        
         view = ClashAccountSelector(ctx.author,eligible_accounts)
@@ -1554,9 +1559,11 @@ class Bank(commands.Cog):
         
         sel_account = await self.client.fetch_player(view.selected_account)
         
-        chk = await member.set_reward_account(sel_account.tag)
+        chk, timestamp = await member.set_reward_account(sel_account.tag)
         if not chk:
-            return await msg.edit(content="You can only change your primary account once every 24 hours.",embed=None,view=None)
+            ts = pendulum.from_timestamp(timestamp)
+            nts = ts.add(days=7)
+            return await msg.edit(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
         
         return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
@@ -1578,7 +1585,12 @@ class Bank(commands.Cog):
         
         embed = await clash_embed(
             context=interaction,
-            message=f"Choose from one of your accounts below as your Primary Account.",
+            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+                + f"\n\nThis account:"
+                + f"\n- Must be a registered member account."
+                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Will receive Bank Rewards at a higher rate."
+                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
             timestamp=pendulum.now()
             )        
         view = ClashAccountSelector(interaction.user,eligible_accounts)
@@ -1589,9 +1601,11 @@ class Bank(commands.Cog):
             return await interaction.edit_original_response(content=f"Did not receive a response.",embed=None,view=None)
         
         sel_account = await self.client.fetch_player(view.selected_account)
-        chk = await member.set_reward_account(sel_account.tag)
+        chk, timestamp = await member.set_reward_account(sel_account.tag)
         if not chk:
-            return await interaction.edit_original_response(content="You can only change your primary account once every 24 hours.",embed=None,view=None)
+            ts = pendulum.from_timestamp(timestamp)
+            nts = ts.add(days=7)
+            return await interaction.edit_original_response(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
         
         return await interaction.edit_original_response(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
