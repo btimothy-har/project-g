@@ -1547,18 +1547,18 @@ class Bank(commands.Cog):
         msg = await ctx.reply(embed=embed,view=view)
         wait = await view.wait()
         if wait:
-            await msg.edit(f"Did not receive a response.",view=None)
+            await msg.edit(content=f"Did not receive a response.",embed=None,view=None)
         
         if not view.selected_account:
-            return await msg.edit("You did not select an account.",view=None)
+            return await msg.edit(content="You did not select an account.",embed=None,view=None)
         
         sel_account = await self.client.fetch_player(view.selected_account)
         
         chk = await member.set_reward_account(sel_account.tag)
         if not chk:
-            return await msg.edit("You can only change your primary account once every 24 hours.",view=None)
+            return await msg.edit(content="You can only change your primary account once every 24 hours.",embed=None,view=None)
         
-        return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",view=None)
+        return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
     @app_command_group_bank.command(name="primary",
         description="Set the Primary Account for your Bank Rewards.")
