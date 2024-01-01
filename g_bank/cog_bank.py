@@ -74,6 +74,9 @@ class Bank(commands.Cog):
         self._bank_guild = 1132581106571550831 if bot.user.id == 1031240380487831664 else 680798075685699691
 
         self._log_channel = 0
+        self._log_queue = asyncio.Queue()
+        self._log_task_lock = asyncio.Lock()
+        self._log_lock = asyncio.Lock()
 
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
@@ -138,9 +141,11 @@ class Bank(commands.Cog):
                 await guild_user.add_roles(admin_role)
         
         self.subscription_item_expiry.start()
+        self.send_bank_logs_batch.start()
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
+        self.send_bank_logs_batch.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -198,22 +203,15 @@ class Bank(commands.Cog):
     async def _send_log(self,user:discord.User,done_by:discord.User,amount:int,comment:str) -> discord.Embed:
         if amount == 0:
             return
-        if not self.log_channel:
-            return
         
-        currency = await bank.get_currency_name()
-        embed = await clash_embed(
-            context=self.bot,
-            message=f"`{user.id}`"
-                + f"**{user.mention}\u3000" + ("+" if amount >= 0 else "-") + f"{abs(amount):,} {currency}**",
-            success=True if amount >= 0 else False,
-            timestamp=pendulum.now()
-            )
-        embed.add_field(name="**Reason**",value=comment,inline=True)
-        embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
-
-        embed.set_author(name=user.display_name,icon_url=user.display_avatar.url)
-        await self.log_channel.send(embed=embed)
+        async with self._log_lock:
+            await self._log_queue.put({
+                'user_id': user.id,
+                'done_by_id': done_by.id,
+                'amount': amount,
+                'comment': comment,
+                'timestamp': pendulum.now().int_timestamp
+                })
     
     async def redemption_terms_conditions(self):
         embed = await clash_embed(
@@ -986,8 +984,47 @@ class Bank(commands.Cog):
     ############################################################
     ##### SUBSCRIPTION EXPIRY
     ############################################################
-    ############################################################    
-    @tasks.loop(seconds=5.0)
+    ############################################################
+    @tasks.loop(seconds=1.0)
+    async def send_bank_logs_batch(self):
+        if self._log_task_lock.locked():
+            return
+        
+        embeds = []
+                
+        async with self._log_task_lock, self._log_lock:
+            if not self.log_channel:
+                return
+            
+            currency = await bank.get_currency_name()
+            while True:
+                size = self._log_queue.qsize()
+                if size == 0:
+                    break
+                
+                log_entry = await self._log_queue.get()
+                log_user = self.bot.get_user(log_entry['user_id'])
+                done_by = self.bot.get_user(log_entry['done_by_id'])
+            
+                embed = await clash_embed(
+                    context=self.bot,
+                    message=f"`{log_user.id}`"
+                        + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
+                    success=True if log_entry['amount'] >= 0 else False,
+                    timestamp=pendulum.from_timestamp(log_entry['timestamp'])
+                    )
+                embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
+                embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
+                embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
+                embeds.append(embed)
+
+                if len(embeds) > 10:
+                    break
+                    
+            if len(embeds) > 0:
+                await self.log_channel.send(embeds=embeds)
+
+    @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):
         if self._subscription_lock.locked():
             return
@@ -1289,6 +1326,28 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / TOGGLEREWARDS
     ##################################################
+    @command_group_bank.command(name="runtaxes")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_run_month_end_taxes(self,ctx:commands.Context):
+        """
+        Manually run the Month-End Tax Calculation.
+        """
+        msg = await ctx.reply("Running Month-End User Tax...")
+        await self.apply_bank_taxes()
+        await msg.edit(content="Month-End Tax Complete.")
+
+    @command_group_bank.command(name="runsweep")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_run_month_end_sweep(self,ctx:commands.Context):
+        """
+        Manually run the Month-End Sweep.
+        """
+        msg = await ctx.reply("Running Month-End Sweep...")
+        await self.month_end_sweep()
+        await msg.edit(content="Month-End Sweep Complete.")
+
     @command_group_bank.command(name="togglerewards")
     @commands.guild_only()
     @commands.is_owner()
@@ -1404,7 +1463,7 @@ class Bank(commands.Cog):
         """
         [Owner-only] Sets a role to use as the Bank Pass Role.
         """   
-        if role.guild != self.bank_guild.id:
+        if role.guild.id != self.bank_guild.id:
             return await ctx.reply("Role must be from the Bank Server.")
              
         self._bank_pass_role = role.id
