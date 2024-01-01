@@ -1590,11 +1590,11 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / PRIMARY ACCOUNT
     ##################################################
-    @command_group_bank.command(name="primary")
+    @command_group_bank.command(name="main")
     @commands.guild_only()
     async def command_bank_set_primary_account(self,ctx:commands.Context):
         """
-        Set the Primary Account for your Bank Rewards.
+        Set the Main Account for your Bank Rewards.
         """        
         
         member = aMember(ctx.author.id)
@@ -1605,16 +1605,16 @@ class Bank(commands.Cog):
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
-            return await ctx.reply("You don't have any eligible accounts to set as your primary account.")
+            return await ctx.reply("You don't have any eligible accounts to set as your main account.")
         
         embed = await clash_embed(
             context=ctx,
-            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+            message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
                 + f"\n- Must be at least Town Hall 7."
                 + f"\n- Will receive Bank Rewards at a higher rate."
-                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
+                + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()
             )        
         view = ClashAccountSelector(ctx.author,eligible_accounts)
@@ -1633,12 +1633,12 @@ class Bank(commands.Cog):
         if not chk:
             ts = pendulum.from_timestamp(timestamp)
             nts = ts.add(days=7)
-            return await msg.edit(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
+            return await msg.edit(content=f"You can only change your main account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
         
-        return await msg.edit(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
+        return await msg.edit(content=f"Your main account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
-    @app_command_group_bank.command(name="primary",
-        description="Set the Primary Account for your Bank Rewards.")
+    @app_command_group_bank.command(name="main",
+        description="Set the Main Account for your Bank Rewards.")
     async def app_command_bank_set_primary_account(self,interaction:discord.Interaction):
 
         await interaction.response.defer()
@@ -1651,16 +1651,16 @@ class Bank(commands.Cog):
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
-            return await interaction.followup.send("You don't have any eligible accounts to set as your primary account.")
+            return await interaction.followup.send("You don't have any eligible accounts to set as your main account.")
         
         embed = await clash_embed(
             context=interaction,
-            message=f"**Choose from one of your accounts below as your Primary Rewards Account.**"
+            message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
                 + f"\n- Must be at least Town Hall 7."
                 + f"\n- Will receive Bank Rewards at a higher rate."
-                + f"\n\nIf not set, or your primary account becomes ineligible, your highest TH account will be used. You can only change your primary account once every 7 days.",
+                + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()
             )        
         view = ClashAccountSelector(interaction.user,eligible_accounts)
@@ -1675,9 +1675,9 @@ class Bank(commands.Cog):
         if not chk:
             ts = pendulum.from_timestamp(timestamp)
             nts = ts.add(days=7)
-            return await interaction.edit_original_response(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
+            return await interaction.edit_original_response(content=f"You can only change your main account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
         
-        return await interaction.edit_original_response(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
+        return await interaction.edit_original_response(content=f"Your main account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
     ##################################################
     ### BANK / TRANSACTIONS
