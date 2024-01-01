@@ -126,7 +126,6 @@ class ClanRaidLoop(TaskLoop):
         reminders = await EventReminder.get_all()
         tags.extend([reminder.tag for reminder in reminders])
 
-
         self._tags = set(tags)
         self._last_db_update = pendulum.now()
     

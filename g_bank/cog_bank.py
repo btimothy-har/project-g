@@ -709,7 +709,9 @@ class Bank(commands.Cog):
             new_hero = new_player.get_hero(hero)
             upgrades = range(getattr(old_hero,'level',0)+1,new_hero.level+1)
             async for u in AsyncIter(upgrades):
-                if u > new_hero.min_level and new_rew > 0:
+                if u > new_hero.min_level and reward > 0:
+                    multi = await self._compute_multiplier(new_player)
+                    new_rew = round(reward * multi)
                     await bank.deposit_credits(member,new_rew)
                     await self.current_account.withdraw(
                         amount = new_rew,
@@ -733,9 +735,7 @@ class Bank(commands.Cog):
         if new_player.hero_strength == old_player.hero_strength:
             return
         
-        rew = 1000
-        multi = await self._compute_multiplier(new_player)
-        new_rew = round(rew * multi)
+        reward = 1000
         heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
         await asyncio.gather(*(_hero_reward(hero) for hero in heroes))
     
@@ -757,20 +757,21 @@ class Bank(commands.Cog):
             old_ach = old_player.get_achievement(achievement.name)
             new_ach = new_player.get_achievement(achievement.name)            
             increment = new_ach.value - old_ach.value
+            reward = round(10 * (increment // 1000))
 
-            event_start = pendulum.datetime(2023,12,22,7,0,0)
-            event_end = pendulum.datetime(2023,12,25,7,0,0)
+            if reward > 0:
+                event_start = pendulum.datetime(2023,12,22,7,0,0)
+                event_end = pendulum.datetime(2023,12,25,7,0,0)
 
-            default_multiplier = await self._compute_multiplier(new_player)
-            if event_start <= pendulum.now() <= event_end:
-                mult = 2 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
-            else:
-                mult = default_multiplier
-            
-            total_reward = round((10 * (increment // 1000)) * mult)
+                default_multiplier = await self._compute_multiplier(new_player)
+                if event_start <= pendulum.now() <= event_end:
+                    mult = 2 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
+                else:
+                    mult = default_multiplier
+                
+                total_reward = round(reward * mult)
 
-            if total_reward > 0:                    
-                await bank.deposit_credits(member,total_reward * mult)
+                await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
@@ -811,14 +812,16 @@ class Bank(commands.Cog):
                     amount=(penalty * -1),
                     comment=f"Clan War Penalty for {player.name} ({player.tag})."
                     )
-            
-            multiplier = await self._compute_multiplier(f_player)
+        
             participation = 50
             performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
             result = 100 if player.clan.result == WarResult.WON else 0
 
-            total_reward = round((participation + performance + result) * multiplier)
-            if total_reward > 0:
+            reward = (participation + performance + result)
+            if reward > 0:
+                multiplier = await self._compute_multiplier(f_player)
+                total_reward = round(reward * multiplier)
+
                 await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
                     amount = total_reward,
@@ -867,11 +870,12 @@ class Bank(commands.Cog):
                     amount=(penalty * -1),
                     comment=f"Raid Weekend Penalty for {player.name} ({player.tag})."
                     )
-            
-            multiplier = await self._compute_multiplier(f_player)
 
-            total_reward = round((20 * (sum([a.new_destruction for a in player.attacks]) // 5)) * multiplier)
-            if total_reward > 0:
+            reward = 20 * (sum([a.new_destruction for a in player.attacks]) // 5)
+            if reward > 0:
+                multiplier = await self._compute_multiplier(f_player)
+                total_reward = round(reward * multiplier)
+
                 await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
                     amount = total_reward,
@@ -913,18 +917,21 @@ class Bank(commands.Cog):
             multiplier = await self._compute_multiplier(player)
             
             trophies = player.legend_statistics.previous_season.trophies - 5000
-            reward = round((trophies * reward_per_trophy) * multiplier)
+            reward = trophies * reward_per_trophy
             if reward > 0:
-                await bank.deposit_credits(member,reward)
+                multiplier = await self._compute_multiplier(player)
+                total_reward = round(reward * multiplier)
+
+                await bank.deposit_credits(member,total_reward)
                 await self.current_account.withdraw(
-                    amount=reward,
+                    amount=total_reward,
                     user_id=self.bot.user.id,
                     comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies}."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
-                    amount=reward,
+                    amount=total_reward,
                     comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies:,}."
                     )
         
@@ -951,21 +958,21 @@ class Bank(commands.Cog):
 
             player_season = await player.get_season_stats(bot_client.current_season)
             if player_season.clangames.clan_tag == player_season.home_clan_tag:
-
-                multiplier = await self._compute_multiplier(player)
-                reward = round((4000 * (player_season.clangames.score / 4000)) * multiplier)
+                reward = 4000 * (player_season.clangames.score / 4000)
 
                 if reward > 0:
-                    await bank.deposit_credits(member,reward)
+                    multiplier = await self._compute_multiplier(player)
+                    total_reward = round(reward * multiplier)
+                    await bank.deposit_credits(member,total_reward)
                     await self.current_account.withdraw(
-                        amount=reward,
+                        amount=total_reward,
                         user_id=self.bot.user.id,
                         comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
-                        amount=reward,
+                        amount=total_reward,
                         comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
                         )
         

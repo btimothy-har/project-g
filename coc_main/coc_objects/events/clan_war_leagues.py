@@ -579,6 +579,9 @@ class WarLeaguePlayer(BasicPlayer):
             return self.elo_change
         
         elo_gain = 0
+        if not self.war_log or len(self.war_log) == 0:
+            return elo_gain
+        
         w_iter = AsyncIter(self.war_log)
         async for war in w_iter:
             w_member = war.get_member(self.tag)

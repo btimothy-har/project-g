@@ -109,6 +109,7 @@
 #     'user_id': int,
 #     'guild_id': int,
 #     'default_account': string,
+#     'reward_account': string,
 #     'roles': [ string ],
 #     'last_role_save': int,
 #     'last_role_sync': int,
