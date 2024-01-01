@@ -30,6 +30,16 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
     
     async def load(self):
         await BasicClan.load(self)
+    
+    def assistant_cwl_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'abbreviation': self.abbreviation,
+            'name': self.name,
+            'level': self.level,
+            'share_link': self.share_link,
+            'clan_war_league': self.war_league_name
+            }
 
     def to_json(self) -> dict:
         return {
@@ -50,7 +60,7 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             'description': self.description,
             'leader': getattr(bot_client.bot.get_user(self.leader),'display_name','No Leader'),
             'coleaders': [bot_client.bot.get_user(i).display_name for i in self.coleaders if bot_client.bot.get_user(i)],
-            'elder': [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)],
+            'elders': [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)],
             }
 
     ##################################################

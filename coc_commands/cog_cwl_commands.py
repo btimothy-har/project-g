@@ -190,7 +190,7 @@ class ClanWarLeagues(commands.Cog):
         schemas = [
             {
                 "name": "_assistant_get_cwl_season",
-                "description": "Identifies the next upcoming season for the Clan War Leagues (CWL).",
+                "description": "Identifies the next current or upcoming season for the Clan War Leagues (CWL).",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -203,7 +203,45 @@ class ClanWarLeagues(commands.Cog):
                     "type": "object",
                     "properties": {},
                     },
-                }
+                },
+            {
+                "name": "_assistant_get_cwl_clans",
+                "description": "Returns all official Clan War League Clans for The Assassins Guild. Capitalization can be ignored when identifying clans.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_participating_cwl_clans",
+                "description": "Returns only the Clans participating in the current or upcoming Clan War Leagues. Capitalization can be ignored when identifying clans.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_clan_roster_information",
+                "description": "Returns the War Roster for a Clan participating in the current or upcoming Clan War Leagues. Capitalization can be ignored when identifying clans. Multiple accounts may be registered to the same discord_user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clan_name_or_tag": {
+                            "type": "string",
+                            "description": "The Clan Name or Tag of the Clan to get the roster for.",
+                            },
+                        },
+                    "required": ["clan_tag"]
+                    },
+                },
+            {
+                "name": "_assistant_get_user_participation_information",
+                "description": "Returns the accounts belonging to the active user which are registered for Clan War Leagues. Multiple accounts may be registered to the same discord_user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                    },
+                },
             ]
         await cog.register_functions(cog_name="ClanWarLeagues", schemas=schemas)
     
@@ -214,6 +252,55 @@ class ClanWarLeagues(commands.Cog):
         info = await self.cwl_information()
         x = info.to_dict()
         return f"CWL Information: {x}"
+    
+    async def _assistant_get_cwl_clans(self,*args,**kwargs) -> str:
+        clans = await self.client.get_war_league_clans()
+        return_info = [c.assistant_cwl_json() for c in clans]
+        return f"The following Clans are registered as official Clan War League clans: {return_info}"
+    
+    async def _assistant_get_participating_cwl_clans(self,*args,**kwargs) -> str:
+        clans = await WarLeagueClan.participating_by_season(self.active_war_league_season)
+        return_info = [c.assistant_cwl_json() for c in clans]
+        return f"The following Clans are participating in CWL for {self.active_war_league_season.description}: {return_info}"
+    
+    async def _assistant_get_clan_roster_information(self,clan_name_or_tag:str,*args,**kwargs) -> str:
+        q_doc = {
+            '$or':[
+                {'tag':{'$regex':f'^{clan_name_or_tag}',"$options":"i"}},
+                {'name':{'$regex':f'^{clan_name_or_tag}',"$options":"i"}}
+                ]
+            }
+        find_clan = await bot_client.coc_db.db__clan.find_one(q_doc)
+        if not find_clan:
+            return f"Could not find a clan with the name or tag `{clan_name_or_tag}`."
+        
+        clan = await WarLeagueClan(find_clan['_id'],self.active_war_league_season)
+        
+        if not clan.is_participating:
+            return f"{clan.title} is not participating in CWL for {self.active_war_league_season.description}."
+        if clan.roster_open:
+            return f"{clan.title}'s CWL Roster has not been finalized and cannot be communicated yet."
+        
+        if clan.league_group_id:
+            roster = await clan.compute_lineup_stats()
+            return_info = [p.assistant_cwl_json() for p in roster]
+            unique_users = list(set([p.discord_user for p in roster]))
+
+            return f"The roster for {clan.name} in {self.active_war_league_season.description} has {len(return_info)} players with {len(unique_users)} unique persons. This is the locked in-game roster and cannot be changed. The members are: {return_info}"
+        else:
+            roster = await clan.get_participants()
+            return_info = [p.assistant_cwl_json() for p in roster]
+            unique_users = list(set([p.discord_user for p in roster]))
+
+            return f"The roster for {clan.name} in {self.active_war_league_season.description} has {len(return_info)} players with {len(unique_users)} unique persons. This is a pre-start roster and might be subject to changes. The members are: {return_info}"
+
+    async def _assistant_get_user_participation_information(self,user:discord.Member,*args,**kwargs) -> str:
+        registered_accounts = await WarLeaguePlayer.get_by_user(self.active_war_league_season,user.id,True)
+        if len(registered_accounts) == 0:
+            return f"{user.display_name} does not have any accounts registered in CWL for {self.active_war_league_season.description}."
+        
+        return_info = [p.assistant_cwl_json() for p in registered_accounts]
+        return f"{user.display_name}'s registered accounts for {self.active_war_league_season.description} are: {return_info}"
     
     ############################################################
     ############################################################
