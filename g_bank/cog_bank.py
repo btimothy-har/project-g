@@ -1206,7 +1206,7 @@ class Bank(commands.Cog):
                 + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
                 + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
                 + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
-                + f"\nChange your primary account with `/bank primary`.",
+                + f"\nChange your primary account with `/bank main`.",
             inline=True
             )
         return embed

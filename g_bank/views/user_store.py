@@ -239,8 +239,7 @@ class UserStore(DefaultView):
         if menu:
             self.current_item = await ShopItem.get_by_id(menu.values[0])
             if self.current_item.type == 'cash' and self.current_item._stock > 0:
-                factor = max((20-self.current_item._stock),1)
-                rand = random.randint(1,factor)
+                rand = random.randint(1,10)
                 if rand != 1:
                     self.current_item._stock = 0
                 else:
