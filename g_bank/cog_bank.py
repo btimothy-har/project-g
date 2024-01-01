@@ -1157,7 +1157,8 @@ class Bank(commands.Cog):
             value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n\n") if pass_active else "*Boost your rewards with a Bank Pass! Get up to 50% more rewards.*\n"
                 + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
                 + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
-                + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n"),
+                + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
+                + f"\n\nChange your primary account with `bank set-primary`.",
             inline=True
             )
         return embed
@@ -1515,6 +1516,84 @@ class Bank(commands.Cog):
             await paginate.start()
         else:
             await interaction.followup.send(embed=leaderboard[0])
+    
+    ##################################################
+    ### BANK / PRIMARY ACCOUNT
+    ##################################################
+    @command_group_bank.command(name="primary")
+    @commands.guild_only()
+    async def command_bank_set_primary_account(self,ctx:commands.Context):
+        """
+        Set the Primary Account for your Bank Rewards.
+        """        
+        
+        member = aMember(ctx.author.id,self.bank_guild.id)
+        await member.load()
+        
+        all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
+
+        if len(eligible_accounts) == 0:
+            return await ctx.reply("You don't have any eligible accounts to set as your primary account.")
+        
+        embed = await clash_embed(
+            context=ctx,
+            message=f"Choose from one of your accounts below as your Primary Account.",
+            timestamp=pendulum.now()
+            )        
+        view = ClashAccountSelector(ctx.author,eligible_accounts)
+
+        msg = await ctx.reply(embed=embed,view=view)
+        wait = await view.wait()
+        if wait:
+            await msg.edit(f"Did not receive a response.",view=None)
+        
+        if not view.selected_account:
+            return await msg.edit("You did not select an account.",view=None)
+        
+        sel_account = await self.client.fetch_player(view.selected_account)
+        
+        chk = await member.set_reward_account(sel_account.tag)
+        if not chk:
+            return await msg.edit("You can only change your primary account once every 24 hours.",view=None)
+        
+        return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",view=None)
+    
+    @app_command_group_bank.command(name="primary",
+        description="Set the Primary Account for your Bank Rewards.")
+    async def app_command_bank_set_primary_account(self,interaction:discord.Interaction):
+
+        await interaction.response.defer()
+
+        member = aMember(interaction.user.id,self.bank_guild.id)
+        await member.load()
+        
+        all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
+
+        if len(eligible_accounts) == 0:
+            return await interaction.followup.send("You don't have any eligible accounts to set as your primary account.")
+        
+        embed = await clash_embed(
+            context=interaction,
+            message=f"Choose from one of your accounts below as your Primary Account.",
+            timestamp=pendulum.now()
+            )        
+        view = ClashAccountSelector(interaction.user,eligible_accounts)
+
+        await interaction.followup.send(embed=embed,view=view)
+        wait = await view.wait()
+        if wait or not view.selected_account:
+            return await interaction.edit_original_response(content=f"Did not receive a response.",embed=None,view=None)
+        
+        sel_account = await self.client.fetch_player(view.selected_account)
+        chk = await member.set_reward_account(sel_account.tag)
+        if not chk:
+            return await interaction.edit_original_response(content="You can only change your primary account once every 24 hours.",embed=None,view=None)
+        
+        return await interaction.edit_original_response(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
     ##################################################
     ### BANK / TRANSACTIONS

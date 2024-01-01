@@ -511,7 +511,7 @@ class aMember(AwaitLoader):
             )
         return mem[0].tag if len(mem) > 0 else None
     
-    async def set_reward_account(self,tag:str):
+    async def set_reward_account(self,tag:str) -> bool:
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
@@ -521,12 +521,23 @@ class aMember(AwaitLoader):
         if tag not in guild_member.account_tags:
             raise InvalidTag(tag)
 
+        db = await bot_client.coc_db.db__discord_member.find_one({'_id':guild_member.db_id})
+        last_updated = db.get('last_reward_account',0) if db else 0
+
+        if last_updated > 0:
+            last_u = pendulum.from_timestamp(last_updated)
+            diff = pendulum.now() - last_u
+            if diff.in_hours() < 168:
+                return False
+
         await bot_client.coc_db.db__discord_member.update_one(
             {'_id':guild_member.db_id},
             {'$set':{
                 'user_id':self.user_id,
                 'guild_id':self.guild_id,
-                'reward_account':tag
+                'reward_account':tag,
+                'last_reward_account':pendulum.now().int_timestamp
                 }
             },
             upsert=True)
+        return True
