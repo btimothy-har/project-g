@@ -1154,10 +1154,10 @@ class Bank(commands.Cog):
         
         embed.add_field(
             name="__Reward Multipliers__",
-            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n\n") if pass_active else "Boost your rewards with a Bank Pass! Get up to 50% more rewards.\n"
-                + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n")) if reward_account else ""
-                + f"**Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
-                + f"**Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n"),
+            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n\n") if pass_active else "*Boost your rewards with a Bank Pass! Get up to 50% more rewards.*\n"
+                + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
+                + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
+                + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n"),
             inline=True
             )
         return embed
