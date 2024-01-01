@@ -507,14 +507,13 @@ class aMember(AwaitLoader):
         if def_tag:
             return def_tag
         
-        mem = [a for a in global_member.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
+        mem = [a for a in global_member.accounts if a.is_member]
         if len(mem) == 0:
             return None
         mem.sort(
             key=lambda x: (x.town_hall_level,x.exp_level),
             reverse=True
             )
-        bot_client.coc_main_log.info(f"Reward Account for {self.user_id} {self.guild_id}: {mem[0].tag}")
         return mem[0].tag
     
     async def set_reward_account(self,tag:str) -> (bool, int):

@@ -1597,7 +1597,7 @@ class Bank(commands.Cog):
         Set the Primary Account for your Bank Rewards.
         """        
         
-        member = aMember(ctx.author.id,self.bank_guild.id)
+        member = aMember(ctx.author.id)
         await member.load()
         
         all_accounts = await self.client.fetch_many_players(*member.account_tags)
@@ -1635,7 +1635,7 @@ class Bank(commands.Cog):
             nts = ts.add(days=7)
             return await msg.edit(content=f"You can only change your primary account once every 7 days. You can next change on/after: <t:{nts.int_timestamp}:f> ",embed=None,view=None)
         
-        return await msg.edit(f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
+        return await msg.edit(content=f"Your primary account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
     @app_command_group_bank.command(name="primary",
         description="Set the Primary Account for your Bank Rewards.")
