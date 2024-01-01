@@ -490,21 +490,23 @@ class aMember(AwaitLoader):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
         
+        global_member = aMember(self.user_id)
+        await global_member.load()
+        
         guild_member = aMember(self.user_id,1132581106571550831)
-        await guild_member.load()
 
-        if len(guild_member.accounts) == 0:
+        if len(global_member.accounts) == 0:
             return None
         
         def_tag = None
         db = await bot_client.coc_db.db__discord_member.find_one({'_id':guild_member.db_id})
-        if db and db.get('reward_account',None) in guild_member.member_tags:
+        if db and db.get('reward_account',None) in global_member.member_tags:
             def_tag = db['reward_account']
 
         if def_tag:
             return def_tag
         
-        mem = [a for a in guild_member.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
+        mem = [a for a in global_member.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
         mem.sort(
             key=lambda x: (x.town_hall_level,x.exp_level),
             reverse=True
@@ -514,13 +516,14 @@ class aMember(AwaitLoader):
     async def set_reward_account(self,tag:str) -> (bool, int):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
+
+        global_member = aMember(self.user_id)
+        await global_member.load()
+        
+        if tag not in global_member.account_tags:
+            raise InvalidTag(tag)
         
         guild_member = aMember(self.user_id,1132581106571550831)
-        await guild_member.load()
-        
-        if tag not in guild_member.account_tags:
-            raise InvalidTag(tag)
-
         db = await bot_client.coc_db.db__discord_member.find_one({'_id':guild_member.db_id})
         last_updated = db.get('last_reward_account',0) if db else 0
 
