@@ -500,18 +500,22 @@ class aMember(AwaitLoader):
         
         def_tag = None
         db = await bot_client.coc_db.db__discord_member.find_one({'_id':guild_member.db_id})
-        if db and db.get('reward_account',None) in global_member.member_tags:
-            def_tag = db['reward_account']
+        if db and db.get('reward_account',None):
+            if db.get('reward_account',None) in global_member.member_tags:
+                def_tag = db['reward_account']
 
         if def_tag:
             return def_tag
         
         mem = [a for a in global_member.accounts if a.is_member and getattr(a.home_clan,'tag',None) in self._scope_clans]
+        if len(mem) == 0:
+            return None
         mem.sort(
             key=lambda x: (x.town_hall_level,x.exp_level),
             reverse=True
             )
-        return mem[0].tag if len(mem) > 0 else None
+        bot_client.coc_main_log.info(f"Reward Account for {self.user_id} {self.guild_id}: {mem[0].tag}")
+        return mem[0].tag
     
     async def set_reward_account(self,tag:str) -> (bool, int):
         if not self.discord_member:

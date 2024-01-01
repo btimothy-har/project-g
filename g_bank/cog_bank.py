@@ -1170,8 +1170,12 @@ class Bank(commands.Cog):
             return embed       
 
         member = await aMember(user.id,context.guild.id)
-        reward_tag = await member._get_reward_account_tag()       
-        reward_account = await self.client.fetch_player(reward_tag) if reward_tag else None
+        reward_tag = await member._get_reward_account_tag()
+        if reward_tag:
+            reward_account = await self.client.fetch_player(reward_tag)
+        else:
+            reward_account = None        
+        
         primary_multiplier = (await self._compute_multiplier(reward_account) * 100) if reward_account else 0
 
         guild_member = self.bank_guild.get_member(user.id)
