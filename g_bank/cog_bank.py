@@ -1150,12 +1150,14 @@ class Bank(commands.Cog):
             embed.description += "\nNext payday: "
             embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
         
+        embed.description += "\n\u200b"
+        
         embed.add_field(
-            name="Reward Multipliers",
-            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n\n") if pass_active else "Boost your rewards with a Bank Pass! Get up to 50% more rewards.\n\n"
-                + (f"{reward_account.town_hall.emoji} {reward_account.name} ({reward_account.tag}): " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n")) if reward_account else ""
-                + f"Member Accounts: " + ("100%\n" if pass_active else "40%\n")
-                + f"Non-Member Accounts: " + ("40%\n" if pass_active else "20%\n"),
+            name="__Reward Multipliers__",
+            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n\n") if pass_active else "Boost your rewards with a Bank Pass! Get up to 50% more rewards.\n"
+                + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n")) if reward_account else ""
+                + f"**Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
+                + f"**Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n"),
             inline=True
             )
         return embed
