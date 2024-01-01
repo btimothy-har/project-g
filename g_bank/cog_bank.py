@@ -1407,49 +1407,6 @@ class Bank(commands.Cog):
         self._bank_pass_role = role.id
         await self.config.bank_pass_role.set(self.bank_pass_role.id)
         await ctx.reply(f"Bank Pass Role set to {role.name} `{role.id}`.")
-    
-    ##################################################
-    ### BANK / ADMIN / DELETE
-    ##################################################
-    @subcommand_bank_admin.command(name="delete")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def subcommand_bank_admin_delete(self,ctx:commands.Context,member:discord.Member):
-        """
-        [Owner-only] Deletes a Bank Admin.
-        """
-        
-        if member.id not in self.bank_admins:
-            return await ctx.reply(f"{member.mention} is not a Bank Admin.")            
-        
-        self.bank_admins.remove(member.id)
-        await ctx.reply(f"{member.mention} is no longer a Bank Admin.")
-
-        admin_role = self.bank_guild.get_role(self._bank_admin_role)
-        if admin_role and admin_role in member.roles:
-            await member.remove_roles(admin_role)
-
-        await self.config.admins.set(self.bank_admins)
-        await ctx.tick()
-    
-    ##################################################
-    ### BANK / ADMIN / SHOW
-    ##################################################
-    @command_group_bank.command(name="show")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def subcommand_bank_admin_show(self,ctx:commands.Context,member:discord.Member):
-        """
-        [Owner only] Lists the current Bank Admins.
-        """
-
-        embed = await clash_embed(
-            context=ctx,
-            title=f"{self.bot.user.name} Bank Admins",
-            message="\n".join([ctx.guild.get_member(id).display_name for id in self.bank_admins]),
-            timestamp=pendulum.now()
-            )
-        await ctx.reply(embed=embed)
 
     ##################################################
     ### BANK / GLOBALBAL
