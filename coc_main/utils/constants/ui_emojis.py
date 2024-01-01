@@ -30,6 +30,7 @@ class EmojisUI:
     WARNING = "<:warning_circle:1120978470986588240>"
     QUESTION = "<:blue_question_circle:1120980170019446814>"
     ELO = "<:elo:1185660352206225578>"
+    BOOST = "<:boost:1191270347656417370>"
 
 class EmojisConfirmation:
     YES = "<:green_check:1108570585568641067>"
