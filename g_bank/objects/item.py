@@ -148,7 +148,8 @@ class ShopItem():
     def _assistant_json(self) -> dict:
         stock = 0
         if self.type == 'cash' and self._stock > 0:
-            rand = random.randint(1,10)
+            factor = max(10-self.current_item._stock,5)
+            rand = random.randint(1,factor)
             if rand != 1:
                 stock = 0
             else:
