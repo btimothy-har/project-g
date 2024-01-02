@@ -2648,6 +2648,7 @@ class Bank(commands.Cog):
     @app_commands.describe(
         item="Select a Shop Item to edit.",
         show_in_store="Change whether the item is shown in the store.",
+        price="Change the price of the item.",
         category="Change the category of the item.",
         description="Change the description of the item.",
         required_role="Change the required role to purchase the item.",
@@ -2661,6 +2662,7 @@ class Bank(commands.Cog):
         interaction:discord.Interaction,
         item:str,
         show_in_store:Optional[int]=0,
+        price:Optional[int]=None,
         category:Optional[str]=None,
         description:Optional[str]=None,
         required_role:Optional[discord.Role]=None,
@@ -2698,6 +2700,10 @@ class Bank(commands.Cog):
             else:
                 await get_item.hide()
                 await interaction.followup.send(f"{get_item.name} is now hidden in the Guild Store.",ephemeral=True)
+        
+        if price:
+            await get_item.edit(price=price)
+            await interaction.followup.send(f"Updated {get_item.name} price to {price:,}.",ephemeral=True)
         
         if category:            
             await get_item.edit(category=category)

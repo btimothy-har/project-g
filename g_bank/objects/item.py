@@ -315,6 +315,13 @@ class ShopItem():
                 )
             self.description = kwargs['description']
         
+        if kwargs.get('price'):
+            await bot_client.coc_db.db__shop_item.update_one(
+                {'_id':self._id},
+                {'$set': {'price':kwargs['price']}}
+                )
+            self.price = kwargs['price']
+        
         if kwargs.get('buy_message'):
             await bot_client.coc_db.db__shop_item.update_one(
                 {'_id':self._id},

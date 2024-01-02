@@ -311,7 +311,7 @@ class AddItem(DefaultView):
                 + f"\n\n`{'Type:':<15}` {self.new_item.type}"
                 + f"\n\n`{'Name:':<15}` {self.new_item.name}"
                 + f"\n`{'Price:':<15}` {self.new_item.price:,}"
-                + f"\n`{'Stock:':<15}` {self.new_item.stock if self.new_item.stock != -1 else 'Infinite'}"
+                + f"\n`{'Stock:':<15}` {self.new_item.stock if self.new_item.stock > -1 else 'Infinite'}"
                 + f"\n`{'Expiry:':<15}` {f'{self.new_item.subscription_duration} days' if self.new_item.subscription_duration > 0 else 'Never'}"
                 + f"\n`{'Requires:':<15}` {getattr(self.new_item.required_role,'mention',None)}"
                 + f"\n`{'Category:':<15}` {self.new_item.category}"
