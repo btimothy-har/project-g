@@ -219,9 +219,9 @@ class Bank(commands.Cog):
             title=f"**Redemption Terms & Conditions**",
             message=f"1. All redemptions cannot be reversed and are not exchangeable or refundable."
                 + f"\n2. Redemptions **can** take up to 72 hours (3 days) to be fulfilled. Please be patient. Begging or pestering the staff will not expedite the process."
-                + f"\n3. In the event where an item is commercially unavailable, we reserve the right to offer you equivalent alternatives." 
+                + f"\n3. In the event where an item is commercially unavailable or region-blocked, we reserve the right to offer you equivalent alternatives." 
                 + f"\n4. You are required to provide confirmation of item receipt. In the absence of valid confirmation, your redemption is assumed to be fulfilled."
-                + f"\n5. We reserve the right to withhold any redemption without reason or explanation."
+                + f"\n5. We reserve the right to withhold any redemption without reason or explanation, without refunds."
                 + "\n\u200b",
             timestamp=pendulum.now()
             )
@@ -423,10 +423,9 @@ class Bank(commands.Cog):
             embed = await self.redemption_terms_conditions()
             embed.add_field(
                 name="**For Gold Pass or Gem Pack Redemptions**",
-                value=f"1. We use **[Codashop](https://www.codashop.com)** to purchase redemptions. This is a 3rd party licensed by Supercell. If you are not comfortable with this, please do not proceed."
+                value=f"1. We use [Supercell-licensed 3rd parties](https://support.supercell.com/clash-of-clans/en/articles/what-is-the-supercell-store-3.html) to purchase redemptions. These include [Codashop](https://codashop.com) and [RazerGold](https://gold.razer.com). If you are not comfortable with this, please do not proceed."
                     + f"\n2. Your Clash of Clans account must be linked to a valid Supercell ID."
-                    + f"\n3. The receipt of purchase serves as confirmation of redemption, regardless of whether you have received the item in-game."
-                    + f"\n4. The following Terms & Conditions are applicable: Supercell, Codashop, Discord.",
+                    + f"\n3. The receipt of purchase serves as confirmation of redemption, regardless of whether you have received the item in-game.",
                 inline=False
                 )
             
@@ -2777,13 +2776,26 @@ class ClashAccountSelector(discord.ui.View):
             min_values=1,
             max_values=1
             )
+        
+        cancel_button = DiscordButton(
+            function=self.callback_cancel,
+            label="Cancel Redemption",
+            emoji=EmojisUI.NO,
+            style=discord.ButtonStyle.grey,
+            )
 
         super().__init__(timeout=90)
         self.add_item(dropdown)
+        self.add_item(cancel_button)
     
     async def callback_select_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
         self.selected_account = menu.values[0]
+        await interaction.edit_original_response(view=None)
+        self.stop()
+    
+    async def callback_cancel(self,interaction:discord.Interaction,button:DiscordButton):
+        await interaction.response.defer()
         await interaction.edit_original_response(view=None)
         self.stop()
     
