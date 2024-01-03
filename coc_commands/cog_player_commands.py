@@ -309,6 +309,39 @@ class Players(commands.Cog):
         )
 
     ##################################################
+    ### MEMBER / SEND-DM
+    ##################################################
+    @command_group_member.command(name="senddm")
+    @commands.guild_only()
+    @commands.check(is_coleader)
+    async def subcommand_send_welcome_dm(self,ctx:commands.Context,member:discord.Member):
+        """
+        Sends the Welcome DM to the user.
+        """
+   
+        menu = NewMemberMenu(ctx,member)
+        send = await menu.send_welcome_dm()
+        if send:
+            return await ctx.send(f"Sent Welcome DM to {member.display_name}.")
+        else:
+            return await ctx.send(f"Could not send Welcome DM to {member.display_name}.")
+    
+    @app_command_group_member.command(name="send-dm",
+        description="[Co-Leader+] Sends the Welcome DM to the user.")
+    @app_commands.check(is_coleader)
+    @app_commands.describe(
+        member="The Discord User to send the DM to.")
+    async def app_subcommand_send_welcome_dm(self,interaction:discord.Interaction,member:discord.Member):
+
+        await interaction.response.defer(ephemeral=True)
+        menu = NewMemberMenu(interaction,member)
+        send = await menu.send_welcome_dm()
+        if send:
+            return await interaction.followup.send(f"Sent Welcome DM to {member.display_name}.")
+        else:
+            return await interaction.followup.send(f"Could not send Welcome DM to {member.display_name}.")
+
+    ##################################################
     ### MEMBER / ADD
     ##################################################
     @command_group_member.command(name="add")
