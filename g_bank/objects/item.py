@@ -63,6 +63,7 @@ class ShopItem():
         'subscription_duration',
         'subscription_log'
         ]
+    _random_stock = defaultdict(lambda:{'stock':0,'timestamp':0})
 
     @classmethod
     async def get_by_id(cls,item_id:str) -> Optional['ShopItem']:        
@@ -145,18 +146,8 @@ class ShopItem():
             return self.id == other.id
         return False
     
-    def _assistant_json(self) -> dict:
-        stock = 0
-        if self.type == 'cash' and self._stock > 0:
-            factor = max(15-self._stock,6)
-            rand = random.randint(1,factor)
-            if rand != 1:
-                stock = 0
-            else:
-                stock = 1
-        else:
-            stock = self.stock
-
+    def _assistant_json(self) -> dict:        
+        self._randomize_stock()
         return {
             'id': self.id,
             'name': self.name,
@@ -165,7 +156,7 @@ class ShopItem():
             'price': self.price,
             'category': self.category,
             'requires_role': self.required_role.name if self.required_role else None,
-            'available_stock': stock,
+            'available_stock': self.stock,
             'assigns_role': self.assigns_role.name if self.assigns_role else None,
             'expires_after_in_days': self.subscription_duration,
             }
@@ -207,6 +198,28 @@ class ShopItem():
             elif self.role_id in [r.id for r in member.roles]:
                 return False
         return True
+
+    def _randomize_stock(self):
+        if self.type not in ['cash']:
+            return
+        if self._stock < 1:
+            return
+        
+        r_int = random.randint(1,10)
+
+        r_stock = self._random_stock[self.id]
+        r_stock_ts = pendulum.from_timestamp(r_stock['timestamp'])
+        if pendulum.now() > r_stock_ts.add(minutes=r_int):
+            factor = max(15-self._stock,6)
+            rand = random.randint(1,factor)
+            if rand != 1:
+                self._stock = 0
+            else:
+                self._stock = 1
+            self._random_stock[self.id]['stock'] = self._stock
+            self._random_stock[self.id]['timestamp'] = pendulum.now().int_timestamp
+        else:
+            self._stock = r_stock['stock']        
     
     async def compute_user_expiry(self,user_id:int) -> Optional[pendulum.DateTime]:
         timestamp = self.subscription_log.get(str(user_id),None)
