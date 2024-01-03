@@ -584,6 +584,8 @@ class WarLeaguePlayer(BasicPlayer):
         
         w_iter = AsyncIter(self.war_log)
         async for war in w_iter:
+            if war.state not in ['warEnded','inWar']:
+                continue
             w_member = war.get_member(self.tag)
             if w_member:
                 a_iter = AsyncIter(w_member.attacks)
