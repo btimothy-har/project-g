@@ -847,7 +847,7 @@ class CWLPlayerMenu(DefaultView):
                         + f"\n{EmojisClash.THREESTARS} `{war_stats.triples:^5}`"
                         + f"\n{EmojisClash.STAR} `{war_stats.offense_stars:^5}`"
                         + f"\n{EmojisClash.DESTRUCTION} `{str(war_stats.offense_destruction)+'%':^5}`"
-                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():,}`"
+                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():,.1f}`"
                         + "\n\u200b",
                     inline=True
                     )
