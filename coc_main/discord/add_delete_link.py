@@ -135,8 +135,7 @@ class AddLinkMenu(DefaultView):
             embed = await clash_embed(
                 context=self.ctx,
                 message=f"The API Token provided is invalid. Please try again.",
-                success=False,
-                view=None
+                success=False
                 )
             await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
         self.stop()

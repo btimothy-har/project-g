@@ -448,7 +448,15 @@ class Bank(commands.Cog):
                 item_id=item_id,
                 goldpass_tag=redeem_tag
                 )
-            return f"The redemption ticket for {user.display_name} on {redeem_account.name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
+            if ticket.channel:
+                ret_channel = {
+                    'channel_id': ticket.channel.id,
+                    'channel_name': ticket.channel.name,
+                    'jump_url': ticket.channel.jump_url
+                    }
+                return f"The redemption ticket for {user.display_name} on {redeem_account.name} has been created: {ret_channel}."
+            else:
+                return f"The redemption ticket for {user.display_name} on {redeem_account.name} has been created."
         
         except Exception as e:
             bot_client.coc_main_log.exception(f"Assistant: Bank: Redeem Gold Pass")

@@ -92,12 +92,15 @@ class aMember(AwaitLoader):
                 },
             {'_id':1,'is_member':1,'home_clan':1}
             )
+        self.accounts = [await BasicPlayer(db['_id']) async for db in query]
         #sort by TH, exp level, alliance rank
-        self.accounts = sorted(
-            [await BasicPlayer(db['_id']) async for db in query],
-            key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
-            reverse=True
-            )
+        try:
+            self.accounts.sort(
+                key=lambda x: (x.town_hall_level,x.exp_level,x.clean_name),
+                reverse=True
+                )
+        except:
+            pass
 
         query = await bot_client.coc_db.db__discord_member.find(
             {'_id':self.db_id},
