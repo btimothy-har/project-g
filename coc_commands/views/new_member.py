@@ -429,12 +429,13 @@ class NewMemberMenu(DefaultView):
             intro_embed.add_field(
                 name="**<:logo_assassinsguild:1140210741908099122> The Assassins Guild**",
                 value="The AriX Alliance is an independent member of The Assassins Guild. As a member of AriX, you're automatically a member of the Guild. You can find more information below, or in the Guild Server."
-                    + "\n\nJoin the Guild Server at [discord.gg/hUSSsFneb2](https://discord.gg/hUSSsFneb2).",
+                    + "\n\nJoin the Guild Server at the invite link below.",
                 inline=False
                 )
         
             try:
                 await self.member.discord_member.send(embeds=[intro_embed,ag_embed])
+                await self.member.discord_member.send(f"discord.gg/hUSSsFneb2")
                 return True
             except:
                 return False
