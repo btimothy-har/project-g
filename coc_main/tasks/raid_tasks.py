@@ -253,7 +253,10 @@ class ClanRaidLoop(TaskLoop):
                     pass
     
     async def _dispatch_events(self,clan:aClan,cached_raid:coc.RaidLogEntry,new_raid:coc.RaidLogEntry):        
-        current_raid = await aRaidWeekend.create_from_api(clan,new_raid)
+        try:
+            current_raid = await aRaidWeekend.create_from_api(clan,new_raid)
+        except:
+            return bot_client.coc_main_log.exception(f"Error creating RaidWeekend object for {clan.tag}")
         tasks = []
 
         #New Raid Started
