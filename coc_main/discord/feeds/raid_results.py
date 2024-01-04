@@ -32,21 +32,22 @@ class RaidResultsFeed(ClanDataFeed):
         try:
             if self.channel:
                 d_file = discord.File(file,filename="raid_weekend.png")
-                webhook = await get_bot_webhook(bot_client.bot,self.channel)
-                if isinstance(self.channel,discord.Thread):
-                    await webhook.send(
-                        username=clan.name,
-                        avatar_url=clan.badge,
-                        file=d_file,
-                        thread=self.channel
-                        )
+                await self.channel.send(file=d_file)
+                # webhook = await get_bot_webhook(bot_client.bot,self.channel)
+                # if isinstance(self.channel,discord.Thread):
+                #     await webhook.send(
+                #         username=clan.name,
+                #         avatar_url=clan.badge,
+                #         file=d_file,
+                #         thread=self.channel
+                #         )
                     
-                else:
-                    await webhook.send(
-                        username=clan.name,
-                        avatar_url=clan.badge,
-                        file=d_file
-                        )
+                # else:
+                #     await webhook.send(
+                #         username=clan.name,
+                #         avatar_url=clan.badge,
+                #         file=d_file
+                #         )
         except Exception:
             bot_client.coc_main_log.exception(f"Error sending Raid Results Feed for {clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}")
     

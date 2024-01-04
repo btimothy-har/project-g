@@ -237,7 +237,8 @@ class Clans(commands.Cog):
         raid = await self.client.get_raid_weekend(clan)
 
         img = await RaidResultsFeed.get_results_image(clan,raid)
-        await ctx.send(file=img)
+        file = discord.File(img,filename="raid_weekend.png")
+        await ctx.send(file=file)
 
     ##################################################
     ### PARENT COMMAND GROUPS
