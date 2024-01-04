@@ -68,7 +68,7 @@ class ClanMemberFeed(ClanDataFeed):
             timestamp=pendulum.now())
         embed.set_footer(
             text=f"Joined {clan.name} [{clan.member_count}/50]",
-            icon_url="https://i.imgur.com/TZF5r54.png"
+            icon_url=bot_client.bot.user.display_avatar.url
             )
         return embed
     
@@ -104,7 +104,7 @@ class ClanMemberFeed(ClanDataFeed):
             timestamp=pendulum.now())
         embed.set_footer(
             text=f"Left {clan.name} [{clan.member_count}/50] " + (f"and joined {player.clan.name}" if player.clan and getattr(player.clan,'tag',None) != clan.tag else ""),
-            icon_url="https://i.imgur.com/TZF5r54.png"
+            icon_url=bot_client.bot.user.display_avatar.url
             )
         return embed
     

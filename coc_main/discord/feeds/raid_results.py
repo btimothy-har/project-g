@@ -1,3 +1,5 @@
+import re
+import aiohttp
 import discord
 import urllib
 import asyncio
@@ -90,26 +92,28 @@ class RaidResultsFeed(ClanDataFeed):
             draw = ImageDraw.Draw(background)
             stroke = 2
 
-            if clan.abbreviation in ['AO9','PR','AS','PA','AX']:
-                if clan.abbreviation == 'AO9':
-                    badge = Image.open(base_path + '/ImgGen/logo_ao9.png')
-                elif clan.abbreviation == 'PR':
-                    badge = Image.open(base_path + '/ImgGen/logo_pr.png')
-                elif clan.abbreviation == 'AS':
-                    badge = Image.open(base_path + '/ImgGen/logo_as.png')
-                elif clan.abbreviation == 'PA':
-                    badge = Image.open(base_path + '/ImgGen/logo_pa.png')
-                elif clan.abbreviation == 'AX':
-                    badge = Image.open(base_path + '/ImgGen/logo_ax.png')
-
+            emoji_id = re.search(r'<:.*:(\d+)>', clan.emoji)
+            if emoji_id:
+                emoji = bot_client.bot.get_emoji(int(emoji_id.group(1)))
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(emoji.url) as resp:
+                        if resp.status != 200:
+                            return None
+                        data = await resp.read()
+                
+                badge = Image.open(data)
                 background.paste(badge, (115, 100), badge.convert("RGBA"))
                 draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
-
+            
             else:
                 badge_data = clan.badge
-                with urllib.request.urlopen(badge_data) as image_data:
-                    badge = Image.open(image_data)
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(badge_data) as resp:
+                        if resp.status != 200:
+                            return None
+                        data = await resp.read()
 
+                badge = Image.open(data)
                 background.paste(badge, (125, 135), badge.convert("RGBA"))
                 draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
                 draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
