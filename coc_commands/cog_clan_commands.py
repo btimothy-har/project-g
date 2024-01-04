@@ -20,11 +20,15 @@ from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
+from coc_main.exceptions import ClashAPIError, InvalidTag
+
 from coc_main.discord.clan_link import ClanGuildLink
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu
 from .excel.clan_export import ClanExcelExport
+
+from coc_main.discord.feeds.raid_results import RaidResultsFeed
 
 bot_client = BotClashClient()
 
@@ -113,6 +117,20 @@ class Clans(commands.Cog):
                     "required": ["clan_name_or_abbreviation"],
                     },
                 },
+            {
+                "name": "_assistant_get_clan_information",
+                "description": "Returns complete information about a Clan. An identifying Clan Tag must be provided as this only returns one clan.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "clan_tag": {
+                            "description": "The Clan Tag to search for.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["clan_tag"],
+                    },
+                },
             ]
         await cog.register_functions(cog_name="Clans", schemas=schemas)
     
@@ -132,8 +150,19 @@ class Clans(commands.Cog):
         clan_tags = [c['_id'] async for c in query]
         clans = await self.client.fetch_many_clans(*clan_tags)
 
-        ret_clans = [c.to_json() for c in clans]
+        ret_clans = [c.assistant_name_json() for c in clans]
         return f"Found {len(ret_clans)} Clans matching `{clan_name_or_abbreviation}`. Clans: {ret_clans}"
+
+    async def _assistant_get_clan_information(self,clan_tag:str,*args,**kwargs) -> str:
+        try:
+            clan = await self.client.fetch_clan(clan_tag)
+        except ClashAPIError:
+            return "The API Service isn't available right now."
+        except InvalidTag:
+            return f"The tag {clan_tag} appears to be invalid."
+        
+        ret_clan = clan.assistant_clan_information()
+        return f"Found Clan: {ret_clan}"
     
     ##################################################
     ### CLAN ABBREVIATION LISTENER
@@ -200,6 +229,26 @@ class Clans(commands.Cog):
     #####
     ############################################################
     ############################################################
+    
+    @commands.command(name="raidimg")
+    @commands.is_owner()
+    async def command_raidimg(self,ctx:commands.Context):
+        clan = await self.client.from_clan_abbreviation("AS")
+        raid = await self.client.get_raid_weekend(clan)
+
+        img = await RaidResultsFeed.get_results_image(clan,raid)
+        file = discord.File(img,filename="raid_weekend.png")
+        await ctx.send(file=file)
+    
+    @commands.command(name="raidfeed")
+    @commands.is_owner()
+    async def command_raidfeed(self,ctx:commands.Context):
+        clan = await self.client.from_clan_abbreviation("AS")
+        raid = await self.client.get_raid_weekend(clan)
+
+        img = await RaidResultsFeed.start_feed(clan,raid)
+        #file = discord.File(img,filename="raid_weekend.png")
+        await ctx.tick()
 
     ##################################################
     ### PARENT COMMAND GROUPS

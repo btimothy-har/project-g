@@ -1,5 +1,7 @@
+import re
+import aiohttp
 import discord
-import urllib
+import io
 import asyncio
 
 from typing import *
@@ -28,24 +30,26 @@ class RaidResultsFeed(ClanDataFeed):
     def __init__(self,database:dict):
         super().__init__(database)
     
-    async def send_to_discord(self,clan:aClan,raid_weekend:aRaidWeekend,file:discord.File):
+    async def send_to_discord(self,clan:aClan,raid_weekend:aRaidWeekend,file):
         try:
             if self.channel:
-                webhook = await get_bot_webhook(bot_client.bot,self.channel)
-                if isinstance(self.channel,discord.Thread):
-                    await webhook.send(
-                        username=clan.name,
-                        avatar_url=clan.badge,
-                        file=file,
-                        thread=self.channel
-                        )
+                d_file = discord.File(file,filename="raid_weekend.png")
+                await self.channel.send(file=d_file)
+                # webhook = await get_bot_webhook(bot_client.bot,self.channel)
+                # if isinstance(self.channel,discord.Thread):
+                #     await webhook.send(
+                #         username=clan.name,
+                #         avatar_url=clan.badge,
+                #         file=d_file,
+                #         thread=self.channel
+                #         )
                     
-                else:
-                    await webhook.send(
-                        username=clan.name,
-                        avatar_url=clan.badge,
-                        file=file
-                        )
+                # else:
+                #     await webhook.send(
+                #         username=clan.name,
+                #         avatar_url=clan.badge,
+                #         file=d_file
+                #         )
         except Exception:
             bot_client.coc_main_log.exception(f"Error sending Raid Results Feed for {clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}")
     
@@ -62,10 +66,10 @@ class RaidResultsFeed(ClanDataFeed):
             clan_feeds = await cls.feeds_for_clan(clan,type)
 
             if len(clan_feeds) > 0:
-                image = await cls.get_results_image(clan,raid_weekend)
+                image_fp = await cls.get_results_image(clan,raid_weekend)
 
                 a_iter = AsyncIter(clan_feeds)
-                tasks = [feed.send_to_discord(clan,raid_weekend,image) async for feed in a_iter]
+                tasks = [feed.send_to_discord(clan,raid_weekend,image_fp) async for feed in a_iter]
                 await bounded_gather(*tasks,return_exceptions=True,limit=1)
 
         except Exception:
@@ -87,30 +91,41 @@ class RaidResultsFeed(ClanDataFeed):
 
             draw = ImageDraw.Draw(background)
             stroke = 2
+            badge = None
 
-            if clan.abbreviation in ['AO9','PR','AS','PA','AX']:
-                if clan.abbreviation == 'AO9':
-                    badge = Image.open(base_path + '/ImgGen/logo_ao9.png')
-                elif clan.abbreviation == 'PR':
-                    badge = Image.open(base_path + '/ImgGen/logo_pr.png')
-                elif clan.abbreviation == 'AS':
-                    badge = Image.open(base_path + '/ImgGen/logo_as.png')
-                elif clan.abbreviation == 'PA':
-                    badge = Image.open(base_path + '/ImgGen/logo_pa.png')
-                elif clan.abbreviation == 'AX':
-                    badge = Image.open(base_path + '/ImgGen/logo_ax.png')
-
-                background.paste(badge, (115, 100), badge.convert("RGBA"))
-                draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
-
+            emoji_id = re.search(r'<:.*:(\d+)>', clan.emoji)
+            if emoji_id:
+                emoji = bot_client.bot.get_emoji(int(emoji_id.group(1)))
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(emoji.url) as resp:
+                        if resp.status != 200:
+                            badge = None
+                        else:
+                            data = await resp.read()
+                            data_io = io.BytesIO(data)
+                            badge = Image.open(data_io)
+                
+                if badge:
+                    badge = badge.resize((200,200))
+                    background.paste(badge, (115, 100), badge.convert("RGBA"))
+                    draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
+            
             else:
                 badge_data = clan.badge
-                with urllib.request.urlopen(badge_data) as image_data:
-                    badge = Image.open(image_data)
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(badge_data) as resp:
+                        if resp.status != 200:
+                            badge = None
+                        else:
+                            data = await resp.read()
+                            data_io = io.BytesIO(data)
+                            badge = Image.open(data_io)
 
-                background.paste(badge, (125, 135), badge.convert("RGBA"))
-                draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
-                draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
+                if badge:
+                    badge = badge.resize((200,200))
+                    background.paste(badge, (125, 135), badge.convert("RGBA"))
+                    draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
+                    draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
 
             # if clan.capital_league.name != 'Unranked':
             #     clan_league = await self.bot.coc_client.get_league_named(clan.capital_league.name)
@@ -145,8 +160,7 @@ class RaidResultsFeed(ClanDataFeed):
             def save_im(background):            
                 fp = bot_client.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}.png"
                 background.save(fp, format="png", compress_level=1)
-                file = discord.File(fp,filename="raid_image.png")
-                return file
+                return fp
 
             file = await bot_client.run_in_thread(save_im,background)
             return file

@@ -136,22 +136,23 @@ class WarLeagueGroup(AwaitLoader):
 
         wars_by_rounds.sort(key=lambda inner_list: min(war.preparation_start_time.int_timestamp for war in inner_list))
         war_ids_by_rounds = [[war._id for war in round] for round in wars_by_rounds]
-        
-        await bot_client.coc_db.db__war_league_group.update_one(
-            {'_id':group_id},
-            {'$set':{
-                'group_id':group_id,
-                'season':season.id,
-                'league':clan.war_league.name,
-                'number_of_rounds':api_data.number_of_rounds,
-                'clans':[clan.tag for clan in api_data.clans],
-                'rounds':war_ids_by_rounds
-                }},
-            upsert=True
-            )        
-        tasks = [WarLeagueClan.from_api(season.id,group_id,clan) async for clan in AsyncIter(api_data.clans)]
-        await bounded_gather(*tasks,limit=1)
-        
+
+        if api_data.state in ['preparation','inWar']:
+            await bot_client.coc_db.db__war_league_group.update_one(
+                {'_id':group_id},
+                {'$set':{
+                    'group_id':group_id,
+                    'season':season.id,
+                    'league':clan.war_league.name,
+                    'number_of_rounds':api_data.number_of_rounds,
+                    'clans':[clan.tag for clan in api_data.clans],
+                    'rounds':war_ids_by_rounds
+                    }},
+                upsert=True
+                )
+            tasks = [WarLeagueClan.from_api(season.id,group_id,clan) async for clan in AsyncIter(api_data.clans)]
+            await bounded_gather(*tasks,limit=1)
+            
         group = await cls(group_id)
         bot_client.coc_data_log.debug(f"CWL Group: {group_id}"
             + f"\nLeague: {group.league}"
@@ -182,10 +183,9 @@ class WarLeagueClan(BasicClan):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
-    def assistant_cwl_json(self) -> dict:
-        return {
+    def assistant_json(self) -> dict:
+        ret = {
             'tag': self.tag,
-            'abbreviation': self.abbreviation,
             'name': self.name,
             'level': self.level,
             'share_link': self.share_link,
@@ -194,6 +194,8 @@ class WarLeagueClan(BasicClan):
             'is_participating': self.is_participating,
             'roster_open': self.roster_open
             }
+        if self.abbreviation:
+            ret['abbreviation'] = self.abbreviation
     
     async def load(self):
         await BasicClan.load(self)

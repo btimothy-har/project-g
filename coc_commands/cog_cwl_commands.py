@@ -213,11 +213,17 @@ class ClanWarLeagues(commands.Cog):
                     },
                 },
             {
-                "name": "_assistant_get_participating_cwl_clans",
-                "description": "Returns only the Clans participating in the current or upcoming Clan War Leagues. Capitalization can be ignored when identifying clans.",
+                "name": "_assistant_get_league_clan_information",
+                "description": "Returns details about a Clan participating in the current or upcoming Clan War Leagues. An identifying Clan Tag must be provided as this only returns one clan.",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "clan_tag": {
+                            "description": "The Clan Tag to search for.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["clan_tag"]
                     },
                 },
             {
@@ -255,13 +261,14 @@ class ClanWarLeagues(commands.Cog):
     
     async def _assistant_get_cwl_clans(self,*args,**kwargs) -> str:
         clans = await self.client.get_war_league_clans()
-        return_info = [c.assistant_cwl_json() for c in clans]
+        return_info = [c.assistant_name_json() for c in clans]
         return f"The following Clans are registered as official Clan War League clans: {return_info}"
     
-    async def _assistant_get_participating_cwl_clans(self,*args,**kwargs) -> str:
-        clans = await WarLeagueClan.participating_by_season(self.active_war_league_season)
-        return_info = [c.assistant_cwl_json() for c in clans]
-        return f"The following Clans are participating in CWL for {self.active_war_league_season.description}: {return_info}"
+    async def _assistant_get_league_clan_information(self,clan_tag:str,*args,**kwargs) -> str:
+        clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
+        if not clan.is_participating:
+            return f"{clan.title} is not participating in CWL for {self.active_war_league_season.description}."
+        return f"War League information for {clan.name}: {clan.assistant_json()}"
     
     async def _assistant_get_clan_roster_information(self,clan_name_or_tag:str,*args,**kwargs) -> str:
         q_doc = {
