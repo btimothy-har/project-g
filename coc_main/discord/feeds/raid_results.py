@@ -91,6 +91,7 @@ class RaidResultsFeed(ClanDataFeed):
 
             draw = ImageDraw.Draw(background)
             stroke = 2
+            badge = None
 
             emoji_id = re.search(r'<:.*:(\d+)>', clan.emoji)
             if emoji_id:
@@ -98,25 +99,30 @@ class RaidResultsFeed(ClanDataFeed):
                 async with aiohttp.ClientSession() as session:
                     async with session.get(emoji.url) as resp:
                         if resp.status != 200:
-                            return None
-                        data = await resp.read()
+                            badge = None
+                        else:
+                            data = await resp.read()
+                            bot_client.coc_main_log.info(f"Badge Data: {data}")
+                            badge = Image.open(data)
                 
-                badge = Image.open(data)
-                background.paste(badge, (115, 100), badge.convert("RGBA"))
-                draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
+                if badge:               
+                    background.paste(badge, (115, 100), badge.convert("RGBA"))
+                    draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
             
             else:
                 badge_data = clan.badge
                 async with aiohttp.ClientSession() as session:
                     async with session.get(badge_data) as resp:
                         if resp.status != 200:
-                            return None
-                        data = await resp.read()
+                            badge = None
+                        else:
+                            data = await resp.read()
+                            badge = Image.open(data)
 
-                badge = Image.open(data)
-                background.paste(badge, (125, 135), badge.convert("RGBA"))
-                draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
-                draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
+                if badge:
+                    background.paste(badge, (125, 135), badge.convert("RGBA"))
+                    draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
+                    draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
 
             # if clan.capital_league.name != 'Unranked':
             #     clan_league = await self.bot.coc_client.get_league_named(clan.capital_league.name)
