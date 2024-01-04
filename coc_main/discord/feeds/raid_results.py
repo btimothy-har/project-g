@@ -1,7 +1,7 @@
 import re
 import aiohttp
 import discord
-import urllib
+import io
 import asyncio
 
 from typing import *
@@ -102,8 +102,8 @@ class RaidResultsFeed(ClanDataFeed):
                             badge = None
                         else:
                             data = await resp.read()
-                            bot_client.coc_main_log.info(f"Badge Data: {data}")
-                            badge = Image.open(data)
+                            data_io = io.BytesIO(data)
+                            badge = Image.open(data_io)
                 
                 if badge:               
                     background.paste(badge, (115, 100), badge.convert("RGBA"))
@@ -117,7 +117,8 @@ class RaidResultsFeed(ClanDataFeed):
                             badge = None
                         else:
                             data = await resp.read()
-                            badge = Image.open(data)
+                            data_io = io.BytesIO(data)
+                            badge = Image.open(data_io)
 
                 if badge:
                     background.paste(badge, (125, 135), badge.convert("RGBA"))
