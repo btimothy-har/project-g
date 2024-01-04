@@ -21,7 +21,6 @@ class aPlayerClan(BasicClan):
         return {
             'tag': self.tag,
             'name': self.name,
-            'badge': self.badge,
             'level': self.level,
             }
     

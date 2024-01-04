@@ -66,7 +66,15 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def __hash__(self):
         return hash(self.tag)
     
-    def overview_json(self) -> dict:
+    def name_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'share_link': self.share_link,
+            'town_hall': self.town_hall_level,
+            }
+    
+    def profile_json(self) -> dict:
         return {
             'tag': self.tag,
             'name': self.name,

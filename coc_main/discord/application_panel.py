@@ -238,8 +238,7 @@ class ClanApplyMenu(discord.ui.View):
 ##### APPLICAITON MENU FOR USER
 #####
 ##################################################
-class ClanApplyMenuUser(DefaultView):
-    
+class ClanApplyMenuUser(DefaultView):    
     @classmethod
     async def start_user_application(cls,interaction:discord.Interaction,clan_tags:Optional[List[str]]=None):
         view = cls(interaction,clan_tags)

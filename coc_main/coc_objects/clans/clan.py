@@ -31,37 +31,36 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
     async def load(self):
         await BasicClan.load(self)
     
-    def assistant_cwl_json(self) -> dict:
+    def assistant_name_json(self) -> dict:
         return {
             'tag': self.tag,
-            'abbreviation': self.abbreviation,
             'name': self.name,
-            'level': self.level,
             'share_link': self.share_link,
-            'clan_war_league': self.war_league_name
             }
 
-    def to_json(self) -> dict:
-        return {
+    def assistant_clan_information(self) -> dict:
+        base = {
             'tag': self.tag,
-            'abbreviation': self.abbreviation,
             'name': self.name,
-            'badge': self.badge,
             'level': self.level,
             'location': getattr(self.location,'name','Not Provided'),
-            'member_count': self.member_count,
-            'members': self.members_dict,
+            'description': self.description,
             'share_link': self.share_link,
             'capital_hall': self.capital_hall,
-            'clan_war_league': self.war_league_name,
-            'war_wins': self.war_wins,
-            'war_ties': self.war_ties,
-            'war_losses': self.war_losses,
-            'description': self.description,
-            'leader': getattr(bot_client.bot.get_user(self.leader),'display_name','No Leader'),
-            'coleaders': [bot_client.bot.get_user(i).display_name for i in self.coleaders if bot_client.bot.get_user(i)],
-            'elders': [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)],
+            'clan_war_league': self.war_league_name,            
             }
+        if self.abbreviation:
+            base['abbreviation'] = self.abbreviation
+        if self.emoji:
+            base['emoji'] = self.emoji
+        if self.is_alliance_clan:
+            base['member_count'] = self.alliance_member_count
+            base['leader'] = getattr(bot_client.bot.get_user(self.leader),'display_name','No Leader')
+            base['coleaders'] = [bot_client.bot.get_user(i).display_name for i in self.coleaders if bot_client.bot.get_user(i)]
+            base['elders'] = [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)]
+        else:
+            base['member_count'] = self.member_count
+        return base
 
     ##################################################
     ### DATA FORMATTERS

@@ -11,7 +11,7 @@ from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 
 from coc_main.discord.member import aMember
 
-from coc_main.utils.components import handle_command_error, clash_embed
+from coc_main.utils.components import handle_command_error, clash_embed, DiscordSelectMenu
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
@@ -229,11 +229,39 @@ class Players(commands.Cog):
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schema = [
             {
-                "name": "_assistant_get_linked_user_accounts",
-                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Only returns high-level information. Use other functions to get specific details. Returns a list of JSON objects.",
+                "name": "_assistant_get_player_named",
+                "description": "Searches the database for players matching the provided name string. Returns a list of matches.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "player_name": {
+                            "description": "The Player Name to search for. Not caps sensitive.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["player_name"],
+                    },
+                },
+            {
+                "name": "_assistant_get_linked_clash_accounts",
+                "description": "Gets a user's Clash Accounts that are linked to their Discord ID. Only returns high-level information. Use other functions to get specific details.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
+                    },
+                },
+            {
+                "name": "_assistant_get_player_clan_status",
+                "description": "Gets Clan and Member information about a Clash Account. Use this if you need to find out which Clan a Player is in, or whether the Player is a member in the Alliance. A Player Tag identifier is needed.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "player_tag": {
+                            "description": "The unique player tag of the account.",
+                            "type": "string",
+                            },
+                        },
+                    "required": ["player_tag"],
                     },
                 },
             {
@@ -242,27 +270,52 @@ class Players(commands.Cog):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "account_tag": {
+                        "player_tag": {
                             "description": "The unique player tag of the account.",
                             "type": "string",
                             },
                         },
-                    "required": ["account_tag"],
+                    "required": ["player_tag"],
                     },
                 }
             ]
         await cog.register_functions(cog_name="Players", schemas=schema)
+    
+    async def _assistant_get_player_named(self,player_name:str,*args,**kwargs) -> str:
+        q_doc = {'name':{'$regex':f'^{player_name}',"$options":"i"}},
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__player.aggregate(pipeline)
 
-    async def _assistant_get_linked_user_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
+        player_tags = [c['_id'] async for c in query]
+        players = await self.client.fetch_many_players(*player_tags)
+
+        ret_players = [p.name_json() for p in players]
+        return f"Found {len(ret_players)} Players matching `{player_name}`. Players: {ret_players}"
+
+    async def _assistant_get_linked_clash_accounts(self,guild:discord.Guild,user:discord.Member,*args,**kwargs) -> str:
         if not user:
             return "No user found."        
         member = await aMember(user.id,guild.id)
         accounts = await self.client.fetch_many_players(*member.account_tags)
-        return f"Only provide the user with their Account Name, Tag, and Townhall Level: {[a.overview_json() for a in accounts]}"
+        return f"{user.name} has the following accounts linked: {[a.name_json() for a in accounts]}"
     
-    async def _assistant_get_account_heroes(self,account_tag:str,*args,**kwargs) -> str:
+    async def _assistant_get_player_clan_status(self,player_tag:str,*args,**kwargs) -> str:
         try:
-            account = await self.client.fetch_player(account_tag)
+            account = await self.client.fetch_player(player_tag)
+        except ClashAPIError as exc:
+            return f"Error: {exc.message}"
+        except InvalidTag:
+            return "Invalid Tag."
+        if not account:
+            return "No account found."
+        return f"{account.profile_json()}"
+    
+    async def _assistant_get_account_heroes(self,player_tag:str,*args,**kwargs) -> str:
+        try:
+            account = await self.client.fetch_player(player_tag)
         except ClashAPIError as exc:
             return f"Error: {exc.message}"
         except InvalidTag:
@@ -609,4 +662,4 @@ class Players(commands.Cog):
             return await interaction.followup.send(content=f"Did not find any accounts for the provided input.")
         
         menu = PlayerProfileMenu(interaction,view_accounts)
-        await menu.start()    
+        await menu.start()

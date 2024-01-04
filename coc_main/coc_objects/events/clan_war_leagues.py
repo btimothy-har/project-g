@@ -182,10 +182,9 @@ class WarLeagueClan(BasicClan):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
-    def assistant_cwl_json(self) -> dict:
-        return {
+    def assistant_json(self) -> dict:
+        ret = {
             'tag': self.tag,
-            'abbreviation': self.abbreviation,
             'name': self.name,
             'level': self.level,
             'share_link': self.share_link,
@@ -194,6 +193,8 @@ class WarLeagueClan(BasicClan):
             'is_participating': self.is_participating,
             'roster_open': self.roster_open
             }
+        if self.abbreviation:
+            ret['abbreviation'] = self.abbreviation
     
     async def load(self):
         await BasicClan.load(self)
