@@ -242,7 +242,7 @@ class Clans(commands.Cog):
     
     @commands.command(name="raidfeed")
     @commands.is_owner()
-    async def command_raidimg(self,ctx:commands.Context):
+    async def command_raidfeed(self,ctx:commands.Context):
         clan = await self.client.from_clan_abbreviation("AS")
         raid = await self.client.get_raid_weekend(clan)
 
