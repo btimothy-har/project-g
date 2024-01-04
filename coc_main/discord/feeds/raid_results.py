@@ -28,15 +28,16 @@ class RaidResultsFeed(ClanDataFeed):
     def __init__(self,database:dict):
         super().__init__(database)
     
-    async def send_to_discord(self,clan:aClan,raid_weekend:aRaidWeekend,file:discord.File):
+    async def send_to_discord(self,clan:aClan,raid_weekend:aRaidWeekend,file):
         try:
             if self.channel:
+                d_file = discord.File(file,filename="raid_weekend.png")
                 webhook = await get_bot_webhook(bot_client.bot,self.channel)
                 if isinstance(self.channel,discord.Thread):
                     await webhook.send(
                         username=clan.name,
                         avatar_url=clan.badge,
-                        file=file,
+                        file=d_file,
                         thread=self.channel
                         )
                     
@@ -44,7 +45,7 @@ class RaidResultsFeed(ClanDataFeed):
                     await webhook.send(
                         username=clan.name,
                         avatar_url=clan.badge,
-                        file=file
+                        file=d_file
                         )
         except Exception:
             bot_client.coc_main_log.exception(f"Error sending Raid Results Feed for {clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}")
@@ -62,10 +63,10 @@ class RaidResultsFeed(ClanDataFeed):
             clan_feeds = await cls.feeds_for_clan(clan,type)
 
             if len(clan_feeds) > 0:
-                image = await cls.get_results_image(clan,raid_weekend)
+                image_fp = await cls.get_results_image(clan,raid_weekend)
 
                 a_iter = AsyncIter(clan_feeds)
-                tasks = [feed.send_to_discord(clan,raid_weekend,image) async for feed in a_iter]
+                tasks = [feed.send_to_discord(clan,raid_weekend,image_fp) async for feed in a_iter]
                 await bounded_gather(*tasks,return_exceptions=True,limit=1)
 
         except Exception:
@@ -145,8 +146,7 @@ class RaidResultsFeed(ClanDataFeed):
             def save_im(background):            
                 fp = bot_client.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}_test.png"
                 background.save(fp, format="png", compress_level=1)
-                file = discord.File(fp,filename="raid_image.png")
-                return file
+                return fp
 
             file = await bot_client.run_in_thread(save_im,background)
             return file
