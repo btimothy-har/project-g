@@ -143,7 +143,7 @@ class RaidResultsFeed(ClanDataFeed):
             draw.text((1245, 370), f"{raid_weekend.defensive_reward}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=split_medal_font)
 
             def save_im(background):            
-                fp = bot_client.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}.png"
+                fp = bot_client.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}_test.png"
                 background.save(fp, format="png", compress_level=1)
                 file = discord.File(fp,filename="raid_image.png")
                 return file
