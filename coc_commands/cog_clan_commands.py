@@ -239,6 +239,16 @@ class Clans(commands.Cog):
         img = await RaidResultsFeed.get_results_image(clan,raid)
         file = discord.File(img,filename="raid_weekend.png")
         await ctx.send(file=file)
+    
+    @commands.command(name="raidfeed")
+    @commands.is_owner()
+    async def command_raidimg(self,ctx:commands.Context):
+        clan = await self.client.from_clan_abbreviation("AS")
+        raid = await self.client.get_raid_weekend(clan)
+
+        img = await RaidResultsFeed.start_feed(clan,raid)
+        #file = discord.File(img,filename="raid_weekend.png")
+        await ctx.tick()
 
     ##################################################
     ### PARENT COMMAND GROUPS
