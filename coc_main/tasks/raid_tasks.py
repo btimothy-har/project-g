@@ -256,7 +256,7 @@ class ClanRaidLoop(TaskLoop):
         try:
             current_raid = await aRaidWeekend.create_from_api(clan,new_raid)
         except:
-            return bot_client.coc_main_log.exception(f"Error creating RaidWeekend object for {clan.tag}")
+            return
         tasks = []
 
         #New Raid Started
