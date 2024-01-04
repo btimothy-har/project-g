@@ -105,7 +105,8 @@ class RaidResultsFeed(ClanDataFeed):
                             data_io = io.BytesIO(data)
                             badge = Image.open(data_io)
                 
-                if badge:               
+                if badge:
+                    badge.resize((200,200))
                     background.paste(badge, (115, 100), badge.convert("RGBA"))
                     draw.text((500, 970), f"{clan.name}\n{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
             
@@ -121,6 +122,7 @@ class RaidResultsFeed(ClanDataFeed):
                             badge = Image.open(data_io)
 
                 if badge:
+                    badge.resize((200,200))
                     background.paste(badge, (125, 135), badge.convert("RGBA"))
                     draw.text((225, 110), f"{clan.name}", anchor="mm", fill=(255,255,255), stroke_width=stroke, stroke_fill=(0, 0, 0),font=clan_name)
                     draw.text((500, 970), f"{raid_weekend.start_time.format('DD MMMM YYYY')}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=clan_name)
