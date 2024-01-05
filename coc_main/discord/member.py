@@ -497,7 +497,6 @@ class aMember(AwaitLoader):
         await global_member.load()
         
         guild_member = aMember(self.user_id,1132581106571550831)
-
         if len(global_member.accounts) == 0:
             return None
         

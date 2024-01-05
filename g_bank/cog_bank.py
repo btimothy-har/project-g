@@ -653,10 +653,9 @@ class Bank(commands.Cog):
             return 0
         member = aMember(player.discord_user)
         guild_user = self.bank_guild.get_member(player.discord_user)
-        reward_tag = None
+        reward_tag = await member._get_reward_account_tag()
 
         if guild_user and self.bank_pass_role in guild_user.roles:
-            reward_tag = await member._get_reward_account_tag()
             if reward_tag == player.tag:
                 multi = 1.5
             elif player.is_member:
