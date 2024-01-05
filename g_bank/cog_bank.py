@@ -652,11 +652,11 @@ class Bank(commands.Cog):
         if not player.discord_user:
             return 0
         member = aMember(player.discord_user)
-        reward_tag = await member._get_reward_account_tag()
-        
         guild_user = self.bank_guild.get_member(player.discord_user)
-        
+        reward_tag = None
+
         if guild_user and self.bank_pass_role in guild_user.roles:
+            reward_tag = await member._get_reward_account_tag()
             if reward_tag == player.tag:
                 multi = 1.5
             elif player.is_member:
@@ -1193,7 +1193,7 @@ class Bank(commands.Cog):
         primary_multiplier = (await self._compute_multiplier(reward_account) * 100) if reward_account else 0
 
         guild_member = self.bank_guild.get_member(user.id)
-        pass_active = True if self.bank_pass_role and self.bank_pass_role in guild_member.roles else False
+        pass_active = True if self.bank_pass_role and self.bank_pass_role in getattr(guild_member,'roles',[]) else False
 
         embed = await clash_embed(
             context=context,
