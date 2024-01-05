@@ -766,12 +766,12 @@ class Bank(commands.Cog):
             reward = round(10 * (increment // 1000))
 
             if reward > 0:
-                event_start = pendulum.datetime(2023,12,22,7,0,0)
-                event_end = pendulum.datetime(2023,12,25,7,0,0)
+                event_start = pendulum.datetime(2024,1,5,7,0,0)
+                event_end = pendulum.datetime(2024,1,7,7,0,0)
 
                 default_multiplier = await self._compute_multiplier(new_player)
                 if event_start <= pendulum.now() <= event_end:
-                    mult = 2 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
+                    mult = 3 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
                 else:
                     mult = default_multiplier
                 
