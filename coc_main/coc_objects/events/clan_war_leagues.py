@@ -592,6 +592,7 @@ class WarLeaguePlayer(BasicPlayer):
             if w_member:
                 a_iter = AsyncIter(w_member.attacks)
                 async for att in a_iter:
+                    elo_gain = -3
                     if att.stars >= 1:
                         elo_gain += 1
                     if att.stars >= 2:
@@ -602,9 +603,9 @@ class WarLeaguePlayer(BasicPlayer):
         
         await self.league_clan.get_participants()
         if self.war_elo > 0:
-            adj_elo = round((elo_gain * (self.league_clan.avg_elo / self.war_elo)),3) - 3
+            adj_elo = round((elo_gain * (self.league_clan.avg_elo / self.war_elo)),3)
         else:
-            adj_elo = round(elo_gain,3) - 3
+            adj_elo = round(elo_gain,3)
         return adj_elo
     
     async def set_elo_change(self,chg:float):
