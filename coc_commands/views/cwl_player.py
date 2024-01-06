@@ -829,7 +829,7 @@ class CWLPlayerMenu(DefaultView):
                 war_player = current_war.get_member(cwl_player.tag) if current_war else None
                 war_stats = aClanWarSummary.for_player(
                     cwl_player.tag,
-                    cwl_player.league_clan.league_wars
+                    [w for w in cwl_player.league_clan.league_wars if w.state not in ['preparation']]
                     )
                 e.add_field(
                     name=f"**Current War (Round: {league_group.current_round})**",
@@ -847,7 +847,7 @@ class CWLPlayerMenu(DefaultView):
                         + f"\n{EmojisClash.THREESTARS} `{war_stats.triples:^5}`"
                         + f"\n{EmojisClash.STAR} `{war_stats.offense_stars:^5}`"
                         + f"\n{EmojisClash.DESTRUCTION} `{str(war_stats.offense_destruction)+'%':^5}`"
-                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():,.1f}`"
+                        + f"\n{EmojisUI.ELO} `{await cwl_player.estimate_elo():^5,.1f}`"
                         + "\n\u200b",
                     inline=True
                     )
