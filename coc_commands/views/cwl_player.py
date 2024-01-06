@@ -940,7 +940,9 @@ class CWLPlayerMenu(DefaultView):
                 + "\u200b",
                 )
         if war_stats.wars_participated > 0:
-            async for war in AsyncIter(war_stats.war_log):
+            war_log = sorted(war_stats.war_log,key=lambda x:(x.end_time),reverse=True)
+            iter = AsyncIter(war_log)
+            async for war in iter:
                 war_member = war.get_member(self.show_account_stats.tag)
                 if war_member:
                     war_attacks = sorted(war_member.attacks,key=lambda x:(x.order))
@@ -956,7 +958,8 @@ class CWLPlayerMenu(DefaultView):
                     embed.add_field(
                         name=f"R{league_group.get_round_from_war(war)}: {war_member.clan.name} vs {war_member.opponent.name}",
                         value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`\u3000{EmojisClash.DEFENSE} `{len(war_member.defenses):^3}`\n"
-                            + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if pendulum.now() < war.end_time else "")
+                            + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if war.start_time < pendulum.now() < war.end_time else "")
+                            + (f"*War Starts <t:{war.start_time.int_timestamp}:R>.*\n" if war.start_time > pendulum.now() else "")
                             + (f"{attack_str}\n" if len(war_attacks) > 0 else "")
                             + (f"{defense_str}\n" if len(war_defenses) > 0 else "")
                             + "\u200b",
