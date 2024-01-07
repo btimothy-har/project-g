@@ -1184,6 +1184,7 @@ class Bank(commands.Cog):
             return embed       
 
         member = await aMember(user.id,context.guild.id)
+        next_change = await member.get_reward_timer()
         reward_tag = await member._get_reward_account_tag()
         if reward_tag:
             reward_account = await self.client.fetch_player(reward_tag)
@@ -1213,7 +1214,7 @@ class Bank(commands.Cog):
                 + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
                 + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
                 + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
-                + f"\nChange your primary account with `/bank main`.",
+                + (f"\nChange your main account with `/bank main`." if pendulum.now() > next_change else f"\nYou can change your main account in: <t:{next_change.int_timestamp}:R>."),
             inline=True
             )
         return embed
@@ -2793,7 +2794,7 @@ class ClashAccountSelector(discord.ui.View):
         
         cancel_button = DiscordButton(
             function=self.callback_cancel,
-            label="Cancel Redemption",
+            label="Cancel",
             emoji=EmojisUI.NO,
             style=discord.ButtonStyle.grey,
             )

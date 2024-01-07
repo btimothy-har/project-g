@@ -519,6 +519,20 @@ class aMember(AwaitLoader):
             )
         return mem[0].tag
     
+    async def get_reward_timer(self) -> Optional[pendulum.DateTime]:
+        if not self.discord_member:
+            raise InvalidUser(self.user_id)
+        
+        global_member = aMember(self.user_id)
+        await global_member.load()
+
+        guild_member = aMember(self.user_id,1132581106571550831)
+        db = await bot_client.coc_db.db__discord_member.find_one({'_id':guild_member.db_id})
+        last_updated = db.get('last_reward_account',0) if db else 0
+
+        last_u_ts = pendulum.from_timestamp(last_updated)
+        return last_u_ts.add(hours=168)
+    
     async def set_reward_account(self,tag:str) -> (bool, int):
         if not self.discord_member:
             raise InvalidUser(self.user_id)
