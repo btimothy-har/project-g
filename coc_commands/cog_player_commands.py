@@ -1,5 +1,6 @@
 import discord
 import pendulum
+import asyncio
 
 from typing import *
 
@@ -10,6 +11,7 @@ from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 
 from coc_main.discord.member import aMember
+from coc_main.discord.application_panel import ClanApplyMenuUser
 
 from coc_main.utils.components import handle_command_error, clash_embed, DiscordSelectMenu
 from coc_main.utils.checks import is_coleader, has_manage_roles
@@ -277,6 +279,14 @@ class Players(commands.Cog):
                         },
                     "required": ["player_tag"],
                     },
+                },
+            {
+                "name": "_assistant_clan_application",
+                "description": "Starts the process for a user to apply to or join a Clan in the Alliance. When completed, returns the ticket channel that the application was created in.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    },
                 }
             ]
         await cog.register_functions(cog_name="Players", schemas=schema)
@@ -323,6 +333,39 @@ class Players(commands.Cog):
         if not account:
             return "No account found."
         return f"Hero Levels for account {account.name} (Tag: {account.tag}): {account.hero_json()}"
+
+    async def _assistant_clan_application(self,user:discord.User,channel:discord.TextChannel,guild:discord.Guild,*args,**kwargs) -> str:
+        if not guild:
+            return f"This can only be used from a Guild Channel."
+        
+        application_id = await ClanApplyMenuUser.assistant_user_application(user,channel)
+        
+        if not application_id:
+            return f"{user.display_name} did not complete the application process."
+        
+        app_channel = None
+        now = pendulum.now()
+
+        while True:
+            rt = pendulum.now()
+            if rt.int_timestamp - now.int_timestamp > 60:
+                break
+
+            application = await bot_client.coc_db.db__clan_application.find_one({'_id':application_id})
+            app_channel = guild.get_channel(application.get('ticket_channel',0))
+            if app_channel:
+                break
+            await asyncio.sleep(0.5)
+        
+        if app_channel:
+            ret_channel = {
+                'channel_id': app_channel.id,
+                'channel_name': app_channel.name,
+                'jump_url': app_channel.jump_url
+                }
+            return f"{user.display_name} completed the application process. Their application ticket is in the channel {ret_channel}"
+
+        return f"{user.display_name} completed the application process, but the ticket channel could not be found."
     
     ############################################################
     ############################################################
