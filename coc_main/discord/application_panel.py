@@ -320,7 +320,7 @@ class ClanApplyMenuUser(discord.ui.View):
         super().__init__(timeout=600)
     
     async def interaction_check(self,interaction:discord.Interaction):
-        if interaction.user.id != self.user.id:
+        if interaction.user.id != self.member.id:
             await interaction.response.send_message(
                 content="This doesn't belong to you!", ephemeral=True
                 )
