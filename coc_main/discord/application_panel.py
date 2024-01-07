@@ -302,7 +302,7 @@ class ClanApplyMenuUser(discord.ui.View):
         await channel.send(content=f"Hey, {user.mention}!",embed=embed,view=view)
 
         wait = await view.wait()
-        if wait:
+        if wait or not view.application_id:
             return None
         return view.application_id
 

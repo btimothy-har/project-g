@@ -282,7 +282,7 @@ class Players(commands.Cog):
                 },
             {
                 "name": "_assistant_clan_application",
-                "description": "Starts the process for a user to apply to a Clan in the Alliance. When completed, returns the ticket channel that the application was created in.",
+                "description": "Starts the process for a user to apply to or join a Clan in the Alliance. When completed, returns the ticket channel that the application was created in.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
