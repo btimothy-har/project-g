@@ -1070,7 +1070,7 @@ class Bank(commands.Cog):
                                         reason="User does not have a valid subscription."
                                         )
                                     
-                    u_iter = AsyncIter(list(i.subscription_log.items()))
+                    u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
                             user = item.guild.get_member(int(user_id))
