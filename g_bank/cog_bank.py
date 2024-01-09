@@ -1052,24 +1052,25 @@ class Bank(commands.Cog):
                         continue
 
                     if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
-                        async with item.lock:
-                            if len(item.assigns_role.members) > 0:
-                                all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
+                        if len(item.assigns_role.members) > 0:
+                            all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
 
-                                all_subscribed_users = []
-                                item_iter = AsyncIter(all_role_items)
-                                async for i in item_iter:
-                                    all_subscribed_users.extend(list(i.subscription_log.keys()))
-                                
-                                m_iter = AsyncIter(item.assigns_role.members)
-                                async for member in m_iter:
-                                    if str(member.id) not in all_subscribed_users:
-                                        await member.remove_roles(
-                                            item.assigns_role,
-                                            reason="User does not have a valid subscription."
-                                            )
-                                        
-                    u_iter = AsyncIter(list(item.subscription_log.items()))
+                            all_subscribed_users = []
+                            item_iter = AsyncIter(all_role_items)
+                            async for i in item_iter:
+                                async with i.lock:
+                                    item = await ShopItem.get_by_id(i.id)
+                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
+                            
+                            m_iter = AsyncIter(item.assigns_role.members)
+                            async for member in m_iter:
+                                if str(member.id) not in all_subscribed_users:
+                                    await member.remove_roles(
+                                        item.assigns_role,
+                                        reason="User does not have a valid subscription."
+                                        )
+                                    
+                    u_iter = AsyncIter(list(i.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
                         try:
                             user = item.guild.get_member(int(user_id))
@@ -1097,7 +1098,7 @@ class Bank(commands.Cog):
                                     await user.send(f"Your {item.name} has expired.")
                                 except:
                                     pass
-                        
+                    
                         except Exception as exc:
                             await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."
                                 + f"```{exc}```")
