@@ -390,8 +390,9 @@ class ClanApplyMenuUser(discord.ui.View):
             self.add_item(dropdown_menu)
             return True
     
-    async def _callback_application(self,interaction:discord.Interaction,select:discord.ui.Select):
-        default_tags = [i for i in select.values if i != 'not_listed']
+    async def _callback_application(self,interaction:discord.Interaction,object:Union[discord.ui.Select,discord.ui.Button]):
+        
+        default_tags = [i for i in getattr(object,'values',[]) if i != 'not_listed']
 
         get_panels = await GuildApplicationPanel.get_for_guild(self.channel.guild.id)
         panel = get_panels[0]
