@@ -90,6 +90,24 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
+        guild = bot_client.bot.get_guild(1132581106571550831) if bot_client.bot.user.id == 1031240380487831664 else bot_client.bot.get_guild(680798075685699691)
+        member = guild.get_member(self.member.user_id)
+        if member is None:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"You must join The Assassins Guild server to register for CWL. Please join the server at https://discord.gg/assassinsguild and try again.",
+                success=False
+                )
+            if isinstance(self.ctx,discord.Interaction):
+                await self.ctx.edit_original_response(embed=embed, view=self)
+                self.message = await self.ctx.original_response()
+            else:
+                try:
+                    self.message = await self.ctx.send(embed=embed, view=self)
+                except discord.HTTPException:
+                    self.message = await self.ctx.send(embed=embed, view=self)
+            return            
+
         self.accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 

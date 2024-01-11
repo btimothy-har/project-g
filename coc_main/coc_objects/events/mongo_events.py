@@ -41,7 +41,10 @@
 #     'season': string,
 #     'tag': string,
 #     'name': string,
+#     'badge': string,
 #     'is_participating': bool,
+#     'league_channel': int,
+#     'league_role': int,
 #     'roster_open': bool,
 #     'league_group': string,
 #     'master_roster': [ string, string, string ]

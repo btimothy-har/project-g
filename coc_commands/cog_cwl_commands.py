@@ -6,7 +6,7 @@ import coc
 
 from typing import *
 
-from redbot.core import commands, app_commands
+from redbot.core import Config, commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
@@ -55,6 +55,8 @@ class ClanWarLeagues(commands.Cog):
         self.bot = bot
         self.sub_v = version
 
+        self._cwl_channel_listener = 1194618178760876042 if bot_client.bot.user.id == 1031240380487831664 else 1194618586610802688
+
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
@@ -73,6 +75,22 @@ class ClanWarLeagues(commands.Cog):
     @property
     def client(self) -> ClashOfClansClient:
         return bot_client.bot.get_cog("ClashOfClansClient")
+    
+    @property
+    def cwl_channel_listener(self) -> Optional[discord.TextChannel]:
+        return self.bot.get_channel(self._channel_listener)
+    
+    @property
+    def cwl_channel_category(self) -> Optional[discord.CategoryChannel]:
+        if self.cwl_channel_listener:
+            return self.cwl_channel_listener.category
+        return None
+    
+    @property
+    def cwl_guild(self) -> Optional[discord.Guild]:
+        if self.cwl_channel_listener:
+            return self.cwl_channel_listener.guild
+        return None
     
     @property
     def active_war_league_season(self) -> aClashSeason:
@@ -105,6 +123,49 @@ class ClanWarLeagues(commands.Cog):
             else:
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
+    
+    async def create_clan_channel(self,clan:WarLeagueClan) -> (discord.TextChannel,discord.Role):
+        if not self.cwl_channel_listener:
+            raise ValueError("CWL Channel Category is not set.")
+        
+        league_clan = await WarLeagueClan(clan.tag,self.active_war_league_season)
+        if league_clan.league_channel:
+            return league_clan.league_channel
+        
+        await self.cwl_channel_listener.send(f"--ticket {clan.tag}")
+
+        st = pendulum.now()
+        while True:
+            now = pendulum.now()
+            if now.int_timestamp - st.int_timestamp > 45:
+                break
+
+            league_clan = await WarLeagueClan(clan.tag,self.active_war_league_season)
+            if league_clan.league_channel and league_clan.league_role:
+                break
+        
+        return league_clan.league_channel,league_clan.league_role
+    
+    @commands.Cog.listener("on_guild_channel_create")
+    async def league_channel_ticket_listener(self,channel:discord.TextChannel):
+        clan_tag = None
+        await asyncio.sleep(1)
+        
+        async for message in channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Clan Tag":
+                    clan_tag = embed.description
+                    break
+
+        if not clan_tag:
+            return
+        
+        league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
+        league_role = await channel.guild.create_role(name=f"CWL {self.active_war_league_season.short_description} {league_clan.name}")
+
+        await channel.edit(name=f"cwl・{league_clan.name}")
+        await channel.send(f"--add {league_role.id}")
+        await league_clan.set_league_discord(channel,league_role)
         
     ############################################################
     ##### WAR ELO TASKS
@@ -127,20 +188,8 @@ class ClanWarLeagues(commands.Cog):
         league_group = await WarLeagueGroup(war._league_group)
         if not league_group:
             return
-
-        async def player_elo_adjustment(player:aWarPlayer,roster_elo:float):
-            elo_gain = 0
-            att_iter = AsyncIter(player.attacks)
-            async for att in att_iter:
-                elo_gain += att.elo_effect
-                
-            if player.war_elo > 0:
-                adj_elo = round((elo_gain * (roster_elo / player.war_elo)),3) - 3
-            else:
-                adj_elo = round(elo_gain,3) - 3
-            league_player = await WarLeaguePlayer(player.tag,league_group.season)
-            await league_player.set_elo_change(adj_elo)
-            await player.adjust_war_elo(adj_elo)
+        
+        calculated_elo = {}
         
         if league_group.state == WarState.WAR_ENDED and league_group.current_round == league_group.number_of_rounds:
             league_clan = league_group.get_clan(clan.tag)
@@ -151,17 +200,14 @@ class ClanWarLeagues(commands.Cog):
                 return
         
             clan_roster = await league_clan.get_participants()
-            try:
-                avg_elo = sum([p.war_elo for p in clan_roster]) / len(clan_roster)
-            except ZeroDivisionError:
-                avg_elo = 0
-
-            w_iter = AsyncIter(league_clan.league_wars)
-            async for war in w_iter:
-                w_clan = war.get_clan(clan.tag)
-                p_iter = AsyncIter(w_clan.members)
-                tasks = [player_elo_adjustment(p,avg_elo) async for p in p_iter]
-                await bounded_gather(*tasks)
+            async for p in AsyncIter(clan_roster):
+                calculated_elo[p.tag] = await p.estimate_elo()
+            
+            elo_iter = AsyncIter(list(calculated_elo.items()))
+            async for tag,elo in elo_iter:
+                player = await WarLeaguePlayer(tag,league_group.season)
+                await player.set_elo_change(elo)
+                await player.adjust_war_elo(elo)
         
     async def war_elo_adjustment(self,clan:aClan,war:aClanWar):
         if war.type != ClanWarType.RANDOM:
@@ -331,6 +377,18 @@ class ClanWarLeagues(commands.Cog):
     #####
     ############################################################
     ############################################################
+    @commands.command(name="finalize")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def command_finalize(self,ctx):
+        """
+        Finalize CWL Rosters for the current season.
+        """
+
+        clan = await WarLeagueClan("#URGQUR82",self.active_war_league_season)
+        clan.roster_open = True
+        i = await clan.finalize_roster()
+        await ctx.reply(f"Finalized: {i}.")
 
     ##################################################
     ### PARENT COMMAND GROUPS
@@ -567,8 +625,6 @@ class ClanWarLeagues(commands.Cog):
             embed.add_field(
                 name=f"{clan.title}",
                 value=f"**League:** {EmojisLeagues.get(clan.war_league_name)} {clan.war_league_name}"
-                    + f"\n**Channel:** {getattr(clan.league_clan_channel,'mention','Unknown Channel')}"
-                    + f"\n**Role:** {getattr(clan.league_clan_role,'mention','Unknown Role')}"
                     + f"\n\u200b",
                 inline=False
                 )            
@@ -602,19 +658,13 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / CLAN / ADD
     ##################################################
-    async def add_war_league_clan_helper(self,
-        context:Union[discord.Interaction,commands.Context],
-        clan:aClan,
-        channel:discord.TextChannel,
-        role:discord.Role):
+    async def add_war_league_clan_helper(self,context:Union[discord.Interaction,commands.Context],clan:aClan):
 
-        await clan.add_to_war_league(channel,role)
+        await clan.add_to_war_league()
 
         embed = await clash_embed(
             context=context,
-            message=f"**{clan.title}** is now added as a CWL Clan."
-                + f"\n\n**Channel:** {clan.league_clan_channel.mention}"
-                + f"\n**Role:** {clan.league_clan_role.mention}",
+            message=f"**{clan.title}** is now added as a CWL Clan.",
             success=True
             )
         return embed
@@ -622,10 +672,7 @@ class ClanWarLeagues(commands.Cog):
     @subcommand_group_cwl_clan.command(name="add")
     @commands.admin()
     @commands.guild_only()
-    async def subcommand_cwl_clan_add(self,ctx,
-        clan_tag:str,
-        cwl_channel:Union[discord.TextChannel,discord.Thread],
-        cwl_role:discord.Role):
+    async def subcommand_cwl_clan_add(self,ctx,clan_tag:str):
         """
         Add a Clan as a CWL Clan.
 
@@ -633,7 +680,7 @@ class ClanWarLeagues(commands.Cog):
         """
         
         clan = await self.client.fetch_clan(clan_tag)
-        embed = await self.add_war_league_clan_helper(ctx,clan,cwl_channel,cwl_role)
+        embed = await self.add_war_league_clan_helper(ctx,clan)
         await ctx.reply(embed=embed)
     
     @app_subcommand_group_cwl_clan.command(name="add",
@@ -641,15 +688,12 @@ class ClanWarLeagues(commands.Cog):
     @app_commands.check(is_admin)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_clans)
-    @app_commands.describe(
-        clan="The Clan to add as a CWL Clan.",
-        channel="The primary channel to use for CWL in this clan.",
-        role="The role to assign to CWL participants in this clan.")
-    async def sub_appcommand_cwl_clan_add(self,interaction:discord.Interaction,clan:str,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):
+    @app_commands.describe(clan="The Clan to add as a CWL Clan.")
+    async def sub_appcommand_cwl_clan_add(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
         get_clan = await self.client.fetch_clan(clan)
-        embed = await self.add_war_league_clan_helper(interaction,get_clan,channel,role)
+        embed = await self.add_war_league_clan_helper(interaction,get_clan)
         await interaction.edit_original_response(embed=embed)
     
     ##################################################

@@ -401,7 +401,7 @@ class Bank(commands.Cog):
                 return f"The user did not respond or cancelled process."
             
             select_account = await self.client.fetch_player(view.selected_account)
-            return f"The user selected the account: {select_account.overview_json()}."
+            return f"The user selected the account: {select_account.name_json()}."
 
     async def _assistant_redeem_clashofclans(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
         try:

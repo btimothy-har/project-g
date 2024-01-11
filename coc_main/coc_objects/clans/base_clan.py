@@ -231,38 +231,24 @@ class BasicClan(AwaitLoader):
                 + f"\n\tUnicode Emoji: {self.unicode_emoji}"
                 )
     
-    async def add_to_war_league(self,channel:Union[discord.TextChannel,discord.Thread],role:discord.Role):        
+    async def add_to_war_league(self):
         async with self._attributes._lock:
-            self._attributes.league_clan_channel_id = channel.id
-            self._attributes.league_clan_role_id = role.id
             self._attributes.is_active_league_clan = True
 
             await bot_client.coc_db.db__war_league_clan_setup.update_one(
                 {'_id':self.tag},
-                {'$set':{
-                    'channel':getattr(self.league_clan_channel,'id',None),
-                    'role':getattr(self.league_clan_role,'id',None),
-                    'is_active':self.is_active_league_clan
-                    }
+                {'$set':{'is_active':self.is_active_league_clan}
                 },
                 upsert=True)
-            bot_client.coc_data_log.info(
-                f"{self}: Registered as CWL Clan."
-                + f"\n\tChannel: {getattr(self.league_clan_channel,'id',None)}"
-                + f"\n\tRole: {getattr(self.league_clan_role,'id',None)}"
-                )
+            bot_client.coc_data_log.info(f"{self}: Registered as CWL Clan.")
     
     async def remove_from_war_league(self):        
         async with self._attributes._lock:
-            self._attributes.league_clan_channel_id = 0
-            self._attributes.league_clan_role_id = 0
             self._attributes.is_active_league_clan = False
 
             await bot_client.coc_db.db__war_league_clan_setup.update_one(
                 {'_id':self.tag},
-                {'$set':{
-                    'is_active':self.is_active_league_clan
-                    }
+                {'$set':{'is_active':self.is_active_league_clan}
                 },
                 upsert=True)
 

@@ -3,6 +3,7 @@ import coc
 import discord
 import hashlib
 import pendulum
+import re
 
 from typing import *
 
@@ -20,7 +21,8 @@ from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
 from ..players.base_player import BasicPlayer
 
-from ...utils.constants.coc_constants import MultiplayerLeagues, WarState, CWLLeagueGroups
+from ...utils.constants.coc_constants import MultiplayerLeagues, WarState, CWLLeagueGroups, EmojisTownHall
+from ...utils.components import clash_embed, ClanLinkMenu
 
 from ...exceptions import InvalidTag, ClashAPIError
 
@@ -224,6 +226,23 @@ class WarLeagueClan(BasicClan):
                 self.league_wars = [await aClanWar(war['_id']) async for war in war_query]
 
         self.master_roster_tags = db.get('master_roster',[]) if db else []
+
+        self._league_channel = db.get('league_channel',None) if db else None
+        self._league_role = db.get('league_role',None) if db else None
+    
+    async def set_league_discord(self,channel:discord.TextChannel,role:discord.Role):
+        self._league_channel = channel.id
+        self._league_role = role.id
+        await bot_client.coc_db.db__war_league_clan.update_one(
+            {'_id':self.db_id},
+            {'$set':{
+                'season':self.season.id,
+                'tag':self.tag,
+                'league_channel':self._league_channel,
+                'league_role':self._league_role
+                }},
+            upsert=True
+            )
     
     ##################################################
     ### GLOBAL ATTRIBUTES
@@ -243,6 +262,17 @@ class WarLeagueClan(BasicClan):
     @property
     def name(self) -> str:
         return self._name
+    
+    @property
+    def league_channel(self) -> Optional[discord.TextChannel]:
+        if self._league_channel:
+            return bot_client.bot.get_channel(self._league_channel)
+        return None    
+    @property
+    def league_role(self) -> Optional[discord.Role]:
+        if self.league_channel and self._league_role:
+            return self.league_channel.guild.get_role(self._league_role)
+        return None
     
     ##################################################
     ### CWL ATTRIBUTES
@@ -396,15 +426,51 @@ class WarLeagueClan(BasicClan):
             if len(participants) < 15:
                 await self.open_roster(skip_lock=True)
                 return False
-
-            role = self.league_clan_role
-            r_members = AsyncIter(role.members)
-            tasks = [m.remove_roles(role,reason='CWL Roster Finalized') async for m in r_members]
-            await bounded_gather(*tasks,limit=1)
+            
+            cwl_cog = bot_client.bot.get_cog("ClanWarLeagues")
+            if cwl_cog:
+                channel, role = await cwl_cog.create_clan_channel(self)
+            else:
+                role = None
             
             a_iter = AsyncIter(participants)
-            tasks = [m.finalize() async for m in a_iter]
+            tasks = [m.finalize(role=role) async for m in a_iter]
             await bounded_gather(*tasks,limit=1)
+
+            participants = await self.get_participants()
+            participants_20 = participants[:20]
+            participants_40 = participants[20:40]
+
+            embeds = []
+            if len(participants_20) > 0:
+                embed_1 = await clash_embed(
+                    context=bot_client.bot,
+                    title=f"CWL Roster: {self.name} {self.tag}",
+                    message=f"Season: {self.season.description}"
+                        + f"\nLeague: {self.league}"
+                        + f"\nParticipants: {len(participants)}"
+                        + f"\n\n"
+                        + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{re.sub('[_*/]','',p.clean_name)[:15]:>15}` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
+                    show_author=False
+                    )
+                embeds.append(embed_1)
+            if len(participants_40) > 0:
+                embed_2 = await clash_embed(
+                    context=bot_client.bot,
+                    title=f"CWL Roster: {self.name} {self.tag}",
+                    message=f"Season: {self.season.description}"
+                        + f"\nLeague: {self.league}"
+                        + f"\nParticipants: {len(participants)}"
+                        + f"\n\n"
+                        + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{re.sub('[_*/]','',p.clean_name)[:15]:>15}` <@{p.discord_user}>" for i,p in enumerate(participants_40,21)]),
+                    show_author=False
+                    )
+                embeds.append(embed_2)
+            
+            view = ClanLinkMenu([self])            
+            if len(embeds) > 0:
+                msg = await channel.send(embeds=embeds,view=view)
+                await msg.pin()
             return True
     
     ##################################################
@@ -729,7 +795,7 @@ class WarLeaguePlayer(BasicPlayer):
                 f"{str(self)} was rostered in CWL: {getattr(self.roster_clan,'name','No Clan')} {'(' + getattr(self.roster_clan,'tag',None + ')')}."
                 )
     
-    async def finalize(self):        
+    async def finalize(self,role:Optional[discord.Role]=None):
         async with self._lock:
             await bot_client.coc_db.db__war_league_player.update_one(
                 {'_id':self.db_id},
@@ -743,15 +809,14 @@ class WarLeaguePlayer(BasicPlayer):
                     }},
                 upsert=True
                 )
-            cwl_role = self.roster_clan.league_clan_role
-            if cwl_role:
+            if role:
                 try:
-                    member = await bot_client.bot.get_or_fetch_member(cwl_role.guild,self.discord_user)
+                    member = await bot_client.bot.get_or_fetch_member(role.guild,self.discord_user)
                 except discord.NotFound:
                     pass
                 else:
                     await member.add_roles(
-                        cwl_role,
+                        role,
                         reason='CWL Roster Finalized'
                         )            
             bot_client.coc_data_log.info(
