@@ -188,6 +188,7 @@ class ClashOfClansClient(commands.Cog):
                     },
                 {'_id':1}
                 )
+            tags = [p['_id'] async for p in query]
         else:
             query = bot_client.coc_db.db__player_stats.find(
                 {
@@ -197,11 +198,12 @@ class ClashOfClansClient(commands.Cog):
                     },
                 {'_id':1,'tag':1}
                 )
-        tags = [p['_id'] async for p in query]
+            tags = [p['tag'] async for p in query]
+                    
         ret_players = await self.fetch_many_players(*tags)
         return sorted(
             ret_players,
-            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),
+            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
             reverse=True
             )
     
