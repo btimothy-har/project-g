@@ -109,6 +109,7 @@ class ClanExcelExport():
             col += 1
         
         members = await self.client.fetch_members_by_season(self.clan,self.season)
+        bot_client.coc_main_log.info(f"Found Members: {len(members)}")
         async for m in AsyncIter(members):
             col = 0
             row += 1
