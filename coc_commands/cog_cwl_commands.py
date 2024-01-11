@@ -211,21 +211,13 @@ class ClanWarLeagues(commands.Cog):
     
     @commands.Cog.listener("on_guild_channel_delete")
     async def league_channel_ticket_delete_listener(self,channel:discord.TextChannel):
-        clan_tag = None
-        await asyncio.sleep(1)
-        
-        async for message in channel.history(limit=1,oldest_first=True):
-            for embed in message.embeds:
-                if embed.footer.text == "Clan War Leagues":
-                    clan_tag = embed.description.split()[0]
-                    break
+        query_league_clan_by_channel = {'league_channel': channel.id}
+        db_query = await bot_client.coc_db.db__war_league_clan.find_one(query_league_clan_by_channel)
 
-        if not clan_tag:
-            return
-        
-        league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
-        if league_clan.league_role:
-            await league_clan.league_role.delete(reason="CWL Channel Deleted.")
+        if db_query:
+            league_role = channel.guild.get_role(db_query['league_role'])
+            if league_role:
+                await league_role.delete(reason="CWL Channel Deleted.")
         
     ############################################################
     ##### WAR ELO TASKS
