@@ -3,6 +3,7 @@ import asyncio
 import pendulum
 import asyncio
 import coc
+import re
 
 from typing import *
 
@@ -18,7 +19,7 @@ from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.discord.member import aMember
 from coc_main.tasks.war_tasks import ClanWarLoop
 
-from coc_main.utils.components import clash_embed
+from coc_main.utils.components import clash_embed, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
 from coc_main.utils.constants.coc_emojis import EmojisClash
@@ -144,7 +145,46 @@ class ClanWarLeagues(commands.Cog):
             if league_clan.league_channel and league_clan.league_role:
                 break
         
-        return league_clan.league_channel,league_clan.league_role
+        if not league_clan.league_channel or not league_clan.league_role:
+            raise ValueError("Could not create Clan Channel.")
+        
+        cwl_participants = await league_clan.get_participants()
+        fetch_players = await self.client.fetch_many_players(*[p.tag for p in cwl_participants])
+
+        p_iter = AsyncIter(cwl_participants)
+        tasks = [m.finalize(role=league_clan.league_role) async for m in p_iter]
+        await bounded_gather(*tasks,limit=1)
+
+        fetch_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level),reverse=True)
+        participants_20 = fetch_players[:20]
+        participants_40 = fetch_players[20:40]
+
+        embeds = []
+        if len(participants_20) > 0:
+            embed_1 = await clash_embed(
+                context=bot_client.bot,
+                title=f"CWL Roster: {self.name} {self.tag}",
+                message=f"Season: {self.season.description}"
+                    + f"\nLeague: {EmojisLeagues.get(self.league)} {self.league}"
+                    + f"\nParticipants: {len(fetch_players)}"
+                    + f"\n\n"
+                    + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{p.tag:<10} {re.sub('[_*/]','',p.clean_name)[:15]:<15} ` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
+                show_author=False
+                )
+            embeds.append(embed_1)
+        if len(participants_40) > 0:
+            embed_2 = await clash_embed(
+                context=bot_client.bot,
+                message='\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{p.tag:<10} {re.sub('[_*/]','',p.clean_name)[:15]:<15}` <@{p.discord_user}>" for i,p in enumerate(participants_40,21)]),
+                show_author=False
+                )
+            embeds.append(embed_2)
+        
+        view = ClanLinkMenu([self])            
+        if len(embeds) > 0:
+            msg = await league_clan.league_channel.send(embeds=embeds,view=view)
+            await msg.pin()    
+        await league_clan.league_channel.send(f"--add {league_clan.league_role.id}")
     
     @commands.Cog.listener("on_guild_channel_create")
     async def league_channel_ticket_listener(self,channel:discord.TextChannel):
@@ -164,7 +204,6 @@ class ClanWarLeagues(commands.Cog):
         league_role = await channel.guild.create_role(name=f"CWL {self.active_war_league_season.short_description} {league_clan.name}")
 
         await channel.edit(name=f"cwl・{league_clan.name}")
-        await channel.send(f"--add {league_role.id}")
         await league_clan.set_league_discord(channel,league_role)
         
     ############################################################

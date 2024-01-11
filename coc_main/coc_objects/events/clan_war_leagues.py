@@ -429,48 +429,11 @@ class WarLeagueClan(BasicClan):
             
             cwl_cog = bot_client.bot.get_cog("ClanWarLeagues")
             if cwl_cog:
-                channel, role = await cwl_cog.create_clan_channel(self)
-            else:
-                role = None
-            
-            a_iter = AsyncIter(participants)
-            tasks = [m.finalize(role=role) async for m in a_iter]
-            await bounded_gather(*tasks,limit=1)
-
-            participants = await self.get_participants()
-            participants_20 = participants[:20]
-            participants_40 = participants[20:40]
-
-            embeds = []
-            if len(participants_20) > 0:
-                embed_1 = await clash_embed(
-                    context=bot_client.bot,
-                    title=f"CWL Roster: {self.name} {self.tag}",
-                    message=f"Season: {self.season.description}"
-                        + f"\nLeague: {self.league}"
-                        + f"\nParticipants: {len(participants)}"
-                        + f"\n\n"
-                        + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{re.sub('[_*/]','',p.clean_name)[:15]:>15}` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
-                    show_author=False
-                    )
-                embeds.append(embed_1)
-            if len(participants_40) > 0:
-                embed_2 = await clash_embed(
-                    context=bot_client.bot,
-                    title=f"CWL Roster: {self.name} {self.tag}",
-                    message=f"Season: {self.season.description}"
-                        + f"\nLeague: {self.league}"
-                        + f"\nParticipants: {len(participants)}"
-                        + f"\n\n"
-                        + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{re.sub('[_*/]','',p.clean_name)[:15]:>15}` <@{p.discord_user}>" for i,p in enumerate(participants_40,21)]),
-                    show_author=False
-                    )
-                embeds.append(embed_2)
-            
-            view = ClanLinkMenu([self])            
-            if len(embeds) > 0:
-                msg = await channel.send(embeds=embeds,view=view)
-                await msg.pin()
+                try:
+                    await cwl_cog.create_clan_channel(self)
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error finalizing CWL Roster for {str(self)}")
+                    return False
             return True
     
     ##################################################
