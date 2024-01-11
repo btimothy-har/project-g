@@ -180,7 +180,7 @@ class ClanWarLeagues(commands.Cog):
                 )
             embeds.append(embed_2)
         
-        view = ClanLinkMenu([self])            
+        view = ClanLinkMenu([league_clan])            
         if len(embeds) > 0:
             msg = await league_clan.league_channel.send(embeds=embeds,view=view)
             await msg.pin()    
