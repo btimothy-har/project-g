@@ -133,7 +133,7 @@ class ClanWarLeagues(commands.Cog):
         if league_clan.league_channel and league_clan.league_role:
             return
         
-        await self.cwl_channel_listener.send(f"--ticket {clan.tag}")
+        await self.cwl_channel_listener.send(f"--ticket {clan.tag} {clan.name}")
 
         st = pendulum.now()
         while True:
@@ -193,8 +193,8 @@ class ClanWarLeagues(commands.Cog):
         
         async for message in channel.history(limit=1,oldest_first=True):
             for embed in message.embeds:
-                if embed.footer.text == "Clan Tag":
-                    clan_tag = embed.description
+                if embed.footer.text == "Clan War Leagues":
+                    clan_tag = embed.description.split()[0]
                     break
 
         if not clan_tag:
