@@ -240,7 +240,7 @@ class Bank(commands.Cog):
                 },
             {
                 "name": "_assistant_get_member_inventory",
-                "description": "Gets a list of items in a user's inventory.",
+                "description": "Gets a list of items in a user's inventory. If a user is quering about the availability of items in the Store, direct them to use the /shop command.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
