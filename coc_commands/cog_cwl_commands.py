@@ -125,13 +125,13 @@ class ClanWarLeagues(commands.Cog):
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
     
-    async def create_clan_channel(self,clan:WarLeagueClan) -> (discord.TextChannel,discord.Role):
+    async def create_clan_channel(self,clan:WarLeagueClan):
         if not self.cwl_channel_listener:
             raise ValueError("CWL Channel Category is not set.")
         
         league_clan = await WarLeagueClan(clan.tag,self.active_war_league_season)
-        if league_clan.league_channel:
-            return league_clan.league_channel
+        if league_clan.league_channel and league_clan.league_role:
+            return
         
         await self.cwl_channel_listener.send(f"--ticket {clan.tag}")
 
@@ -163,9 +163,9 @@ class ClanWarLeagues(commands.Cog):
         if len(participants_20) > 0:
             embed_1 = await clash_embed(
                 context=bot_client.bot,
-                title=f"CWL Roster: {self.name} {self.tag}",
-                message=f"Season: {self.season.description}"
-                    + f"\nLeague: {EmojisLeagues.get(self.league)} {self.league}"
+                title=f"CWL Roster: {league_clan.name} {league_clan.tag}",
+                message=f"Season: {league_clan.season.description}"
+                    + f"\nLeague: {EmojisLeagues.get(league_clan.league)} {league_clan.league}"
                     + f"\nParticipants: {len(fetch_players)}"
                     + f"\n\n"
                     + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{p.tag:<10} {re.sub('[_*/]','',p.clean_name)[:15]:<15} ` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
