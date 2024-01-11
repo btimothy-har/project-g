@@ -78,7 +78,7 @@ class ClanWarLeagues(commands.Cog):
     
     @property
     def cwl_channel_listener(self) -> Optional[discord.TextChannel]:
-        return self.bot.get_channel(self._channel_listener)
+        return self.bot.get_channel(self._cwl_channel_listener)
     
     @property
     def cwl_channel_category(self) -> Optional[discord.CategoryChannel]:
