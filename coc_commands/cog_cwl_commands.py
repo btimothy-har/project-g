@@ -168,14 +168,14 @@ class ClanWarLeagues(commands.Cog):
                     + f"\nLeague: {EmojisLeagues.get(league_clan.league)} {league_clan.league}"
                     + f"\nParticipants: {len(fetch_players)}"
                     + f"\n\n"
-                    + '\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{p.tag:<10} {re.sub('[_*/]','',p.clean_name)[:15]:<15} ` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
+                    + '\n'.join([f"{EmojisTownHall.get(p.town_hall_level)} `{p.tag:<12} {re.sub('[_*/]','',p.clean_name)[:18]:<18}` <@{p.discord_user}>" for i,p in enumerate(participants_20,1)]),
                 show_author=False
                 )
             embeds.append(embed_1)
         if len(participants_40) > 0:
             embed_2 = await clash_embed(
                 context=bot_client.bot,
-                message='\n'.join([f"**{i:>2}** {EmojisTownHall.get(p.town_hall_level)} `{p.tag:<10} {re.sub('[_*/]','',p.clean_name)[:15]:<15}` <@{p.discord_user}>" for i,p in enumerate(participants_40,21)]),
+                message='\n'.join([f"{EmojisTownHall.get(p.town_hall_level)} `{p.tag:<12} {re.sub('[_*/]','',p.clean_name)[:18]:<18}` <@{p.discord_user}>" for i,p in enumerate(participants_40,21)]),
                 show_author=False
                 )
             embeds.append(embed_2)
@@ -187,7 +187,7 @@ class ClanWarLeagues(commands.Cog):
         await league_clan.league_channel.send(f"--add {league_clan.league_role.id}")
     
     @commands.Cog.listener("on_guild_channel_create")
-    async def league_channel_ticket_listener(self,channel:discord.TextChannel):
+    async def league_channel_ticket_create_listener(self,channel:discord.TextChannel):
         clan_tag = None
         await asyncio.sleep(1)
         
@@ -201,10 +201,31 @@ class ClanWarLeagues(commands.Cog):
             return
         
         league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
-        league_role = await channel.guild.create_role(name=f"CWL {self.active_war_league_season.short_description} {league_clan.name}")
+        league_role = await channel.guild.create_role(
+            reason="CWL Channel Created.",
+            name=f"CWL {self.active_war_league_season.short_description} {league_clan.name}"
+            )
 
         await channel.edit(name=f"cwl・{league_clan.name}")
         await league_clan.set_league_discord(channel,league_role)
+    
+    @commands.Cog.listener("on_guild_channel_delete")
+    async def league_channel_ticket_delete_listener(self,channel:discord.TextChannel):
+        clan_tag = None
+        await asyncio.sleep(1)
+        
+        async for message in channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Clan War Leagues":
+                    clan_tag = embed.description.split()[0]
+                    break
+
+        if not clan_tag:
+            return
+        
+        league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
+        if league_clan.league_role:
+            await league_clan.league_role.delete(reason="CWL Channel Deleted.")
         
     ############################################################
     ##### WAR ELO TASKS
