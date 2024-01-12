@@ -1044,39 +1044,33 @@ class Bank(commands.Cog):
     async def staff_item_grant(self):
         async with self._subscription_lock:
             try:
-                base_vault_items = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
-                            
-                base_vault_role = base_vault_items[0].assigns_role
-
                 minister_role = self.bank_guild.get_role(self.guild_minister)
-                if minister_role:
-                    bot_client.coc_main_log.info(f"Granting Vault Passes to Ministers.")
+                if minister_role:                    
                     minister_members = minister_role.members
                     if len(minister_members) > 0:
+                        find_one_year_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (1 year)")
+                        one_year_pass = find_one_year_pass[0]
+                        
                         m_iter = AsyncIter(minister_members)
                         async for member in m_iter:
-                            if base_vault_role not in member.roles:
-                                find_one_year_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (1 year)")
-                                if len(find_one_year_pass) > 0:
-                                    one_year_pass = find_one_year_pass[0]
-                                    inventory = await UserInventory(member)
-                                    await inventory.purchase_item(one_year_pass,True)
+                            if one_year_pass.assigns_role not in member.roles:
+                                inventory = await UserInventory(member)
+                                await inventory.purchase_item(one_year_pass,True)
+
+                find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (30 days)")
+                bpass = find_pass[0]
 
                 staff_roles = AsyncIter(self.guild_staff)
                 async for role_id in staff_roles:
                     role = self.bank_guild.get_role(role_id)
                     if role:
-                        bot_client.coc_main_log.info(f"Granting Vault Passes to Staff.")
                         staff_members = role.members
                         if len(staff_members) > 0:
                             m_iter = AsyncIter(staff_members)
                             async for member in m_iter:
-                                if base_vault_role not in member.roles:
-                                    find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (30 days)")
-                                    if len(find_pass) > 0:
-                                        bpass = find_pass[0]
-                                        inventory = await UserInventory(member)
-                                        await inventory.purchase_item(bpass,True)
+                                if bpass.assigns_role not in member.roles:
+                                    inventory = await UserInventory(member)
+                                    await inventory.purchase_item(bpass,True)
             except Exception as exc:
                 await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."
                     + f"```{exc}```")
