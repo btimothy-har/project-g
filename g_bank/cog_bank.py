@@ -73,6 +73,9 @@ class Bank(commands.Cog):
         self.bank_admins = []
         self._bank_guild = 1132581106571550831 if bot.user.id == 1031240380487831664 else 680798075685699691
 
+        self.guild_minister = 1136566045407203409
+        self.guild_staff = [1136566179662659644,1136574967560015902,1136575140910604299,1136575146681958410]
+
         self._log_channel = 0
         self._log_queue = asyncio.Queue()
         self._log_task_lock = asyncio.Lock()
@@ -648,14 +651,14 @@ class Bank(commands.Cog):
                 multi = 1.0
             else:
                 multi = 0.4
-        elif guild_user and bot_client.bot.guild_minister in [r.id for r in guild_user.roles]:
+        elif guild_user and self.guild_minister in [r.id for r in guild_user.roles]:
             if reward_tag == player.tag:
                 multi = 1.2
             elif player.is_member:
                 multi = 1.0
             else:
                 multi = 0.2
-        elif guild_user and set(bot_client.bot.guild_staff).intersection(set([r.id for r in guild_user.roles])):
+        elif guild_user and set(self.guild_staff).intersection(set([r.id for r in guild_user.roles])):
             if reward_tag == player.tag:
                 multi = 1.0
             elif player.is_member:
@@ -1045,8 +1048,9 @@ class Bank(commands.Cog):
                             
                 base_vault_role = base_vault_items[0].assigns_role
 
-                minister_role = self.bank_guild.get_role(bot_client.bot.guild_minister)
+                minister_role = self.bank_guild.get_role(self.guild_minister)
                 if minister_role:
+                    bot_client.coc_main_log.info(f"Granting Vault Passes to Ministers.")
                     minister_members = minister_role.members
                     if len(minister_members) > 0:
                         m_iter = AsyncIter(minister_members)
@@ -1058,10 +1062,11 @@ class Bank(commands.Cog):
                                     inventory = await UserInventory(member)
                                     await inventory.purchase_item(one_year_pass,True)
 
-                staff_roles = AsyncIter(bot_client.bot.guild_staff)
+                staff_roles = AsyncIter(self.guild_staff)
                 async for role_id in staff_roles:
                     role = self.bank_guild.get_role(role_id)
                     if role:
+                        bot_client.coc_main_log.info(f"Granting Vault Passes to Staff.")
                         staff_members = role.members
                         if len(staff_members) > 0:
                             m_iter = AsyncIter(staff_members)

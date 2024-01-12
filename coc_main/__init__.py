@@ -7,9 +7,6 @@ async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1176156235167449139,1031240380487831664]:
         raise RuntimeError("You are not allowed to install this cog.")
     
-    bot.guild_minister = 1136566045407203409
-    bot.guild_staff = [1136574967560015902,1136575140910604299,1136575146681958410]
-    
     cog_main = coc_main(bot)
     await bot.add_cog(cog_main)
 
