@@ -31,22 +31,22 @@ class CWLLeagueGroups:
     league_groups = {
         0: f"{EmojisLeagues.UNRANKED} **Admin Group**",
         1: f"{EmojisLeagues.CHAMPION_LEAGUE_I} **Group A**: Champion League I",
-        2: f"{EmojisLeagues.MASTER_LEAGUE_II} **Group B**: Master League II",
-        9: f"{EmojisLeagues.CRYSTAL_LEAGUE_II} **Group C**: Crystal League II",
+        2: f"{EmojisLeagues.MASTER_LEAGUE_II} **Group B**: Master League I",
+        9: f"{EmojisLeagues.CRYSTAL_LEAGUE_II} **Group C**: Crystal League I",
         99: f"{EmojisLeagues.UNRANKED} **Group D**: Lazy CWL",
         }
     league_groups_no_emoji = {
         0: f"Admin Group",
         1: f"Group A (Champion League I)",
-        2: f"Group B (Master League II)",
-        9: f"Group C (Crystal League II)",
+        2: f"Group B (Master League I)",
+        9: f"Group C (Crystal League I)",
         99: f"Group D (Lazy CWL)",
         }
     league_groups_emoji = {
         0: f"{EmojisLeagues.UNRANKED}",
         1: f"{EmojisLeagues.CHAMPION_LEAGUE_I}",
-        2: f"{EmojisLeagues.MASTER_LEAGUE_II}",
-        9: f"{EmojisLeagues.CRYSTAL_LEAGUE_II}",
+        2: f"{EmojisLeagues.MASTER_LEAGUE_I}",
+        9: f"{EmojisLeagues.CRYSTAL_LEAGUE_I}",
         99: f"{EmojisLeagues.UNRANKED}",
         }
     eligibility = {
@@ -58,10 +58,9 @@ class CWLLeagueGroups:
         'Champion League I': 1,
         'Champion League II': 1,
         'Champion League III': 1,
-        'Master League I': 1,
+        'Master League I': 2,
         'Master League II': 2,
         'Master League III': 2,
-        'Crystal League I': 2,
         }
     @classmethod
     def get_description(cls,num:int) -> str:

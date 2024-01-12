@@ -91,8 +91,22 @@ class ShopItem():
         return [cls(item) async for item in query]
 
     @classmethod
-    async def get_by_guild(cls,guild_id:int):        
+    async def get_by_guild(cls,guild_id:int):
         query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'disabled':False})
+        return [cls(item) async for item in query]
+    
+    @classmethod
+    async def get_by_guild_named(cls,guild_id:int,item_name:str) -> List['ShopItem']:
+        n = str(item_name)
+        q_doc = {
+            'name':{'$regex':f'^{n}',"$options":"i"},
+            'guild_id':guild_id
+            }
+        pipeline = [
+            {'$match': q_doc},
+            {'$sample': {'size': 8}}
+            ]
+        query = bot_client.coc_db.db__shop_item.aggregate(pipeline)
         return [cls(item) async for item in query]
 
     @classmethod

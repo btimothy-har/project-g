@@ -141,10 +141,12 @@ class Bank(commands.Cog):
                 await guild_user.add_roles(admin_role)
         
         self.subscription_item_expiry.start()
+        self.staff_item_grant.start()
         self.send_bank_logs_batch.start()
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
+        self.staff_item_grant.cancel()
         self.send_bank_logs_batch.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
@@ -646,6 +648,20 @@ class Bank(commands.Cog):
                 multi = 1.0
             else:
                 multi = 0.4
+        elif guild_user and bot_client.bot.guild_minister in [r.id for r in guild_user.roles]:
+            if reward_tag == player.tag:
+                multi = 1.2
+            elif player.is_member:
+                multi = 1.0
+            else:
+                multi = 0.2
+        elif guild_user and set(bot_client.bot.guild_staff).intersection(set([r.id for r in guild_user.roles])):
+            if reward_tag == player.tag:
+                multi = 1.0
+            elif player.is_member:
+                multi = 0.6
+            else:
+                multi = 0.2
         else:            
             if reward_tag == player.tag:
                 multi = 1.0
@@ -1020,6 +1036,43 @@ class Bank(commands.Cog):
                     
             if len(embeds) > 0:
                 await self.log_channel.send(embeds=embeds)
+    
+    @tasks.loop(minutes=5.0)
+    async def staff_item_grant(self):
+        async with self._subscription_lock:
+            base_vault_items = await ShopItem.get_by_guild_named("Base Vault Pass")
+            if len(base_vault_items) == 0:
+                return
+                        
+            base_vault_role = base_vault_items[0].assigns_role
+
+            minister_role = self.bank_guild.get_role(bot_client.bot.guild_minister)
+            if minister_role:
+                minister_members = minister_role.members
+                if len(minister_members) > 0:
+                    m_iter = AsyncIter(minister_members)
+                    async for member in m_iter:
+                        if base_vault_role not in member.roles:
+                            find_one_year_pass = await ShopItem.get_by_guild_named("Base Vault Pass (1 year)")
+                            if len(find_one_year_pass) > 0:
+                                one_year_pass = find_one_year_pass[0]
+                                inventory = await UserInventory(member)
+                                await inventory.purchase_item(one_year_pass,True)
+
+            staff_roles = AsyncIter(bot_client.bot.guild_staff)
+            async for role_id in staff_roles:
+                role = self.bank_guild.get_role(role_id)
+                if role:
+                    staff_members = role.members
+                    if len(staff_members) > 0:
+                        m_iter = AsyncIter(staff_members)
+                        async for member in m_iter:
+                            if base_vault_role not in member.roles:
+                                find_pass = await ShopItem.get_by_guild_named("Base Vault Pass (30 days)")
+                                if len(find_pass) > 0:
+                                    bpass = find_pass[0]
+                                    inventory = await UserInventory(member)
+                                    await inventory.purchase_item(bpass,True)
 
     @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):

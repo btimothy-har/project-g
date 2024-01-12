@@ -427,7 +427,7 @@ class CWLPlayerMenu(DefaultView):
             group_2_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_2_accounts,
-                placeholder=f"Group B: Up to Master II (TH13+)",
+                placeholder=f"Group B: Up to Master I (TH13+)",
                 min_values=0,
                 max_values=len(group_2_accounts),
                 row=2,
@@ -439,7 +439,7 @@ class CWLPlayerMenu(DefaultView):
             group_3_selector = DiscordSelectMenu(
                 function=self._callback_group_signup,
                 options=group_3_accounts,
-                placeholder=f"Group C: Up to Crystal II (TH10+)",
+                placeholder=f"Group C: Up to Crystal I (TH10+)",
                 min_values=0,
                 max_values=len(group_3_accounts),
                 row=3,
@@ -657,8 +657,8 @@ class CWLPlayerMenu(DefaultView):
                 + "**It is not a guarantee that you will play in that League.** Rosters are subject to availability and Alliance needs."
                 + "\n\nThere are currently 4 League Groups available:"
                 + f"\n> **League Group A**: {EmojisLeagues.CHAMPION_LEAGUE_I} Champion I ({EmojisTownHall.TH15} TH15+)"
-                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League II ({EmojisTownHall.TH13} TH13+)"
-                + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League II ({EmojisTownHall.TH10} TH10+)"
+                + f"\n> **League Group B**: {EmojisLeagues.MASTER_LEAGUE_II} Master League I ({EmojisTownHall.TH13} TH13+)"
+                + f"\n> **League Group C**: {EmojisLeagues.CRYSTAL_LEAGUE_II} Crystal League I ({EmojisTownHall.TH10} TH10+)"
                 + f"\n> **League Group D**: {EmojisLeagues.UNRANKED} Lazy CWL (TH6+; heroes down wars)"
                 + "\n\n**Note**: If you do not have any accounts eligible for a specific League Group, you will not be able to register for that group."
                 + "\n\u200b",
@@ -666,7 +666,7 @@ class CWLPlayerMenu(DefaultView):
             )
         embed.add_field(
             name="**Example: How League Groups Work**",
-            value="If you sign up for League Group B (Master League II):\n"
+            value="If you sign up for League Group B (Master League I):\n"
                 + "\n> You will **not** be rostered in a Champion League III clan."
                 + "\n> You **can** be rostered for a Crystal League III clan."
                 + "\n\u200b",
