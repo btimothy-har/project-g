@@ -100,7 +100,8 @@ class ShopItem():
         n = str(item_name)
         q_doc = {
             'name':{'$regex':f'^{n}',"$options":"i"},
-            'guild_id':guild_id
+            'guild_id':guild_id,
+            'disabled':False
             }
         pipeline = [
             {'$match': q_doc},
