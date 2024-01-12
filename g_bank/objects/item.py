@@ -246,10 +246,14 @@ class ShopItem():
             return expiry_time
         return None
 
-    async def purchase(self,user:discord.Member,quantity:int=1):        
+    async def purchase(self,user:discord.Member,free_purchase:bool=False):
+        quantity = 1
         async with self.lock:
-            if not self.can_i_buy(user):
-                raise CannotPurchase(self)
+            if free_purchase:
+                pass
+            else:
+                if not self.can_i_buy(user):
+                    raise CannotPurchase(self)
 
             if self.subscription:
                 doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})

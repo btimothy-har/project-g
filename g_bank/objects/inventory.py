@@ -114,7 +114,7 @@ class UserInventory(AwaitLoader):
 
     async def purchase_item(self,item:ShopItem,free_purchase:bool=False):
         member = item.guild.get_member(self.user.id)
-        await item.purchase(member)
+        await item.purchase(member,free_purchase=free_purchase)
 
         if item.type in ['random']:
             item = await item.random_select()
