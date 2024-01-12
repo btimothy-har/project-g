@@ -1044,12 +1044,13 @@ class Bank(commands.Cog):
     async def staff_item_grant(self):
         async with self._subscription_lock:
             try:
+                find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
+
                 minister_role = self.bank_guild.get_role(self.guild_minister)
                 if minister_role:                    
                     minister_members = minister_role.members
                     if len(minister_members) > 0:
-                        find_one_year_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (1 year)")
-                        one_year_pass = find_one_year_pass[0]
+                        one_year_pass = [p for p in find_pass if p.name == "Base Vault Pass (1 year)"][0]
                         
                         m_iter = AsyncIter(minister_members)
                         async for member in m_iter:
@@ -1057,9 +1058,7 @@ class Bank(commands.Cog):
                                 inventory = await UserInventory(member)
                                 await inventory.purchase_item(one_year_pass,True)
 
-                find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass (30 days)")
-                bpass = find_pass[0]
-
+                bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
                 staff_roles = AsyncIter(self.guild_staff)
                 async for role_id in staff_roles:
                     role = self.bank_guild.get_role(role_id)
