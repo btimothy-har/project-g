@@ -655,7 +655,7 @@ class Bank(commands.Cog):
             if reward_tag == player.tag:
                 multi = 1.2
             elif player.is_member:
-                multi = 1.0
+                multi = 0.8
             else:
                 multi = 0.2
         elif guild_user and set(self.guild_staff).intersection(set([r.id for r in guild_user.roles])):
