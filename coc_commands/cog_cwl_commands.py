@@ -2,17 +2,16 @@ import discord
 import asyncio
 import pendulum
 import asyncio
-import coc
 import re
 
 from typing import *
 
-from redbot.core import Config, commands, app_commands
+from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aPlayer, BasicPlayer
+from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 
@@ -22,8 +21,6 @@ from coc_main.tasks.war_tasks import ClanWarLoop
 from coc_main.utils.components import clash_embed, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
-from coc_main.utils.constants.coc_emojis import EmojisClash
-from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
 from coc_main.utils.checks import is_member, is_admin, is_coleader
 
@@ -453,7 +450,6 @@ class ClanWarLeagues(commands.Cog):
     ### MYCWL
     ##################################################
     @commands.command(name="mycwl")
-    @commands.check(is_member)
     @commands.guild_only()
     async def command_mycwl(self,ctx):
         """
@@ -473,7 +469,6 @@ class ClanWarLeagues(commands.Cog):
 
     @app_commands.command(name="mycwl",
         description="Manage your CWL Signups, Rosters, Stats.")
-    @app_commands.check(is_member)
     @app_commands.guild_only()
     async def appcommand_mycwl(self,interaction:discord.Interaction):
         
@@ -585,7 +580,6 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / CLAN / ADD
     ##################################################
     async def add_war_league_clan_helper(self,context:Union[discord.Interaction,commands.Context],clan:aClan):
-
         await clan.add_to_war_league()
 
         embed = await clash_embed(
@@ -649,7 +643,6 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / CLAN / VIEW-ROSTER
     ##################################################
     @subcommand_group_cwl_clan.command(name="roster")
-    @commands.check(is_member)
     @commands.guild_only()
     async def subcommand_cwl_clan_viewroster_member(self,ctx,clan_tag:str):
         """
@@ -662,7 +655,7 @@ class ClanWarLeagues(commands.Cog):
         if not league_clan.is_participating:
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{league_clan.title}** is not participating in CWL for {season.description}.",
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {season.description}.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
@@ -672,7 +665,6 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_clan.command(name="roster",
         description="View a CWL Clan's current Roster.")
-    @app_commands.check(is_member)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_war_league_clans)
     @app_commands.describe(clan="The Clan to view. Only registered CWL Clans are eligible.")
@@ -686,7 +678,7 @@ class ClanWarLeagues(commands.Cog):
         if not league_clan.is_participating:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{league_clan.title}** is not participating in CWL for {season.description}.",
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {season.description}.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -698,14 +690,21 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / CLAN / LEAGUE GROUP
     ##################################################
     @subcommand_group_cwl_clan.command(name="group")
-    @commands.check(is_member)
     @commands.guild_only()
-    async def subcommand_cwl_clan_viewgroup(self,ctx,clan_tag:str):
+    async def subcommand_cwl_clan_viewgroup(self,ctx:commands.Context,clan_tag:str):
         """
         View the League Group for a CWL Clan.
         """
         
         league_clan = await WarLeagueClan(clan_tag,self.bot_client.current_season)
+
+        if not league_clan.is_participating:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {self.bot_client.current_season.description}. You might be able to view their CWL Group with a different bot.",
+                success=False
+                )
+            return await ctx.reply(embed=embed,view=None)
 
         if not league_clan.league_group_id:
             embed = await clash_embed(
@@ -722,7 +721,6 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_clan.command(name="group",
         description="View a CWL Clan's current League Group.")
-    @app_commands.check(is_member)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_war_league_clans)
     @app_commands.describe(clan="The Clan to view. Only registered CWL Clans are tracked.")
@@ -731,6 +729,13 @@ class ClanWarLeagues(commands.Cog):
         await interaction.response.defer()
 
         league_clan = await WarLeagueClan(clan,self.bot_client.current_season)
+        if not league_clan.is_participating:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {self.bot_client.current_season.description}. You might be able to view their CWL Group with a different bot.",
+                success=False
+                )
+            return await interaction.edit_original_response(embed=embed,view=None)
 
         if not league_clan.league_group_id:
             embed = await clash_embed(
