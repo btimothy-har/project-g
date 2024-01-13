@@ -1311,8 +1311,10 @@ class Bank(commands.Cog):
     async def helper_payday(self,context:Union[discord.Interaction,commands.Context]):
         currency = await bank.get_currency_name()
         user_id = context.user.id if isinstance(context,discord.Interaction) else context.author.id
-        member = await aMember(user_id,1132581106571550831)
+        member = await aMember(user_id,self.bank_guild.id)
 
+        is_minister = True if self.guild_minister in [r.id for r in getattr(member.discord_member,'roles',[])] else False
+        is_staff = True if self.guild_staff and set(self.guild_staff).intersection(set([r.id for r in getattr(member.discord_member,'roles',[])])) else False
         is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
         if member.last_payday:
@@ -1332,13 +1334,14 @@ class Bank(commands.Cog):
                 get_avatar=False
                 )
         except:
-            mee6user = None
+            mee6user = None        
 
         basic_payout = 50
         xp_bonus = 10 * (mee6user.level // 10 if mee6user else 0)
+        staff_bonus = 2 * (basic_payout + xp_bonus) if is_staff or is_minister else 0
         boost_bonus = 1000 if is_booster else 0
 
-        total_payout = basic_payout + xp_bonus + boost_bonus
+        total_payout = basic_payout + xp_bonus + boost_bonus + staff_bonus
         await bank.deposit_credits(member.discord_member,total_payout)
         await member.set_last_payday(pendulum.now())
 
@@ -1347,6 +1350,7 @@ class Bank(commands.Cog):
             message=f"Here's some money, {member.mention}! You received:"
                 + f"\n\nBase Payout: {basic_payout} {currency}"
                 + f"\nXP Bonus: {xp_bonus:,} {currency}"
+                + f"\nStaff Bonus: {staff_bonus:,} {currency}"
                 + f"\nNitro Bonus: {boost_bonus:,} {currency}"
                 + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
             success=True,
