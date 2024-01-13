@@ -1350,7 +1350,7 @@ class Bank(commands.Cog):
             message=f"Here's some money, {member.mention}! You received:"
                 + f"\n\nBase Payout: {basic_payout} {currency}"
                 + f"\nXP Bonus: {xp_bonus:,} {currency}"
-                + f"\nStaff Bonus: {staff_bonus:,} {currency}"
+                + (f"\nStaff Bonus: {staff_bonus:,} {currency}" if staff_bonus > 0 else "")
                 + f"\nNitro Bonus: {boost_bonus:,} {currency}"
                 + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
             success=True,
