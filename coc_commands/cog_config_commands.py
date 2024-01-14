@@ -11,7 +11,7 @@ from coc_main.cog_coc_client import ClashOfClansClient
 
 from coc_main.discord.guild import aGuild, ClanGuildLink, GuildClanPanel, aGuildClocks, GuildApplicationPanel
 from coc_main.utils.components import clash_embed
-from coc_main.utils.checks import is_admin, has_manage_server
+from coc_main.utils.checks import is_admin, has_manage_server, has_manage_threads
 
 from .views.create_application_panel import CreateApplicationMenu
 from .views.create_recruiting_reminder import CreateRecruitingReminder, RecruitingReminder
@@ -227,6 +227,7 @@ class ClashServerConfig(commands.Cog):
     ### SERVERSETUP / CREATE-THREAD
     ##################################################    
     @command_group_guildset.command(name="create-thread")
+    @commands.check(has_manage_threads)
     @commands.guild_only()
     @commands.guildowner_or_can_manage_channel()
     async def subcommand_group_create_forum_thread(self,ctx,channel:discord.ForumChannel,title:str,message:str):
@@ -241,7 +242,7 @@ class ClashServerConfig(commands.Cog):
     
     @app_command_group_guildset.command(name="create-thread",
         description="Creates a new Forum Thread in the specified Forum Channel.")
-    @app_commands.check(has_manage_server)
+    @app_commands.check(has_manage_threads)
     @app_commands.guild_only()
     async def sub_appcommand_create_forum_thread(self,interaction:discord.Interaction,channel:discord.ForumChannel,title:str,message:str):
         

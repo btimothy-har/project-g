@@ -47,6 +47,24 @@ def is_bot_owner_or_guild_owner(interaction:discord.Interaction):
 ##################################################
 ### COMMAND CHECKS
 ##################################################
+def has_manage_threads(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
+    if isinstance(ctx,commands.Context):
+        bot = ctx.bot
+        guild = ctx.guild
+        user = guild.get_member(ctx.author.id) if guild else bot.get_user(ctx.author.id)
+    elif isinstance(ctx,discord.Interaction):
+        bot = ctx.client
+        guild = ctx.guild
+        user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
+
+    if user.id in bot.owner_ids:
+        return True    
+    if user.guild_permissions.manage_threads:
+        return True
+    return False
+
 def has_manage_server(ctx:Union[discord.Interaction,commands.Context]):
     if not ctx.guild:
         return False
