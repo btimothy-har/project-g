@@ -131,7 +131,7 @@ async def context_menu_sync_roles(interaction:discord.Interaction,member:discord
                 ephemeral=True
                 )    
         m_member = await aMember(member.id,member.guild.id)
-        added, removed = await m_member.sync_clan_roles(context=interaction)
+        added, removed = await m_member.sync_clan_roles(context=interaction,force=True)
         
         embed = await clash_embed(
             context=interaction,
