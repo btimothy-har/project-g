@@ -296,7 +296,7 @@ class aMember(AwaitLoader):
             ls = db_last_sync.get('last_role_sync',None) if db_last_sync else None
             
             if ls and pendulum.now().int_timestamp - ls < 600:
-                return roles_added, roles_removed                
+                return roles_added, roles_removed
     
         async with self._lock:
             await self.load()

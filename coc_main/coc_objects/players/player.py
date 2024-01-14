@@ -412,12 +412,12 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     ##################################################
     ### PLAYER SEASON STATS
     ##################################################    
-    async def _sync_cache(self):
-        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
-            return
-        
-        if self._attributes._sync_lock.locked():
-            return
+    async def _sync_cache(self,force:bool=False):
+        if force:
+            pass
+        else:
+            if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
+                return
         
         async with self._attributes._sync_lock:
             basic_player = await BasicPlayer(self.tag)

@@ -245,7 +245,8 @@ class NewMemberMenu(DefaultView):
             await self._select_home_clan(account)    
         await self._finish_add()
 
-    async def _select_home_clan(self,account:aPlayer):        
+    async def _select_home_clan(self,account:aPlayer):
+        await account._sync_cache()
         linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
         guild_clans = await self.client.fetch_many_clans(*[c.tag for c in linked_clans])
 
