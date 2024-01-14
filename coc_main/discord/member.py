@@ -414,7 +414,7 @@ class aMember(AwaitLoader):
         
         def_tag = None
         db = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
-        if db and db.get('default_account',None) in self.account_tags:
+        if db and db.get('default_account',None) and db.get('default_account',None) in self.account_tags:
             def_tag = db['default_account']
 
         #ARIX
@@ -426,8 +426,7 @@ class aMember(AwaitLoader):
             return self.member_tags[0]        
         
         if def_tag:
-            return def_tag
-        
+            return def_tag        
         return self.accounts[0].tag
     
     async def set_default_account(self,tag:str):
@@ -452,7 +451,8 @@ class aMember(AwaitLoader):
             raise InvalidUser(self.user_id)
         
         default_tag = await self._get_default_account_tag()
-        default_account = await BasicPlayer(default_tag) if default_tag else None
+        client = bot_client.bot.get_cog('ClashOfClansClient')
+        default_account = await client.fetch_player(default_tag) if default_tag else None
 
         if not default_account:
             new_nickname = self.discord_member.name
