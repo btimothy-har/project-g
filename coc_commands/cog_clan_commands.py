@@ -1153,7 +1153,7 @@ class Clans(commands.Cog):
             message=f"**Current Leader:** <@{select_clan.leader}>"
                 + f"\n**New Leader:** {new_leader.mention}"
                 + f"\n\n{select_clan.long_description}"
-                + f"\n\n>>> {select_clan.c_description}",
+                + f"\n\n>>> {select_clan.description}",
             thumbnail=select_clan.badge)
         confirm_view = MenuConfirmation(interaction)
 

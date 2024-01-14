@@ -278,6 +278,7 @@ class BasicClan(AwaitLoader):
                     }
                 },
                 upsert=True)
+            self._attributes.is_alliance_clan = True
             bot_client.coc_data_log.info(f"{self}: leader is now {new_leader}.")
     
     async def new_coleader(self,new_coleader:int):
