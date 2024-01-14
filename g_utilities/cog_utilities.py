@@ -187,7 +187,14 @@ class GuildUtility(commands.Cog):
     ##### SLASH WRAPPER
     #####
     ############################################################
-    ############################################################    
+    ############################################################
+    @app_commands.command(name="help",
+        description="Opens the bot help menu.")
+    async def app_command_help_(self,interaction:discord.Interaction):
+    
+        context = await Context.from_interaction(interaction)
+        await context.invoke(self.bot.get_command("help"))
+
     @app_commands.command(name="away",
         description="Tell the bot you're away or back.")
     @app_commands.guild_only()

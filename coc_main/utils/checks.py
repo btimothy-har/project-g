@@ -65,6 +65,31 @@ def has_manage_server(ctx:Union[discord.Interaction,commands.Context]):
         return True
     return False
 
+def is_cwl_leader(ctx:Union[discord.Interaction,commands.Context]):
+    if not ctx.guild:
+        return False
+    
+    if isinstance(ctx,commands.Context):
+        bot = ctx.bot
+        guild = ctx.guild
+        user = guild.get_member(ctx.author.id) if guild else bot.get_user(ctx.author.id)
+    elif isinstance(ctx,discord.Interaction):
+        bot = ctx.client
+        guild = ctx.guild
+        user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
+
+    if user.id in bot.owner_ids:
+        return True
+    if isinstance(user,discord.Member) and user.guild_permissions.administrator:
+        return True
+    
+    as_guild = bot.get_guild(1132581106571550831)
+    guild_member = as_guild.get_member(user.id)
+    if guild_member:
+        if 1193018553461391401 in [role.id for role in guild_member.roles]:
+            return True
+    return False
+
 def is_coleader(ctx:Union[discord.Interaction,commands.Context]):
     if not ctx.guild:
         return False

@@ -228,7 +228,7 @@ class ClashServerConfig(commands.Cog):
     ##################################################    
     @command_group_guildset.command(name="create-thread")
     @commands.guild_only()
-    @commands.admin()
+    @commands.guildowner_or_can_manage_channel()
     async def subcommand_group_create_forum_thread(self,ctx,channel:discord.ForumChannel,title:str,message:str):
         """
         Creates a new Forum Thread in the specified Forum Channel.
@@ -241,7 +241,7 @@ class ClashServerConfig(commands.Cog):
     
     @app_command_group_guildset.command(name="create-thread",
         description="Creates a new Forum Thread in the specified Forum Channel.")
-    @app_commands.check(is_admin)
+    @app_commands.check(has_manage_server)
     @app_commands.guild_only()
     async def sub_appcommand_create_forum_thread(self,interaction:discord.Interaction,channel:discord.ForumChannel,title:str,message:str):
         

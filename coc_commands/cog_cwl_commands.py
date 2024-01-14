@@ -22,7 +22,7 @@ from coc_main.utils.components import clash_embed, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
-from coc_main.utils.checks import is_member, is_admin, is_coleader
+from coc_main.utils.checks import is_admin, is_coleader, is_cwl_leader
 
 from .views.cwl_player import CWLPlayerMenu
 from .views.cwl_setup import CWLSeasonSetup
@@ -486,7 +486,7 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / SETUP
     ##################################################
     @command_group_cwl.command(name="setup")
-    @commands.admin()
+    @commands.check(is_cwl_leader)
     @commands.guild_only()
     async def subcommand_cwl_setup(self,ctx):
         """
@@ -501,7 +501,7 @@ class ClanWarLeagues(commands.Cog):
     
     @app_command_group_cwl.command(name="setup",
         description="Setup CWL for a season.")
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_leader)
     @app_commands.guild_only()
     async def sub_appcommand_cwl_setup(self,interaction:discord.Interaction):
         
@@ -781,7 +781,7 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / ROSTER / SETUP
     ##################################################
     @subcommand_group_cwl_roster.command(name="setup")
-    @commands.admin()
+    @commands.check(is_cwl_leader)
     @commands.guild_only()
     async def subcommand_cwl_roster_setup(self,ctx,clan_tag:str):
         """
@@ -808,7 +808,7 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_roster.command(name="setup",
         description="Setup a CWL Roster for a Clan. Defaults to the next open CWL Season.")
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_leader)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_war_league_clans)
     @app_commands.describe(clan="The Clan to setup for.")
@@ -895,7 +895,7 @@ class ClanWarLeagues(commands.Cog):
         await ctx.tick()
     
     @subcommand_group_cwl_roster.command(name="add")
-    @commands.admin()
+    @commands.check(is_cwl_leader)
     @commands.guild_only()
     async def subcommand_cwl_roster_add(self,ctx,clan_tag:str,player_tag:str):
         """
@@ -913,7 +913,7 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_roster.command(name="add",
         description="Add a Player to a CWL Roster. Automatically registers the Player, if not registered.")
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_leader)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_war_league_clans)
     @app_commands.autocomplete(player=autocomplete_players)
@@ -964,7 +964,7 @@ class ClanWarLeagues(commands.Cog):
         return embed
     
     @subcommand_group_cwl_roster.command(name="remove")
-    @commands.admin()
+    @commands.check(is_cwl_leader)
     @commands.guild_only()
     async def subcommand_cwl_roster_remove(self,ctx,player_tag:str):
         """
@@ -981,7 +981,7 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_roster.command(name="remove",
         description="Removes a Player from a CWL Roster. Automatically unregisters the Player, if registered.")
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_leader)
     @app_commands.guild_only()
     @app_commands.autocomplete(player=autocomplete_players)
     @app_commands.describe(player="The Player to remove from CWL.")
@@ -996,7 +996,7 @@ class ClanWarLeagues(commands.Cog):
     ### CWL / ROSTER / EXPORT
     ##################################################
     @subcommand_group_cwl_roster.command(name="export")
-    @commands.check(is_coleader)
+    @commands.check(is_cwl_leader)
     @commands.guild_only()
     async def subcommand_cwl_roster_export(self,ctx):
         """
@@ -1020,7 +1020,7 @@ class ClanWarLeagues(commands.Cog):
     
     @app_subcommand_group_cwl_roster.command(name="export",
         description="Exports all Signups (and Roster information) to Excel. Uses the currently open CWL Season.")
-    @app_commands.check(is_coleader)
+    @app_commands.check(is_cwl_leader)
     @app_commands.guild_only()
     async def sub_appcommand_cwl_roster_export(self,interaction:discord.Interaction):
         

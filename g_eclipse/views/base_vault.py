@@ -422,7 +422,7 @@ class BaseVaultMenu(DefaultView):
     async def _base_vault_home_embed(self,no_base=None):
         curr = await bank.get_currency_name()
 
-        base_vault_intro = (f"Welcome to the **Assassins Base Vault**. "
+        base_vault_intro = (f"Welcome to the **E.C.L.I.P.S.E. Base Vault**. "
             + f"\n\nWe have a curated collection of bases ranging from **TH9 {EmojisTownHall.get(9)}** to **TH16 {EmojisTownHall.get(16)}**. "
             + f"Bases are refreshed periodically, and expire after a certain period of time:"
             + f"\n- {EmojisTownHall.get(max_th)} TH{max_th}: after 4 month(s)"
@@ -442,7 +442,7 @@ class BaseVaultMenu(DefaultView):
             )        
         embed = await eclipse_embed(
             context=self.ctx,
-            title="**Assassins Base Vault**",
+            title="**E.C.L.I.P.S.E. Base Vault**",
             message=(f"## **Oops!\nWe currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
@@ -464,7 +464,7 @@ class BaseVaultMenu(DefaultView):
         else:
             embed = await eclipse_embed(
                 context=self.ctx,
-                title="**Assassins Base Vault**",
+                title="**E.C.L.I.P.S.E. Base Vault**",
                 message=f"There are a total of **{len(self.all_bases)} bases for {EmojisTownHall.get(self.base_th)} Townhall {self.base_th}**."
                     + f"\n\nRecently added bases are shown first. To view older bases, use the dropdown menu."
                     + f"\n\u200b"
