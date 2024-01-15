@@ -6,6 +6,8 @@ from .cog_coc_main import ClashOfClansMain as coc_main
 async def setup(bot:Red):
     if bot.user.id not in [828838353977868368,1176156235167449139,1031240380487831664]:
         raise RuntimeError("You are not allowed to install this cog.")
+		
+	# push from ipad
     
     cog_main = coc_main(bot)
     await bot.add_cog(cog_main)
