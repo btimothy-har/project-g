@@ -92,7 +92,7 @@ class ClanWarLeagues(commands.Cog):
     
     @property
     def active_war_league_season(self) -> aClashSeason:
-        if pendulum.now() > self.bot_client.current_season.cwl_end.add(days=5):
+        if pendulum.now() > self.bot_client.current_season.cwl_end.add(days=4):
             return self.bot_client.current_season.next_season()
         return self.bot_client.current_season
     

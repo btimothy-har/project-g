@@ -755,7 +755,7 @@ class WarLeaguePlayer(BasicPlayer):
                 upsert=True
                 )
             bot_client.coc_data_log.info(
-                f"{str(self)} was rostered in CWL: {getattr(self.roster_clan,'name','No Clan')} {'(' + getattr(self.roster_clan,'tag',None + ')')}."
+                f"{str(self)} was rostered in CWL: {getattr(self.roster_clan,'name','No Clan')} {'(' + getattr(self.roster_clan,'tag','' + ')')}."
                 )
     
     async def finalize(self,role:Optional[discord.Role]=None):

@@ -83,11 +83,13 @@ class EventReminder():
         return self._locks[self._id]
     
     @property
-    def guild(self) -> discord.Guild:
+    def guild(self) -> Optional[discord.Guild]:
         return bot_client.bot.get_guild(self.guild_id)
     
     @property
-    def channel(self) -> Union[discord.TextChannel,discord.Thread]:
+    def channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
+        if not self.guild:
+            return None
         return bot_client.bot.get_channel(self.channel_id)
     
     @property
@@ -121,11 +123,14 @@ class EventReminder():
     
     async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
-
         if self._lock.locked():
             return
         async with self._lock:
-            if self.guild and self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder: 
+            if not self.channel:
+                await self.delete()
+                return
+            
+            if self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder: 
                 a_iter = AsyncIter(players)
                 async for rem_player in a_iter:
                     try:
