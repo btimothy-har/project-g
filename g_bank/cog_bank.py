@@ -532,13 +532,35 @@ class Bank(commands.Cog):
             
         sweep_balance = self.sweep_account.balance
         distribution_per_clan = (sweep_balance * 0.7) / len(alliance_clans)
+        redistrib_amount = 0
 
         a_iter = AsyncIter(alliance_clans)
         async for clan in a_iter:
             clan_account = await ClanAccount(clan)
             clan_balance = clan_account.balance
 
-            if clan_balance > 0:
+            if clan_balance > (distribution_per_clan * 6):
+                excess = clan_balance - (distribution_per_clan * 4)
+                excess_to_sweep = round(excess * 0.4)
+                excess_to_reserve = round(excess * 0.2)
+                redistrib_amount += (excess - excess_to_sweep - excess_to_reserve)
+                await clan_account.withdraw(
+                    amount=excess,
+                    user_id=self.bot.user.id,
+                    comment=f"Excess from {clan.name}."
+                    )
+                await self.sweep_account.deposit(
+                    amount=excess_to_sweep,
+                    user_id=self.bot.user.id,
+                    comment=f"Excess from {clan.name} to Sweep Account."
+                    )
+                await self.reserve_account.deposit(
+                    amount=excess_to_reserve,
+                    user_id=self.bot.user.id,
+                    comment=f"Excess from {clan.name} to Reserve Account."
+                    )
+        
+            elif clan_balance > 0:
                 await clan_account.withdraw(
                     amount=round(clan_balance * 0.1),
                     user_id=self.bot.user.id,
@@ -552,7 +574,6 @@ class Bank(commands.Cog):
                 
             if distribution_per_clan > 0:
                 distribution = round(distribution_per_clan * (clan.alliance_member_count / 50))
-
                 await clan_account.deposit(
                     amount=distribution,
                     user_id=self.bot.user.id,
@@ -562,6 +583,17 @@ class Bank(commands.Cog):
                     amount=distribution,
                     user_id=self.bot.user.id,
                     comment=f"EOS to {clan.tag} {clan.name}."
+                    )
+        
+        if redistrib_amount > 0:
+            redistrib_per_clan = round(redistrib_amount / len(alliance_clans))
+            c_iter = AsyncIter(alliance_clans)
+            async for clan in c_iter:
+                account = await ClanAccount(clan)
+                await account.deposit(
+                    amount=redistrib_per_clan,
+                    user_id=self.bot.user.id,
+                    comment=f"Redistributed from Clan Excess."
                     )
         
         owner = self.bot.get_user(644530507505336330)
@@ -2021,10 +2053,12 @@ class Bank(commands.Cog):
         Funds are withdrawn from Global or Clan Accounts.
         """
 
+        if user.bot:
+            return await ctx.reply("You can't reward a bot.")
+
         if account_type_or_clan_abbreviation in global_accounts:
             if not is_bank_admin(ctx):
-                return await ctx.reply("You don't have permission to do this.")
-            
+                return await ctx.reply("You don't have permission to do this.")            
             account = await MasterAccount(account_type_or_clan_abbreviation)
 
         else:
@@ -2035,9 +2069,15 @@ class Bank(commands.Cog):
             
             check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
             if not check_permissions:
-                return await ctx.reply("You don't have permission to do this.")
-            
+                return await ctx.reply("You don't have permission to do this.")            
             account = await ClanAccount(clan)
+            if account.balance - amount <= -100000:
+                return await ctx.reply(f"Insufficient funds. {clan.title} has {account.balance:,} {await bank.get_currency_name()}.")
+        
+        if amount < 0:
+            user_bal = await bank.get_balance(user)
+            if user_bal + amount < 0:
+                amount = user_bal * -1
 
         await account.withdraw(
             amount=amount,
@@ -2072,10 +2112,18 @@ class Bank(commands.Cog):
         
         await interaction.response.defer()
 
-        async def _helper_reward_user(account:BankAccount,user:discord.Member):
+        async def _helper_reward_user(account:BankAccount,user:discord.Member,a:int):
             try:
+                if user.bot:
+                    return None
+                
+                if a < 0:
+                    user_bal = await bank.get_balance(user)
+                    if user_bal + a < 0:
+                        a = user_bal * -1
+                
                 await account.withdraw(
-                    amount=amount,
+                    amount=a,
                     user_id=interaction.user.id,
                     comment=f"Reward transfer to {user.name} {user.id}."
                     )
@@ -2083,7 +2131,7 @@ class Bank(commands.Cog):
                 await self._send_log(
                     user=user,
                     done_by=interaction.user,
-                    amount=amount,
+                    amount=a,
                     comment=f"Reward distribution."
                     )
                 return user
@@ -2106,14 +2154,19 @@ class Bank(commands.Cog):
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
             account = await ClanAccount(clan)
+            count_users = len([member for member in role.members if not member.bot]) + (1 if user else 0)
+
+            total_amount = amount * count_users
+            if account.balance - total_amount <= -100000:
+                return await interaction.followup.send(f"Insufficient funds. {clan.title} has {account.balance:,} {currency}.",ephemeral=True)
 
         count = 0
         if role:            
-            distribution = await asyncio.gather(*(_helper_reward_user(account,member) for member in role.members))
+            distribution = await asyncio.gather(*(_helper_reward_user(account,member,amount) for member in role.members))
             count += len([member for member in distribution if isinstance(member,discord.Member)])
         
         if user:
-            await _helper_reward_user(account,user)
+            await _helper_reward_user(account,user,amount)
             count += 1
         
         if count == 1 and user:
@@ -2273,16 +2326,18 @@ class Bank(commands.Cog):
 
         if user.id == interaction.user.id:
             return await interaction.followup.send("You can't gift yourself!",ephemeral=True)
-
         if user.bot:
             return await interaction.followup.send("You can't gift bots!",ephemeral=True)
         
         item = await ShopItem.get_by_id(item)
 
         inventory = await UserInventory(interaction.user)
+        if not inventory.has_item(item):
+            return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
         gift = await inventory.gift_item(item,user)
         if not gift:
-            return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
+            return await interaction.followup.send(f"Could not gift the item. You either don't have this item or the user already has this item.",ephemeral=True)
+        
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
     
     ##################################################

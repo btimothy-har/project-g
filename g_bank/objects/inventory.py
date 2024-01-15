@@ -159,6 +159,8 @@ class UserInventory(AwaitLoader):
             return False
 
         r_inv = await UserInventory(recipient)
+        if r_inv.has_item(item):
+            return False
         await r_inv.add_item_to_inventory(item)
         return item        
 

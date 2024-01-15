@@ -10,11 +10,14 @@ from timestamps.timestamps import DateConverter
 
 def administrator_check(ctx:Union[discord.Interaction,commands.Context]):
     """Check if the user is an administrator."""
-    if isinstance(ctx,commands.Context):
-        return ctx.author.guild_permissions.administrator
-    elif isinstance(ctx,discord.Interaction):
-        return ctx.user.guild_permissions.administrator
-    else:
+    try:
+        if isinstance(ctx,commands.Context):
+            return ctx.author.guild_permissions.administrator
+        elif isinstance(ctx,discord.Interaction):
+            return ctx.user.guild_permissions.administrator
+        else:
+            return False
+    except:
         return False
 
 class GuildUtility(commands.Cog):
