@@ -437,7 +437,7 @@ class PlayerLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue       
 
-                if (pendulum.now() - self._last_db_update).total_seconds() > 300:
+                if (pendulum.now() - self._last_db_update).total_seconds() > 60:
                     await self._reload_tags()
 
                 if len(self._tags) == 0:
