@@ -2154,7 +2154,7 @@ class Bank(commands.Cog):
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
             account = await ClanAccount(clan)
-            count_users = len([member for member in role.members if not member.bot]) + (1 if user else 0)
+            count_users = (len([member for member in role.members if not member.bot]) if role else 0) + (1 if user else 0)
 
             total_amount = amount * count_users
             if account.balance - total_amount <= -100000:
