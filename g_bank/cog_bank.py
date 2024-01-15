@@ -1082,26 +1082,33 @@ class Bank(commands.Cog):
                 if minister_role:                    
                     minister_members = minister_role.members
                     if len(minister_members) > 0:
-                        one_year_pass = [p for p in find_pass if p.name == "Base Vault Pass (1 year)"][0]
-                        
-                        m_iter = AsyncIter(minister_members)
-                        async for member in m_iter:
-                            if one_year_pass.assigns_role not in member.roles:
-                                inventory = await UserInventory(member)
-                                await inventory.purchase_item(one_year_pass,True)
-
-                bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
-                staff_roles = AsyncIter(self.guild_staff)
-                async for role_id in staff_roles:
-                    role = self.bank_guild.get_role(role_id)
-                    if role:
-                        staff_members = role.members
-                        if len(staff_members) > 0:
-                            m_iter = AsyncIter(staff_members)
+                        try:
+                            one_year_pass = [p for p in find_pass if p.name == "Base Vault Pass (1 year)"][0]
+                        except IndexError:
+                            pass
+                        else:
+                            m_iter = AsyncIter(minister_members)
                             async for member in m_iter:
-                                if bpass.assigns_role not in member.roles:
+                                if one_year_pass.assigns_role not in member.roles:
                                     inventory = await UserInventory(member)
-                                    await inventory.purchase_item(bpass,True)
+                                    await inventory.purchase_item(one_year_pass,True)
+
+                try:
+                    bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
+                except IndexError:
+                    pass
+                else:
+                    staff_roles = AsyncIter(self.guild_staff)
+                    async for role_id in staff_roles:
+                        role = self.bank_guild.get_role(role_id)
+                        if role:
+                            staff_members = role.members
+                            if len(staff_members) > 0:
+                                m_iter = AsyncIter(staff_members)
+                                async for member in m_iter:
+                                    if bpass.assigns_role not in member.roles:
+                                        inventory = await UserInventory(member)
+                                        await inventory.purchase_item(bpass,True)
             except Exception as exc:
                 await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."
                     + f"```{exc}```")

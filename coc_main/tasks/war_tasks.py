@@ -402,17 +402,19 @@ class ClanWarLoop(TaskLoop):
     async def _update_league_group(self,clan:aClan):
         war_reminders = await EventReminder.war_reminders_for_clan(clan)
 
-        await self.coc_client.get_league_group(clan)
+        if clan.is_active_league_clan:
+            league_group = await self.coc_client.get_league_group(clan)
+            league_clan = league_group.get_clan(clan.tag)
 
-        if clan.is_active_league_clan and clan.league_clan_channel:
-            war_league_reminder = [r for r in war_reminders if r.channel_id == clan.league_clan_channel.id]
-            if len(war_league_reminder) == 0:
-                await EventReminder.create_war_reminder(
-                    clan=clan,
-                    channel=clan.league_clan_channel,
-                    war_types=['cwl'],
-                    interval=[12,8,6,4,3,2,1],
-                    )
+            if league_clan and league_clan.league_channel:
+                war_league_reminder = [r for r in war_reminders if r.channel_id == league_clan.league_channel.id]
+                if len(war_league_reminder) == 0:
+                    await EventReminder.create_war_reminder(
+                        clan=clan,
+                        channel=clan.league_clan_channel,
+                        war_types=['cwl'],
+                        interval=[12,8,6,4,3,2,1],
+                        )
     
     async def _dispatch_events(self,clan:aClan,cached_war:coc.ClanWar,new_war:coc.ClanWar,is_current:bool=False):
         if new_war.state == 'notInWar':
