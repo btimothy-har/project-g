@@ -124,16 +124,22 @@ class BasicPlayer(AwaitLoader):
 
     @property
     def alliance_rank(self) -> str:
-        if self.is_member:
-            if self.discord_user == self.home_clan.leader:
-                return 'Leader'
-            elif self.discord_user in self.home_clan.coleaders:
-                return 'Co-Leader'
-            elif self.discord_user in self.home_clan.elders:
-                return 'Elder'
+        try:
+            if self.is_member:
+                try:
+                    if self.discord_user == self.home_clan.leader:
+                        return 'Leader'
+                    elif self.discord_user in self.home_clan.coleaders:
+                        return 'Co-Leader'
+                    elif self.discord_user in self.home_clan.elders:
+                        return 'Elder'
+                    else:
+                        return 'Member'
+                except:
+                    return 'Member'
             else:
-                return 'Member'
-        else:
+                return 'Non-Member'
+        except:
             return 'Non-Member'
     
     @property
