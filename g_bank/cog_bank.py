@@ -47,6 +47,28 @@ from mee6rank.mee6rank import Mee6Rank
 bot_client = BotClashClient()
 non_member_multiplier = 0.2
 
+pen_duration_sel = [
+    app_commands.Choice(name="1 Day", value=1),
+    app_commands.Choice(name="3 Days", value=3),
+    app_commands.Choice(name="5 Days", value=5),
+    app_commands.Choice(name="7 Days", value=7),
+    app_commands.Choice(name="14 Days", value=14),
+    app_commands.Choice(name="30 Days", value=30),
+    ]
+
+def _staff_check(interaction:discord.Interaction):
+    if is_owner(interaction):
+        return True
+    if is_bank_admin(interaction):
+        return True
+    
+    cog = bot_client.bot.get_cog("Bank")
+    
+    guild_user = cog.bank_guild.get_member(interaction.user.id)
+    if guild_user and set(cog.guild_staff).intersection(set([r.id for r in guild_user.roles])):
+        return True
+    return False
+
 ############################################################
 ############################################################
 #####
@@ -84,6 +106,7 @@ class Bank(commands.Cog):
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
         self._bank_pass_role = 0
+        self._bank_penalty_role = 0
 
         self._subscription_lock = asyncio.Lock()
 
@@ -92,8 +115,8 @@ class Bank(commands.Cog):
             "use_rewards":False,
             "log_channel":0,
             "bank_pass_role":0,
+            "bank_penalty_role":0,
             "admins":[],
-            "debt_collection":{},
             }
         self.config.register_global(**default_global)
 
@@ -114,6 +137,10 @@ class Bank(commands.Cog):
             self._bank_pass_role = await self.config.bank_pass_role()
         except:
             self._bank_pass_role = 0
+        try:
+            self._bank_penalty_role = await self.config.bank_penalty_role()
+        except:
+            self._bank_penalty_role = 0
 
         self.bank_admins = await self.config.admins()
         asyncio.create_task(self.start_cog())
@@ -179,6 +206,10 @@ class Bank(commands.Cog):
     @property
     def bank_pass_role(self) -> Optional[discord.Role]:
         return self.bank_guild.get_role(self._bank_pass_role) if self.bank_guild else None
+
+    @property
+    def bank_penalty_role(self) -> Optional[discord.Role]:
+        return self.bank_guild.get_role(self._bank_penalty_role) if self.bank_guild else None
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -644,8 +675,13 @@ class Bank(commands.Cog):
             else:
                 tax_pct = 0.25
                 additional_tax = (current_balance - 200000) // 10000 * 0.01 * 10000
+            
+            guild_user = self.bank_guild.get_member(user_id)
+            if guild_user and self.bank_penalty_role in guild_user.roles:
+                total_tax = max(round(0.1 * current_balance),round((current_balance * tax_pct) + additional_tax) * 2)
+            else:
+                total_tax = round((current_balance * tax_pct) + additional_tax)
 
-            total_tax = round((current_balance * tax_pct) + additional_tax)
             if total_tax > 0:
                 await bank.withdraw_credits(user,total_tax)
                 await self.reserve_account.deposit(
@@ -677,6 +713,9 @@ class Bank(commands.Cog):
         guild_user = self.bank_guild.get_member(player.discord_user)
         reward_tag = await member._get_reward_account_tag()
 
+        if guild_user and self.bank_penalty_role in guild_user.roles:
+            return 0
+        
         if guild_user and self.bank_pass_role in guild_user.roles:
             if reward_tag == player.tag:
                 multi = 1.5
@@ -842,6 +881,11 @@ class Bank(commands.Cog):
             if player.unused_attacks > 0:
                 balance = await bank.get_balance(member)
                 penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
+
+                guild_user = self.bank_guild.get_member(player.discord_user)
+                if guild_user and self.bank_penalty_role in guild_user.roles:
+                    penalty *= 2                
+
                 await bank.withdraw_credits(member,penalty)
                 await self.current_account.deposit(
                     amount = penalty,
@@ -900,6 +944,11 @@ class Bank(commands.Cog):
                 unused_attacks = 6 - player.attack_count
                 balance = await bank.get_balance(member)
                 penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
+                
+                guild_user = self.bank_guild.get_member(player.discord_user)
+                if guild_user and self.bank_penalty_role in guild_user.roles:
+                    penalty *= 2
+
                 await bank.withdraw_credits(member,penalty)
                 await self.current_account.deposit(
                     amount = penalty,
@@ -1116,6 +1165,36 @@ class Bank(commands.Cog):
                 bot_client.coc_main_log.exception(
                     f"Error granting Vault Passes to Staff."
                     )
+    
+    @commands.Cog.listener("on_member_update")
+    async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
+        async with self._subscription_lock:
+            new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
+            if len(new_roles) == 0:
+                return
+
+            r_iter = AsyncIter(new_roles)
+            async for role_id in r_iter:
+                role = after.guild.get_role(role_id)
+                if not role:
+                    continue
+
+                all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                if all_role_items and len(all_role_items) == 0:
+                    continue
+
+                all_subscribed_users = []
+                item_iter = AsyncIter(all_role_items)
+                async for i in item_iter:
+                    async with i.lock:
+                        item = await ShopItem.get_by_id(i.id)
+                        all_subscribed_users.extend(list(item.subscription_log.keys()))
+                
+                if str(after.id) not in all_subscribed_users:
+                    await after.remove_roles(
+                        role,
+                        reason="User does not have a valid subscription."
+                        )
 
     @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):
@@ -1130,25 +1209,6 @@ class Bank(commands.Cog):
                 try:
                     if not item.guild:
                         continue
-
-                    if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
-                        if len(item.assigns_role.members) > 0:
-                            all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
-
-                            all_subscribed_users = []
-                            item_iter = AsyncIter(all_role_items)
-                            async for i in item_iter:
-                                async with i.lock:
-                                    item = await ShopItem.get_by_id(i.id)
-                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
-                            
-                            m_iter = AsyncIter(item.assigns_role.members)
-                            async for member in m_iter:
-                                if str(member.id) not in all_subscribed_users:
-                                    await member.remove_roles(
-                                        item.assigns_role,
-                                        reason="User does not have a valid subscription."
-                                        )
                                     
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
@@ -1572,6 +1632,23 @@ class Bank(commands.Cog):
         self._bank_pass_role = role.id
         await self.config.bank_pass_role.set(self.bank_pass_role.id)
         await ctx.reply(f"Bank Pass Role set to {role.name} `{role.id}`.")
+    
+    ##################################################
+    ### BANK / ADMIN / PENALTY ROLE
+    ##################################################
+    @command_group_bank.command(name="penrole")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_set_pen_role(self,ctx:commands.Context,role:discord.Role):
+        """
+        [Owner-only] Sets a role to use as the Bank Penalty Role.
+        """   
+        if role.guild.id != self.bank_guild.id:
+            return await ctx.reply("Role must be from the Bank Server.")
+             
+        self._bank_penalty_role = role.id
+        await self.config.bank_penalty_role.set(self.bank_penalty_role.id)
+        await ctx.reply(f"Bank Penalty Role set to {role.name} `{role.id}`.")
 
     ##################################################
     ### BANK / GLOBALBAL
@@ -2238,6 +2315,34 @@ class Bank(commands.Cog):
             count += 1
         
         return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
+
+    ##################################################
+    ### BANK / PENALTY
+    ##################################################    
+    @app_command_group_bank.command(name="penalty",
+        description="Propose a user to be penalized. Usable by Staff Members.")
+    @app_commands.check(_staff_check)
+    @app_commands.choices(duration=pen_duration_sel)
+    @app_commands.describe(
+        user="The user to penalize.",
+        duration="The duration of the penalty.",
+        reason="The reason for the penalty."
+        )
+    async def app_command_bank_penalty(self,interaction:discord.Interaction,user:discord.Member,duration:int,reason:str):        
+        await interaction.response.defer()
+
+        channel = self.bank_guild.get_channel(1197058963192160316)
+        embed = await clash_embed(
+            context=interaction,
+            message=f"**Penalty for:** {user.mention}"
+                + f"\n**Duration:** {duration} days"
+                + f"\n**Reason:** {reason}"
+                + f"\n\n**Proposed by:** {interaction.user.mention}",
+            timestamp=pendulum.now(),
+            show_author=False,
+            thumbnail=user.avatar.url
+            )
+        await channel.send(embed=embed)
         
     ##################################################
     ### USER INVENTORY
@@ -2387,7 +2492,7 @@ class Bank(commands.Cog):
         description="Administratively distribute an item to a specified user."
         )
     @app_commands.guild_only()
-    @app_commands.check(is_admin)
+    @app_commands.check(is_bank_admin)
     @app_commands.autocomplete(item=autocomplete_distribute_items)
     @app_commands.describe(
         item="Select an item to distribute.",
