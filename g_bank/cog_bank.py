@@ -101,7 +101,6 @@ class Bank(commands.Cog):
         self._log_channel = 0
         self._log_queue = asyncio.Queue()
         self._log_task = None
-        self._log_lock = asyncio.Lock()
 
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
@@ -242,14 +241,13 @@ class Bank(commands.Cog):
         if amount == 0:
             return
         
-        async with self._log_lock:
-            await self._log_queue.put({
-                'user_id': user.id,
-                'done_by_id': done_by.id,
-                'amount': amount,
-                'comment': comment,
-                'timestamp': pendulum.now().int_timestamp
-                })
+        await self._log_queue.put({
+            'user_id': user.id,
+            'done_by_id': done_by.id,
+            'amount': amount,
+            'comment': comment,
+            'timestamp': pendulum.now().int_timestamp
+            })
     
     async def redemption_terms_conditions(self):
         embed = await clash_embed(
@@ -1087,9 +1085,11 @@ class Bank(commands.Cog):
     async def _log_task_loop(self):        
         try:
             while True:
-                embeds = []                
+                embeds = []
                 if not self.log_channel:
-                    continue        
+                    await asyncio.sleep(0.25)
+                    continue
+
                 currency = await bank.get_currency_name()
 
                 chk = True
