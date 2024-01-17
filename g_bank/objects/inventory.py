@@ -137,6 +137,10 @@ class UserInventory(AwaitLoader):
                         similar_items = await ShopItem.get_by_guild(item.guild_id)
                     else:
                         similar_items = await ShopItem.get_by_guild_category(item.guild_id,item.category)
+                    
+                    expire_items = [i for i in similar_items if i.subscription]
+                    if len(expire_items) > 0:
+                        await asyncio.gather(*(i.expire_item(self.user) for i in expire_items))
 
                     roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
 

@@ -275,7 +275,7 @@ class ShopItem():
                     )
                 self._stock = item['stock']
     
-    async def expire_item(self,user:discord.Member):
+    async def expire_item(self,user:Union[discord.Member,discord.User]):
         async with self.lock:
             doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
             self.subscription_log = doc.get('subscription_log',{})

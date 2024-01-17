@@ -93,6 +93,7 @@ class Bank(commands.Cog):
             "log_channel":0,
             "bank_pass_role":0,
             "admins":[],
+            "debt_collection":{},
             }
         self.config.register_global(**default_global)
 
@@ -1876,7 +1877,7 @@ class Bank(commands.Cog):
             embed=None,
             attachments=[discord.File(rpfile)]
             )
-    
+        
     ##################################################
     ### BALANCE
     ##################################################
