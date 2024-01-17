@@ -40,6 +40,7 @@ class BasicPlayer(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
+        self.home_clan = None
 
     def __str__(self):
         return f"Player {self.tag}"
@@ -232,6 +233,7 @@ class BasicPlayer(AwaitLoader):
                     )
             
     async def remove_member(self):
+        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
         if self.home_clan:
             await self.home_clan.remove_member(self.tag)
 
