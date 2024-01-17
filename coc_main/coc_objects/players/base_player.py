@@ -259,7 +259,7 @@ class BasicPlayer(AwaitLoader):
                 )
             bot_client.coc_data_log.info(
                 f"Player {self} has been removed as a member."
-                + f"\n\tLast Removed: {self.last_removed}"
+                + f"\n\tLast Removed: {self._attributes.last_removed}"
                 )
     
     async def reset_war_elo(self):
