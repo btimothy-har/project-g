@@ -100,7 +100,7 @@ class Bank(commands.Cog):
 
         self._log_channel = 0
         self._log_queue = asyncio.Queue()
-        self._log_task_lock = asyncio.Lock()
+        self._log_task = None
         self._log_lock = asyncio.Lock()
 
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
@@ -173,12 +173,13 @@ class Bank(commands.Cog):
         
         self.subscription_item_expiry.start()
         self.staff_item_grant.start()
-        self.send_bank_logs_batch.start()
+
+        self._log_task = asyncio.create_task(self._log_task_loop())
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
         self.staff_item_grant.cancel()
-        self.send_bank_logs_batch.cancel()
+        await self._log_task.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -1083,27 +1084,48 @@ class Bank(commands.Cog):
     ##### SUBSCRIPTION EXPIRY
     ############################################################
     ############################################################
-    @tasks.loop(seconds=1.0)
-    async def send_bank_logs_batch(self):
-        if self._log_task_lock.locked():
-            return
-        
-        embeds = []
-                
-        async with self._log_task_lock, self._log_lock:
-            if not self.log_channel:
-                return
-            
-            currency = await bank.get_currency_name()
+    async def _log_task_loop(self):        
+        try:
             while True:
-                size = self._log_queue.qsize()
-                if size == 0:
-                    break
+                embeds = []                
+                if not self.log_channel:
+                    continue        
+                currency = await bank.get_currency_name()
+
+                chk = True
+                while chk:
+                    log_entry = await self._log_queue.get()
                 
-                log_entry = await self._log_queue.get()
-                log_user = self.bot.get_user(log_entry['user_id'])
-                done_by = self.bot.get_user(log_entry['done_by_id'])
+                    log_user = self.bot.get_user(log_entry['user_id'])
+                    done_by = self.bot.get_user(log_entry['done_by_id'])
             
+                    embed = await clash_embed(
+                        context=self.bot,
+                        message=f"`{log_user.id}`"
+                            + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
+                        success=True if log_entry['amount'] >= 0 else False,
+                        timestamp=pendulum.from_timestamp(log_entry['timestamp'])
+                        )
+                    embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
+                    embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
+                    embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
+                    embeds.append(embed)
+
+                    if len(embeds) >= 10:
+                        chk = False
+                    elif self._log_queue.qsize() == 0:
+                        chk = False                        
+                    
+                if len(embeds) > 0:
+                    await self.log_channel.send(embeds=embeds)
+                    await asyncio.sleep(0.25)
+        
+        except asyncio.CancelledError:
+            while True:
+                embeds = []
+                log_entry = await self._log_queue.get()                    
+                log_user = self.bot.get_user(log_entry['user_id'])
+                done_by = self.bot.get_user(log_entry['done_by_id'])        
                 embed = await clash_embed(
                     context=self.bot,
                     message=f"`{log_user.id}`"
@@ -1114,13 +1136,11 @@ class Bank(commands.Cog):
                 embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
                 embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
                 embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
-                embeds.append(embed)
+                await self.log_channel.send(embed=embed)
 
-                if len(embeds) > 10:
+                if self._log_queue.qsize() == 0:
                     break
-                    
-            if len(embeds) > 0:
-                await self.log_channel.send(embeds=embeds)
+                await asyncio.sleep(0.25)
     
     @tasks.loop(minutes=5.0)
     async def staff_item_grant(self):
