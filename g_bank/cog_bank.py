@@ -358,6 +358,11 @@ class Bank(commands.Cog):
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
         
+        member = aMember(user.id)
+        await member.load()
+        if not member.is_member:
+            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
+        
         item = await ShopItem.get_by_id(item_id)
         inventory = await UserInventory(user)
         if not inventory.has_item(item):
@@ -395,6 +400,9 @@ class Bank(commands.Cog):
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
         await member.load()
+
+        if not member.is_member:
+            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
         
         fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
@@ -430,6 +438,11 @@ class Bank(commands.Cog):
             
             if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
                 return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+            
+            member = aMember(user.id)
+            await member.load()
+            if not member.is_member:
+                return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
             
             item = await ShopItem.get_by_id(item_id)
             inventory = await UserInventory(user)
@@ -1190,31 +1203,55 @@ class Bank(commands.Cog):
     async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
         async with self._subscription_lock:
             new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
-            if len(new_roles) == 0:
-                return
+            removed_roles = [r for r in [r.id for r in before.roles] if r not in [r.id for r in after.roles]]
+            
+            if len(new_roles) > 0:
+                r_iter = AsyncIter(new_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
 
-            r_iter = AsyncIter(new_roles)
-            async for role_id in r_iter:
-                role = after.guild.get_role(role_id)
-                if not role:
-                    continue
+                    all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                    if all_role_items and len(all_role_items) == 0:
+                        continue
 
-                all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
-                if all_role_items and len(all_role_items) == 0:
-                    continue
+                    all_subscribed_users = []
+                    item_iter = AsyncIter(all_role_items)
+                    async for i in item_iter:
+                        async with i.lock:
+                            item = await ShopItem.get_by_id(i.id)
+                            all_subscribed_users.extend(list(item.subscription_log.keys()))
+                    
+                    if str(after.id) not in all_subscribed_users:
+                        await after.remove_roles(
+                            role,
+                            reason="User does not have a valid subscription."
+                            )
+            
+            if len(removed_roles) > 0:
+                r_iter = AsyncIter(removed_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
+                    if role.id == self.bank_penalty_role.id:
+                        all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                        if all_role_items and len(all_role_items) == 0:
+                            continue
 
-                all_subscribed_users = []
-                item_iter = AsyncIter(all_role_items)
-                async for i in item_iter:
-                    async with i.lock:
-                        item = await ShopItem.get_by_id(i.id)
-                        all_subscribed_users.extend(list(item.subscription_log.keys()))
-                
-                if str(after.id) not in all_subscribed_users:
-                    await after.remove_roles(
-                        role,
-                        reason="User does not have a valid subscription."
-                        )
+                        all_subscribed_users = []
+                        item_iter = AsyncIter(all_role_items)
+                        async for i in item_iter:
+                            async with i.lock:
+                                item = await ShopItem.get_by_id(i.id)
+                                all_subscribed_users.extend(list(item.subscription_log.keys()))
+                        
+                        if str(after.id) in all_subscribed_users:
+                            await after.add_roles(
+                                role,
+                                reason="User has a valid subscription."
+                                )
 
     @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):

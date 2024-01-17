@@ -231,6 +231,33 @@ class BasicClan(AwaitLoader):
                 + f"\n\tUnicode Emoji: {self.unicode_emoji}"
                 )
     
+    async def unregister(self):
+        async with self._attributes._lock:    
+            self._attributes.abbreviation = ""
+            self._attributes.emoji = ""
+            self._attributes.unicode_emoji = ""
+
+            await bot_client.coc_db.db__clan.update_one(
+                {'_id':self.tag},
+                {'$unset':{
+                    'abbreviation':'',
+                    'emoji':'',
+                    'unicode_emoji':''
+                    }
+                },
+                upsert=True)
+            
+            if self.is_alliance_clan:
+                await bot_client.coc_db.db__alliance_clan.delete_one({'_id':self.tag})
+                self._attributes.is_alliance_clan = False
+            
+            bot_client.coc_data_log.info(
+                f"{self}: Clan Unregistered!"
+                + f"\n\tAbbreviation: {self.abbreviation}"
+                + f"\n\tEmoji: {self.emoji}"
+                + f"\n\tUnicode Emoji: {self.unicode_emoji}"
+                )
+    
     async def add_to_war_league(self):
         async with self._attributes._lock:
             self._attributes.is_active_league_clan = True

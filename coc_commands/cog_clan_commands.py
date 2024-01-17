@@ -769,6 +769,34 @@ class Clans(commands.Cog):
         await interaction.followup.send(embed=embed)
     
     ##################################################
+    ### CLANSET / UNREGISTER
+    ##################################################
+    async def helper_unregister_clan(self,
+        context:Union[commands.Context,discord.Interaction],clan_tag:str):
+
+        clan = await self.client.fetch_clan(clan_tag)
+        await clan.unregister()
+        embed = await clash_embed(
+            context=context,
+            title=f"Unregistered: {clan.title}",
+            message=clan.long_description,
+            thumbnail=clan.badge,
+            success=True
+            )
+        return embed
+
+    @command_group_clanset.command(name="unregister")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_unregister_clan(self,ctx:commands.Context,clan_tag:str):
+        """
+        [Admin-only] Register an in-game Clan to the bot.
+        """
+        
+        embed = await self.helper_unregister_clan(ctx,clan_tag)
+        await ctx.reply(embed=embed)
+    
+    ##################################################
     ### CLANSET / LINK
     ##################################################
     @command_group_clanset.command(name="link")
