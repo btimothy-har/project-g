@@ -2349,7 +2349,7 @@ class Bank(commands.Cog):
         reason="The reason for the penalty."
         )
     async def app_command_bank_penalty(self,interaction:discord.Interaction,user:discord.Member,duration:int,reason:str):        
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         channel = self.bank_guild.get_channel(1197058963192160316)
         embed = await clash_embed(
@@ -2362,7 +2362,12 @@ class Bank(commands.Cog):
             show_author=False,
             thumbnail=user.avatar.url
             )
-        await channel.send(embed=embed)
+        message = await channel.send(embed=embed)
+        thread = await channel.create_thread(
+            name=f"Penalty for {user.display_name}",
+            message=message)
+        
+        await interaction.followup.send(f"Penalty proposed for {user.mention} has been submitted.",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY
