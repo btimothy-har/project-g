@@ -107,7 +107,7 @@ class ClanWarLog(DefaultView):
             clan = war.get_clan(self.clan.tag)
             opponent = war.get_opponent(self.clan.tag)
             embed.add_field(
-                name=f"{clan.emoji} {clan.clean_name} vs {opponent.clean_name}",
+                name=f"{clan.emoji} {clan.clean_name}\u3000vs\u3000{opponent.clean_name}",
                 value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^4}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^4}`"
                     + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
