@@ -108,7 +108,7 @@ class ClanWarLog(DefaultView):
             opponent = war.get_opponent(self.clan.tag)
             embed.add_field(
                 name=f"{clan.emoji} {clan.clean_name} vs {opponent.clean_name}",
-                value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{len(clan.attacks_used):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
+                value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
                     + f"{EmojisClash.STAR} `{clan.stars:^5}` vs `{opponent.stars:^5}` {EmojisClash.STAR}"
                     + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^5.2f}%` vs `{opponent.destruction:^5.2f}%` {EmojisClash.DESTRUCTION}",
                 inline=False
