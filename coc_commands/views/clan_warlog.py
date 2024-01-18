@@ -96,9 +96,9 @@ class ClanWarLog(DefaultView):
                 + f"\n`{'Ties:':<10}` {war_ties} ({war_ties/len(self.war_summary.war_log)*100:.0f}%)"
                 + f"\n\n**__War Stats__**"
                 + f"\n{EmojisClash.CLANWAR} `{'Avg War Size:':<15}` {avg_war_size}"
-                + f"\n{EmojisTownHall.get(int(avg_townhall))} `{'Average TH:':<15}` {avg_townhall}"
-                + f"\n{EmojisClash.THREESTARS} `{'Triples:':<15}` {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
-                + f"\n{EmojisClash.UNUSEDATTACK} `{'Unused Hits:':<15}` {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)"
+                + f"\n{EmojisTownHall.get(int(avg_townhall))} `{'Avg Townhall:':<15}` {avg_townhall}"
+                + f"\n{EmojisClash.THREESTARS} `{'% Triples:':<15}` {self.war_summary.triples/total_attacks*100:.0f}%"
+                + f"\n{EmojisClash.UNUSEDATTACK} `{'% Unused Hits:':<15}` {self.war_summary.unused_attacks/total_attacks*100:.0f}%"
                 + f"\n\n*Most recent 5 wars shown below.*",
             thumbnail=self.clan.badge,
             )
