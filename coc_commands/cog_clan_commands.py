@@ -754,7 +754,7 @@ class Clans(commands.Cog):
                 )
             return await interaction.followup.send(embed=embed)
 
-        menu = ClanWarLog(interaction,clan)
+        menu = ClanWarLog(interaction,get_clan)
         await menu.start()
     
     ##################################################
