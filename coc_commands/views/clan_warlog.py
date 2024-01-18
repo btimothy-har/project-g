@@ -112,7 +112,7 @@ class ClanWarLog(DefaultView):
                     + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
                     + f"\n{EmojisClash.STAR} `{clan.stars:^7}` vs `{opponent.stars:^7}` {EmojisClash.STAR}"
-                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^7.2f}%` vs `{opponent.destruction:^7.2f}%` {EmojisClash.DESTRUCTION}",
+                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^6.2f}%` vs `{opponent.destruction:^6.2f}%` {EmojisClash.DESTRUCTION}",
                 inline=False
                 )
         return embed
