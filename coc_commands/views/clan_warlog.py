@@ -114,18 +114,18 @@ class ClanWarLog(DefaultView):
     def _build_war_select_menu(self):
         self.clear_items()
 
-        if len(self.war_summary.war_log) > 24:
+        if len(self.war_selector) > 24:
             minus_diff = None
             plus_diff = 24
-            if 12 < self.war_index < len(self.war_summary.war_log) - 24:
+            if 12 < self.war_index < len(self.war_selector) - 24:
                 minus_diff = self.war_index - 12
                 plus_diff = self.war_index + 12
-            elif self.war_index >= len(self.war_summary.war_log) - 24:
-                minus_diff = len(self.war_summary.war_log) - 24
+            elif self.war_index >= len(self.war_selector) - 24:
+                minus_diff = len(self.war_selector) - 24
                 plus_diff = None
-            options = self.war_summary.war_log[minus_diff:plus_diff]
+            options = self.war_selector[minus_diff:plus_diff]
         else:
-            options = self.war_summary.war_log[:24]
+            options = self.war_selector[:24]
         
         for option in options:
             if option.value == self.war_index:
