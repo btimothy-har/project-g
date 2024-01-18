@@ -123,6 +123,20 @@ class ClanWarLog(DefaultView):
     async def start(self):
         self.is_active = True
         get_all_wars = await aClanWar.for_clan(self.clan.tag)
+
+        if len(get_all_wars) == 0:
+            embed = await clash_embed(
+                context=self.ctx,
+                title=f"**{self.clan.title}**",
+                message=f"No wars found for this clan.",
+                thumbnail=self.clan.badge,
+                )
+            if isinstance(self.ctx,discord.Interaction):
+                await self.ctx.edit_original_response(embed=embed,view=self)
+                self.message = await self.ctx.original_response()
+            else:
+                self.message = await self.ctx.reply(embed=embed,view=self)
+            return
         
         self.war_summary = await bot_client.run_in_thread(aClanWarSummary.for_clan,self.clan.tag,get_all_wars)
         self.war_selector = [
