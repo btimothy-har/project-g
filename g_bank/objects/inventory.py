@@ -134,16 +134,15 @@ class UserInventory(AwaitLoader):
             else:
                 if item.exclusive_role:
                     if item.category == 'Uncategorized':
-                        similar_items = await ShopItem.get_by_guild(item.guild_id)
+                        similar_items = [i for i in await ShopItem.get_by_guild(item.guild_id) if i.id != item.id]
                     else:
-                        similar_items = await ShopItem.get_by_guild_category(item.guild_id,item.category)
+                        similar_items = [i for i in await ShopItem.get_by_guild_category(item.guild_id,item.category) if i.id != item.id]
                     
                     expire_items = [i for i in similar_items if i.subscription]
                     if len(expire_items) > 0:
                         await asyncio.gather(*(i.expire_item(self.user) for i in expire_items))
 
                     roles_from_similar_items = [i.assigns_role for i in similar_items if i.assigns_role]
-
                     #remove_role_from_user
                     r_iter = AsyncIter(roles_from_similar_items)
                     async for role in r_iter:

@@ -1221,8 +1221,6 @@ class Bank(commands.Cog):
                             async with i.lock:
                                 item = await ShopItem.get_by_id(i.id)
                                 all_subscribed_users.extend(list(item.subscription_log.keys()))
-
-                        bot_client.coc_main_log.info(f"{all_subscribed_users}")
                         
                         if str(after.id) not in all_subscribed_users:
                             await after.remove_roles(
