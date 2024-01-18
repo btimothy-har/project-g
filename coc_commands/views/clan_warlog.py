@@ -130,7 +130,7 @@ class ClanWarLog(DefaultView):
                 label=f"{w.get_clan(self.clan.tag).name} vs {w.get_opponent(self.clan.tag).name}",
                 value=i-1,
                 description=(f"War ended {w.end_time.format('MMM DD, YYYY')}" if w.state == WarState.WAR_ENDED else f"War ends {w.end_time.format('MMM DD, YYYY')}"),
-                emoji=WarResult.WINEMOJI if w.get_clan(self.clan.tag).result in [WarResult.WON,WarResult.WINNING] else WarResult.LOSEMOJI if w.get_clan(self.clan.tag).result in [WarResult.LOST,WarResult.LOSING] else WarResult.TIEEMOJI)
+                emoji=WarResult.WINEMOJI if w.get_clan(self.clan.tag).result in [WarResult.WON,WarResult.WINNING] else WarResult.LOSEEMOJI if w.get_clan(self.clan.tag).result in [WarResult.LOST,WarResult.LOSING] else WarResult.TIEEMOJI)
             for i,w in enumerate(self.war_summary.war_log,1)
             ]
         
