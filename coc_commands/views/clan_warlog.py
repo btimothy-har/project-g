@@ -129,7 +129,7 @@ class ClanWarLog(DefaultView):
             discord.SelectOption(
                 label=f"{w.get_clan(self.clan.tag).name} vs {w.get_opponent(self.clan.tag).name}",
                 value=i-1,
-                description=f"{w.get_clan(self.clan.tag).stars} vs {w.get_opponent(self.clan.tag).stars}"
+                description=f"We {w.get_clan(self.clan.tag).result} this war. | "
                     + (f"War ended {w.end_time.format('MMM DD, YYYY')}" if w.state == WarState.WAR_ENDED else f"War ends {w.end_time.format('MMM DD, YYYY')}"),
                 emoji=w.get_clan(self.clan.tag).emoji)
             for i,w in enumerate(self.war_summary.war_log,1)
