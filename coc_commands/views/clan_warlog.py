@@ -3,7 +3,7 @@ import discord
 import pendulum
 
 from typing import *
-from redbot.core import commands,bank
+from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient as client
 
@@ -89,24 +89,30 @@ class ClanWarLog(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**{self.clan.title}**",
-            message=f"**{len(self.war_summary.war_log)} Clan War(s) recorded since <t:{min_prep_start-86400}:R>.**",
-            thumbnail=self.clan.badge,
-            )
-        embed.add_field(
-            name="**__War Performance__**",
-            value=f"`{'Wins:':<10}` {war_wins} ({war_wins/len(self.war_summary.war_log)*100:.0f}%)"
+            message=f"**{len(self.war_summary.war_log)} Clan War(s) recorded since <t:{min_prep_start-86400}:R>.**"
+                + f"\n\n**__War Performance__**"
+                + f"\n`{'Wins:':<10}` {war_wins} ({war_wins/len(self.war_summary.war_log)*100:.0f}%)"
                 + f"\n`{'Losses:':<10}` {war_losses} ({war_losses/len(self.war_summary.war_log)*100:.0f}%)"
                 + f"\n`{'Ties:':<10}` {war_ties} ({war_ties/len(self.war_summary.war_log)*100:.0f}%)"
-                + f"\n\nAvg War Size: {avg_war_size:,}",
-            inline=False
-            )
-        embed.add_field(
-            name="**__War Stats__**",
-            value=f"{EmojisTownHall.get(int(avg_townhall))} `{'Average TH:':<15}` {avg_townhall}"
+                + f"\n\n**__War Stats__**"
+                + f"\n{EmojisClash.CLANWAR} `{'Avg War Size:':<15}` {avg_war_size}"
+                + f"\n{EmojisTownHall.get(int(avg_townhall))} `{'Average TH:':<15}` {avg_townhall}"
                 + f"\n{EmojisClash.THREESTARS} `{'Triples:':<15}` {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
-                + f"\n{EmojisClash.UNUSEDATTACK} `{'Unused Hits:':<15}` {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)",
-            inline=False
+                + f"\n{EmojisClash.UNUSEDATTACK} `{'Unused Hits:':<15}` {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)"
+                + f"\n\n*Most recent 5 wars shown below.*\n\u200b",
+            thumbnail=self.clan.badge,
             )
+        a_iter = AsyncIter(self.war_summary.war_log[:5])
+        async for war in a_iter:
+            clan = war.get_clan(self.clan.tag)
+            opponent = war.get_opponent(self.clan.tag)
+            embed.add_field(
+                name=f"{clan.emoji} {clan.clean_name} vs {opponent.clean_name}",
+                value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{len(clan.attacks_used):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
+                    + f"{EmojisClash.STAR} `{clan.stars:^5}` vs `{opponent.stars:^5}` {EmojisClash.STAR}"
+                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^5.2f}%` vs `{opponent.destruction:^5.2f}%` {EmojisClash.DESTRUCTION}",
+                inline=False
+                )
         return embed
     
     ##################################################
