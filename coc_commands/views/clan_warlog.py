@@ -28,7 +28,42 @@ class ClanWarLog(DefaultView):
         self.war_selector = None
         self.war_summary = None
         self.war_index = -1
+
+
         super().__init__(context,timeout=600)
+    
+    @property
+    def home_button(self):
+        return DiscordButton(
+            function=self._callback_home,
+            style=discord.ButtonStyle.blurple,
+            emoji=EmojisUI.HOME,
+            label="Overview",
+            row=1
+            )
+    @property
+    def close_button(self):
+        return DiscordButton(
+            function=self._callback_close,
+            style=discord.ButtonStyle.red,
+            emoji=EmojisUI.EXIT,
+            row=1
+            )
+    
+    # def view_clan_button(self,war:aClanWar):
+    #     return DiscordButton(
+    #         function=self._callback_,
+    #         style=discord.ButtonStyle.red,
+    #         emoji=EmojisUI.EXIT,
+    #         row=1
+    #         )
+    # def view_opponent_button(self,war:aClanWar):
+    #     return DiscordButton(
+    #         function=self._callback_close,
+    #         style=discord.ButtonStyle.red,
+    #         emoji=EmojisUI.EXIT,
+    #         row=1
+    #         )
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -61,14 +96,14 @@ class ClanWarLog(DefaultView):
             value=f"Wins: {war_wins} ({war_wins/len(self.war_summary.war_log)*100:.0f}%)"
                 + f"\nLosses: {war_losses} ({war_losses/len(self.war_summary.war_log)*100:.0f}%)"
                 + f"\nTies: {war_ties} ({war_ties/len(self.war_summary.war_log)*100:.0f}%)",
-            inline=True
+            inline=False
             )
         embed.add_field(
             name="**__War Stats__**",
             value=f"Average TH: {avg_townhall}"
-                + f"\n{EmojisClash.THREESTARS} Triples: {self.war_summary.triples} ({self.war_summary.triples/total_attacks*100:.0f}%)"
-                + f"\n{EmojisClash.UNUSEDATTACK} Unused Hits: {self.war_summary.unused_attacks} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)",
-            inline=True
+                + f"\n{EmojisClash.THREESTARS} Triples: {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
+                + f"\n{EmojisClash.UNUSEDATTACK} Unused Hits: {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)",
+            inline=False
             )
         return embed
     
@@ -98,6 +133,17 @@ class ClanWarLog(DefaultView):
         else:
             self.message = await self.ctx.reply(embed=embed,view=self)
     
+    async def _callback_home(self,interaction:discord.Interaction,button:discord.Button):
+        self.war_index = -1
+        embed = await self.overview_embed()
+        self._build_war_select_menu()
+        await interaction.response.edit_message(embed=embed,view=self)
+    
+    async def _callback_close(self,interaction:discord.Interaction,button:discord.Button):
+        self.clear_items()
+        await interaction.response.edit_message(view=self)
+        self.stop_menu()
+    
     async def _callback_select_war(self,interaction:discord.Interaction,select:DiscordSelectMenu):
         await interaction.response.defer()
         if select.values[0] == "overview":
@@ -115,40 +161,33 @@ class ClanWarLog(DefaultView):
     def _build_war_select_menu(self):
         self.clear_items()
 
-        if len(self.war_selector) > 24:
+        if len(self.war_selector) > 25:
             minus_diff = None
-            plus_diff = 24
-            if 12 < self.war_index < len(self.war_selector) - 24:
+            plus_diff = 25
+            if 12 < self.war_index < len(self.war_selector) - 25:
                 minus_diff = self.war_index - 12
-                plus_diff = self.war_index + 12
-            elif self.war_index >= len(self.war_selector) - 24:
-                minus_diff = len(self.war_selector) - 24
+                plus_diff = self.war_index + 13
+            elif self.war_index >= len(self.war_selector) - 25:
+                minus_diff = len(self.war_selector) - 25
                 plus_diff = None
             options = self.war_selector[minus_diff:plus_diff]
         else:
-            options = self.war_selector[:24]
+            options = self.war_selector[:25]
         
         for option in options:
             if option.value == self.war_index:
                 option.default = True
             else:
                 option.default = False
-        
-        select_options = [
-            discord.SelectOption(
-                label=f"Overview Stats",
-                value="overview",
-                default=False,
-                )
-            ]
-        select_options.extend(options)
             
         select_menu = DiscordSelectMenu(
             function=self._callback_select_war,
-            options=select_options,
+            options=options,
             placeholder="Select a War to view.",
             min_values=1,
             max_values=1,
             row=1
             )
+        self.add_item(self.home_button)
+        self.add_item(self.close_button)
         self.add_item(select_menu)
