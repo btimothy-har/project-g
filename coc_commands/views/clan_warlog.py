@@ -54,7 +54,7 @@ class ClanWarLog(DefaultView):
             context=self.ctx,
             title=f"**{self.clan.title}**",
             message=f"**{len(self.war_summary.war_log)} Clan War(s) recorded since <t:{min_prep_start-86400}:R>.**",
-            thumbnail=self.clan.badge_url,
+            thumbnail=self.clan.badge,
             )
         embed.add_field(
             name="**__War Performance__**",
