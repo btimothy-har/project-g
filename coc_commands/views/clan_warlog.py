@@ -111,8 +111,8 @@ class ClanWarLog(DefaultView):
                 value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
                     + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
-                    + f"\n{EmojisClash.STAR} `{clan.stars:^7}` vs `{opponent.stars:^7}`"
-                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^6.2f}%` vs `{opponent.destruction:^6.2f}%`",
+                    + f"\n{EmojisClash.STAR} `{clan.stars:^8}` vs `{opponent.stars:^8}`"
+                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^7.2f}%` vs `{opponent.destruction:^7.2f}%`",
                 inline=False
                 )
         return embed
@@ -121,7 +121,6 @@ class ClanWarLog(DefaultView):
     ### START / STOP 
     ##################################################
     async def start(self):
-        self.is_active = True
         get_all_wars = await aClanWar.for_clan(self.clan.tag)
 
         if len(get_all_wars) == 0:
@@ -132,12 +131,13 @@ class ClanWarLog(DefaultView):
                 thumbnail=self.clan.badge,
                 )
             if isinstance(self.ctx,discord.Interaction):
-                await self.ctx.edit_original_response(embed=embed,view=self)
-                self.message = await self.ctx.original_response()
+                await self.ctx.edit_original_response(embed=embed)
             else:
-                self.message = await self.ctx.reply(embed=embed,view=self)
+                await self.ctx.reply(embed=embed)
             return
         
+        self.is_active = True
+
         self.war_summary = await bot_client.run_in_thread(aClanWarSummary.for_clan,self.clan.tag,get_all_wars)
         self.war_selector = [
             discord.SelectOption(
