@@ -26,6 +26,7 @@ from coc_main.discord.clan_link import ClanGuildLink
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu
+from .views.clan_warlog import ClanWarLog
 from .excel.clan_export import ClanExcelExport
 
 from coc_main.discord.feeds.raid_results import RaidResultsFeed
@@ -710,6 +711,50 @@ class Clans(commands.Cog):
             return await interaction.edit_original_response(embed=embed)
 
         menu = ClanMembersMenu(interaction,get_clan)
+        await menu.start()
+    
+    ##################################################
+    ### CLANDATA / WARLOG
+    ##################################################
+    @command_group_clan.command(name="warlog")
+    @commands.guild_only()
+    async def command_clan_warlog(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        View a Clan's War Log.
+
+        Only usable for Alliance clans.
+        """
+
+        clan = await self.client.from_clan_abbreviation(clan_tag_or_abbreviation)
+        if not clan.is_alliance_clan:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"Only Clan Wars for Alliance Clans are tracked.",
+                success=False,
+                )
+            return await ctx.reply(embed=embed)
+
+        menu = ClanWarLog(ctx,clan)
+        await menu.start()
+
+    @app_command_group_clan.command(
+        name="war-log",
+        description="View a Clan's Townhall composition.")
+    @app_commands.autocomplete(clan=autocomplete_clans)
+    @app_commands.describe(clan="Select a Clan.")
+    async def app_command_clan_warlog(self,interaction:discord.Interaction,clan:str):
+
+        await interaction.response.defer()
+        get_clan = await self.client.fetch_clan(clan)
+        if not get_clan.is_alliance_clan:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Only Clan Wars for Alliance Clans are tracked.",
+                success=False,
+                )
+            return await interaction.followup.send(embed=embed)
+
+        menu = ClanWarLog(interaction,clan)
         await menu.start()
     
     ##################################################
