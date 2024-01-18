@@ -99,7 +99,7 @@ class ClanWarLog(DefaultView):
                 + f"\n{EmojisTownHall.get(int(avg_townhall))} `{'Average TH:':<15}` {avg_townhall}"
                 + f"\n{EmojisClash.THREESTARS} `{'Triples:':<15}` {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
                 + f"\n{EmojisClash.UNUSEDATTACK} `{'Unused Hits:':<15}` {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)"
-                + f"\n\n*Most recent 5 wars shown below.*\n\u200b",
+                + f"\n\n*Most recent 5 wars shown below.*",
             thumbnail=self.clan.badge,
             )
         a_iter = AsyncIter(self.war_summary.war_log[:5])
@@ -111,8 +111,8 @@ class ClanWarLog(DefaultView):
                 value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
                     + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
-                    + f"\n{EmojisClash.STAR} `{clan.stars:^5}` vs `{opponent.stars:^5}` {EmojisClash.STAR}"
-                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^5.2f}%` vs `{opponent.destruction:^5.2f}%` {EmojisClash.DESTRUCTION}",
+                    + f"\n{EmojisClash.STAR} `{clan.stars:^7}` vs `{opponent.stars:^7}` {EmojisClash.STAR}"
+                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^7.2f}%` vs `{opponent.destruction:^7.2f}%` {EmojisClash.DESTRUCTION}",
                 inline=False
                 )
         return embed
