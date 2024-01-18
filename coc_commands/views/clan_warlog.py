@@ -39,7 +39,7 @@ class ClanWarLog(DefaultView):
             style=discord.ButtonStyle.blurple,
             emoji=EmojisUI.HOME,
             label="Overview",
-            row=1
+            row=0
             )
     @property
     def close_button(self):
@@ -47,7 +47,7 @@ class ClanWarLog(DefaultView):
             function=self._callback_close,
             style=discord.ButtonStyle.red,
             emoji=EmojisUI.EXIT,
-            row=1
+            row=0
             )
     
     # def view_clan_button(self,war:aClanWar):
