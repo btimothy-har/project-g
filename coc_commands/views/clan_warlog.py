@@ -107,6 +107,7 @@ class ClanWarLog(DefaultView):
         
         self.war_index = int(select.values[0])
         select_war = self.war_summary.war_log[self.war_index]
+        self._build_war_select_menu()
         embed = await clan_war_embed(context=interaction,clan_war=select_war)
 
         await interaction.edit_original_response(embed=embed,view=self)
