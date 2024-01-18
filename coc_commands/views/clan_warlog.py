@@ -82,6 +82,7 @@ class ClanWarLog(DefaultView):
         war_losses = len([w for w in self.war_summary.war_log if w.get_clan(self.clan.tag).result in [WarResult.LOSING,WarResult.LOST]])
         war_ties = len([w for w in self.war_summary.war_log if w.get_clan(self.clan.tag).result in [WarResult.TIED]])
 
+        avg_war_size = round(sum([w.team_size for w in self.war_summary.war_log])/len(self.war_summary.war_log),1)
         avg_townhall = round(sum([w.get_clan(self.clan.tag).average_townhall for w in self.war_summary.war_log])/len(self.war_summary.war_log),1)
         total_attacks = sum([w.attacks_per_member * w.team_size for w in self.war_summary.war_log])
 
@@ -93,16 +94,17 @@ class ClanWarLog(DefaultView):
             )
         embed.add_field(
             name="**__War Performance__**",
-            value=f"Wins: {war_wins} ({war_wins/len(self.war_summary.war_log)*100:.0f}%)"
-                + f"\nLosses: {war_losses} ({war_losses/len(self.war_summary.war_log)*100:.0f}%)"
-                + f"\nTies: {war_ties} ({war_ties/len(self.war_summary.war_log)*100:.0f}%)",
+            value=f"`{'Wins:':<10}` {war_wins} ({war_wins/len(self.war_summary.war_log)*100:.0f}%)"
+                + f"\n`{'Losses:':<10}` {war_losses} ({war_losses/len(self.war_summary.war_log)*100:.0f}%)"
+                + f"\n`{'Ties:':<10}` {war_ties} ({war_ties/len(self.war_summary.war_log)*100:.0f}%)"
+                + f"\n\nAvg War Size: {avg_war_size:,}",
             inline=False
             )
         embed.add_field(
             name="**__War Stats__**",
-            value=f"Average TH: {avg_townhall}"
-                + f"\n{EmojisClash.THREESTARS} Triples: {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
-                + f"\n{EmojisClash.UNUSEDATTACK} Unused Hits: {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)",
+            value=f"{EmojisTownHall.get(int(avg_townhall))} `{'Average TH:':<15}` {avg_townhall}"
+                + f"\n{EmojisClash.THREESTARS} `{'Triples:':<15}` {self.war_summary.triples:,} / {total_attacks:,} ({self.war_summary.triples/total_attacks*100:.0f}%)"
+                + f"\n{EmojisClash.UNUSEDATTACK} `{'Unused Hits:':<15}` {self.war_summary.unused_attacks:,} / {total_attacks:,} ({self.war_summary.unused_attacks/total_attacks*100:.0f}%)",
             inline=False
             )
         return embed
