@@ -105,7 +105,7 @@ class ClanWarLog(DefaultView):
             await interaction.edit_original_response(embed=embed,view=self)
             return
         
-        self.war_index = select.values[0]
+        self.war_index = int(select.values[0])
         select_war = self.war_summary.war_log[self.war_index]
         embed = await clan_war_embed(context=interaction,clan_war=select_war)
 
