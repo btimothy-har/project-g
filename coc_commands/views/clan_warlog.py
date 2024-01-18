@@ -109,7 +109,9 @@ class ClanWarLog(DefaultView):
             embed.add_field(
                 name=f"{clan.emoji} {clan.clean_name} vs {opponent.clean_name}",
                 value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
-                    + f"{EmojisClash.STAR} `{clan.stars:^5}` vs `{opponent.stars:^5}` {EmojisClash.STAR}"
+                    + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
+                    + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
+                    + f"\n{EmojisClash.STAR} `{clan.stars:^5}` vs `{opponent.stars:^5}` {EmojisClash.STAR}"
                     + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^5.2f}%` vs `{opponent.destruction:^5.2f}%` {EmojisClash.DESTRUCTION}",
                 inline=False
                 )
