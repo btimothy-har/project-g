@@ -111,8 +111,8 @@ class ClanWarLog(DefaultView):
                 value=f"{WarResult.emoji(clan.result)}\u3000{EmojisClash.ATTACK} `{clan.attacks_used:^3}`\u3000{EmojisClash.UNUSEDATTACK} `{clan.unused_attacks:^3}`"
                     + (f"\n*War Ends <t:{war.end_time.int_timestamp}:R>.*" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"\n*War Starts <t:{war.start_time.int_timestamp}:R>.*" if war.start_time > pendulum.now() else "")
-                    + f"\n{EmojisClash.STAR} `{clan.stars:^7}` vs `{opponent.stars:^7}` {EmojisClash.STAR}"
-                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^6.2f}%` vs `{opponent.destruction:^6.2f}%` {EmojisClash.DESTRUCTION}",
+                    + f"\n{EmojisClash.STAR} `{clan.stars:^7}` vs `{opponent.stars:^7}`"
+                    + f"\n{EmojisClash.DESTRUCTION} `{clan.destruction:^6.2f}%` vs `{opponent.destruction:^6.2f}%`",
                 inline=False
                 )
         return embed
@@ -127,9 +127,10 @@ class ClanWarLog(DefaultView):
         self.war_summary = await bot_client.run_in_thread(aClanWarSummary.for_clan,self.clan.tag,get_all_wars)
         self.war_selector = [
             discord.SelectOption(
-                label=f"{w.clan_1.name} vs {w.clan_2.name}",
+                label=f"{w.get_clan(self.clan.tag).name} vs {w.get_opponent(self.clan.tag).name}",
                 value=i-1,
-                description=(f"War Ended {w.end_time.format('MMM DD, YYYY')}" if w.state == WarState.WAR_ENDED else f"War Ends {w.end_time.format('MMM DD, YYYY')}"),
+                description=f"{w.get_clan(self.clan.tag).stars} vs {w.get_opponent(self.clan.tag).stars}"
+                    + (f"War ended {w.end_time.format('MMM DD, YYYY')}" if w.state == WarState.WAR_ENDED else f"War ends {w.end_time.format('MMM DD, YYYY')}"),
                 emoji=w.get_clan(self.clan.tag).emoji)
             for i,w in enumerate(self.war_summary.war_log,1)
             ]
