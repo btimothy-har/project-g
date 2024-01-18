@@ -1213,21 +1213,20 @@ class Bank(commands.Cog):
                         continue
 
                     all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
-                    if all_role_items and len(all_role_items) == 0:
-                        continue
+                    if all_role_items and len(all_role_items) > 0:
 
-                    all_subscribed_users = []
-                    item_iter = AsyncIter(all_role_items)
-                    async for i in item_iter:
-                        async with i.lock:
-                            item = await ShopItem.get_by_id(i.id)
-                            all_subscribed_users.extend(list(item.subscription_log.keys()))
-                    
-                    if str(after.id) not in all_subscribed_users:
-                        await after.remove_roles(
-                            role,
-                            reason="User does not have a valid subscription."
-                            )
+                        all_subscribed_users = []
+                        item_iter = AsyncIter(all_role_items)
+                        async for i in item_iter:
+                            async with i.lock:
+                                item = await ShopItem.get_by_id(i.id)
+                                all_subscribed_users.extend(list(item.subscription_log.keys()))
+                        
+                        if str(after.id) not in all_subscribed_users:
+                            await after.remove_roles(
+                                role,
+                                reason="User does not have a valid subscription."
+                                )
             
             if len(removed_roles) > 0:
                 r_iter = AsyncIter(removed_roles)
