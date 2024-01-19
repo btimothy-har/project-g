@@ -47,9 +47,17 @@ class DefaultRaidTasks():
             bot_client.coc_main_log.exception(f"Error in New Raid task.")
     
     @staticmethod
+    async def _raid_ongoing(clan:aClan,raid:aRaidWeekend):           
+        try:
+            if raid.do_i_save:
+                await raid.save_to_database()
+        except:
+            bot_client.coc_main_log.exception(f"Error in New Raid task.")
+    
+    @staticmethod
     async def _raid_ended(clan:aClan,raid:aRaidWeekend):
         try:
-            await asyncio.sleep(120)
+            await asyncio.sleep(180)
             coc_client = DefaultRaidTasks._get_client()
             
             new_clan = await coc_client.fetch_clan(tag=clan.tag)
@@ -66,6 +74,7 @@ class ClanRaidLoop(TaskLoop):
     _instance = None
 
     _raid_start_events = [DefaultRaidTasks._raid_start]
+    _raid_ongoing_events = [DefaultRaidTasks._raid_ongoing]
     _raid_ended_events = [DefaultRaidTasks._raid_ended]
     
     @classmethod
@@ -267,6 +276,11 @@ class ClanRaidLoop(TaskLoop):
         #Raid Ended
         elif new_raid.state in ['ended'] and getattr(cached_raid,'state',None) == 'ongoing':
             a_iter = AsyncIter(ClanRaidLoop._raid_ended_events)
+            tasks.extend([event(clan,current_raid) async for event in a_iter])
+        
+        #Ongoing Raid
+        elif new_raid.state == 'ongoing' and getattr(cached_raid,'state',None) == 'ongoing':
+            a_iter = AsyncIter(ClanRaidLoop._raid_ongoing_events)
             tasks.extend([event(clan,current_raid) async for event in a_iter])
         
         raid_reminders = await EventReminder.raid_reminders_for_clan(clan)

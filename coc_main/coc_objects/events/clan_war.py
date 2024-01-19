@@ -189,8 +189,6 @@ class aClanWar(AwaitLoader):
         else:
             clan_war.is_alliance_war = False
         
-        if clan_war.do_i_save:
-            await clan_war.save_to_database()
         return clan_war
     
     def to_json(self):
