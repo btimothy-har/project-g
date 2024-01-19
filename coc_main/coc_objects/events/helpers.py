@@ -33,6 +33,7 @@ async def clan_war_embed(
             + (f"\nWar Ended: <t:{clan_war.end_time.int_timestamp}:R>" if clan_war.state == WarState.WAR_ENDED else "")
             + "\n"
             + f"\n\u200E`{clan_war.clan_1.clean_name[:13]:^13}`{EmojisUI.SPACER}`{clan_war.clan_2.clean_name[:13]:^13}`"
+            + f"\n\u200E`{clan_war.clan_1.tag[:13]:^13}`{EmojisClash.CLAN}`{clan_war.clan_2.tag[:13]:^13}`"
             + f"\n\u200E`{str(clan_war.clan_1.attacks_used)+' / '+str(clan_war.attacks_per_member * clan_war.team_size):^13}`{EmojisClash.ATTACK}`{str(clan_war.clan_2.attacks_used)+' / '+str(clan_war.attacks_per_member * clan_war.team_size):^13}`"
             + f"\n\u200E`{str(clan_war.clan_1.stars):^13}`{EmojisClash.STAR}`{str(clan_war.clan_2.stars):^13}`"
             + f"\n\u200E`{str(round(clan_war.clan_1.destruction,2))+'%':^13}`{EmojisClash.DESTRUCTION}`{str(round(clan_war.clan_2.destruction,2))+'%':^13}`"

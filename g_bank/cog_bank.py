@@ -2406,10 +2406,10 @@ class Bank(commands.Cog):
             )
         message = await channel.send(embed=embed)
         thread = await channel.create_thread(
-            name=f"Penalty for {user.display_name}",
+            name=f"Penalty for {user.global_name}",
             message=message)
         
-        await interaction.followup.send(f"Penalty proposed for {user.mention} has been submitted.",ephemeral=True)
+        await interaction.followup.send(f"Your Penalty Proposal for {user.mention} has been submitted.",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY
