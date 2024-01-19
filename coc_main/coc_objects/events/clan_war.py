@@ -645,9 +645,12 @@ class aWarAttack():
         return eff
     
     def compute_attack_stats(self):
-        base_stars = 0
-        base_destruction = 0
         prior_attacks = [att for att in self.defender.defenses if att.order < self.order]
+
+        if len(prior_attacks) == 0:
+            self._new_stars = self.stars
+            self._new_destruction = self.destruction
+            return
 
         prior_stars = max([att.stars for att in prior_attacks])
         prior_destruction = max([att.destruction for att in prior_attacks])
