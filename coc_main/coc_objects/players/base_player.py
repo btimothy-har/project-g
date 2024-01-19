@@ -382,7 +382,7 @@ class _PlayerAttributes():
         return self._sync_locks[self.tag]
     
     async def load(self):
-        if not self._loaded:            
+        if not self._loaded:
             database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self.name = database.get('name','') if database else ""
             self.exp_level = database.get('xp_level','') if database else 0
@@ -391,7 +391,7 @@ class _PlayerAttributes():
             self.home_clan_tag = database.get('home_clan',None) if database else None
             self.war_elo = database.get('war_elo',0) if database else 0
 
-            self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
+            self.is_member = database.get('is_member',False) if database else False
 
             fs = database.get('first_seen',0) if database else 0
             self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
@@ -406,6 +406,9 @@ class _PlayerAttributes():
             self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
             self._loaded = True
+        
+        eval_member = await self.eval_membership(self.is_member)
+        self.is_member = eval_member
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:
