@@ -40,6 +40,7 @@ class BasicPlayer(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
+        self.home_clan = None
 
     def __str__(self):
         return f"Player {self.tag}"
@@ -124,16 +125,22 @@ class BasicPlayer(AwaitLoader):
 
     @property
     def alliance_rank(self) -> str:
-        if self.is_member:
-            if self.discord_user == self.home_clan.leader:
-                return 'Leader'
-            elif self.discord_user in self.home_clan.coleaders:
-                return 'Co-Leader'
-            elif self.discord_user in self.home_clan.elders:
-                return 'Elder'
+        try:
+            if self.is_member:
+                try:
+                    if self.discord_user == self.home_clan.leader:
+                        return 'Leader'
+                    elif self.discord_user in self.home_clan.coleaders:
+                        return 'Co-Leader'
+                    elif self.discord_user in self.home_clan.elders:
+                        return 'Elder'
+                    else:
+                        return 'Member'
+                except:
+                    return 'Member'
             else:
-                return 'Member'
-        else:
+                return 'Non-Member'
+        except:
             return 'Non-Member'
     
     @property
@@ -226,6 +233,7 @@ class BasicPlayer(AwaitLoader):
                     )
             
     async def remove_member(self):
+        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
         if self.home_clan:
             await self.home_clan.remove_member(self.tag)
 
@@ -251,7 +259,7 @@ class BasicPlayer(AwaitLoader):
                 )
             bot_client.coc_data_log.info(
                 f"Player {self} has been removed as a member."
-                + f"\n\tLast Removed: {self.last_removed}"
+                + f"\n\tLast Removed: {self._attributes.last_removed}"
                 )
     
     async def reset_war_elo(self):
@@ -374,7 +382,7 @@ class _PlayerAttributes():
         return self._sync_locks[self.tag]
     
     async def load(self):
-        if not self._loaded:            
+        if not self._loaded:
             database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self.name = database.get('name','') if database else ""
             self.exp_level = database.get('xp_level','') if database else 0
@@ -383,7 +391,7 @@ class _PlayerAttributes():
             self.home_clan_tag = database.get('home_clan',None) if database else None
             self.war_elo = database.get('war_elo',0) if database else 0
 
-            self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
+            self.is_member = database.get('is_member',False) if database else False
 
             fs = database.get('first_seen',0) if database else 0
             self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
@@ -398,6 +406,9 @@ class _PlayerAttributes():
             self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
             self._loaded = True
+        
+        eval_member = await self.eval_membership(self.is_member)
+        self.is_member = eval_member
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:

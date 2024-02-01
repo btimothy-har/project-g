@@ -6,6 +6,8 @@ import pendulum
 
 from typing import *
 
+from redbot.core.utils import AsyncIter
+
 from pymongo import ReturnDocument
 from collections import defaultdict
 from coc_main.api_client import BotClashClient
@@ -237,14 +239,32 @@ class ShopItem():
             self._stock = r_stock['stock']        
     
     async def compute_user_expiry(self,user_id:int) -> Optional[pendulum.DateTime]:
-        timestamp = self.subscription_log.get(str(user_id),None)
-        if timestamp:
-            if bot_client.bot.user.id == 828838353977868368:
-                expiry_time = pendulum.from_timestamp(timestamp).add(minutes=self.subscription_duration)
-            else:
-                expiry_time = pendulum.from_timestamp(timestamp).add(days=self.subscription_duration)
-            return expiry_time
-        return None
+        if not self.subscription:
+            return None
+        if self.assigns_role:
+            expiration_times = []
+            role_items = await ShopItem.get_by_role_assigned(self.guild_id,self.role_id)
+            i_iter = AsyncIter([r for r in role_items if r.subscription])
+            async for item in i_iter:
+                timestamp = item.subscription_log.get(str(user_id),None)
+                if timestamp:
+                    if bot_client.bot.user.id == 828838353977868368:
+                        expiry_time = pendulum.from_timestamp(timestamp).add(minutes=item.subscription_duration)
+                    else:
+                        expiry_time = pendulum.from_timestamp(timestamp).add(days=item.subscription_duration)
+                    expiration_times.append(expiry_time)
+            if len(expiration_times) > 0:
+                return max(expiration_times)
+            return None
+        else:
+            timestamp = self.subscription_log.get(str(user_id),None)
+            if timestamp:
+                if bot_client.bot.user.id == 828838353977868368:
+                    expiry_time = pendulum.from_timestamp(timestamp).add(minutes=self.subscription_duration)
+                else:
+                    expiry_time = pendulum.from_timestamp(timestamp).add(days=self.subscription_duration)
+                return expiry_time
+            return None
 
     async def purchase(self,user:discord.Member,free_purchase:bool=False):
         quantity = 1
@@ -275,18 +295,19 @@ class ShopItem():
                     )
                 self._stock = item['stock']
     
-    async def expire_item(self,user:discord.Member):
+    async def expire_item(self,user:Union[discord.Member,discord.User]):
         async with self.lock:
             doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
             self.subscription_log = doc.get('subscription_log',{})
-            del self.subscription_log[str(user.id)]            
-            await bot_client.coc_db.db__shop_item.update_one(
-                {'_id':self._id},
-                {'$set':
-                    {'subscription_log':self.subscription_log}
-                    }
-                )
-            bot_client.coc_main_log.info(f"{self.id} {self.name} expired for {user.id} {user.name}.")
+            if str(user.id) in self.subscription_log:
+                del self.subscription_log[str(user.id)]            
+                await bot_client.coc_db.db__shop_item.update_one(
+                    {'_id':self._id},
+                    {'$set':
+                        {'subscription_log':self.subscription_log}
+                        }
+                    )
+                bot_client.coc_main_log.info(f"{self.id} {self.name} expired for {user.id} {user.name}.")
 
     async def restock(self,quantity:int=1):
         async with self.lock:

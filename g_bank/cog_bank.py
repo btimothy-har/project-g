@@ -47,6 +47,28 @@ from mee6rank.mee6rank import Mee6Rank
 bot_client = BotClashClient()
 non_member_multiplier = 0.2
 
+pen_duration_sel = [
+    app_commands.Choice(name="1 Day", value=1),
+    app_commands.Choice(name="3 Days", value=3),
+    app_commands.Choice(name="5 Days", value=5),
+    app_commands.Choice(name="7 Days", value=7),
+    app_commands.Choice(name="14 Days", value=14),
+    app_commands.Choice(name="30 Days", value=30),
+    ]
+
+def _staff_check(interaction:discord.Interaction):
+    if is_owner(interaction):
+        return True
+    if is_bank_admin(interaction):
+        return True
+    
+    cog = bot_client.bot.get_cog("Bank")
+    
+    guild_user = cog.bank_guild.get_member(interaction.user.id)
+    if guild_user and set(cog.guild_staff).intersection(set([r.id for r in guild_user.roles])):
+        return True
+    return False
+
 ############################################################
 ############################################################
 #####
@@ -78,12 +100,12 @@ class Bank(commands.Cog):
 
         self._log_channel = 0
         self._log_queue = asyncio.Queue()
-        self._log_task_lock = asyncio.Lock()
-        self._log_lock = asyncio.Lock()
+        self._log_task = None
 
         self._redm_log_channel = 1189491279449575525 if bot.user.id == 1031240380487831664 else 1189120831880700014
         self._bank_admin_role = 1189481989984751756 if bot.user.id == 1031240380487831664 else 1123175083272327178
         self._bank_pass_role = 0
+        self._bank_penalty_role = 0
 
         self._subscription_lock = asyncio.Lock()
 
@@ -92,6 +114,7 @@ class Bank(commands.Cog):
             "use_rewards":False,
             "log_channel":0,
             "bank_pass_role":0,
+            "bank_penalty_role":0,
             "admins":[],
             }
         self.config.register_global(**default_global)
@@ -113,6 +136,10 @@ class Bank(commands.Cog):
             self._bank_pass_role = await self.config.bank_pass_role()
         except:
             self._bank_pass_role = 0
+        try:
+            self._bank_penalty_role = await self.config.bank_penalty_role()
+        except:
+            self._bank_penalty_role = 0
 
         self.bank_admins = await self.config.admins()
         asyncio.create_task(self.start_cog())
@@ -145,12 +172,13 @@ class Bank(commands.Cog):
         
         self.subscription_item_expiry.start()
         self.staff_item_grant.start()
-        self.send_bank_logs_batch.start()
+
+        self._log_task = asyncio.create_task(self._log_task_loop())
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
         self.staff_item_grant.cancel()
-        self.send_bank_logs_batch.cancel()
+        await self._log_task.cancel()
         PlayerLoop.remove_player_event(self.member_th_progress_reward)
         PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
         PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
@@ -178,6 +206,10 @@ class Bank(commands.Cog):
     @property
     def bank_pass_role(self) -> Optional[discord.Role]:
         return self.bank_guild.get_role(self._bank_pass_role) if self.bank_guild else None
+
+    @property
+    def bank_penalty_role(self) -> Optional[discord.Role]:
+        return self.bank_guild.get_role(self._bank_penalty_role) if self.bank_guild else None
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):
@@ -209,14 +241,13 @@ class Bank(commands.Cog):
         if amount == 0:
             return
         
-        async with self._log_lock:
-            await self._log_queue.put({
-                'user_id': user.id,
-                'done_by_id': done_by.id,
-                'amount': amount,
-                'comment': comment,
-                'timestamp': pendulum.now().int_timestamp
-                })
+        await self._log_queue.put({
+            'user_id': user.id,
+            'done_by_id': done_by.id,
+            'amount': amount,
+            'comment': comment,
+            'timestamp': pendulum.now().int_timestamp
+            })
     
     async def redemption_terms_conditions(self):
         embed = await clash_embed(
@@ -327,6 +358,11 @@ class Bank(commands.Cog):
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
         
+        member = aMember(user.id)
+        await member.load()
+        if not member.is_member:
+            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
+        
         item = await ShopItem.get_by_id(item_id)
         inventory = await UserInventory(user)
         if not inventory.has_item(item):
@@ -364,6 +400,9 @@ class Bank(commands.Cog):
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
         await member.load()
+
+        if not member.is_member:
+            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
         
         fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
@@ -399,6 +438,11 @@ class Bank(commands.Cog):
             
             if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
                 return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+            
+            member = aMember(user.id)
+            await member.load()
+            if not member.is_member:
+                return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
             
             item = await ShopItem.get_by_id(item_id)
             inventory = await UserInventory(user)
@@ -643,8 +687,13 @@ class Bank(commands.Cog):
             else:
                 tax_pct = 0.25
                 additional_tax = (current_balance - 200000) // 10000 * 0.01 * 10000
+            
+            guild_user = self.bank_guild.get_member(user_id)
+            if guild_user and self.bank_penalty_role in guild_user.roles:
+                total_tax = max(round(0.1 * current_balance),round((current_balance * tax_pct) + additional_tax) * 2)
+            else:
+                total_tax = round((current_balance * tax_pct) + additional_tax)
 
-            total_tax = round((current_balance * tax_pct) + additional_tax)
             if total_tax > 0:
                 await bank.withdraw_credits(user,total_tax)
                 await self.reserve_account.deposit(
@@ -676,6 +725,9 @@ class Bank(commands.Cog):
         guild_user = self.bank_guild.get_member(player.discord_user)
         reward_tag = await member._get_reward_account_tag()
 
+        if guild_user and self.bank_penalty_role in guild_user.roles:
+            return 0
+        
         if guild_user and self.bank_pass_role in guild_user.roles:
             if reward_tag == player.tag:
                 multi = 1.5
@@ -841,6 +893,11 @@ class Bank(commands.Cog):
             if player.unused_attacks > 0:
                 balance = await bank.get_balance(member)
                 penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
+
+                guild_user = self.bank_guild.get_member(player.discord_user)
+                if guild_user and self.bank_penalty_role in guild_user.roles:
+                    penalty *= 2                
+
                 await bank.withdraw_credits(member,penalty)
                 await self.current_account.deposit(
                     amount = penalty,
@@ -899,6 +956,11 @@ class Bank(commands.Cog):
                 unused_attacks = 6 - player.attack_count
                 balance = await bank.get_balance(member)
                 penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
+                
+                guild_user = self.bank_guild.get_member(player.discord_user)
+                if guild_user and self.bank_penalty_role in guild_user.roles:
+                    penalty *= 2
+
                 await bank.withdraw_credits(member,penalty)
                 await self.current_account.deposit(
                     amount = penalty,
@@ -1033,27 +1095,50 @@ class Bank(commands.Cog):
     ##### SUBSCRIPTION EXPIRY
     ############################################################
     ############################################################
-    @tasks.loop(seconds=1.0)
-    async def send_bank_logs_batch(self):
-        if self._log_task_lock.locked():
-            return
-        
-        embeds = []
-                
-        async with self._log_task_lock, self._log_lock:
-            if not self.log_channel:
-                return
-            
-            currency = await bank.get_currency_name()
+    async def _log_task_loop(self):        
+        try:
             while True:
-                size = self._log_queue.qsize()
-                if size == 0:
-                    break
+                embeds = []
+                if not self.log_channel:
+                    await asyncio.sleep(0.25)
+                    continue
+
+                currency = await bank.get_currency_name()
+
+                chk = True
+                while chk:
+                    log_entry = await self._log_queue.get()
                 
-                log_entry = await self._log_queue.get()
-                log_user = self.bot.get_user(log_entry['user_id'])
-                done_by = self.bot.get_user(log_entry['done_by_id'])
+                    log_user = self.bot.get_user(log_entry['user_id'])
+                    done_by = self.bot.get_user(log_entry['done_by_id'])
             
+                    embed = await clash_embed(
+                        context=self.bot,
+                        message=f"`{log_user.id}`"
+                            + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
+                        success=True if log_entry['amount'] >= 0 else False,
+                        timestamp=pendulum.from_timestamp(log_entry['timestamp'])
+                        )
+                    embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
+                    embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
+                    embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
+                    embeds.append(embed)
+
+                    if len(embeds) >= 10:
+                        chk = False
+                    elif self._log_queue.qsize() == 0:
+                        chk = False                        
+                    
+                if len(embeds) > 0:
+                    await self.log_channel.send(embeds=embeds)
+                    await asyncio.sleep(0.25)
+        
+        except asyncio.CancelledError:
+            while True:
+                embeds = []
+                log_entry = await self._log_queue.get()                    
+                log_user = self.bot.get_user(log_entry['user_id'])
+                done_by = self.bot.get_user(log_entry['done_by_id'])        
                 embed = await clash_embed(
                     context=self.bot,
                     message=f"`{log_user.id}`"
@@ -1064,13 +1149,11 @@ class Bank(commands.Cog):
                 embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
                 embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
                 embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
-                embeds.append(embed)
+                await self.log_channel.send(embed=embed)
 
-                if len(embeds) > 10:
+                if self._log_queue.qsize() == 0:
                     break
-                    
-            if len(embeds) > 0:
-                await self.log_channel.send(embeds=embeds)
+                await asyncio.sleep(0.25)
     
     @tasks.loop(minutes=5.0)
     async def staff_item_grant(self):
@@ -1115,6 +1198,65 @@ class Bank(commands.Cog):
                 bot_client.coc_main_log.exception(
                     f"Error granting Vault Passes to Staff."
                     )
+    
+    @commands.Cog.listener("on_member_update")
+    async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
+        async with self._subscription_lock:
+            new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
+            removed_roles = [r for r in [r.id for r in before.roles] if r not in [r.id for r in after.roles]]
+            
+            if len(new_roles) > 0:
+                r_iter = AsyncIter(new_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
+
+                    all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+
+                    if all_role_items and len(all_role_items) > 0:
+                        subscription_items = [i for i in all_role_items if i.subscription]
+
+                        if len(subscription_items) > 0:
+                            all_subscribed_users = []
+                            item_iter = AsyncIter(subscription_items)
+                            async for i in item_iter:
+                                async with i.lock:
+                                    item = await ShopItem.get_by_id(i.id)
+                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
+                            
+                            if str(after.id) not in all_subscribed_users:
+                                await after.remove_roles(
+                                    role,
+                                    reason="User does not have a valid subscription."
+                                    )
+                                bot_client.coc_main_log.info(
+                                    f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
+                                    )
+            
+            if len(removed_roles) > 0:
+                r_iter = AsyncIter(removed_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
+                    if role.id == self.bank_penalty_role.id:
+                        all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                        if all_role_items and len(all_role_items) == 0:
+                            continue
+
+                        all_subscribed_users = []
+                        item_iter = AsyncIter(all_role_items)
+                        async for i in item_iter:
+                            async with i.lock:
+                                item = await ShopItem.get_by_id(i.id)
+                                all_subscribed_users.extend(list(item.subscription_log.keys()))
+                        
+                        if str(after.id) in all_subscribed_users:
+                            await after.add_roles(
+                                role,
+                                reason="User has a valid subscription."
+                                )
 
     @tasks.loop(seconds=1.0)
     async def subscription_item_expiry(self):
@@ -1129,25 +1271,6 @@ class Bank(commands.Cog):
                 try:
                     if not item.guild:
                         continue
-
-                    if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
-                        if len(item.assigns_role.members) > 0:
-                            all_role_items = await ShopItem.get_by_role_assigned(item.guild.id,item.assigns_role.id)
-
-                            all_subscribed_users = []
-                            item_iter = AsyncIter(all_role_items)
-                            async for i in item_iter:
-                                async with i.lock:
-                                    item = await ShopItem.get_by_id(i.id)
-                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
-                            
-                            m_iter = AsyncIter(item.assigns_role.members)
-                            async for member in m_iter:
-                                if str(member.id) not in all_subscribed_users:
-                                    await member.remove_roles(
-                                        item.assigns_role,
-                                        reason="User does not have a valid subscription."
-                                        )
                                     
                     u_iter = AsyncIter(list(item.subscription_log.items()))
                     async for user_id,timestamp in u_iter:
@@ -1571,6 +1694,23 @@ class Bank(commands.Cog):
         self._bank_pass_role = role.id
         await self.config.bank_pass_role.set(self.bank_pass_role.id)
         await ctx.reply(f"Bank Pass Role set to {role.name} `{role.id}`.")
+    
+    ##################################################
+    ### BANK / ADMIN / PENALTY ROLE
+    ##################################################
+    @command_group_bank.command(name="penrole")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_set_pen_role(self,ctx:commands.Context,role:discord.Role):
+        """
+        [Owner-only] Sets a role to use as the Bank Penalty Role.
+        """   
+        if role.guild.id != self.bank_guild.id:
+            return await ctx.reply("Role must be from the Bank Server.")
+             
+        self._bank_penalty_role = role.id
+        await self.config.bank_penalty_role.set(self.bank_penalty_role.id)
+        await ctx.reply(f"Bank Penalty Role set to {role.name} `{role.id}`.")
 
     ##################################################
     ### BANK / GLOBALBAL
@@ -1876,7 +2016,7 @@ class Bank(commands.Cog):
             embed=None,
             attachments=[discord.File(rpfile)]
             )
-    
+        
     ##################################################
     ### BALANCE
     ##################################################
@@ -2237,6 +2377,39 @@ class Bank(commands.Cog):
             count += 1
         
         return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
+
+    ##################################################
+    ### BANK / PENALTY
+    ##################################################    
+    @app_command_group_bank.command(name="penalty",
+        description="Propose a user to be penalized. Usable by Staff Members.")
+    @app_commands.check(_staff_check)
+    @app_commands.choices(duration=pen_duration_sel)
+    @app_commands.describe(
+        user="The user to penalize.",
+        duration="The duration of the penalty.",
+        reason="The reason for the penalty."
+        )
+    async def app_command_bank_penalty(self,interaction:discord.Interaction,user:discord.Member,duration:int,reason:str):        
+        await interaction.response.defer(ephemeral=True)
+
+        channel = self.bank_guild.get_channel(1197058963192160316)
+        embed = await clash_embed(
+            context=interaction,
+            message=f"**Penalty for:** {user.mention}"
+                + f"\n**Duration:** {duration} days"
+                + f"\n**Reason:** {reason}"
+                + f"\n\n**Proposed by:** {interaction.user.mention}",
+            timestamp=pendulum.now(),
+            show_author=False,
+            thumbnail=user.avatar.url
+            )
+        message = await channel.send(embed=embed)
+        thread = await channel.create_thread(
+            name=f"Penalty for {user.global_name}",
+            message=message)
+        
+        await interaction.followup.send(f"Your Penalty Proposal for {user.mention} has been submitted.",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY
@@ -2386,7 +2559,7 @@ class Bank(commands.Cog):
         description="Administratively distribute an item to a specified user."
         )
     @app_commands.guild_only()
-    @app_commands.check(is_admin)
+    @app_commands.check(is_bank_admin)
     @app_commands.autocomplete(item=autocomplete_distribute_items)
     @app_commands.describe(
         item="Select an item to distribute.",

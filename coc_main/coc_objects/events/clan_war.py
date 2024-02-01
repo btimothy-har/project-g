@@ -189,8 +189,6 @@ class aClanWar(AwaitLoader):
         else:
             clan_war.is_alliance_war = False
         
-        if clan_war.do_i_save:
-            await clan_war.save_to_database()
         return clan_war
     
     def to_json(self):
@@ -404,11 +402,11 @@ class aWarClan(BasicClan):
     
     @property
     def members(self) -> List['aWarPlayer']:
-        return [m for m in self.war.members if m.clan_tag == self.tag]
+        return sorted([m for m in self.war.members if m.clan_tag == self.tag],key=lambda x:(x.map_position))
     
     @property
     def attacks(self) -> List['aWarAttack']:
-        return [a for a in self.war.attacks if a.attacker.clan_tag == self.tag]
+        return sorted([a for a in self.war.attacks if a.attacker.clan_tag == self.tag],key=lambda x:x.order)
     
     @property
     def unused_attacks(self) -> int:
@@ -416,7 +414,7 @@ class aWarClan(BasicClan):
     
     @property
     def defenses(self) -> List['aWarAttack']:
-        return [a for a in self.war.attacks if a.defender.clan_tag == self.tag]
+        return sorted([a for a in self.war.attacks if a.defender.clan_tag == self.tag],key=lambda x:x.order)
 
     def compute_result(self):
         opponent = self.war.get_opponent(self.tag)        
@@ -645,12 +643,15 @@ class aWarAttack():
         return eff
     
     def compute_attack_stats(self):
-        base_stars = 0
-        base_destruction = 0
-        for attack in [att for att in self.defender.defenses if att.order < self.order]:
-            if attack.stars > base_stars:
-                base_stars = attack.stars
-            if attack.destruction > base_destruction:
-                base_destruction = attack.destruction
-        self._new_stars = max(0,self.stars - base_stars)
-        self._new_destruction = max(0,self.destruction - base_destruction)
+        prior_attacks = [att for att in self.defender.defenses if att.order < self.order]
+
+        if len(prior_attacks) == 0:
+            self._new_stars = self.stars
+            self._new_destruction = self.destruction
+            return
+
+        prior_stars = max([att.stars for att in prior_attacks])
+        prior_destruction = max([att.destruction for att in prior_attacks])
+        
+        self._new_stars = max(0,self.stars - prior_stars)
+        self._new_destruction = max(0,self.destruction - prior_destruction)

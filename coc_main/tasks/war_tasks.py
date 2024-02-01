@@ -40,6 +40,9 @@ class DefaultWarTasks():
         try:
             await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
 
+            if war.do_i_save:
+                await war.save_to_database()
+
             if clan.is_active_league_clan and war.type == ClanWarType.CWL:
                 return
             
@@ -74,6 +77,9 @@ class DefaultWarTasks():
     async def _war_start(clan:aClan,war:aClanWar):
         try:
             await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
+            if war.do_i_save:
+                await war.save_to_database()
+
             if clan.is_registered_clan and len(clan.abbreviation) > 0:
                 await bot_client.update_bot_status(
                     cooldown=60,
@@ -115,6 +121,9 @@ class DefaultWarTasks():
                 link_iter = AsyncIter(clan_links)
                 async for link in link_iter:
                     await link.reset_clan_war_role()
+            
+            if war.do_i_save:
+                await war.save_to_database()
 
             await asyncio.sleep(120)
             client = DefaultWarTasks._get_client()
@@ -142,12 +151,20 @@ class DefaultWarTasks():
             return
         except Exception:
             bot_client.coc_main_log.exception(f"Error in War Ended task.")
+
+    @staticmethod
+    async def _war_ended_infinity(clan:aClan,war:aClanWar):
+        if war.do_i_save:
+            await war.save_to_database()
     
     @staticmethod
     async def _ongoing_war(clan:aClan,war:aClanWar):
         try:
             if war.state != 'inWar':
                 return
+            
+            if war.do_i_save:
+                await war.save_to_database()
             
             time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
             if clan.is_registered_clan and len(clan.abbreviation) > 0 and time_remaining > 3600:
@@ -179,6 +196,7 @@ class ClanWarLoop(TaskLoop):
     _new_war_events = [DefaultWarTasks._war_found]
     _war_start_events = [DefaultWarTasks._war_start]
     _war_ended_events = [DefaultWarTasks._war_ended]
+    _post_war_ended_events = [DefaultWarTasks._war_ended_infinity]
     _ongoing_war_events = [DefaultWarTasks._ongoing_war]
     _new_attack_events = []
     
@@ -436,15 +454,19 @@ class ClanWarLoop(TaskLoop):
             a_iter = AsyncIter(ClanWarLoop._war_ended_events)
             tasks.extend([event(clan,current_war) async for event in a_iter])
                
-        else:
+        elif getattr(cached_war,'state',None) == 'inWar' and new_war.state == 'inWar':
             a_iter = AsyncIter(ClanWarLoop._ongoing_war_events)
             tasks.extend([event(clan,current_war) async for event in a_iter])
         
-            new_attacks = [a for a in new_war.attacks if a.order not in [ca.order for ca in getattr(cached_war,'attacks',[])]]
-            a_iter = AsyncIter(new_attacks)
-            async for a in a_iter:
-                event_iter = AsyncIter(ClanWarLoop._new_attack_events)
-                tasks.extend([event(current_war,a.order) async for event in event_iter])
+        elif getattr(cached_war,'state',None) == 'warEnded' and new_war.state == 'warEnded':
+            a_iter = AsyncIter(ClanWarLoop._post_war_ended_events)
+            tasks.extend([event(clan,current_war) async for event in a_iter])
+        
+        new_attacks = [a for a in new_war.attacks if a.order not in [ca.order for ca in getattr(cached_war,'attacks',[])]]
+        a_iter = AsyncIter(new_attacks)
+        async for a in a_iter:
+            event_iter = AsyncIter(ClanWarLoop._new_attack_events)
+            tasks.extend([event(current_war,a.order) async for event in event_iter])
 
         if is_current:
             war_reminders = await EventReminder.war_reminders_for_clan(clan)

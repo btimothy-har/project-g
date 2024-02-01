@@ -100,11 +100,15 @@ async def autocomplete_store_items_restock(interaction:discord.Interaction,curre
 
 async def autocomplete_distribute_items(interaction:discord.Interaction,current:str):
     try:
+        bank_cog = bot_client.bot.get_cog("Bank")
+
         items = await ShopItem.get_by_guild(interaction.guild.id)
         if interaction.user.id in interaction.client.owner_ids:
             guild_items = [i for i in items]
-        else:
+        elif interaction.user.id in bank_cog.bank_admins:
             guild_items = [i for i in items if i.type != 'cash']
+        else:
+            guild_items = [i for i in items if i.type != 'cash' and getattr(i.assigns_role,'id',None) not in [bank_cog._bank_pass_role,bank_cog._bank_penalty_role]]
 
         if not current:
             selection = guild_items

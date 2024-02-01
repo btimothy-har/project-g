@@ -94,7 +94,7 @@ class GuildUtility(commands.Cog):
                 },
             {
                 "name": "_assistant_wikipedia_search",
-                "description": "Searches Wikipedia for results. Only returns 3 results at a time. Use different queries to find different results. It may help you to save the specific search queries that correspond with specific Wikipedia pages.",
+                "description": "Searches Wikipedia for results. Only returns 3 results at a time. Use different queries to find different results. It may help you to save the specific search queries that correspond with specific Wikipedia pages. Only use this if you cannot find the answer in your existing training model.",
                 "parameters": {
                     "type": "object",
                     "properties": {
