@@ -287,13 +287,22 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @cached_property
     def troop_strength(self) -> int:
-        return sum([troop.level for troop in self.troops if not troop.is_super_troop]) + sum([pet.level for pet in self.pets])
+        strg = sum([troop.level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.level for pet in self.pets])
+        return strg
     @cached_property
     def max_troop_strength(self) -> int:
-        return (sum([troop.max_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.max_level for pet in self.pets]))
+        strg = sum([troop.max_level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.max_level for pet in self.pets])
+        return strg
     @cached_property
     def min_troop_strength(self) -> int:
-        return (sum([troop.min_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.min_level for pet in self.pets]))
+        strg = sum([troop.min_level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.min_level for pet in self.pets])
+        return strg
     @cached_property
     def troop_strength_pct(self) -> float:
         try:

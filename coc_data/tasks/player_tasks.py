@@ -122,14 +122,14 @@ class PlayerTasks():
                     )
                 bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {pet} upgraded to {new_troop.level}.")
 
+        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: troop strength {old_player.troop_strength} vs {new_player.troop_strength}.")
+        
         tasks = []
         troops = TroopAvailability.return_all_unlocked(new_player.town_hall.level)
-        troop_iter = AsyncIter(troops)        
-        tasks.extend([_check_troop_upgrade(t) async for t in troop_iter])
+        tasks.extend([_check_troop_upgrade(t) for t in troops])
 
         pets = PetAvailability.return_all_unlocked(new_player.town_hall.level)
-        pet_iter = AsyncIter(pets)
-        tasks.extend([_check_pet_upgrade(p) async for p in pet_iter])
+        tasks.extend([_check_pet_upgrade(p) for p in pets])
 
         await bounded_gather(*tasks)
     
