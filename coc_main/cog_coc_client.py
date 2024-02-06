@@ -114,24 +114,26 @@ class ClashOfClansClient(commands.Cog):
             if len(name) <= 0:
                 name = player.name
             
-            await self.client.coc_db.db__player_activity.insert_one(
-                {
-                    'tag':tag,
-                    'name':name,
-                    'is_member':is_member,
-                    'discord_user':player.discord_user,
-                    'townhall':townhall.json(),
-                    'home_clan':home_clan,
-                    'clan':'',
-                    'activity':'time_in_home_clan',
-                    'stat':'',
-                    'change':0,
-                    'new_value':entry['time_in_home_clan'],
-                    'timestamp':timestamp.int_timestamp,
-                    'read_by_bank':True,
-                    'legacy_conversion':True
-                }
-            )
+            if entry['time_in_home_clan'] > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'time_in_home_clan',
+                        'stat':'',
+                        'change':0,
+                        'new_value':entry['time_in_home_clan'],
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True,
+                        'legacy_conversion':True
+                    }
+                )
+                
             attack_wins = entry.get('attacks',{})
             if attack_wins.get('season_total',0) > 0:
                 await self.client.coc_db.db__player_activity.insert_one(
