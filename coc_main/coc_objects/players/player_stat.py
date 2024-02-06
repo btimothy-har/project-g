@@ -63,7 +63,11 @@ class aPlayerActivity():
 
     @classmethod
     async def get_last_for_player_by_type(cls,tag:str,activity:str) -> Optional['aPlayerActivity']:
-        filter_criteria = {'tag':tag,'activity':activity}
+        filter_criteria = {
+            'tag':tag,
+            'activity':activity,
+            'legacy_conversion':{"$exists": False}
+            }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',-1).limit(1)
         entry = await query.to_list(1)
         if len(entry) > 0:
@@ -88,7 +92,8 @@ class aPlayerActivity():
     async def get_by_type_for_bank(cls,activity:str) -> List[Optional['aPlayerActivity']]:
         filter_criteria = {
             'activity':activity,
-            'read_by_bank':False
+            'read_by_bank':False,
+            'legacy_conversion':{"$exists": False}
             }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',1)
         entries = [cls(entry) async for entry in query]
