@@ -83,7 +83,7 @@ class aPlayerSeason(AwaitLoader):
             ts = self.season.season_start.int_timestamp
             async for a in a_iter:
                 if a.clan_tag == a.home_clan_tag:
-                    self.time_in_home_clan += a._timestamp - ts
+                    self.time_in_home_clan += max(0,a._timestamp - ts)
                 ts = a._timestamp
         
         if self.is_member:            

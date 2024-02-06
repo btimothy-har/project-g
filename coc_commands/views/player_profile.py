@@ -255,7 +255,7 @@ class PlayerProfileMenu(DefaultView):
             td, th, tm, ts = s_convert_seconds_to_str(current_season.time_in_home_clan)
             embed.add_field(
                 name="**Current Season Stats with The Guild**",
-                value=(f"{player.home_clan.emoji} {td} days spent in {player.home_clan.name}\n\n" if player.home_clan else "")
+                value=(f"{player.home_clan.emoji} {max(0,td)} days spent in {player.home_clan.name}\n\n" if player.home_clan else "")
                     + f"**Activity**\n"
                     + f"{EmojisClash.ATTACK} {current_season.attacks}\u3000{EmojisClash.DEFENSE} {current_season.defenses}\n"
                     + f"**Donations**\n"
