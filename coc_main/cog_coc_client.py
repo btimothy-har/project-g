@@ -109,14 +109,14 @@ class ClashOfClansClient(commands.Cog):
             if len(name) <= 0:
                 name = player.name
 
-            is_member = entry('is_member',False)
-            home_clan = entry('home_clan','')
+            is_member = entry.get('is_member',False)
+            home_clan = entry.get('home_clan','')
             townhall = aTownHall(
-                level=entry('town_hall',player.town_hall.level),
-                weapon=0 if entry('town_hall',player.town_hall.level) < 12 else 1
+                level=entry.get('town_hall',player.town_hall.level),
+                weapon=0 if entry.get('town_hall',player.town_hall.level) < 12 else 1
                 )
             
-            if entry['time_in_home_clan'] > 0:
+            if entry.get('time_in_home_clan',0) > 0:
                 await self.client.coc_db.db__player_activity.insert_one(
                     {
                         'tag':tag,
