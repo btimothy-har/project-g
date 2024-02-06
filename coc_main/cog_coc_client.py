@@ -318,7 +318,8 @@ class ClashOfClansClient(commands.Cog):
                         'timestamp':clangames.get('ending_time',0) if clangames.get('ending_time',None) else season.clangames_end.int_timestamp,
                         'read_by_bank':True
                     }
-                )
+                )            
+            bot_client.coc_data_log.info(f"Converted Stats for {tag} {name} {season.id}")
         await ctx.send("Done")
 
     ##################################################
