@@ -680,6 +680,7 @@ async def player_loop_start(iteration_number:int):
     client = BotClashClient()
     client._player_loop_tracker[iteration_number] = pendulum.now()
     client.loop_running['player'] = True
+    client.coc_main_log.info(f"Started Player Loop")
 
 @coc.ClientEvents.player_loop_end()
 async def player_loop_end(iteration_number:int):
@@ -691,6 +692,7 @@ async def player_loop_end(iteration_number:int):
         client.player_loop.append(end.diff(start).in_seconds())
         del client._player_loop_tracker[iteration_number]
         client.loop_running['player'] = False
+    client.coc_main_log.info(f"Ended Player Loop")
 
 @coc.ClientEvents.clan_loop_start()
 async def clan_loop_start(iteration_number:int):
