@@ -343,7 +343,7 @@ class ClashOfClansClient(commands.Cog):
                     }
                 )            
             bot_client.coc_data_log.debug(f"Converted Stats for {tag} {name} {season.id}")
-        await ctx.send("Done")
+        await self.bot.send_to_owners("Stats Conversion Complete")
 
     ##################################################
     ### COG LOAD

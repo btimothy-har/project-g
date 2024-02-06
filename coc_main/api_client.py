@@ -377,7 +377,7 @@ class BotClashClient():
             self.bot.coc_client = coc.EventsClient(
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
-                throttle_limit=rate_limit
+                throttle_limit=rate_limit,
                 )
             self.coc_main_log.info(f"New Client Created: {self.bot.coc_client} with {len(self.client_keys)} keys.")
 

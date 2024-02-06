@@ -222,6 +222,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.war_stars
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="war_stars",
             change=max(0,new_player.war_stars - ref_value),
             new_value=new_player.war_stars
