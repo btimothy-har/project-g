@@ -475,16 +475,20 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         return await WarLeaguePlayer(self.tag,season)
 
     def get_hero(self,hero_name:str):
-        return next((hero for hero in self.heroes if hero.name == hero_name),None)
+        hero = next((hero for hero in self._heroes if hero.name == hero_name),None)
+        return aHero(hero,self.town_hall.level) if hero else None
     
     def get_troop(self,name:str,is_home_troop:bool=True):
         if is_home_troop:
-            return next((troop for troop in self.troops if troop.name == name and troop.is_home_troop),None)
+            troop = next((troop for troop in self._troops if troop.name == name and troop.village == 'home'),None)
         else:
-            return next((troop for troop in self.troops if troop.name == name),None)
+            troop = next((troop for troop in self._troops if troop.name == name),None)
+        return aTroop(troop,self.town_hall.level) if troop else None
     
     def get_spell(self,name:str):
-        return next((spell for spell in self.spells if spell.name == name),None)
+        spell = next((spell for spell in self._spells if spell.name == name),None)
+        return aSpell(spell,self.town_hall.level) if spell else None
     
     def get_pet(self,name:str):
-        return next((pet for pet in self.pets if pet.name == name),None)
+        pet = next((pet for pet in self._pets if pet.name == name),None)
+        return aPet(pet,self.town_hall.level) if pet else None
