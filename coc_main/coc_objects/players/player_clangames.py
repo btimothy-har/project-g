@@ -4,6 +4,8 @@ import pendulum
 
 from typing import *
 
+from .player_stat import aPlayerActivity
+
 from ..season.season import aClashSeason
 from ...api_client import BotClashClient as client
 
@@ -11,93 +13,71 @@ bot_client = client()
 
 class aPlayerClanGames():
     __slots__ = [
-        '_lock',
-        '_prior_seen',
         'tag',
         'season',
         'clan_tag',
-        'score',
-        'last_update',
         'starting_time',
+        '_score',
         'ending_time'
         ]
     
-    def __init__(self,tag:str,season:aClashSeason,dict_value:dict):
-        self._lock = asyncio.Lock()
-        self._prior_seen = dict_value.get('priorSeen',False)
-        
+    def __init__(self,tag:str,season:aClashSeason,activities:List[aPlayerActivity]):        
         self.tag = tag
-        self.season = season        
+        self.season = season
 
-        self.clan_tag = dict_value.get('clan',None)
-        self.score = dict_value.get('score',0)
-        self.last_update = dict_value.get('last_updated',0)
-
-        if isinstance(dict_value.get('starting_time'),datetime.datetime):
-            if dict_value['starting_time'].timestamp() > 0:
-                self.starting_time = pendulum.instance(dict_value['starting_time'])
-            else:
-                self.starting_time = None
-        else:
-            if isinstance(dict_value.get('starting_time',0),int) and dict_value.get('starting_time',0) > 0:
-                self.starting_time = pendulum.from_timestamp(dict_value.get('starting_time',0))
-            else:
-                self.starting_time = None
-
-        if isinstance(dict_value.get('ending_time'),datetime.datetime):
-            if dict_value['ending_time'].timestamp() > 0:
-                self.ending_time = pendulum.instance(dict_value['ending_time'])
-            else:
-                self.ending_time = None
-        else:
-            if dict_value.get('ending_time') and int(dict_value.get('ending_time',0)) > 0:
-                self.ending_time = pendulum.from_timestamp(dict_value.get('ending_time',0))
-            else:
-                self.ending_time = None
-    
-    @property
-    def _db_id(self) -> Dict[str,str]:
-        return {'season': self.season.id,'tag': self.tag}
+        if len(activities) == 0:
+            self.clan_tag = None
+            self.starting_time = None
+            self._score = 0
+            self.ending_time = None
         
-    @property
-    def json(self):
-        return {
-            'clan': self.clan_tag,
-            'score': self.score,
-            'last_updated': self.last_update,
-            'starting_time': getattr(self.starting_time,'int_timestamp',None),
-            'ending_time': getattr(self.ending_time,'int_timestamp',None),
-            'priorSeen': self._prior_seen
-            }
+        else:
+            first_entry = activities[0]
+            last_entry = activities[-1]
+
+            self.clan_tag = first_entry.clan
+            self.starting_time = first_entry.timestamp
+
+            self._score = sum([activity.change for activity in activities if activity.activity == 'clangames'])
+            self._ending_time = last_entry.timestamp
     
     @property
     def games_start(self):
-        return self.season.clangames_start
-    
+        return self.season.clangames_start    
     @property
     def games_end(self):
-        return self.season.clangames_end
-    
+        return self.season.clangames_end    
     @property
-    def completion(self):
+    def is_participating(self) -> bool:
+        return self.clan_tag is not None    
+    @property
+    def is_completed(self) -> bool:
+        return self.score >= self.season.clangames_max    
+    @property
+    def score(self) -> int:
+        return min(self._score,self.season.clangames_max)    
+    @property
+    def ending_time(self) -> Optional[pendulum.DateTime]:
+        if self.is_completed:
+            return self._ending_time
+        return None    
+    @property
+    def completion(self) -> Optional[pendulum.Duration]:
         if self.ending_time:
             return self.games_start.diff(self.ending_time)
         else:
-            return None
-        
+            return None        
     @property
     def completion_seconds(self) -> int:
         if self.ending_time:
             return self.completion.in_seconds()
         else:
-            return 0
-        
+            return 0        
     @property
     def time_to_completion(self):
         if self.ending_time:
             if self.ending_time.int_timestamp - self.games_start.int_timestamp <= 50:
-                return "Not Tracked"
-            
+                return "Not Tracked"            
             completion_str = ""
             if self.completion.days > 0:
                 completion_str += f"{self.completion.days}d"
@@ -108,40 +88,3 @@ class aPlayerClanGames():
             return completion_str
         else:
             return ""
-        
-    async def update_in_database(self):
-        await bot_client.coc_db.db__player_stats.update_one(
-            {'_id':self._db_id},
-            {'$set': {
-                'season':self.season.id,
-                'tag':self.tag,
-                'clangames':self.json
-                }
-            },
-            upsert=True)
-
-    async def update(self,increment:int,latest_value:int,timestamp:pendulum.DateTime,clan_tag:str):        
-        async with self._lock:
-            if pendulum.now() >= self.games_start and self.score == 0 and clan_tag:
-                self.clan_tag = clan_tag
-                self.starting_time = timestamp
-                bot_client.coc_data_log.debug(
-                    f"Player {self.tag} {self.season.id}: Started Clan Games at {timestamp}."
-                    )
-
-            self.score += increment
-            self.last_update = latest_value
-            bot_client.coc_data_log.debug(
-                f"Player {self.tag} {self.season.id}: Clan Games score updated to {self.score} ({increment})."
-                )
-
-            if self.score >= self.season.clangames_max:
-                self.ending_time = timestamp
-                self.score = self.season.clangames_max
-                bot_client.coc_data_log.debug(
-                    f"Player {self.tag} {self.season.id}: Finished Clan Games at {timestamp}."
-                    )
-            
-            self._prior_seen = True            
-            await self.update_in_database()        
-        return self

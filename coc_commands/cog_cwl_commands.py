@@ -16,13 +16,14 @@ from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeag
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 
 from coc_main.discord.member import aMember
-from coc_main.tasks.war_tasks import ClanWarLoop
 
 from coc_main.utils.components import clash_embed, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
 from coc_main.utils.checks import is_admin, is_coleader, is_cwl_leader
+
+from coc_data.tasks.war_tasks import ClanWarLoop
 
 from .views.cwl_player import CWLPlayerMenu
 from .views.cwl_setup import CWLSeasonSetup
@@ -60,6 +61,14 @@ class ClanWarLeagues(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
     
     async def cog_load(self):
+        async def load_events(self):
+            while True:
+                if getattr(bot_client,'_is_initialized',False):
+                    break
+                await asyncio.sleep(1)            
+            ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
+            ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
+            
         asyncio.create_task(self.load_events())
     
     async def cog_unload(self):
@@ -218,16 +227,7 @@ class ClanWarLeagues(commands.Cog):
         
     ############################################################
     ##### WAR ELO TASKS
-    ############################################################    
-    async def load_events(self):
-        while True:
-            if getattr(bot_client,'_is_initialized',False):
-                break
-            await asyncio.sleep(1)
-        
-        ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
-        ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
-
+    ############################################################
     async def cwl_elo_adjustment(self,clan:aClan,war:aClanWar):
         if war.type != ClanWarType.CWL:
             return
@@ -528,7 +528,7 @@ class ClanWarLeagues(commands.Cog):
         description="Manage Clans available for CWL.",
         parent=app_command_group_cwl,
         guild_only=True
-        )    
+        )
 
     ##################################################
     ### CWL / CLAN / LIST

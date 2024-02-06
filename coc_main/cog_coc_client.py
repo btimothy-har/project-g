@@ -5,6 +5,7 @@ import pendulum
 
 from typing import *
 
+from art import text2art
 from collections import deque
 from discord.ext import tasks
 
@@ -46,7 +47,7 @@ class ClashOfClansClient(commands.Cog):
 
     def __init__(self,bot:Red):
         self.bot = bot
-        self.start_task = None
+        self.season_lock = asyncio.Lock()
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -89,9 +90,11 @@ class ClashOfClansClient(commands.Cog):
     ##################################################
     async def cog_load(self):
         self.bot_status_update_loop.start() 
+        self.clash_season_check.start()
         
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
+        self.clash_season_check.cancel()
 
         BasicPlayer.clear_cache()
         BasicClan.clear_cache()
@@ -128,6 +131,48 @@ class ClashOfClansClient(commands.Cog):
             self.client.coc_main_log.exception(
                 f"Error in Bot Status Loop"
                 )
+    
+    @tasks.loop(seconds=10.0)
+    async def clash_season_check(self):
+        if self.season_lock.locked():
+            return
+        
+        try:
+            async with self.season_lock:
+                season = await aClashSeason.get_current_season()
+
+                if season.id == bot_client.current_season.id:
+                    return None
+                
+                await season.set_as_current()
+                await bot_client.load_seasons()
+                
+                bot_client.coc_main_log.info(f"New Season Started: {season.id} {season.description}\n"
+                    + text2art(f"{season.id}",font="small")
+                    )
+                bot_client.coc_data_log.info(f"New Season Started: {season.id} {season.description}\n"
+                    + text2art(f"{season.id}",font="small")
+                    )
+                
+                await bot_client.bot.change_presence(
+                    activity=discord.Activity(
+                        type=discord.ActivityType.playing,
+                        name=f"start of the {bot_client.current_season.short_description} Season! Clash on!")
+                        )
+
+                bank_cog = bot_client.bot.get_cog('Bank')
+                if bank_cog:
+                    await bank_cog.apply_bank_taxes()
+                    await bank_cog.month_end_sweep()
+        
+        except Exception as exc:
+            await self.bot.send_to_owners(f"An error occured during Season Refresh. Check logs for details."
+                + f"```{exc}```")
+            bot_client.coc_main_log.exception(
+                f"Error in Season Refresh"
+                )        
+        finally:
+            bot_client.last_season_check = pendulum.now()
 
     ############################################################
     #####
@@ -480,7 +525,6 @@ class RefreshStatus(DefaultView):
 
         super().__init__(context,timeout=9999999)
         self.is_active = True
-
         self.add_item(button)
     
     @property

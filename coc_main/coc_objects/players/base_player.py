@@ -51,7 +51,6 @@ class BasicPlayer(AwaitLoader):
     async def load(self):
         await self._attributes.load()
         self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
-        await bot_client.player_queue.put(self.tag)
     
     ##################################################
     #####

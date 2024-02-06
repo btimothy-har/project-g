@@ -10,13 +10,18 @@ class aTownHall():
     def __str__(self) -> str:
         return self.description
     
+    def json(self) -> dict:
+        return {
+            'level':self.level,
+            'weapon':self.weapon
+            }
+    
     @property
     def emoji(self) -> str:
         return EmojisTownHall.get(self.level)
     @property
     def emote(self) -> str:
-        return EmojisTownHall.get(self.level)
-    
+        return EmojisTownHall.get(self.level)    
     @property
     def description(self) -> str:
         if self.level >= 12:

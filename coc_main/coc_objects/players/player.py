@@ -349,6 +349,24 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         except ZeroDivisionError:
             return 0
     
+    @cached_property
+    def loot_gold(self) -> int:
+        achievement = self.get_achievement('Gold Grab')
+        return achievement.value if achievement else 0
+    @cached_property
+    def loot_elixir(self) -> int:
+        achievement = self.get_achievement('Elixir Escapade')
+        return achievement.value if achievement else 0
+    @cached_property
+    def loot_darkelixir(self) -> int:
+        achievement = self.get_achievement('Heroic Heist')
+        return achievement.value if achievement else 0
+    @cached_property
+    def clan_games(self) -> int:
+        achievement = self.get_achievement('Games Champion')
+        return achievement.value if achievement else 0
+
+    
     ##################################################
     ### DATA FORMATTERS
     ##################################################
@@ -434,21 +452,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
                 tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
             if basic_player.town_hall_level != self.town_hall_level:
                 tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
-
-            if self.is_member:
-                current_season = await self.get_current_season()
-
-                if self.name != current_season.name:
-                    tasks.append(asyncio.create_task(current_season.update_name(self.name)))
-
-                if self.town_hall_level != current_season.town_hall:
-                    tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
-
-                if getattr(self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
-                    tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(self.home_clan,'tag',None))))
-
-                if self.is_member != current_season.is_member:
-                    tasks.append(asyncio.create_task(current_season.update_member(self.is_member)))
             
             if tasks:
                 await asyncio.gather(*tasks)

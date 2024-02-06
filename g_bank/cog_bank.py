@@ -17,20 +17,21 @@ from coc_main.api_client import BotClashClient, ClashOfClansError, InvalidAbbrev
 from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWeekend
 
 from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.players.hero import aHero
+from coc_main.coc_objects.players.player_stat import aPlayerActivity
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidMember
 
 from coc_main.discord.member import aMember
 
-from coc_main.tasks.player_tasks import PlayerLoop
-from coc_main.tasks.war_tasks import ClanWarLoop
-from coc_main.tasks.raid_tasks import ClanRaidLoop
-
 from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
-from coc_main.utils.constants.coc_constants import WarResult, ClanWarType, HeroAvailability
+from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.checks import is_admin, is_owner
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
+
+from coc_data.tasks.war_tasks import ClanWarLoop
+from coc_data.tasks.raid_tasks import ClanRaidLoop
 
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
 from .objects.inventory import UserInventory
@@ -108,6 +109,9 @@ class Bank(commands.Cog):
         self._bank_penalty_role = 0
 
         self._subscription_lock = asyncio.Lock()
+        self._reward_lock_townhall = asyncio.Lock()
+        self._reward_lock_hero_upgrade = asyncio.Lock()
+        self._reward_lock_clan_capital = asyncio.Lock()
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -154,9 +158,10 @@ class Bank(commands.Cog):
         self.sweep_account = await MasterAccount('sweep')
         self.reserve_account = await MasterAccount('reserve')
     
-        PlayerLoop.add_player_event(self.member_th_progress_reward)
-        PlayerLoop.add_player_event(self.member_hero_upgrade_reward)
-        PlayerLoop.add_achievement_event(self.capital_contribution_rewards)        
+        self.progress_reward_townhall.start()
+        self.progress_reward_hero_upgrade.start()
+        self.clan_capital_contribution_reward.start()
+
         ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
         ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
 
@@ -178,10 +183,13 @@ class Bank(commands.Cog):
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
         self.staff_item_grant.cancel()
+
+        self.progress_reward_townhall.cancel()
+        self.progress_reward_hero_upgrade.cancel()
+        self.clan_capital_contribution_reward.cancel()
+
         await self._log_task.cancel()
-        PlayerLoop.remove_player_event(self.member_th_progress_reward)
-        PlayerLoop.remove_player_event(self.member_hero_upgrade_reward)
-        PlayerLoop.remove_achievement_event(self.capital_contribution_rewards)
+        
         ClanWarLoop.remove_war_end_event(self.clan_war_ended_rewards)
         ClanRaidLoop.remove_raid_end_event(self.raid_weekend_ended_rewards)
         ClanAccount._cache = {}
@@ -189,24 +197,19 @@ class Bank(commands.Cog):
 
     @property
     def client(self) -> ClashOfClansClient:
-        return self.bot.get_cog("ClashOfClansClient")
-    
+        return self.bot.get_cog("ClashOfClansClient")    
     @property
     def bank_guild(self) -> Optional[discord.Guild]:
         return self.bot.get_guild(self._bank_guild)
-
     @property
     def log_channel(self) -> Optional[discord.TextChannel]:
-        return self.bot.get_channel(self._log_channel)
-    
+        return self.bot.get_channel(self._log_channel)    
     @property
     def redemption_log_channel(self) -> discord.TextChannel:
-        return self.bot.get_channel(self._redm_log_channel)
-    
+        return self.bot.get_channel(self._redm_log_channel)    
     @property
     def bank_pass_role(self) -> Optional[discord.Role]:
         return self.bank_guild.get_role(self._bank_pass_role) if self.bank_guild else None
-
     @property
     def bank_penalty_role(self) -> Optional[discord.Role]:
         return self.bank_guild.get_role(self._bank_penalty_role) if self.bank_guild else None
@@ -717,146 +720,183 @@ class Bank(commands.Cog):
     ##### PLAYER PROGRESS REWARDS
     #####
     ############################################################
-    async def _compute_multiplier(self,player:aPlayer) -> float:
+    async def _compute_multiplier(self,player_activity_log:aPlayerActivity) -> float:
         multi = 0.0
-        if not player.discord_user:
+        member = self.bot.get_user(player_activity_log.discord_user)
+        if not member:
             return 0
-        member = aMember(player.discord_user)
-        guild_user = self.bank_guild.get_member(player.discord_user)
+        
+        member = aMember(member.id)
+        guild_user = self.bank_guild.get_member(member.id)
         reward_tag = await member._get_reward_account_tag()
 
         if guild_user and self.bank_penalty_role in guild_user.roles:
             return 0
         
         if guild_user and self.bank_pass_role in guild_user.roles:
-            if reward_tag == player.tag:
+            if reward_tag == player_activity_log.tag:
                 multi = 1.5
-            elif player.is_member:
+            elif player_activity_log.is_member:
                 multi = 1.0
             else:
                 multi = 0.4
         elif guild_user and self.guild_minister in [r.id for r in guild_user.roles]:
-            if reward_tag == player.tag:
+            if reward_tag == player_activity_log.tag:
                 multi = 1.2
-            elif player.is_member:
+            elif player_activity_log.is_member:
                 multi = 0.8
             else:
                 multi = 0.2
         elif guild_user and set(self.guild_staff).intersection(set([r.id for r in guild_user.roles])):
-            if reward_tag == player.tag:
+            if reward_tag == player_activity_log.tag:
                 multi = 1.0
-            elif player.is_member:
+            elif player_activity_log.is_member:
                 multi = 0.6
             else:
                 multi = 0.2
         else:            
-            if reward_tag == player.tag:
+            if reward_tag == player_activity_log.tag:
                 multi = 1.0
-            elif player.is_member:
+            elif player_activity_log.is_member:
                 multi = 0.4
             else:
                 multi = 0.2
         return multi
     
-    async def member_th_progress_reward(self,old_player:aPlayer,new_player:aPlayer):
-        if not self.use_rewards:
-            return
-        if not new_player.is_member:
-            return
-        member = self.bot.get_user(new_player.discord_user)
-        if not member:
-            return
-        
-        if old_player.town_hall.level == new_player.town_hall.level:
-            return
-        
-        if new_player.hero_rushed_pct > 0:
-            reward = 0
-        elif new_player.town_hall.level <= 9:
-            reward = 10000
-        elif new_player.town_hall.level <= 13:
-            reward = 15000
-        else:
-            reward = 20000
-        
-        if reward > 0:
-            multi = await self._compute_multiplier(new_player)
-            new_reward = round(reward * multi)
+    @tasks.loop(minutes=5)
+    async def progress_reward_townhall(self):
+        async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
+            try:
+                if not player_activity_log.is_member:
+                    return            
+                member = self.bot.get_user(player_activity_log.discord_user)
+                if not member:
+                    return            
+                if player_activity_log.change <= 0:
+                    return            
+                player = await self.client.get_player(player_activity_log.tag)            
+                if player.hero_rushed_pct > 0:
+                    reward = 0
+                elif player_activity_log.new_value <= 9:
+                    reward = 10000
+                elif player_activity_log.new_value <= 13:
+                    reward = 15000
+                else:
+                    reward = 20000
+                
+                multi = await self._compute_multiplier(player_activity_log)
+                new_reward = round(reward * multi)
 
-            await bank.deposit_credits(member,new_reward)
-            await self.current_account.withdraw(
-                amount = new_reward,
-                user_id = self.bot.user.id,
-                comment = f"Townhall Bonus (x{multi})for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
-                )
-            await self._send_log(
-                user=member,
-                done_by=self.bot.user,
-                amount=new_reward,
-                comment=f"Townhall Bonus (x{multi}) for {new_player.name} ({new_player.tag}): TH{old_player.town_hall_level} to TH{new_player.town_hall.level}."
-                )
+                await bank.deposit_credits(member,new_reward)
+                await self.current_account.withdraw(
+                    amount = new_reward,
+                    user_id = self.bot.user.id,
+                    comment = f"Townhall Bonus (x{multi})for {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    )
+                await self._send_log(
+                    user=member,
+                    done_by=self.bot.user,
+                    amount=new_reward,
+                    comment=f"Townhall Bonus (x{multi})for {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    )            
+                await player_activity_log.mark_as_read()
+
+            except Exception as e:
+                bot_client.coc_main_log.exception(f"Progress Reward Townhall: {player_activity_log.tag}")
+        
+        if self._reward_lock_townhall.locked():
+            return
+        
+        async with self._reward_lock_townhall:
+            if not self.use_rewards:
+                return
+            
+            activity_type = 'upgrade_townhall'
+            event_logs = await aPlayerActivity.get_by_type_for_bank(activity_type)
+
+            if len(event_logs) == 0:
+                return        
+            distribute_rewards = [distribute_reward_townhall(log) for log in event_logs]
+            await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
     
-    async def member_hero_upgrade_reward(self,old_player:aPlayer,new_player:aPlayer):
-        async def _hero_reward(hero:str):
-            old_hero = old_player.get_hero(hero)
-            new_hero = new_player.get_hero(hero)
-            upgrades = range(getattr(old_hero,'level',0)+1,new_hero.level+1)
-            async for u in AsyncIter(upgrades):
-                if u > new_hero.min_level and reward > 0:
-                    multi = await self._compute_multiplier(new_player)
+    @tasks.loop(minutes=5)
+    async def progress_reward_hero_upgrade(self):
+        async def distribute_reward_hero_upgrade(player_activity_log:aPlayerActivity):
+            try:
+                if not player_activity_log.is_member:
+                    return
+                
+                member = self.bot.get_user(player_activity_log.discord_user)
+                if not member:
+                    return            
+                if player_activity_log.change <= 0:
+                    return
+                
+                hero = aHero.get_hero(player_activity_log.stat)
+                upgrades = range(player_activity_log.new_value - player_activity_log.change,player_activity_log.new_value+1)
+
+                async for u in AsyncIter(upgrades):                
+                    reward = 0 if u <= hero.min_level else 1000
+
+                    multi = await self._compute_multiplier(player_activity_log)
                     new_rew = round(reward * multi)
                     await bank.deposit_credits(member,new_rew)
+
                     await self.current_account.withdraw(
                         amount = new_rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {u}/{new_hero.level}."
+                        comment = f"Hero Bonus (x{multi}) for {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=new_rew,
-                        comment=f"Hero Bonus (x{multi}) for {new_player.name} ({new_player.tag}): {new_hero.name} upgraded to {u}/{new_hero.level}."
+                        comment=f"Hero Bonus (x{multi}) for {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
+                await player_activity_log.mark_as_read()
+
+            except Exception as e:
+                bot_client.coc_main_log.exception(f"Progress Reward Hero Upgrade: {player_activity_log.tag}")
                     
-        if not self.use_rewards:
-            return
-        if not new_player.is_member:
-            return
-        member = self.bot.get_user(new_player.discord_user)
-        if not member:
-            return        
-        if new_player.hero_strength == old_player.hero_strength:
+        if self._reward_lock_hero_upgrade.locked():
             return
         
-        reward = 1000
-        heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
-        await asyncio.gather(*(_hero_reward(hero) for hero in heroes))
-    
-    async def capital_contribution_rewards(self,old_player:aPlayer,new_player:aPlayer,achievement:coc.Achievement):
-        if achievement.name == "Most Valuable Clanmate":
+        async with self._reward_lock_hero_upgrade:
             if not self.use_rewards:
                 return
-            member = self.bot.get_user(new_player.discord_user)
-            if not member:
-                return
             
-            target_clan = new_player.clan if new_player.clan else old_player.clan
+            activity_type = 'upgrade_hero'
+            event_logs = await aPlayerActivity.get_by_type_for_bank(activity_type)
 
-            if not target_clan:
-                return
-            if not target_clan.is_alliance_clan:
-                return
-            
-            old_ach = old_player.get_achievement(achievement.name)
-            new_ach = new_player.get_achievement(achievement.name)            
-            increment = new_ach.value - old_ach.value
-            reward = round(10 * (increment // 1000))
+            if len(event_logs) == 0:
+                return        
+            distribute_rewards = [distribute_reward_hero_upgrade(log) for log in event_logs]
+            await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
+    
+    @tasks.loop(minutes=1)
+    async def clan_capital_contribution_reward(self):
+        async def distribute_capital_contribution_reward(player_activity_log:aPlayerActivity):
+            try:
+                member = self.bot.get_user(player_activity_log.discord_user)
+                if not member:
+                    return
+                
+                if not player_activity_log.stat:
+                    return
+                
+                target_clan = await self.client.fetch_clan(player_activity_log.stat)
+                if not target_clan:
+                    return
+                if not target_clan.is_alliance_clan:
+                    return
+                
+                increment = player_activity_log.change
+                reward = round(10 * (increment // 1000))
 
-            if reward > 0:
                 event_start = pendulum.datetime(2024,1,5,7,0,0)
                 event_end = pendulum.datetime(2024,1,7,7,0,0)
 
-                default_multiplier = await self._compute_multiplier(new_player)
+                default_multiplier = await self._compute_multiplier(player_activity_log)
                 if event_start <= pendulum.now() <= event_end:
                     mult = 3 * default_multiplier if target_clan.tag == "#2L90QPRL9" else default_multiplier
                 else:
@@ -868,14 +908,33 @@ class Bank(commands.Cog):
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): {increment}"
+                    comment = f"Capital Gold Bonus (x{mult}) for {player_activity_log.name} ({player_activity_log.tag}): {increment}"
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=total_reward,
-                    comment=f"Capital Gold Bonus (x{mult}) for {new_player.name} ({new_player.tag}): Donated {increment:,} Gold to {target_clan.name}."
+                    comment=f"Capital Gold Bonus (x{mult}) for {player_activity_log.name} ({player_activity_log.tag}): Donated {increment:,} Gold to {target_clan.name}."
                     )
+                await player_activity_log.mark_as_read()
+
+            except Exception as e:
+                bot_client.coc_main_log.exception(f"Clan Capital Contribution Reward: {player_activity_log.tag}")
+                
+        if self._reward_lock_clan_capital.locked():
+            return
+        
+        async with self._reward_lock_clan_capital:
+            if not self.use_rewards:
+                return
+            
+            activity_type = 'capital_contribution'
+            event_logs = await aPlayerActivity.get_by_type_for_bank(activity_type)
+
+            if len(event_logs) == 0:
+                return        
+            distribute_rewards = [distribute_capital_contribution_reward(log) for log in event_logs]
+            await asyncio.gather(*distribute_rewards)
     
     ############################################################
     #####
@@ -883,55 +942,57 @@ class Bank(commands.Cog):
     #####
     ############################################################
     async def clan_war_ended_rewards(self,clan:aClan,war:aClanWar):
-
         async def war_bank_rewards(player:aWarPlayer):
-            f_player = await self.client.fetch_player(player.tag)
-            member = self.bot.get_user(f_player.discord_user)
-            if not member:
-                return
+            try:
+                f_player = await self.client.fetch_player(player.tag)
+                member = self.bot.get_user(f_player.discord_user)
+                if not member:
+                    return
+                
+                if player.unused_attacks > 0:
+                    balance = await bank.get_balance(member)
+                    penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
+
+                    guild_user = self.bank_guild.get_member(player.discord_user)
+                    if guild_user and self.bank_penalty_role in guild_user.roles:
+                        penalty *= 2                
+
+                    await bank.withdraw_credits(member,penalty)
+                    await self.current_account.deposit(
+                        amount = penalty,
+                        user_id = self.bot.user.id,
+                        comment = f"Clan War Penalty for {player.name} ({player.tag})."
+                        )
+                    await self._send_log(
+                        user=member,
+                        done_by=self.bot.user,
+                        amount=(penalty * -1),
+                        comment=f"Clan War Penalty for {player.name} ({player.tag})."
+                        )
             
-            if player.unused_attacks > 0:
-                balance = await bank.get_balance(member)
-                penalty = round(min(balance,max(100,0.05 * balance) * player.unused_attacks))
+                participation = 50
+                performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
+                result = 100 if player.clan.result == WarResult.WON else 0
 
-                guild_user = self.bank_guild.get_member(player.discord_user)
-                if guild_user and self.bank_penalty_role in guild_user.roles:
-                    penalty *= 2                
+                reward = (participation + performance + result)
+                if reward > 0:
+                    multiplier = await self._compute_multiplier(f_player)
+                    total_reward = round(reward * multiplier)
 
-                await bank.withdraw_credits(member,penalty)
-                await self.current_account.deposit(
-                    amount = penalty,
-                    user_id = self.bot.user.id,
-                    comment = f"Clan War Penalty for {player.name} ({player.tag})."
-                    )
-                await self._send_log(
-                    user=member,
-                    done_by=self.bot.user,
-                    amount=(penalty * -1),
-                    comment=f"Clan War Penalty for {player.name} ({player.tag})."
-                    )
-        
-            participation = 50
-            performance = (50 * player.star_count) + (300 * len([a for a in player.attacks if a.is_triple]))
-            result = 100 if player.clan.result == WarResult.WON else 0
-
-            reward = (participation + performance + result)
-            if reward > 0:
-                multiplier = await self._compute_multiplier(f_player)
-                total_reward = round(reward * multiplier)
-
-                await bank.deposit_credits(member,total_reward)
-                await self.current_account.withdraw(
-                    amount = total_reward,
-                    user_id = self.bot.user.id,
-                    comment = f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
-                    )
-                await self._send_log(
-                    user=member,
-                    done_by=self.bot.user,
-                    amount=total_reward,
-                    comment=f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
-                    )
+                    await bank.deposit_credits(member,total_reward)
+                    await self.current_account.withdraw(
+                        amount = total_reward,
+                        user_id = self.bot.user.id,
+                        comment = f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        )
+                    await self._send_log(
+                        user=member,
+                        done_by=self.bot.user,
+                        amount=total_reward,
+                        comment=f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        )
+            except Exception:
+                bot_client.coc_main_log.exception(f"Clan War Ended Rewards: {player.tag}")
         
         if not self.use_rewards:
             return
@@ -947,50 +1008,53 @@ class Bank(commands.Cog):
     
     async def raid_weekend_ended_rewards(self,clan:aClan,raid:aRaidWeekend):
         async def raid_bank_rewards(player:aRaidMember):
-            f_player = await self.client.fetch_player(player.tag)
-            member = self.bot.get_user(f_player.discord_user)
-            if not member:
-                return
-            
-            if player.attack_count < 6:
-                unused_attacks = 6 - player.attack_count
-                balance = await bank.get_balance(member)
-                penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
+            try:
+                f_player = await self.client.fetch_player(player.tag)
+                member = self.bot.get_user(f_player.discord_user)
+                if not member:
+                    return
                 
-                guild_user = self.bank_guild.get_member(player.discord_user)
-                if guild_user and self.bank_penalty_role in guild_user.roles:
-                    penalty *= 2
+                if player.attack_count < 6:
+                    unused_attacks = 6 - player.attack_count
+                    balance = await bank.get_balance(member)
+                    penalty = round(min(balance,max(50,0.02 * balance) * unused_attacks))
+                    
+                    guild_user = self.bank_guild.get_member(player.discord_user)
+                    if guild_user and self.bank_penalty_role in guild_user.roles:
+                        penalty *= 2
 
-                await bank.withdraw_credits(member,penalty)
-                await self.current_account.deposit(
-                    amount = penalty,
-                    user_id = self.bot.user.id,
-                    comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
-                    )
-                await self._send_log(
-                    user=member,
-                    done_by=self.bot.user,
-                    amount=(penalty * -1),
-                    comment=f"Raid Weekend Penalty for {player.name} ({player.tag})."
-                    )
+                    await bank.withdraw_credits(member,penalty)
+                    await self.current_account.deposit(
+                        amount = penalty,
+                        user_id = self.bot.user.id,
+                        comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
+                        )
+                    await self._send_log(
+                        user=member,
+                        done_by=self.bot.user,
+                        amount=(penalty * -1),
+                        comment=f"Raid Weekend Penalty for {player.name} ({player.tag})."
+                        )
 
-            reward = 20 * (sum([a.new_destruction for a in player.attacks]) // 5)
-            if reward > 0:
-                multiplier = await self._compute_multiplier(f_player)
-                total_reward = round(reward * multiplier)
+                reward = 20 * (sum([a.new_destruction for a in player.attacks]) // 5)
+                if reward > 0:
+                    multiplier = await self._compute_multiplier(f_player)
+                    total_reward = round(reward * multiplier)
 
-                await bank.deposit_credits(member,total_reward)
-                await self.current_account.withdraw(
-                    amount = total_reward,
-                    user_id = self.bot.user.id,
-                    comment = f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
-                    )
-                await self._send_log(
-                    user=member,
-                    done_by=self.bot.user,
-                    amount=total_reward,
-                    comment=f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
-                    )
+                    await bank.deposit_credits(member,total_reward)
+                    await self.current_account.withdraw(
+                        amount = total_reward,
+                        user_id = self.bot.user.id,
+                        comment = f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        )
+                    await self._send_log(
+                        user=member,
+                        done_by=self.bot.user,
+                        amount=total_reward,
+                        comment=f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        )
+            except Exception:
+                bot_client.coc_main_log.exception(f"Raid Weekend Ended Rewards: {player.tag}")
 
         if not self.use_rewards:
             return        
@@ -1006,37 +1070,40 @@ class Bank(commands.Cog):
     ############################################################
     async def member_legend_rewards(self):        
         async def _distribute_rewards(player:aPlayer):
-            if not player.is_member:
-                return
-            if not player.legend_statistics:
-                return
-            if not player.legend_statistics.previous_season:
-                return
+            try:
+                if not player.is_member:
+                    return
+                if not player.legend_statistics:
+                    return
+                if not player.legend_statistics.previous_season:
+                    return
 
-            member = self.bot.get_user(player.discord_user)
-            if not member:
-                return
-            
-            multiplier = await self._compute_multiplier(player)
-            
-            trophies = player.legend_statistics.previous_season.trophies - 5000
-            reward = trophies * reward_per_trophy
-            if reward > 0:
+                member = self.bot.get_user(player.discord_user)
+                if not member:
+                    return
+                
                 multiplier = await self._compute_multiplier(player)
-                total_reward = round(reward * multiplier)
+                
+                trophies = player.legend_statistics.previous_season.trophies - 5000
+                reward = trophies * reward_per_trophy
+                if reward > 0:
+                    multiplier = await self._compute_multiplier(player)
+                    total_reward = round(reward * multiplier)
 
-                await bank.deposit_credits(member,total_reward)
-                await self.current_account.withdraw(
-                    amount=total_reward,
-                    user_id=self.bot.user.id,
-                    comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies}."
-                    )
-                await self._send_log(
-                    user=member,
-                    done_by=self.bot.user,
-                    amount=total_reward,
-                    comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies:,}."
-                    )
+                    await bank.deposit_credits(member,total_reward)
+                    await self.current_account.withdraw(
+                        amount=total_reward,
+                        user_id=self.bot.user.id,
+                        comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies}."
+                        )
+                    await self._send_log(
+                        user=member,
+                        done_by=self.bot.user,
+                        amount=total_reward,
+                        comment=f"Legend Rewards (x{multiplier}) for {player.name} {player.tag}. Trophies: {trophies:,}."
+                        )
+            except Exception:
+                bot_client.coc_main_log.exception(f"Member Legend Rewards: {player.tag}")
         
         if not self.use_rewards:
             return
@@ -1053,31 +1120,34 @@ class Bank(commands.Cog):
     
     async def member_clan_games_rewards(self):
         async def _distribute_rewards(player:aPlayer):
-            if not player.is_member:
-                return          
-            member = self.bot.get_user(player.discord_user)
-            if not member:
-                return
+            try:
+                if not player.is_member:
+                    return          
+                member = self.bot.get_user(player.discord_user)
+                if not member:
+                    return
 
-            player_season = await player.get_season_stats(bot_client.current_season)
-            if player_season.clangames.clan_tag == player_season.home_clan_tag:
-                reward = 4000 * (player_season.clangames.score / 4000)
+                player_season = await player.get_season_stats(bot_client.current_season)
+                if player_season.clangames.clan_tag == player_season.home_clan_tag:
+                    reward = 4000 * (player_season.clangames.score / 4000)
 
-                if reward > 0:
-                    multiplier = await self._compute_multiplier(player)
-                    total_reward = round(reward * multiplier)
-                    await bank.deposit_credits(member,total_reward)
-                    await self.current_account.withdraw(
-                        amount=total_reward,
-                        user_id=self.bot.user.id,
-                        comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
-                        )
-                    await self._send_log(
-                        user=member,
-                        done_by=self.bot.user,
-                        amount=total_reward,
-                        comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
-                        )
+                    if reward > 0:
+                        multiplier = await self._compute_multiplier(player)
+                        total_reward = round(reward * multiplier)
+                        await bank.deposit_credits(member,total_reward)
+                        await self.current_account.withdraw(
+                            amount=total_reward,
+                            user_id=self.bot.user.id,
+                            comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
+                            )
+                        await self._send_log(
+                            user=member,
+                            done_by=self.bot.user,
+                            amount=total_reward,
+                            comment=f"Clan Games Rewards (x{multiplier}) for {player.name} {player.tag}. Score: {player_season.clangames.score}."
+                            )
+            except Exception:
+                bot_client.coc_main_log.exception(f"Member Clan Games Rewards: {player.tag}")
         
         if not self.use_rewards:
             return
@@ -1135,25 +1205,35 @@ class Bank(commands.Cog):
         
         except asyncio.CancelledError:
             while True:
-                embeds = []
-                log_entry = await self._log_queue.get()                    
-                log_user = self.bot.get_user(log_entry['user_id'])
-                done_by = self.bot.get_user(log_entry['done_by_id'])        
-                embed = await clash_embed(
-                    context=self.bot,
-                    message=f"`{log_user.id}`"
-                        + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
-                    success=True if log_entry['amount'] >= 0 else False,
-                    timestamp=pendulum.from_timestamp(log_entry['timestamp'])
-                    )
-                embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
-                embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
-                embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
-                await self.log_channel.send(embed=embed)
+                try:
+                    embeds = []
+                    log_entry = await self._log_queue.get()                    
+                    log_user = self.bot.get_user(log_entry['user_id'])
+                    done_by = self.bot.get_user(log_entry['done_by_id'])        
+                    embed = await clash_embed(
+                        context=self.bot,
+                        message=f"`{log_user.id}`"
+                            + f"**{log_user.mention}\u3000" + ("+" if log_entry['amount'] >= 0 else "-") + f"{abs(log_entry['amount']):,} {currency}**",
+                        success=True if log_entry['amount'] >= 0 else False,
+                        timestamp=pendulum.from_timestamp(log_entry['timestamp'])
+                        )
+                    embed.add_field(name="**Reason**",value=log_entry['comment'],inline=True)
+                    embed.add_field(name="**By**",value=f"{done_by.mention}" + f"`{done_by.id}`",inline=True)
+                    embed.set_author(name=log_user.display_name,icon_url=log_user.display_avatar.url)
+                    await self.log_channel.send(embed=embed)
 
-                if self._log_queue.qsize() == 0:
-                    break
-                await asyncio.sleep(0.25)
+                    if self._log_queue.qsize() == 0:
+                        break
+                    await asyncio.sleep(0.25)
+
+                except:
+                    pass
+        
+        except Exception:
+            bot_client.coc_main_log.exception("Error in Bank Log Task Loop")
+            await bot_client.bot.send_to_owners(f"An error occurred in the Bank Log Task Loop. Check logs for details.")
+            await asyncio.sleep(5)
+            self._log_task = asyncio.create_task(self._log_task_loop())
     
     @tasks.loop(minutes=5.0)
     async def staff_item_grant(self):

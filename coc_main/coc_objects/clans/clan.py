@@ -105,6 +105,10 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         self._level = value
     
     @property
+    def total_clan_donations(self) -> int:
+        return sum([member.donations for member in self.members]) + sum([member.received for member in self.members])
+    
+    @property
     def capital_hall(self) -> int:
         try:
             return [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
