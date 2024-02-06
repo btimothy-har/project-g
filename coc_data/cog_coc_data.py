@@ -267,7 +267,12 @@ class ClashOfClansData(commands.Cog):
             tag_iter = AsyncIter(tags)
             async for tag in tag_iter:
                 if tag not in bot_client.coc._player_updates:
-                    bot_client.coc.add_player_updates(tag)
+                    try:
+                        player = await self.client.fetch_player(tag)
+                    except:
+                        pass
+                    else:
+                        bot_client.coc.add_player_updates(player.tag)
     
     @tasks.loop(minutes=1)    
     async def update_clan_loop(self):
@@ -295,7 +300,12 @@ class ClashOfClansData(commands.Cog):
             tag_iter = AsyncIter(tags)
             async for tag in tag_iter:
                 if tag not in bot_client.coc._clan_updates:
-                    bot_client.coc.add_clan_updates(tag)
+                    try:
+                        clan = await self.client.fetch_clan(tag)
+                    except:
+                        pass
+                    else:
+                        bot_client.coc.add_player_updates(clan.tag)
         
     async def status_embed(self):
         embed = await clash_embed(self.bot,
