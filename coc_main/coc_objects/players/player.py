@@ -479,9 +479,9 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     def get_troop(self,name:str,is_home_troop:bool=True):
         if is_home_troop:
-            return next((troop for troop in self._troops if troop.name == name),None)
+            return next((troop for troop in self._troops if troop.name == name and troop.is_home_troop),None)
         else:
-            return next((troop for troop in self._troops if troop.name == name and not troop.village == 'home'),None)
+            return next((troop for troop in self._troops if troop.name == name),None)
     
     def get_spell(self,name:str):
         return next((spell for spell in self._spells if spell.name == name),None)
