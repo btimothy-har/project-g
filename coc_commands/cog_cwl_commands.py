@@ -68,8 +68,8 @@ class ClanWarLeagues(commands.Cog):
                 await asyncio.sleep(1)            
             ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
             ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
-            
-        asyncio.create_task(self.load_events())
+
+        asyncio.create_task(load_events())
     
     async def cog_unload(self):
         ClanWarLoop.remove_war_end_event(self.cwl_elo_adjustment)

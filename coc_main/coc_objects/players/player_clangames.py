@@ -29,7 +29,7 @@ class aPlayerClanGames():
             self.clan_tag = None
             self.starting_time = None
             self._score = 0
-            self.ending_time = None
+            self._ending_time = None
         
         else:
             first_entry = activities[0]
