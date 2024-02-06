@@ -682,7 +682,7 @@ async def clash_event_error(exception:Exception):
 async def player_loop_start(iteration_number:int):
     client = BotClashClient()
     client._player_loop_tracker[iteration_number] = pendulum.now()
-    client.loop_running['player'] = True
+    client.player_loop_status = True
 
 @coc.ClientEvents.player_loop_finish()
 async def player_loop_end(iteration_number:int):
@@ -691,15 +691,15 @@ async def player_loop_end(iteration_number:int):
     if start:
         end = pendulum.now()
         client.last_loop['player'] = end
+        client.player_loop_status = False
         client.player_loop_runtime.append(end.diff(start).in_seconds())
         del client._player_loop_tracker[iteration_number]
-        client.loop_running['player'] = False
 
 @coc.ClientEvents.clan_loop_start()
 async def clan_loop_start(iteration_number:int):
     client = BotClashClient()
     client._clan_loop_tracker[iteration_number] = pendulum.now()
-    client.loop_running['clan'] = True
+    client.clan_loop_status = True
 
 @coc.ClientEvents.clan_loop_finish()
 async def clan_loop_end(iteration_number:int):
@@ -708,9 +708,9 @@ async def clan_loop_end(iteration_number:int):
     if start:
         end = pendulum.now()
         client.last_loop['clan'] = end
+        client.clan_loop_status = False
         client.clan_loop_runtime.append(end.diff(start).in_seconds())
         del client._clan_loop_tracker[iteration_number]
-        client.loop_running['clan'] = False
 
 @coc.ClientEvents.maintenance_start()
 async def clash_maintenance_start():
