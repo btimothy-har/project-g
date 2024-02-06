@@ -90,7 +90,7 @@ class ClashOfClansClient(commands.Cog):
     @commands.is_owner()
     async def command_convert_stat(self,ctx:commands.Context):
         
-        await self.client.coc_db.db__player_activity.delete_many({})        
+        await self.client.coc_db.db__player_activity.delete_many({'legacy_conversion':True})        
         query = self.client.coc_db.db__player_stats.find({})
 
         await ctx.tick()
@@ -133,7 +133,7 @@ class ClashOfClansClient(commands.Cog):
                         'legacy_conversion':True
                     }
                 )
-                
+
             attack_wins = entry.get('attacks',{})
             if attack_wins.get('season_total',0) > 0:
                 await self.client.coc_db.db__player_activity.insert_one(
