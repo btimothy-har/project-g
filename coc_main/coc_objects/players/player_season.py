@@ -84,6 +84,10 @@ class aPlayerSeason(AwaitLoader):
             async for a in a_iter:
                 if a.clan_tag == a.home_clan_tag:
                     self.time_in_home_clan += a._timestamp - ts
+                ts = a._timestamp
+        
+        if self.is_member:            
+            self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
         self.last_seen = [a for a in season_entries if a.is_online_activity]
 
@@ -91,49 +95,49 @@ class aPlayerSeason(AwaitLoader):
             tag=self.tag,
             season=self.season,
             description='attack_wins',
-            activities=[a.change for a in season_entries if a.activity == 'attack_wins']
+            activities=[a for a in season_entries if a.activity == 'attack_wins']
             )
         self.defense_wins = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='defense_wins',
-            activities=[a.change for a in season_entries if a.activity == 'defense_wins']
+            activities=[a for a in season_entries if a.activity == 'defense_wins']
             )
         self.donations_sent = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='donations_sent',
-            activities=[a.change for a in season_entries if a.activity == 'donations_sent']
+            activities=[a for a in season_entries if a.activity == 'donations_sent']
             )
         self.donations_rcvd = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='donations_received',
-            activities=[a.change for a in season_entries if a.activity == 'donations_received']
+            activities=[a for a in season_entries if a.activity == 'donations_received']
             )
         self.loot_gold = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_gold',
-            activities=[a.change for a in season_entries if a.activity == 'loot_gold']
+            activities=[a for a in season_entries if a.activity == 'loot_gold']
             )
         self.loot_elixir = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_elixir',
-            activities=[a.change for a in season_entries if a.activity == 'loot_elixir']
+            activities=[a for a in season_entries if a.activity == 'loot_elixir']
             )
         self.loot_darkelixir = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='loot_darkelixir',
-            activities=[a.change for a in season_entries if a.activity == 'loot_darkelixir']
+            activities=[a for a in season_entries if a.activity == 'loot_darkelixir']
             )
         self.capital_contribution = aPlayerStat(
             tag=self.tag,
             season=self.season,
             description='capital_contribution',
-            activities=[a.change for a in season_entries if a.activity == 'capital_contribution']
+            activities=[a for a in season_entries if a.activity == 'capital_contribution']
             )
         self.clan_games = aPlayerClanGames(
             tag=self.tag,

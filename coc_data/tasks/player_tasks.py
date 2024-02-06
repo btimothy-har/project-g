@@ -28,6 +28,7 @@ class PlayerTasks():
         if not last_activity or last_activity._timestamp - new_player.timestamp > 3600:
             await aPlayerActivity.create_new(
                 player=new_player,
+                timestamp=new_player.timestamp,
                 activity="snapshot",
                 )
             await new_player._sync_cache()
@@ -36,6 +37,7 @@ class PlayerTasks():
     async def on_player_update_name(old_player:aPlayer,new_player:aPlayer):
         await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="change_name",
             new_value=new_player.name
             )
@@ -46,6 +48,7 @@ class PlayerTasks():
         if old_player.war_opted_in != None and new_player.war_opted_in != None:
             await aPlayerActivity.create_new(
                 player=new_player,
+                timestamp=new_player.timestamp,
                 activity="change_war_option",
                 new_value=new_player.war_opted_in
                 )
@@ -55,6 +58,7 @@ class PlayerTasks():
     async def on_player_update_labels(old_player:aPlayer,new_player:aPlayer):
         await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="change_label",
             new_value=new_player.label_ids
             )
@@ -65,6 +69,7 @@ class PlayerTasks():
     async def on_player_upgrade_townhall(old_player:aPlayer,new_player:aPlayer):
         await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="upgrade_townhall",
             change=new_player.town_hall.level - old_player.town_hall.level,
             new_value=new_player.town_hall.level
@@ -80,6 +85,7 @@ class PlayerTasks():
             if getattr(new_hero,'level',0) > getattr(old_hero,'level',0):
                 await aPlayerActivity.create_new(
                     player=new_player,
+                    timestamp=new_player.timestamp,
                     activity="upgrade_hero",
                     stat=hero,
                     change=getattr(new_hero,'level',0) - getattr(old_hero,'level',0),
@@ -100,6 +106,7 @@ class PlayerTasks():
             if getattr(new_troop,'level',0) > getattr(old_troop,'level',0):
                 await aPlayerActivity.create_new(
                     player=new_player,
+                    timestamp=new_player.timestamp,
                     activity="upgrade_troop",
                     stat=troop,
                     change=getattr(new_troop,'level',0) - getattr(old_troop,'level',0),
@@ -114,6 +121,7 @@ class PlayerTasks():
             if getattr(new_troop,'level',0) > getattr(old_troop,'level',0):
                 await aPlayerActivity.create_new(
                     player=new_player,
+                    timestamp=new_player.timestamp,
                     activity="upgrade_troop",
                     stat=pet,
                     change=getattr(new_troop,'level',0) - getattr(old_troop,'level',0),
@@ -141,6 +149,7 @@ class PlayerTasks():
             if getattr(new_spell,'level',0) > getattr(old_spell,'level',0):
                 await aPlayerActivity.create_new(
                     player=new_player,
+                    timestamp=new_player.timestamp,
                     activity="upgrade_spell",
                     stat=spell,
                     change=getattr(new_spell,'level',0) - getattr(old_spell,'level',0),
@@ -157,6 +166,7 @@ class PlayerTasks():
         if old_player.clan_tag:
             await aPlayerActivity.create_new(
                 player=old_player,
+                timestamp=new_player.timestamp,
                 activity="leave_clan"
                 )
             bot_client.coc_data_log.debug(f"{old_player.tag} {old_player.name}: Left Clan {old_player.clan.tag} {old_player.clan.name}.")
@@ -164,6 +174,7 @@ class PlayerTasks():
         if new_player.clan_tag:
             await aPlayerActivity.create_new(
                 player=new_player,
+                timestamp=new_player.timestamp,
                 activity="join_clan",
                 )
             bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Joined Clan {new_player.clan.tag} {new_player.clan.name}.")
@@ -172,6 +183,7 @@ class PlayerTasks():
     async def on_player_update_trophies(old_player:aPlayer,new_player:aPlayer):
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="trophies",
             change=new_player.trophies - old_player.trophies,
             new_value=new_player.trophies
@@ -184,6 +196,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.attack_wins
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="attack_wins",
             change=max(0,new_player.attack_wins - ref_value),
             new_value=new_player.attack_wins
@@ -196,6 +209,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.defense_wins
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="defense_wins",
             change=max(0,new_player.defense_wins - ref_value),
             new_value=new_player.defense_wins
@@ -220,6 +234,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.donations
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="donations_sent",
             change=max(0,new_player.donations - ref_value),
             new_value=new_player.donations
@@ -232,6 +247,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.received
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="donations_received",
             change=max(0,new_player.received - ref_value),
             new_value=new_player.received
@@ -244,6 +260,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.clan_capital_contributions
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="capital_contribution",
             stat=new_player.clan.tag if new_player.clan else old_player.clan.tag if old_player.clan else None,
             change=max(0,new_player.clan_capital_contributions - ref_value),
@@ -257,6 +274,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.loot_gold
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="loot_gold",
             change=max(0,new_player.loot_gold - ref_value),
             new_value=new_player.loot_gold
@@ -269,6 +287,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.loot_elixir
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="loot_elixir",
             change=max(0,new_player.loot_elixir - ref_value),
             new_value=new_player.loot_elixir
@@ -281,6 +300,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.loot_darkelixir
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="loot_darkelixir",
             change=max(0,new_player.loot_darkelixir - ref_value),
             new_value=new_player.loot_darkelixir
@@ -293,6 +313,7 @@ class PlayerTasks():
         ref_value = last_stat.new_value if last_stat else old_player.clan_games
         log = await aPlayerActivity.create_new(
             player=new_player,
+            timestamp=new_player.timestamp,
             activity="clan_games",
             change=max(0,new_player.clan_games - ref_value),
             new_value=new_player.clan_games

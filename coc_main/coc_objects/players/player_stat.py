@@ -13,6 +13,7 @@ bot_client = client()
 
 valid_activity_types = [
     'snapshot',
+    'time_in_home_clan',
     'change_name',
     'change_war_option',
     'change_label',
@@ -94,7 +95,7 @@ class aPlayerActivity():
         return entries
 
     @classmethod
-    async def create_new(cls,player,activity:str,**kwargs) -> 'aPlayerActivity':
+    async def create_new(cls,player,timestamp:pendulum.DateTime,activity:str,**kwargs) -> 'aPlayerActivity':
         activity = activity.lower()
         if activity not in valid_activity_types:
             raise ValueError(f"Invalid activity type: {activity}.")
@@ -112,7 +113,7 @@ class aPlayerActivity():
                 'stat':kwargs.get('stat',''),
                 'change':kwargs.get('change',0),
                 'new_value':kwargs.get('new_value',''),
-                'timestamp':player.timestamp.int_timestamp,
+                'timestamp':timestamp.int_timestamp,
                 'read_by_bank':False
                 }
             )

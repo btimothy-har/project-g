@@ -84,11 +84,6 @@ class ClashOfClansMain(commands.Cog):
         await self.client.shutdown()
         del self.client
 
-    @commands.command(name="convertstat")
-    @commands.is_owner()
-    async def command_convert_stat(self,ctx:commands.Context):
-        return
-
     @commands.group(name="cocreload")
     @commands.is_owner()
     async def command_reload_project_g(self,ctx:commands.Context):

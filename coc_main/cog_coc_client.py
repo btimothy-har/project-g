@@ -16,6 +16,7 @@ from redbot.core.utils import AsyncIter,bounded_gather
 from .api_client import BotClashClient, aClashSeason
 
 from .coc_objects.players.player import BasicPlayer, aPlayer
+from .coc_objects.players.townhall import aTownHall
 from .coc_objects.clans.clan import BasicClan, aClan
 from .coc_objects.events.clan_war import aClanWar
 from .coc_objects.events.clan_war_leagues import WarLeagueGroup
@@ -84,6 +85,241 @@ class ClashOfClansClient(commands.Cog):
         n_tag = coc.utils.correct_tag(tag)
         task_cog = self.bot.get_cog("ClashOfClansTasks")
         return task_cog.clan_loop._cached.get(n_tag,None)
+    
+    @commands.command(name="convertstat")
+    @commands.is_owner()
+    async def command_convert_stat(self,ctx:commands.Context):
+        
+        query = self.client.coc_db.db__player_stats.find({})
+        await ctx.tick()
+        async for entry in query:
+            season = await aClashSeason(entry['season'])
+            timestamp = pendulum.now() if season.is_current else season.season_end
+            tag = entry['tag']
+            name = entry['name']
+            is_member = entry['is_member']
+            home_clan = entry['home_clan']
+            townhall = aTownHall(
+                level=entry['town_hall'],
+                weapon=0 if entry['town_hall'] < 12 else 1
+                )
+
+            player = await self.client.coc.get_player(tag,cls=aPlayer)
+            
+            await self.client.coc_db.db__player_activity.insert_one(
+                {
+                    'tag':tag,
+                    'name':name,
+                    'is_member':is_member,
+                    'discord_user':player.discord_user,
+                    'townhall':townhall.json(),
+                    'home_clan':home_clan,
+                    'clan':'',
+                    'activity':'time_in_home_clan',
+                    'stat':'',
+                    'change':0,
+                    'new_value':entry['time_in_home_clan'],
+                    'timestamp':timestamp.int_timestamp,
+                    'read_by_bank':True
+                }
+            )
+            attack_wins = entry.get('attacks',{})
+            if attack_wins.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'attack_wins',
+                        'stat':'',
+                        'change':attack_wins.get('season_total',0),
+                        'new_value':attack_wins.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+
+            defense_wins = entry.get('defenses',{})
+            if defense_wins.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'defense_wins',
+                        'stat':'',
+                        'change':defense_wins.get('season_total',0),
+                        'new_value':defense_wins.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+
+            donations_sent = entry.get('donations_sent',{})
+            if donations_sent.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'donations_sent',
+                        'stat':'',
+                        'change':donations_sent.get('season_total',0),
+                        'new_value':donations_sent.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+
+            donations_rcvd = entry.get('donations_rcvd',{})
+            if donations_rcvd.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'donations_received',
+                        'stat':'',
+                        'change':donations_rcvd.get('season_total',0),
+                        'new_value':donations_rcvd.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+            
+            loot_gold = entry.get('loot_gold',{})
+            if loot_gold.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'loot_gold',
+                        'stat':'',
+                        'change':loot_gold.get('season_total',0),
+                        'new_value':loot_gold.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+            
+            loot_elixir = entry.get('loot_elixir',{})
+            if loot_elixir.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'loot_elixir',
+                        'stat':'',
+                        'change':loot_elixir.get('season_total',0),
+                        'new_value':loot_elixir.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+            
+            loot_darkelixir = entry.get('loot_darkelixir',{})
+            if loot_darkelixir.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'loot_darkelixir',
+                        'stat':'',
+                        'change':loot_darkelixir.get('season_total',0),
+                        'new_value':loot_darkelixir.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+            
+            capitalcontribution = entry.get('capitalcontribution',{})
+            if capitalcontribution.get('season_total',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':'',
+                        'activity':'capital_contribution',
+                        'stat':'',
+                        'change':capitalcontribution.get('season_total',0),
+                        'new_value':capitalcontribution.get('lastUpdate',0),
+                        'timestamp':timestamp.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+
+            clangames = entry.get('clangames',{})
+            if clangames.get('score',0) > 0:
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':clangames.get('clan',''),
+                        'activity':'clan_games',
+                        'stat':'',
+                        'change':0,
+                        'new_value':clangames.get('last_updated',0) - clangames.get('score',0),
+                        'timestamp':clangames.get('starting_time',0) if clangames.get('starting_time',None) else 0,
+                        'read_by_bank':True
+                    }
+                )
+                await self.client.coc_db.db__player_activity.insert_one(
+                    {
+                        'tag':tag,
+                        'name':name,
+                        'is_member':is_member,
+                        'discord_user':player.discord_user,
+                        'townhall':townhall.json(),
+                        'home_clan':home_clan,
+                        'clan':clangames.get('clan',''),
+                        'activity':'clan_games',
+                        'stat':'',
+                        'change':clangames.get('score',0),
+                        'new_value':clangames.get('last_updated',0),
+                        'timestamp':clangames.get('ending_time',0) if clangames.get('ending_time',None) else season.clangames_end.int_timestamp,
+                        'read_by_bank':True
+                    }
+                )
+        await ctx.send("Done")
 
     ##################################################
     ### COG LOAD
