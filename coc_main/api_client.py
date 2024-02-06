@@ -691,7 +691,7 @@ async def player_loop_end(iteration_number:int):
     if start:
         end = pendulum.now()
         client.last_loop['player'] = end
-        client.player_loop.append(end.diff(start).in_seconds())
+        client.player_loop_runtime.append(end.diff(start).in_seconds())
         del client._player_loop_tracker[iteration_number]
         client.loop_running['player'] = False
 
@@ -708,7 +708,7 @@ async def clan_loop_end(iteration_number:int):
     if start:
         end = pendulum.now()
         client.last_loop['clan'] = end
-        client.clan_loop.append(end.diff(start).in_seconds())
+        client.clan_loop_runtime.append(end.diff(start).in_seconds())
         del client._clan_loop_tracker[iteration_number]
         client.loop_running['clan'] = False
 
