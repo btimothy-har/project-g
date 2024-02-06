@@ -61,7 +61,7 @@ class ClanWarLeagues(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
     
     async def cog_load(self):
-        async def load_events(self):
+        async def load_events():
             while True:
                 if getattr(bot_client,'_is_initialized',False):
                     break
