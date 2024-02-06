@@ -75,7 +75,7 @@ class aPlayerActivity():
         filter_criteria = {
             'tag':tag,
             'timestamp': {
-                '$gte':season.season_start.int_timestamp,
+                '$gt':season.season_start.int_timestamp,
                 '$lte':season.season_end.int_timestamp
                 }
             }
