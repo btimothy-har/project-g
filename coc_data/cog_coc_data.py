@@ -257,7 +257,7 @@ class ClashOfClansData(commands.Cog):
         async with self._lock_player_loop:
             query = {
                 "$and": [
-                    {"_id": {"$nin": bot_client.coc._player_updates}},
+                    {"_id": {"$nin": list(bot_client.coc._player_updates)}},
                     {"$or": [
                         {"discord_user": {"$exists":True,"$gt":0}},
                         {"is_member": True}
