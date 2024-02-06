@@ -680,11 +680,12 @@ async def player_loop_start(iteration_number:int):
     client = BotClashClient()
     client._player_loop_tracker[iteration_number] = pendulum.now()
     client.loop_running['player'] = True
-    client.coc_main_log.info(f"Started Player Loop")
+    client.coc_main_log.info(f"Started Player Loop {iteration_number}")
 
-@coc.ClientEvents.player_loop_end()
+@coc.ClientEvents.player_loop_finish()
 async def player_loop_end(iteration_number:int):
     client = BotClashClient()
+    client.coc_main_log.info(f"Ended Player Loop {iteration_number}")
     start = client._player_loop_tracker.get(iteration_number,None)
     if start:
         end = pendulum.now()
@@ -692,7 +693,6 @@ async def player_loop_end(iteration_number:int):
         client.player_loop.append(end.diff(start).in_seconds())
         del client._player_loop_tracker[iteration_number]
         client.loop_running['player'] = False
-    client.coc_main_log.info(f"Ended Player Loop")
 
 @coc.ClientEvents.clan_loop_start()
 async def clan_loop_start(iteration_number:int):
@@ -700,7 +700,7 @@ async def clan_loop_start(iteration_number:int):
     client._clan_loop_tracker[iteration_number] = pendulum.now()
     client.loop_running['clan'] = True
 
-@coc.ClientEvents.clan_loop_end()
+@coc.ClientEvents.clan_loop_finish()
 async def clan_loop_end(iteration_number:int):
     client = BotClashClient()
     start = client._clan_loop_tracker.get(iteration_number,None)
