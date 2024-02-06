@@ -47,6 +47,7 @@ class aPlayerSeason(AwaitLoader):
         self.town_hall = 0
         self.is_member = False
         self.home_clan_tag = None
+        self.home_clan = None
         self.time_in_home_clan = 0
         self.last_seen = []
         self.attack_wins = None
