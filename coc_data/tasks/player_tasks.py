@@ -89,7 +89,7 @@ class PlayerTasks():
         heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
 
         a_iter = AsyncIter(heroes)
-        await bounded_gather(*(_check_upgrade(hero) async for hero in a_iter))
+        await bounded_gather(*[_check_upgrade(hero) async for hero in a_iter])
     
     @coc.PlayerEvents.troop_strength()
     async def on_player_upgrade_troops(old_player:aPlayer,new_player:aPlayer):        
@@ -123,11 +123,11 @@ class PlayerTasks():
 
         troops = TroopAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(troops)
-        await bounded_gather(*(_check_troop_upgrade(t) async for t in a_iter))
+        await bounded_gather(*[_check_troop_upgrade(t) async for t in a_iter])
 
         pets = PetAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(pets)
-        await bounded_gather(*(_check_pet_upgrade(p) async for p in a_iter))
+        await bounded_gather(*[_check_pet_upgrade(p) async for p in a_iter])
     
     @coc.PlayerEvents.spell_strength()
     async def on_player_upgrade_spells(old_player:aPlayer,new_player:aPlayer):
@@ -147,7 +147,7 @@ class PlayerTasks():
 
         spells = SpellAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(spells)
-        await bounded_gather(*(_check_spell_upgrade(s) async for s in a_iter))
+        await bounded_gather(*[_check_spell_upgrade(s) async for s in a_iter])
     
     @coc.PlayerEvents.clan_tag()
     async def on_player_update_clan(old_player:aPlayer,new_player:aPlayer):
