@@ -18,10 +18,10 @@ class aPlayerClanGames():
         'clan_tag',
         'starting_time',
         '_score',
-        'ending_time'
+        '_ending_time'
         ]
     
-    def __init__(self,tag:str,season:aClashSeason,activities:List[aPlayerActivity]):        
+    def __init__(self,tag:str,season:aClashSeason,activities:List[aPlayerActivity]):
         self.tag = tag
         self.season = season
 
