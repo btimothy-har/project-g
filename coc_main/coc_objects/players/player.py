@@ -477,7 +477,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def get_hero(self,hero_name:str):
         return next((hero for hero in self._heroes if hero.name == hero_name),None)
     
-    def get_troop(self,name:str,is_home_troop:bool=False):
+    def get_troop(self,name:str,is_home_troop:bool=True):
         if is_home_troop:
             return next((troop for troop in self._troops if troop.name == name),None)
         else:

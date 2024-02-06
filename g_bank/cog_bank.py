@@ -767,6 +767,8 @@ class Bank(commands.Cog):
     async def progress_reward_townhall(self):
         async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
             try:
+                await player_activity_log.mark_as_read()
+
                 if not player_activity_log.is_member:
                     return            
                 member = self.bot.get_user(player_activity_log.discord_user)
@@ -798,8 +800,7 @@ class Bank(commands.Cog):
                     done_by=self.bot.user,
                     amount=new_reward,
                     comment=f"Townhall Bonus (x{multi})for {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
-                    )            
-                await player_activity_log.mark_as_read()
+                    )
 
             except Exception as e:
                 bot_client.coc_main_log.exception(f"Progress Reward Townhall: {player_activity_log.tag}")
@@ -823,6 +824,7 @@ class Bank(commands.Cog):
     async def progress_reward_hero_upgrade(self):
         async def distribute_reward_hero_upgrade(player_activity_log:aPlayerActivity):
             try:
+                await player_activity_log.mark_as_read()                
                 if not player_activity_log.is_member:
                     return
                 
@@ -853,7 +855,6 @@ class Bank(commands.Cog):
                         amount=new_rew,
                         comment=f"Hero Bonus (x{multi}) for {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
-                await player_activity_log.mark_as_read()
 
             except Exception as e:
                 bot_client.coc_main_log.exception(f"Progress Reward Hero Upgrade: {player_activity_log.tag}")
@@ -877,6 +878,7 @@ class Bank(commands.Cog):
     async def clan_capital_contribution_reward(self):
         async def distribute_capital_contribution_reward(player_activity_log:aPlayerActivity):
             try:
+                await player_activity_log.mark_as_read()
                 member = self.bot.get_user(player_activity_log.discord_user)
                 if not member:
                     return
@@ -916,7 +918,6 @@ class Bank(commands.Cog):
                     amount=total_reward,
                     comment=f"Capital Gold Bonus (x{mult}) for {player_activity_log.name} ({player_activity_log.tag}): Donated {increment:,} Gold to {target_clan.name}."
                     )
-                await player_activity_log.mark_as_read()
 
             except Exception as e:
                 bot_client.coc_main_log.exception(f"Clan Capital Contribution Reward: {player_activity_log.tag}")
