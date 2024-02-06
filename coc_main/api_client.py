@@ -183,12 +183,15 @@ class BotClashClient():
 
             # CLIENT LOOP TIME
             self.last_loop = {}
-            self.loop_running = {}
-            self.player_loop = deque(maxlen=1000)
-            self.clan_loop = deque(maxlen=1000)
-            self.war_loop = deque(maxlen=1000)
-            self.raid_loop = deque(maxlen=1000)
-            self.discord_loop = deque(maxlen=1000)
+            
+            self.player_loop_status = False
+            self.clan_loop_status = False
+
+            self.player_loop_runtime = deque(maxlen=1000)
+            self.clan_loop_runtime = deque(maxlen=1000)
+            self.war_loop_runtime = deque(maxlen=1000)
+            self.raid_loop_runtime = deque(maxlen=1000)
+            self.discord_loop_runtime = deque(maxlen=1000)
 
             # DISCORDLINKS
             self.discordlinks_sandbox = False
@@ -680,12 +683,10 @@ async def player_loop_start(iteration_number:int):
     client = BotClashClient()
     client._player_loop_tracker[iteration_number] = pendulum.now()
     client.loop_running['player'] = True
-    client.coc_main_log.info(f"Started Player Loop {iteration_number}")
 
 @coc.ClientEvents.player_loop_finish()
 async def player_loop_end(iteration_number:int):
     client = BotClashClient()
-    client.coc_main_log.info(f"Ended Player Loop {iteration_number}")
     start = client._player_loop_tracker.get(iteration_number,None)
     if start:
         end = pendulum.now()

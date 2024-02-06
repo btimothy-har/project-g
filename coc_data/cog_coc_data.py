@@ -302,13 +302,13 @@ class ClashOfClansData(commands.Cog):
             tags = list(set(tags))
             tag_iter = AsyncIter(tags)
             async for tag in tag_iter:
-                if tag not in bot_client.coc._clan_updates:
+                if tag not in list(bot_client.coc._clan_updates):
                     try:
                         clan = await self.client.fetch_clan(tag)
                     except:
                         pass
                     else:
-                        bot_client.coc.add_player_updates(clan.tag)
+                        bot_client.coc.add_clan_updates(clan.tag)
         
     async def status_embed(self):
         embed = await clash_embed(self.bot,
@@ -326,41 +326,61 @@ class ClashOfClansData(commands.Cog):
         
         embed.add_field(
             name="**Player Loops**",
-            value=f"Last: " + (f"<t:{bot_client.last_loop.get('player')}:R>" if bot_client.last_loop.get('player') else "None")
+            value=f"Last: " + (f"<t:{getattr(bot_client.last_loop.get('player'),'int_timestamp')}:R>" if bot_client.last_loop.get('player') else "None")
                 + "```ini"
+                + f"\n{'[Refresh]':<10} {True if self._lock_player_loop.locked() else False}"
+                + f"\n{'[Running]':<10} {bot_client.player_loop_status}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._player_updates):,}"
-                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.player_loop)/len(bot_client.player_loop):.2f}" if len(bot_client.player_loop) > 0 else "0") + "s"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.player_loop_runtime)/len(bot_client.player_loop_runtime):.2f}" if len(bot_client.player_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
         embed.add_field(
             name="**Clan Loops**",
-            value=f"Last: " + (f"<t:{bot_client.last_loop.get('clan')}:R>" if bot_client.last_loop.get('clan') else "None")
+            value=f"Last: " + (f"<t:{getattr(bot_client.last_loop.get('clan'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('clan') else "None")
                 + "```ini"
+                + f"\n{'[Refresh]':<10} {True if self._lock_clan_loop.locked() else False}"
+                + f"\n{'[Running]':<10} {bot_client.clan_loop_status}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
-                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.clan_loop)/len(bot_client.clan_loop):.2f}" if len(bot_client.clan_loop) > 0 else "0") + "s"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.clan_loop_runtime)/len(bot_client.clan_loop_runtime):.2f}" if len(bot_client.clan_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
         embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Clan Wars**",
-            value="Last: " + (f"<t:{bot_client.last_loop.get('war')}:R>" if bot_client.last_loop.get('war') else "None")
+            value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('war'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('war') else "None")
                 + "```ini"                
+                + f"\n{'[Running]':<10} {self._war_loop._running}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
-                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.war_loop)/len(bot_client.war_loop):.2f}" if len(bot_client.war_loop) > 0 else "0") + "s"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.war_loop_runtime)/len(bot_client.war_loop_runtime):.2f}" if len(bot_client.war_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
         embed.add_field(
             name="**Capital Raids**",
-            value="Last: " + (f"<t:{bot_client.last_loop.get('raid')}:R>" if bot_client.last_loop.get('raid') else "None")
-                + "```ini"                
+            value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('raid'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('raid') else "None")
+                + "```ini"     
+                + f"\n{'[Running]':<10} {self._raid_loop._running}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
-                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.raid_loop)/len(bot_client.raid_loop):.2f}" if len(bot_client.raid_loop) > 0 else "0") + "s"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.raid_loop_runtime)/len(bot_client.raid_loop_runtime):.2f}" if len(bot_client.raid_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
+
+        embed.add_field(
+            name="**Discord**",
+            value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('discord'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('discord') else "None")
+                + "```ini"                
+                + f"\n{'[Running]':<10} {self._discord_loop._running}"
+                + f"\n{'[Guilds]':<10} {len(bot_client.bot.guilds):,}"
+                + f"\n{'[Users]':<10} {len(bot_client.bot.users):,}"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.discord_loop_runtime)/len(bot_client.discord_loop_runtime):.2f}" if len(bot_client.discord_loop_runtime) > 0 else "0") + "s"
+                + "```",
+            inline=True
+            )
+        embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(name="\u200b",value="\u200b",inline=True)
         return embed
     

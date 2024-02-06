@@ -136,7 +136,7 @@ class ClanRaidLoop(TaskLoop):
                 self._running = False
                 try:
                     runtime = et - st
-                    bot_client.raid_loop.append(runtime.total_seconds())
+                    bot_client.raid_loop_runtime.append(runtime.total_seconds())
                 except:
                     pass
 

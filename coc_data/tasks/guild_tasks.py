@@ -59,7 +59,7 @@ class DiscordGuildLoop(TaskLoop):
                 
                 try:
                     runtime = et - st
-                    bot_client.discord_loop.append(runtime.total_seconds())
+                    bot_client.discord_loop_runtime.append(runtime.total_seconds())
                 except:
                     pass
 
