@@ -183,6 +183,7 @@ class BotClashClient():
 
             # CLIENT LOOP TIME
             self.last_loop = {}
+            self.loop_running = {}
             self.player_loop = deque(maxlen=1000)
             self.clan_loop = deque(maxlen=1000)
             self.war_loop = deque(maxlen=1000)
@@ -259,6 +260,11 @@ class BotClashClient():
         await instance.discordlinks_login()        
 
         bot.coc_client.add_events(
+            clash_event_error,
+            player_loop_start,
+            player_loop_end,
+            clan_loop_start,
+            clan_loop_end,
             clash_maintenance_start,
             clash_maintenance_complete,
             end_of_trophy_season,
@@ -672,7 +678,8 @@ async def clash_event_error(exception:Exception):
 @coc.ClientEvents.player_loop_start()
 async def player_loop_start(iteration_number:int):
     client = BotClashClient()
-    client._player_loop_tracker[iteration_number] = pendulum.now()    
+    client._player_loop_tracker[iteration_number] = pendulum.now()
+    client.loop_running['player'] = True
 
 @coc.ClientEvents.player_loop_end()
 async def player_loop_end(iteration_number:int):
@@ -683,11 +690,13 @@ async def player_loop_end(iteration_number:int):
         client.last_loop['player'] = end
         client.player_loop.append(end.diff(start).in_seconds())
         del client._player_loop_tracker[iteration_number]
+        client.loop_running['player'] = False
 
 @coc.ClientEvents.clan_loop_start()
 async def clan_loop_start(iteration_number:int):
     client = BotClashClient()
     client._clan_loop_tracker[iteration_number] = pendulum.now()
+    client.loop_running['clan'] = True
 
 @coc.ClientEvents.clan_loop_end()
 async def clan_loop_end(iteration_number:int):
@@ -698,6 +707,7 @@ async def clan_loop_end(iteration_number:int):
         client.last_loop['clan'] = end
         client.clan_loop.append(end.diff(start).in_seconds())
         del client._clan_loop_tracker[iteration_number]
+        client.loop_running['clan'] = False
 
 @coc.ClientEvents.maintenance_start()
 async def clash_maintenance_start():

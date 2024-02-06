@@ -255,24 +255,27 @@ class ClashOfClansData(commands.Cog):
             return
         
         async with self._lock_player_loop:
-            query = {"$or": [
-                {"discord_user": {"$exists":True,"$gt":0}},
-                {"is_member": True}
-                ]
-                }        
+            query = {
+                "$and": [
+                    {"_id": {"$nin": bot_client.coc._player_updates}},
+                    {"$or": [
+                        {"discord_user": {"$exists":True,"$gt":0}},
+                        {"is_member": True}
+                        ]}
+                    ]
+                }
             
             db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
             tags = [p['_id'] async for p in db_query]
 
             tag_iter = AsyncIter(tags)
             async for tag in tag_iter:
-                if tag not in bot_client.coc._player_updates:
-                    try:
-                        player = await self.client.fetch_player(tag)
-                    except:
-                        pass
-                    else:
-                        bot_client.coc.add_player_updates(player.tag)
+                try:
+                    player = await self.client.fetch_player(tag)
+                except:
+                    pass
+                else:
+                    bot_client.coc.add_player_updates(player.tag)
     
     @tasks.loop(minutes=1)    
     async def update_clan_loop(self):
@@ -429,7 +432,7 @@ class RefreshStatus(DefaultView):
     
     @property
     def task_cog(self) -> ClashOfClansData:
-        return bot_client.bot.get_cog("ClashOfClansTasks")
+        return bot_client.bot.get_cog("ClashOfClansData")
     
     async def _refresh_embed(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
