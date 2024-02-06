@@ -89,7 +89,7 @@ class aPlayerSeason(AwaitLoader):
         if self.is_member:            
             self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
-        self.last_seen = [a for a in season_entries if a.is_online_activity]
+        self.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]
 
         self.attack_wins = aPlayerStat(
             tag=self.tag,
