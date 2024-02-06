@@ -90,7 +90,9 @@ class ClashOfClansClient(commands.Cog):
     @commands.is_owner()
     async def command_convert_stat(self,ctx:commands.Context):
         
+        await self.client.coc_db.db__player_activity.delete_many({})        
         query = self.client.coc_db.db__player_stats.find({})
+
         await ctx.tick()
         async for entry in query:
             season = await aClashSeason(entry['season'])
@@ -104,7 +106,13 @@ class ClashOfClansClient(commands.Cog):
                 weapon=0 if entry['town_hall'] < 12 else 1
                 )
 
-            player = await self.client.coc.get_player(tag,cls=aPlayer)
+            try:
+                player = await self.client.coc.get_player(tag,cls=aPlayer)
+            except:
+                continue
+
+            if len(name) <= 0:
+                name = player.name
             
             await self.client.coc_db.db__player_activity.insert_one(
                 {
@@ -120,7 +128,8 @@ class ClashOfClansClient(commands.Cog):
                     'change':0,
                     'new_value':entry['time_in_home_clan'],
                     'timestamp':timestamp.int_timestamp,
-                    'read_by_bank':True
+                    'read_by_bank':True,
+                    'legacy_conversion':True
                 }
             )
             attack_wins = entry.get('attacks',{})
@@ -139,7 +148,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':attack_wins.get('season_total',0),
                         'new_value':attack_wins.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
 
@@ -159,7 +169,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':defense_wins.get('season_total',0),
                         'new_value':defense_wins.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
 
@@ -179,7 +190,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':donations_sent.get('season_total',0),
                         'new_value':donations_sent.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
 
@@ -199,7 +211,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':donations_rcvd.get('season_total',0),
                         'new_value':donations_rcvd.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
             
@@ -219,7 +232,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':loot_gold.get('season_total',0),
                         'new_value':loot_gold.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
             
@@ -239,7 +253,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':loot_elixir.get('season_total',0),
                         'new_value':loot_elixir.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
             
@@ -259,7 +274,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':loot_darkelixir.get('season_total',0),
                         'new_value':loot_darkelixir.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
             
@@ -279,7 +295,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':capitalcontribution.get('season_total',0),
                         'new_value':capitalcontribution.get('lastUpdate',0),
                         'timestamp':timestamp.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
 
@@ -299,7 +316,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':0,
                         'new_value':clangames.get('last_updated',0) - clangames.get('score',0),
                         'timestamp':clangames.get('starting_time',0) if clangames.get('starting_time',None) else 0,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )
                 await self.client.coc_db.db__player_activity.insert_one(
@@ -316,7 +334,8 @@ class ClashOfClansClient(commands.Cog):
                         'change':clangames.get('score',0),
                         'new_value':clangames.get('last_updated',0),
                         'timestamp':clangames.get('ending_time',0) if clangames.get('ending_time',None) else season.clangames_end.int_timestamp,
-                        'read_by_bank':True
+                        'read_by_bank':True,
+                        'legacy_conversion':True
                     }
                 )            
             bot_client.coc_data_log.info(f"Converted Stats for {tag} {name} {season.id}")
