@@ -86,7 +86,10 @@ class ClashOfClansData(commands.Cog):
                 ClanTasks.on_clan_member_join_role,
                 ClanTasks.on_clan_member_leave_role,
                 )
-            self.update_clan_loop.start()
+            try:
+                self.update_clan_loop.start()
+            except:
+                pass
             asyncio.create_task(self._war_loop.start())
             asyncio.create_task(self._raid_loop.start())
             asyncio.create_task(self._discord_loop.start())
@@ -114,8 +117,14 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_clan_games,
                 ClanTasks.on_clan_check_snapshot
                 )
-            self.update_player_loop.start()
-            self.update_clan_loop.start()
+            try:
+                self.update_player_loop.start()
+            except:
+                pass
+            try:
+                self.update_clan_loop.start()
+            except:
+                pass
             
         while True:
             if getattr(bot_client,'_is_initialized',False):
@@ -142,7 +151,10 @@ class ClashOfClansData(commands.Cog):
     ##################################################
     async def cog_unload(self):
         async def unload_nebula_tasks():
-            self.update_clan_loop.cancel()
+            try:
+                self.update_clan_loop.cancel()
+            except:
+                pass
             await self._war_loop.stop()
             await self._raid_loop.stop()
             await self._discord_loop.stop()
@@ -156,8 +168,14 @@ class ClashOfClansData(commands.Cog):
                 )
             
         async def unload_meteor_tasks():
-            self.update_player_loop.cancel()
-            self.update_clan_loop.cancel()
+            try:
+                self.update_player_loop.cancel()
+            except:
+                pass
+            try:
+                self.update_clan_loop.cancel()
+            except:
+                pass
 
             bot_client.coc.remove_events(
                 PlayerTasks.on_player_update_name,

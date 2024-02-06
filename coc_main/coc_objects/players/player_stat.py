@@ -41,11 +41,15 @@ class aPlayerActivity():
         '_timestamp',
         '_read_by_bank',
         'tag',
+        'name',
         'is_member',
-        'clan',
+        'discord_user',
+        'town_hall',
+        'home_clan_tag',
+        'clan_tag',
         'activity',
         'stat',
-        'change',        
+        'change',      
         'new_value'        
         ]
     
