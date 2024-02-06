@@ -371,7 +371,7 @@ class ClashOfClansData(commands.Cog):
 
         embed.add_field(
             name="**Discord**",
-            value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('discord'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('discord') else "None")
+            value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('guild'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('guild') else "None")
                 + "```ini"                
                 + f"\n{'[Running]':<10} {self._discord_loop._running}"
                 + f"\n{'[Guilds]':<10} {len(bot_client.bot.guilds):,}"

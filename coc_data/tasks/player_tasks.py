@@ -43,12 +43,13 @@ class PlayerTasks():
     
     @coc.PlayerEvents.war_opted_in()
     async def on_player_update_war_opted_in(old_player:aPlayer,new_player:aPlayer):
-        await aPlayerActivity.create_new(
-            player=new_player,
-            activity="change_war_option",
-            new_value=new_player.war_opted_in
-            )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: War Opt In from {old_player.war_opted_in} to {new_player.war_opted_in}.")
+        if old_player.war_opted_in != None and new_player.war_opted_in != None:
+            await aPlayerActivity.create_new(
+                player=new_player,
+                activity="change_war_option",
+                new_value=new_player.war_opted_in
+                )
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: War Opt In from {old_player.war_opted_in} to {new_player.war_opted_in}.")
     
     @coc.PlayerEvents.label_ids()
     async def on_player_update_labels(old_player:aPlayer,new_player:aPlayer):
@@ -121,13 +122,16 @@ class PlayerTasks():
                     )
                 bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {pet} upgraded to {new_troop.level}.")
 
+        tasks = []
         troops = TroopAvailability.return_all_unlocked(new_player.town_hall.level)
-        a_iter = AsyncIter(troops)
-        await bounded_gather(*[_check_troop_upgrade(t) async for t in a_iter])
+        troop_iter = AsyncIter(troops)        
+        tasks.extend([_check_troop_upgrade(t) async for t in troop_iter])
 
         pets = PetAvailability.return_all_unlocked(new_player.town_hall.level)
-        a_iter = AsyncIter(pets)
-        await bounded_gather(*[_check_pet_upgrade(p) async for p in a_iter])
+        pet_iter = AsyncIter(pets)
+        tasks.extend([_check_pet_upgrade(p) async for p in pet_iter])
+
+        await bounded_gather(*tasks)
     
     @coc.PlayerEvents.spell_strength()
     async def on_player_upgrade_spells(old_player:aPlayer,new_player:aPlayer):
