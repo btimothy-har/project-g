@@ -34,11 +34,18 @@ class DefaultWarTasks():
     @staticmethod
     def _get_client() -> ClashOfClansClient:
         return bot_client.bot.get_cog('ClashOfClansClient')
+    
+    @staticmethod
+    async def _add_player_to_cache(tag:str):
+        client = DefaultWarTasks._get_client()
+        player = await client.fetch_player(tag)
+        await player._sync_cache()
 
     @staticmethod
     async def _war_found(clan:aClan,war:aClanWar):
         try:
-            await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
+            tasks = [DefaultWarTasks._add_player_to_cache(m.tag) for m in war.members]
+            await bounded_gather(*tasks)
 
             if clan.is_active_league_clan and war.type == ClanWarType.CWL:
                 return
@@ -63,7 +70,7 @@ class DefaultWarTasks():
                             await user.add_roles(
                                 link.clan_war_role,
                                 reason=f"War Found: {clan.name} vs {opponent.name}"
-                                )
+                                )            
 
         except asyncio.CancelledError:
             return
@@ -73,12 +80,14 @@ class DefaultWarTasks():
     @staticmethod
     async def _war_start(clan:aClan,war:aClanWar):
         try:
-            await asyncio.gather(*(bot_client.player_queue.put(m.tag) for m in war.members))
             if clan.is_registered_clan and len(clan.abbreviation) > 0:
                 await bot_client.update_bot_status(
                     cooldown=60,
                     text=f"{clan.abbreviation} declare war!"
                     )
+            
+            tasks = [DefaultWarTasks._add_player_to_cache(m.tag) for m in war.members]
+            await bounded_gather(*tasks)
             
             if clan.is_active_league_clan and war.type == ClanWarType.CWL:
                 return

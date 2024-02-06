@@ -99,22 +99,22 @@ class ClashOfClansClient(commands.Cog):
         async for entry in query:
             season = await aClashSeason(entry['season'])
             timestamp = now if season.is_current else season.season_end
-            tag = entry['tag']
-            name = entry['name']
-            is_member = entry['is_member']
-            home_clan = entry['home_clan']
-            townhall = aTownHall(
-                level=entry['town_hall'],
-                weapon=0 if entry['town_hall'] < 12 else 1
-                )
-
             try:
+                tag = entry['tag']
                 player = await self.client.coc.get_player(tag,cls=aPlayer)
             except:
                 continue
 
+            name = entry.get('name','')
             if len(name) <= 0:
                 name = player.name
+
+            is_member = entry('is_member',False)
+            home_clan = entry('home_clan','')
+            townhall = aTownHall(
+                level=entry('town_hall',player.town_hall.level),
+                weapon=0 if entry('town_hall',player.town_hall.level) < 12 else 1
+                )
             
             if entry['time_in_home_clan'] > 0:
                 await self.client.coc_db.db__player_activity.insert_one(
