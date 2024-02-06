@@ -93,10 +93,12 @@ class ClashOfClansClient(commands.Cog):
         await self.client.coc_db.db__player_activity.delete_many({'legacy_conversion':True})        
         query = self.client.coc_db.db__player_stats.find({})
 
+        now = pendulum.now()
+
         await ctx.tick()
         async for entry in query:
             season = await aClashSeason(entry['season'])
-            timestamp = pendulum.now() if season.is_current else season.season_end
+            timestamp = now if season.is_current else season.season_end
             tag = entry['tag']
             name = entry['name']
             is_member = entry['is_member']
@@ -340,7 +342,7 @@ class ClashOfClansClient(commands.Cog):
                         'legacy_conversion':True
                     }
                 )            
-            bot_client.coc_data_log.info(f"Converted Stats for {tag} {name} {season.id}")
+            bot_client.coc_data_log.debug(f"Converted Stats for {tag} {name} {season.id}")
         await ctx.send("Done")
 
     ##################################################
