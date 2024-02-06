@@ -290,13 +290,12 @@ class ClanWarLoop(TaskLoop):
                 self._cached[tag] = cached_events = {}
         
             cached_war = cached_events.get('current_war',None)
-            async with self.api_limiter:
-                try:
-                    clan = await self.coc_client.fetch_clan(tag)
-                except InvalidTag:
-                    return self.loop.call_later(3600,self.unlock,lock)
-                except ClashAPIError:
-                    return self.loop.call_later(10,self.unlock,lock)
+            try:
+                clan = await self.coc_client.fetch_clan(tag)
+            except InvalidTag:
+                return self.loop.call_later(3600,self.unlock,lock)
+            except ClashAPIError:
+                return self.loop.call_later(10,self.unlock,lock)
             
             if not getattr(clan,'public_war_log',False):
                 return self.loop.call_later(10,self.unlock,lock)

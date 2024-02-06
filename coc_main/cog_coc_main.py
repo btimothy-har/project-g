@@ -81,10 +81,6 @@ class ClashOfClansMain(commands.Cog):
         
     async def cog_unload(self):
         self.client._is_initialized = False
-        cog = self.bot.get_cog('ClashOfClansTasks')
-        if cog:
-            await cog.shutdown()
-
         await self.client.shutdown()
         del self.client
 

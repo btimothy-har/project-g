@@ -171,6 +171,7 @@ class BotClashClient():
             # SEASONS
             self._current_season = None
             self._tracked_seasons = []
+            self.last_season_check = None
 
             # API HELPERS
             self.client_keys = []
@@ -666,7 +667,7 @@ class BotClashClient():
 async def clash_event_error(exception:Exception):
     client = BotClashClient()
     client.coc_main_log.exception(f"Clash Event Error: {exception}")
-    await client.bot.send_to_owners(f"Clash Event Error: {exception}")
+    await client.bot.send_to_owners(f"Clash Event Error: ```{exception}```")
 
 @coc.ClientEvents.player_loop_start()
 async def player_loop_start(iteration_number:int):
