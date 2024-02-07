@@ -1,6 +1,7 @@
 import coc
 import pendulum
 import asyncio
+import random
 
 from typing import *
 
@@ -92,6 +93,11 @@ class BasicPlayer(AwaitLoader):
     ##### PLAYER ATTRIBUTES
     #####
     ##################################################
+    @property
+    def _create_snapshot(self) -> bool:
+        if random.randint(1,100) == random.randint(1,100):
+            return True
+        
     @property
     def name(self) -> str:
         if not self._attributes._loaded:

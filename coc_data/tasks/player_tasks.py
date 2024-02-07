@@ -23,18 +23,19 @@ default_sleep = 60
 ############################################################
 class PlayerTasks():
 
-    @coc.PlayerEvents.timestamp()
+    @coc.PlayerEvents._create_snapshot()
     async def on_player_check_snapshot(old_player:aPlayer,new_player:aPlayer):
+        if not new_player._create_snapshot:
+            return
         last_activity = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'snapshot')
         if not last_activity or last_activity._timestamp - new_player.timestamp.int_timestamp > 3600:
-            if random.randint(1,100) == random.randint(1,100):
-                await aPlayerActivity.create_new(
-                    player=new_player,
-                    timestamp=new_player.timestamp,
-                    activity="snapshot",
-                    )
-                await new_player._sync_cache()
-                bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Created new snapshot.")
+            await aPlayerActivity.create_new(
+                player=new_player,
+                timestamp=new_player.timestamp,
+                activity="snapshot",
+                )
+            await new_player._sync_cache()
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Created new snapshot.")
     
     @coc.PlayerEvents.name()
     async def on_player_update_name(old_player:aPlayer,new_player:aPlayer):
