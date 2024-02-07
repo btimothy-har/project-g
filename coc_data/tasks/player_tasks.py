@@ -34,7 +34,6 @@ class PlayerTasks():
                 timestamp=new_player.timestamp,
                 activity="snapshot",
                 )
-            await new_player._sync_cache()
             bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Created new snapshot.")
     
     @coc.PlayerEvents.name()

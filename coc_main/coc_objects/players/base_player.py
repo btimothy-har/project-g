@@ -52,6 +52,7 @@ class BasicPlayer(AwaitLoader):
     async def load(self):
         await self._attributes.load()
         self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
+        await bot_client.clan_queue.put(self.tag)
     
     ##################################################
     #####
@@ -387,7 +388,8 @@ class _PlayerAttributes():
         return self._sync_locks[self.tag]
     
     async def load(self):
-        if not self._loaded:            
+        #if not self._loaded:
+        if True:
             database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self.name = database.get('name','') if database else ""
             self.exp_level = database.get('xp_level','') if database else 0

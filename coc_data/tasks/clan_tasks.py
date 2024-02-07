@@ -29,13 +29,6 @@ class ClanTasks():
     @staticmethod
     def _get_client() -> ClashOfClansClient:
         return bot_client.bot.get_cog('ClashOfClansClient')
-    
-    @coc.ClanEvents._create_snapshot()
-    async def on_clan_check_snapshot(old_clan:aClan,new_clan:aClan):
-        if not new_clan._create_snapshot:
-            return
-        if new_clan._attributes._last_sync and pendulum.now().int_timestamp - new_clan._attributes._last_sync.int_timestamp > 3600:
-            await new_clan._sync_cache()
 
     @coc.ClanEvents.total_clan_donations()
     async def on_clan_donation_change(old_clan:aClan,new_clan:aClan):
@@ -47,9 +40,7 @@ class ClanTasks():
 
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_capture(member:coc.ClanMember,clan:aClan):
-        client = ClanTasks._get_client()
-        n_player = await client.fetch_player(member.tag)
-        await n_player._sync_cache()
+        await bot_client.player_queue.put(member.tag)
     
     @coc.ClanEvents.member_leave()
     async def on_clan_member_leave_feed(member:coc.ClanMember,clan:aClan):
@@ -57,9 +48,7 @@ class ClanTasks():
 
     @coc.ClanEvents.member_leave()
     async def on_clan_member_leave_capture(member:coc.ClanMember,clan:aClan):
-        client = ClanTasks._get_client()
-        n_player = await client.fetch_player(member.tag)
-        await n_player._sync_cache()
+        await bot_client.player_queue.put(member.tag)
     
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_role(member:coc.ClanMember,clan:aClan):

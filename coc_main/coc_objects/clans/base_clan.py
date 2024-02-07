@@ -590,7 +590,8 @@ class _ClanAttributes():
         return self._sync_locks[self.tag]
 
     async def load(self):
-        if not self._loaded:
+        #if not self._loaded:
+        if True:
             clan_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
             self.name = clan_db.get('name','') if clan_db else ''
             self.badge = clan_db.get('badge','') if clan_db else ''

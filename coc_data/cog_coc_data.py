@@ -2,6 +2,7 @@ import asyncio
 import discord
 import pendulum
 import logging
+import coc
 
 from typing import *
 
@@ -59,6 +60,9 @@ class ClashOfClansData(commands.Cog):
         self.config.register_global(**default_global)        
         self.is_global = False
 
+        self.player_queue_task = None
+        self.clan_queue_task = None
+
         # DATA QUEUE
         self._lock_player_loop = asyncio.Lock()
         self._lock_clan_loop = asyncio.Lock()
@@ -84,6 +88,8 @@ class ClashOfClansData(commands.Cog):
     async def cog_load(self):
         self.is_global = await self.config.global_scope() == 1
         asyncio.create_task(self.start_task_cog())
+        self.clan_queue_task = asyncio.create_task(self.clan_queue_loop())
+        self.player_queue_task = asyncio.create_task(self.player_queue_loop())
     
     async def start_task_cog(self):
         async def load_nebula_tasks():
@@ -212,13 +218,21 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_loot_elixir,
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
-                ClanTasks.on_clan_check_snapshot,
                 ClanTasks.on_clan_member_join_capture,
                 ClanTasks.on_clan_member_leave_capture
                 )
             
         bot_client.coc.remove_clan_updates(*list(bot_client.coc._clan_updates))
         bot_client.coc.remove_player_updates(*list(bot_client.coc._player_updates))
+
+        try:
+            self.clan_queue_task.cancel()
+        except:
+            pass
+        try:
+            self.player_queue_task.cancel()
+        except:
+            pass
             
         #NEBULA Bot
         if self.bot.user.id == 1031240380487831664:
@@ -337,6 +351,52 @@ class ClashOfClansData(commands.Cog):
                 db_query = bot_client.coc_db.db__clan.find(query,{'_id':1}).limit(limit)
                 tags = [p['_id'] async for p in db_query]
                 bot_client.coc.add_clan_updates(*tags)
+    
+    async def clan_queue_loop(self):
+        sleep = 0.1
+        try:
+            while True:
+                try:
+                    tag = await bot_client.clan_queue.get()
+                    n_tag = coc.utils.correct_tag(tag)
+                    try:
+                        clan = await self.client.fetch_clan(n_tag)
+                    except:
+                        continue
+                    await clan._sync_cache()
+                    bot_client.clan_queue.task_done()
+                    await asyncio.sleep(sleep)
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    continue
+        except asyncio.CancelledError:
+            return
+    
+    async def player_queue_loop(self):
+        sleep = 0.1
+        try:
+            while True:
+                try:
+                    tag = await bot_client.player_queue.get()
+                    n_tag = coc.utils.correct_tag(tag)
+                    try:
+                        player = await self.client.fetch_player(n_tag)
+                    except:
+                        continue
+                    await player._sync_cache()
+                    bot_client.player_queue.task_done()
+                    await asyncio.sleep(sleep)
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    continue
+        except asyncio.CancelledError:
+            return
         
     async def status_embed(self):
         embed = await clash_embed(self.bot,
