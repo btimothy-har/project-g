@@ -41,6 +41,7 @@ class aPlayerActivity():
         '_id',
         '_timestamp',
         '_read_by_bank',
+        '_legacy_conversion',
         'tag',
         'name',
         'is_member',
