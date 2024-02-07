@@ -675,9 +675,13 @@ class BotClashClient():
 
 @coc.ClientEvents.event_error()
 async def clash_event_error(exception:Exception):
-    client = BotClashClient()
-    client.coc_main_log.exception(f"Clash Event Error: {exception}")
-    await client.bot.send_to_owners(f"Clash Event Error: ```{exception}```")
+    try:
+        client = BotClashClient()
+    except:
+        pass
+    else:
+        client.coc_main_log.exception(f"Clash Event Error: {exception}")
+        await client.bot.send_to_owners(f"Clash Event Error: ```{exception}```")
 
 @coc.ClientEvents.player_loop_start()
 async def player_loop_start(iteration_number:int):
