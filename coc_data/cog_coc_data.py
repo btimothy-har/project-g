@@ -96,6 +96,7 @@ class ClashOfClansData(commands.Cog):
             
         async def load_meteor_tasks():
             bot_client.coc.add_events(
+                PlayerTasks.on_player_check_snapshot,
                 PlayerTasks.on_player_update_name,
                 PlayerTasks.on_player_update_war_opted_in,
                 PlayerTasks.on_player_update_labels,
@@ -178,6 +179,7 @@ class ClashOfClansData(commands.Cog):
                 pass
 
             bot_client.coc.remove_events(
+                PlayerTasks.on_player_check_snapshot,
                 PlayerTasks.on_player_update_name,
                 PlayerTasks.on_player_update_war_opted_in,
                 PlayerTasks.on_player_update_labels,
