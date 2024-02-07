@@ -30,6 +30,7 @@ valid_activity_types = [
     'donations_sent',
     'donations_received',
     'capital_contribution',
+    'loot_capital_gold',
     'loot_gold',
     'loot_elixir',
     'loot_darkelixir',    
@@ -176,6 +177,7 @@ class aPlayerActivity():
             'loot_elixir',
             'loot_darkelixir',
             'capital_contribution',
+            'loot_capital_gold',
             'clan_games'
             ]        
         return self.activity in online_events

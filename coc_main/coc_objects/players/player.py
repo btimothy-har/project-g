@@ -374,7 +374,10 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def clan_games(self) -> int:
         achievement = self.get_achievement('Games Champion')
         return achievement.value if achievement else 0
-
+    @cached_property
+    def capital_gold_looted(self) -> int:
+        achievement = self.get_achievement('Aggressive Capitalism')
+        return achievement.value if achievement else 0    
     
     ##################################################
     ### DATA FORMATTERS

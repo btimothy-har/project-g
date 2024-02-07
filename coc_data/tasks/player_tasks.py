@@ -284,6 +284,20 @@ class PlayerTasks():
             )
         bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Capital Contribution changed to {new_player.clan_capital_contributions} (+{log.change}).")
     
+    @coc.PlayerEvents.capital_gold_looted()
+    async def on_player_update_loot_capital_gold(old_player:aPlayer,new_player:aPlayer):
+        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_capital_gold')
+        ref_value = last_stat.new_value if last_stat else old_player.capital_gold_looted
+
+        log = await aPlayerActivity.create_new(
+            player=new_player,
+            timestamp=new_player.timestamp,
+            activity="loot_capital_gold",
+            change=max(0,new_player.capital_gold_looted - ref_value),
+            new_value=new_player.capital_gold_looted
+            )
+        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Capital Gold Looted changed to {new_player.capital_gold_looted} (+{log.change}).")
+    
     @coc.PlayerEvents.loot_gold()
     async def on_player_update_loot_gold(old_player:aPlayer,new_player:aPlayer):
         last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_gold')
