@@ -383,7 +383,7 @@ class ClashOfClansData(commands.Cog):
             value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('war'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('war') else "None")
                 + "```ini"                
                 + f"\n{'[Running]':<10} {self._war_loop._running}"
-                + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
+                + f"\n{'[Tags]':<10} {len(self._war_loop._tags):,}"
                 + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.war_loop_runtime)/len(bot_client.war_loop_runtime):.2f}" if len(bot_client.war_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
@@ -393,7 +393,7 @@ class ClashOfClansData(commands.Cog):
             value="Last: " + (f"<t:{getattr(bot_client.last_loop.get('raid'),'int_timestamp',0)}:R>" if bot_client.last_loop.get('raid') else "None")
                 + "```ini"     
                 + f"\n{'[Running]':<10} {self._raid_loop._running}"
-                + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
+                + f"\n{'[Tags]':<10} {len(self._raid_loop._tags):,}"
                 + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.raid_loop_runtime)/len(bot_client.raid_loop_runtime):.2f}" if len(bot_client.raid_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
