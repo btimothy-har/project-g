@@ -766,7 +766,7 @@ class Bank(commands.Cog):
             return min(0.5,multi) # multi capped at 0.5 for TH8 and below        
         return multi
     
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=1)
     async def progress_reward_townhall(self):
         async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
             try:
@@ -823,7 +823,7 @@ class Bank(commands.Cog):
             distribute_rewards = [distribute_reward_townhall(log) for log in event_logs]
             await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
     
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=1)
     async def progress_reward_hero_upgrade(self):
         async def distribute_reward_hero_upgrade(player_activity_log:aPlayerActivity):
             try:
@@ -877,7 +877,7 @@ class Bank(commands.Cog):
             distribute_rewards = [distribute_reward_hero_upgrade(log) for log in event_logs]
             await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
     
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=30)
     async def clan_capital_contribution_reward(self):
         async def distribute_capital_contribution_reward(player_activity_log:aPlayerActivity):
             try:
@@ -929,12 +929,8 @@ class Bank(commands.Cog):
             return
         
         async with self._reward_lock_clan_capital:
-            bot_client.coc_main_log.info("Test Clan Capital Contribution Reward")
-
             if not self.use_rewards:
                 return
-            
-            bot_client.coc_main_log.info("Running Clan Capital Contribution Reward")
             
             activity_type = 'capital_contribution'
             event_logs = await aPlayerActivity.get_by_type_for_bank(activity_type)
