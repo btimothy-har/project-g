@@ -360,7 +360,7 @@ class BotClashClient():
     ##### CLIENT API LOGIN / LOGOUT / PROPERTIES
     #####
     ############################################################
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=30):
         try:
             await self.api_login_keys(rate_limit)
         except:
@@ -675,13 +675,17 @@ class BotClashClient():
 
 @coc.ClientEvents.event_error()
 async def clash_event_error(exception:Exception):
+    if isinstance(exception,coc.NotFound):
+        return
+    
     try:
         client = BotClashClient()
     except:
         pass
     else:
+        if client.api_maintenance:
+            return
         client.coc_main_log.exception(f"Clash Event Error: {exception}")
-        await client.bot.send_to_owners(f"Clash Event Error: ```{exception}```")
 
 @coc.ClientEvents.player_loop_start()
 async def player_loop_start(iteration_number:int):

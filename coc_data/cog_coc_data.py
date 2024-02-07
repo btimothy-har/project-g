@@ -263,20 +263,11 @@ class ClashOfClansData(commands.Cog):
         
         limit = 1000
         
-        async def add_to_client(tags:List[str]):
-            tag_iter = AsyncIter(tags)
-            async for tag in tag_iter:
-                try:
-                    player = await self.client.fetch_player(tag)
-                except:
-                    continue
-                else:
-                    bot_client.coc.add_player_updates(player.tag)
-        
         async with self._lock_player_loop:
+            current = list(bot_client.coc._player_updates)
             query = {
                 "$and": [
-                    {"_id": {"$nin": list(bot_client.coc._player_updates)}},
+                    {"_id": {"$nin": current}},
                     {"$or": [
                         {"discord_user": {"$exists":True,"$gt":0}},
                         {"is_member": True}
@@ -286,20 +277,25 @@ class ClashOfClansData(commands.Cog):
             db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
             user_tags = [p['_id'] async for p in db_query]
             limit -= len(user_tags)
-            await add_to_client(user_tags)
+            bot_client.coc.add_player_updates(*user_tags)
 
             if limit > 0:
-                query = {"_id": {"$nin": list(bot_client.coc._player_updates)}}
+                current = list(bot_client.coc._player_updates)
+                query = {"_id": {"$nin": current}}
                 db_query = bot_client.coc_db.db__player.find(query,{'_id':1}).limit(limit)
                 tags = [p['_id'] async for p in db_query]
-                await add_to_client(tags)            
+                bot_client.coc.add_player_updates(*tags)  
     
     @tasks.loop(minutes=1)    
     async def update_clan_loop(self):
         if self._lock_clan_loop.locked():
             return
         
+        limit = 1000
+        
         async with self._lock_clan_loop:
+            current = list(bot_client.coc._clan_updates)
+
             tags = []
             tags.extend([clan.tag for clan in await self.client.get_registered_clans()])
             tags.extend([clan.tag for clan in await self.client.get_alliance_clans()])
@@ -317,15 +313,16 @@ class ClashOfClansData(commands.Cog):
             tags.extend([reminder.tag for reminder in reminders])
 
             tags = list(set(tags))
-            tag_iter = AsyncIter(tags)
-            async for tag in tag_iter:
-                if tag not in list(bot_client.coc._clan_updates):
-                    try:
-                        clan = await self.client.fetch_clan(tag)
-                    except:
-                        pass
-                    else:
-                        bot_client.coc.add_clan_updates(clan.tag)
+            limit -= len(tags)
+            bot_client.coc.add_clan_updates(*[t for t in tags if t not in current])
+
+            #NEBULA does not need to do this
+            if self.bot.user.id != 1031240380487831664 and limit > 0:
+                current = list(bot_client.coc._clan_updates)
+                query = {"_id": {"$nin": current}}
+                db_query = bot_client.coc_db.db__clan.find(query,{'_id':1}).limit(limit)
+                tags = [p['_id'] async for p in db_query]
+                bot_client.coc.add_clan_updates(*tags)
         
     async def status_embed(self):
         embed = await clash_embed(self.bot,
