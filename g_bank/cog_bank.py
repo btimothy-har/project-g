@@ -1504,6 +1504,17 @@ class Bank(commands.Cog):
             inline=True
             )
         return embed
+
+    @commands.command(name="unread")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_bank_unread_activity(self,ctx:commands.Context,id:str):
+        
+        activity = await aPlayerActivity.get_by_id(id)
+        if not activity:
+            return await ctx.reply("No such activity.")
+        await activity.mark_as_unread()
+        await ctx.tick()        
     
     @commands.command(name="balance",aliases=['bal'])
     @commands.guild_only()
