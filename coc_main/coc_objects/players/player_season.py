@@ -87,7 +87,7 @@ class aPlayerSeason(AwaitLoader):
                     self.time_in_home_clan += max(0,a._timestamp - ts)
                 ts = a._timestamp
         
-        if self.is_member:            
+        if self.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'] > 0):
             self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
         self.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]

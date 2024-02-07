@@ -761,6 +761,9 @@ class Bank(commands.Cog):
                 multi = 0.4
             else:
                 multi = 0.2
+        
+        if player_activity_log.town_hall.level <= 8:
+            return min(0.5,multi) # multi capped at 0.5 for TH8 and below        
         return multi
     
     @tasks.loop(minutes=5)

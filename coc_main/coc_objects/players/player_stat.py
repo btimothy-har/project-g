@@ -70,8 +70,9 @@ class aPlayerActivity():
             }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',-1).limit(1)
         entry = await query.to_list(1)
-        if len(entry) > 0:
-            return cls(entry[0])
+        s = sorted(entry,key=lambda x: x['timestamp'],reverse=True)
+        if len(s) > 0:
+            return cls(s[0])
         return None
     
     @classmethod
@@ -85,8 +86,8 @@ class aPlayerActivity():
             }
         
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',-1)
-        entries = [cls(entry) async for entry in query]        
-        return entries
+        entries = [cls(entry) async for entry in query]
+        return sorted(entries,key=lambda x: x._timestamp)
     
     @classmethod
     async def get_by_type_for_bank(cls,activity:str) -> List[Optional['aPlayerActivity']]:
@@ -138,16 +139,17 @@ class aPlayerActivity():
             weapon=database['townhall']['weapon']
             )
         
-        self.home_clan_tag = database['home_clan']        
-        self.clan_tag = database['clan']
+        self.home_clan_tag = database['home_clan'] if database['home_clan'] != 'None' else None
+        self.clan_tag = database['clan'] if database['clan'] != 'None' else None
 
         self.activity = database['activity']
-        self.stat = database['stat']
-        self.change = database['change']
-        self.new_value = database['new_value']
+        self.stat = database['stat'] if database['stat'] != '' else None
+        self.change = database['change'] if database['change'] != 0 else None
+        self.new_value = database['new_value'] if database['new_value'] != '' else None
 
         self._timestamp = database['timestamp']
         self._read_by_bank = database.get('read_by_bank',False)
+        self._legacy_conversion = database.get('legacy_conversion',False)
     
     async def mark_as_read(self) -> None:
         await bot_client.coc_db.db__player_activity.update_one(

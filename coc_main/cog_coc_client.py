@@ -90,8 +90,8 @@ class ClashOfClansClient(commands.Cog):
     @commands.is_owner()
     async def command_convert_stat(self,ctx:commands.Context):
         
-        #await self.client.coc_db.db__player_activity.delete_many({'legacy_conversion':True})
-        await self.client.coc_db.db__player_activity.delete_many({})
+        await self.client.coc_db.db__player_activity.delete_many({'legacy_conversion':True})
+        #await self.client.coc_db.db__player_activity.delete_many({})
         query = self.client.coc_db.db__player_stats.find({})
 
         now = pendulum.now()
