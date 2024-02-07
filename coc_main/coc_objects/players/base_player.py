@@ -375,6 +375,7 @@ class _PlayerAttributes():
             self.last_removed = None
 
             self._last_sync = None
+            self._last_loaded = pendulum.now().subtract(days=1)
         
         self._new = False
     

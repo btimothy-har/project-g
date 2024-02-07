@@ -577,6 +577,7 @@ class _ClanAttributes():
             self.league_clan_role_id = None
 
             self._last_sync = None
+            self._last_loaded = pendulum.now().subtract(days=1)
             
         self._new = False
     
