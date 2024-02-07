@@ -349,6 +349,7 @@ class ClashOfClansData(commands.Cog):
                 + f"\n{'[Running]':<10} {bot_client.player_loop_status}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._player_updates):,}"
                 + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.player_loop_runtime)/len(bot_client.player_loop_runtime):.2f}" if len(bot_client.player_loop_runtime) > 0 else "0") + "s"
+                + f"\n{'[Last]':<10} " + (f"{bot_client.player_loop_runtime[-1]:.2f}" if len(bot_client.player_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
@@ -360,6 +361,7 @@ class ClashOfClansData(commands.Cog):
                 + f"\n{'[Running]':<10} {bot_client.clan_loop_status}"
                 + f"\n{'[Tags]':<10} {len(bot_client.coc._clan_updates):,}"
                 + f"\n{'[RunTime]':<10} " + (f"{sum(bot_client.clan_loop_runtime)/len(bot_client.clan_loop_runtime):.2f}" if len(bot_client.clan_loop_runtime) > 0 else "0") + "s"
+                + f"\n{'[Last]':<10} " + (f"{bot_client.clan_loop_runtime[-1]:.2f}" if len(bot_client.clan_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )

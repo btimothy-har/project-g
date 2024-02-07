@@ -2,6 +2,7 @@ import coc
 import discord
 import asyncio
 import pendulum
+import random
 
 from typing import *
 
@@ -68,6 +69,11 @@ class BasicClan(AwaitLoader):
         if self.tag:
             return f"https://link.clashofclans.com/en?action=OpenClanProfile&tag=%23{self.tag.strip('#')}"
         return None
+    
+    @property
+    def _create_snapshot(self) -> bool:
+        if random.randint(1,50) == random.randint(1,50):
+            return True
     
     ##################################################
     #####
