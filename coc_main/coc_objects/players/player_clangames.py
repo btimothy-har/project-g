@@ -35,7 +35,7 @@ class aPlayerClanGames():
             first_entry = activities[0]
             last_entry = activities[-1]
 
-            self.clan_tag = first_entry.clan
+            self.clan_tag = first_entry.clan_tag
             self.starting_time = first_entry.timestamp
 
             self._score = sum([activity.change for activity in activities if activity.activity == 'clan_games'])
