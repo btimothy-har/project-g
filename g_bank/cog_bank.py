@@ -722,12 +722,12 @@ class Bank(commands.Cog):
     ############################################################
     async def _compute_multiplier(self,player_activity_log:aPlayerActivity) -> float:
         multi = 0.0
-        member = self.bot.get_user(player_activity_log.discord_user)
-        if not member:
+        user = self.bot.get_user(player_activity_log.discord_user)
+        if not user:
             return 0
         
         member = aMember(member.id)
-        guild_user = self.bank_guild.get_member(member.id)
+        guild_user = self.bank_guild.get_member(user.id)
         reward_tag = await member._get_reward_account_tag()
 
         if guild_user and self.bank_penalty_role in guild_user.roles:
@@ -806,7 +806,7 @@ class Bank(commands.Cog):
                     )
 
             except Exception as e:
-                bot_client.coc_main_log.exception(f"Progress Reward Townhall: {player_activity_log.tag}")
+                bot_client.coc_main_log.exception(f"Exception in Townhall Upgrade Reward: {player_activity_log.tag} {player_activity_log._id}")
         
         if self._reward_lock_townhall.locked():
             return
@@ -837,7 +837,7 @@ class Bank(commands.Cog):
                 if player_activity_log.change <= 0:
                     return
                 
-                hero = aHero.get_hero(player_activity_log.stat)
+                hero = aHero.get_hero(player_activity_log.stat,player_activity_log.town_hall.level)
                 upgrades = range(player_activity_log.new_value - player_activity_log.change,player_activity_log.new_value+1)
 
                 async for u in AsyncIter(upgrades):                
@@ -860,7 +860,7 @@ class Bank(commands.Cog):
                         )
 
             except Exception as e:
-                bot_client.coc_main_log.exception(f"Progress Reward Hero Upgrade: {player_activity_log.tag}")
+                bot_client.coc_main_log.exception(f"Exception in Hero Upgrade Reward: {player_activity_log.tag} {player_activity_log._id}")
                     
         if self._reward_lock_hero_upgrade.locked():
             return
@@ -923,7 +923,7 @@ class Bank(commands.Cog):
                     )
 
             except Exception as e:
-                bot_client.coc_main_log.exception(f"Clan Capital Contribution Reward: {player_activity_log.tag}")
+                bot_client.coc_main_log.exception(f"Exception in Clan Capital Contribution Reward: {player_activity_log.tag} {player_activity_log._id}")
                 
         if self._reward_lock_clan_capital.locked():
             return

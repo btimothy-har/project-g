@@ -158,6 +158,13 @@ class aPlayerActivity():
             {'$set':{'read_by_bank':True}}
             )
         self._read_by_bank = True
+    
+    async def mark_as_unread(self) -> None:
+        await bot_client.coc_db.db__player_activity.update_one(
+            {'_id':bson.ObjectId(self._id)},
+            {'$set':{'read_by_bank':False}}
+            )
+        self._read_by_bank = False
 
     @property
     def timestamp(self) -> pendulum.DateTime:
