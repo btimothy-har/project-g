@@ -7,7 +7,7 @@ from typing import *
 
 from discord.ext import tasks
 
-from redbot.core import commands
+from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
@@ -34,6 +34,10 @@ from .tasks.guild_tasks import DiscordGuildLoop
 
 bot_client = client()
 
+default_global = {
+    "global_scope": 0,
+    }
+
 ############################################################
 ############################################################
 #####
@@ -50,7 +54,10 @@ class ClashOfClansData(commands.Cog):
     __version__ = bot_client.version
 
     def __init__(self,bot:Red):
-        self.bot = bot
+        self.bot = bot        
+        self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)        
+        self.config.register_global(**default_global)        
+        self.is_global = False
 
         # DATA QUEUE
         self._lock_player_loop = asyncio.Lock()
@@ -75,6 +82,7 @@ class ClashOfClansData(commands.Cog):
     ### COG LOAD
     ##################################################
     async def cog_load(self):
+        self.is_global = await self.config.global_scope() == 1
         asyncio.create_task(self.start_task_cog())
     
     async def start_task_cog(self):
@@ -279,7 +287,7 @@ class ClashOfClansData(commands.Cog):
             limit -= len(user_tags)
             bot_client.coc.add_player_updates(*user_tags)
 
-            if limit > 0:
+            if self.is_global and limit > 0:
                 current = list(bot_client.coc._player_updates)
                 query = {"_id": {"$nin": current}}
                 db_query = bot_client.coc_db.db__player.find(query,{'_id':1}).limit(limit)
@@ -316,8 +324,7 @@ class ClashOfClansData(commands.Cog):
             limit -= len(tags)
             bot_client.coc.add_clan_updates(*[t for t in tags if t not in current])
 
-            #NEBULA does not need to do this
-            if self.bot.user.id != 1031240380487831664 and limit > 0:
+            if self.is_global and limit > 0:
                 current = list(bot_client.coc._clan_updates)
                 query = {"_id": {"$nin": current}}
                 db_query = bot_client.coc_db.db__clan.find(query,{'_id':1}).limit(limit)
@@ -409,7 +416,7 @@ class ClashOfClansData(commands.Cog):
 
     @command_group_clash_data.command(name="status")
     @commands.is_owner()
-    async def subcommand_clash_data_status(self,ctx):
+    async def subcommand_clash_data_status(self,ctx:commands.Context):
         """Clash of Clans Data Status."""
 
         if not getattr(bot_client,'_is_initialized',False):
@@ -419,9 +426,37 @@ class ClashOfClansData(commands.Cog):
         view = RefreshStatus(ctx)
         await ctx.reply(embed=embed,view=view)
     
+    @command_group_clash_data.command(name="setglobal")
+    @commands.is_owner()
+    async def subcommand_clash_data_setglobal(self,ctx:commands.Context,scope:int):
+        """Toggle if the Data loop should accept a global scope."""
+
+        if scope == 1:
+            self.is_global = True
+            await self.config.global_scope.set(1)
+            await ctx.reply("Global Scope enabled.")
+        else:
+            self.is_global = False
+            await self.config.global_scope.set(0)
+            await ctx.reply("Global Scope disabled.")
+    
+    @command_group_clash_data.command(name="resetloops")
+    @commands.is_owner()
+    async def subcommand_clash_data_setglobal(self,ctx:commands.Context,scope:int):
+        """Toggle if the Data loop should accept a global scope."""
+
+        if scope == 1:
+            self.is_global = True
+            await self.config.global_scope.set(1)
+            await ctx.reply("Global Scope enabled.")
+        else:
+            self.is_global = False
+            await self.config.global_scope.set(0)
+            await ctx.reply("Global Scope disabled.")
+    
     @command_group_clash_data.command(name="stream")
     @commands.is_owner()
-    async def subcommand_clash_data_stream(self,ctx):
+    async def subcommand_clash_data_stream(self,ctx:commands.Context):
         """Toggle the Clash of Clans Data Stream."""
 
         current_data_level = bot_client.coc_data_log.level

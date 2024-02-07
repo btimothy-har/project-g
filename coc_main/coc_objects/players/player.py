@@ -92,8 +92,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             }
 
     async def load(self):
-        if self.tag == '#LJC8V0GCJ':
-            bot_client.coc_main_log.info(f"Loading Player: {self.tag}")
         if self.clan:
             await self.clan
         await BasicPlayer.load(self)

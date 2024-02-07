@@ -70,7 +70,7 @@ class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
         self.rate_limit = 1 / sleep_time
         sleep = 1 / (self.rate_limit * 3)
-        self.limiter = AsyncLimiter(1,sleep)
+        self.limiter = AsyncLimiter(1,sleep_time)
         super().__init__(sleep_time)
     
     @property
@@ -360,7 +360,7 @@ class BotClashClient():
     ##### CLIENT API LOGIN / LOGOUT / PROPERTIES
     #####
     ############################################################
-    async def api_login(self,rate_limit:int=10):
+    async def api_login(self,rate_limit:int=30):
         try:
             await self.api_login_keys(rate_limit)
         except:
