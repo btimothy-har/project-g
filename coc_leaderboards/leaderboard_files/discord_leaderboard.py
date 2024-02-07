@@ -395,8 +395,11 @@ class ClanWarLeaderboard(Leaderboard):
         leaderboard_clans = await leaderboard.parent.get_leaderboard_clans()
 
         a_iter = AsyncIter(leaderboard_players)
-        async for player in a_iter:
+        async for player in a_iter:            
             stats = await player.get_season_stats(season)
+            if not stats.is_member:
+                continue
+            
             th_iter = AsyncIter(eligible_townhalls)
             async for lb_th in th_iter:
                 if parent.is_global:
