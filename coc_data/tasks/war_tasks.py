@@ -37,9 +37,7 @@ class DefaultWarTasks():
     
     @staticmethod
     async def _add_player_to_cache(tag:str):
-        client = DefaultWarTasks._get_client()
-        player = await client.fetch_player(tag)
-        await player._sync_cache()
+        await bot_client.player_queue.put(tag)
 
     @staticmethod
     async def _war_found(clan:aClan,war:aClanWar):
