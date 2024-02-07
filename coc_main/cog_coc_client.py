@@ -495,23 +495,35 @@ class ClashOfClansClient(commands.Cog):
                 {'_id':1}
                 )
             tags = [p['_id'] async for p in query]
-        else:
-            query = bot_client.coc_db.db__player_stats.find(
-                {
-                    '_id.season':season.id,
-                    'home_clan':clan.tag,
-                    'is_member':True,
-                    },
-                {'_id':1,'tag':1}
+            ret_players = await self.fetch_many_players(*tags)
+            return sorted(
+                ret_players,
+                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+                reverse=True
                 )
+        else:
+            filter_criteria = {
+                {
+                'is_member':True,
+                'home_clan':clan.tag,
+                'timestamp': {
+                    '$gt':season.season_start.int_timestamp,
+                    '$lte':season.season_end.int_timestamp
+                    }
+                }
+            }
+            query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
             tags = [p['tag'] async for p in query]
-                    
-        ret_players = await self.fetch_many_players(*tags)
-        return sorted(
-            ret_players,
-            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
-            reverse=True
-            )
+
+            players = await self.fetch_many_players(*tags)
+            season_stats = await bounded_gather(*[p.get_season_stats(season) for p in players])
+            season_members = [s.tag for s in season_stats if s.is_member and s.home_clan_tag == clan.tag]
+            ret_players = [p for p in players if p.tag in season_members]
+            return sorted(
+                ret_players,
+                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+                reverse=True
+                )
     
     ############################################################
     #####

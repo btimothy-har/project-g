@@ -381,8 +381,15 @@ class ClanWarLeaderboard(Leaderboard):
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
         leaderboard = cls(parent,season)        
-        query = bot_client.coc_db.db__player_stats.find({'is_member':True,'season':season.id},{'tag':1})
-        member_tags = [p['tag'] async for p in query]
+        filter_criteria = {
+            'is_member':True,
+            'timestamp': {
+                '$gt':season.season_start.int_timestamp,
+                '$lte':season.season_end.int_timestamp
+                }
+            }
+        query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
+        member_tags = list(set([p['tag'] async for p in query]))
         
         leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
         leaderboard_clans = await leaderboard.parent.get_leaderboard_clans()
@@ -457,31 +464,31 @@ class ResourceLootLeaderboard(Leaderboard):
     @classmethod
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
         leaderboard = cls(parent,season)
-        if parent.is_global:
-            query = bot_client.coc_db.db__player_stats.find({
-                'is_member':True,
-                'season':season.id,
-                'attacks.season_total': {'$gt':0},
-                'loot_darkelixir.season_total': {'$gt':0}
-                },
-                {'tag':1})
-        else:
-            leaderboard_clans = await leaderboard.parent.get_leaderboard_clans()
-            query = bot_client.coc_db.db__player_stats.find({
-                'is_member':True,
-                'season':season.id,
-                'attacks.season_total': {'$gt':0},
-                'loot_darkelixir.season_total': {'$gt':0},
-                'home_clan': {'$in':[c.tag for c in leaderboard_clans]}
-                },
-                {'tag':1})
-            
-        member_tags = [p['tag'] async for p in query]
+        
+        filter_criteria = {
+            'is_member':True,
+            'activity':'loot_darkelixir',
+            'change': {'$gt':0},
+            'timestamp': {
+                '$gt':season.season_start.int_timestamp,
+                '$lte':season.season_end.int_timestamp
+                }
+            }
+        query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
+
+        member_tags = list(set([p['tag'] async for p in query]))
+
         leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
+        leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None
         
         a_iter = AsyncIter(leaderboard_players)
         async for player in a_iter:
             stats = await player.get_season_stats(season)
+            if not stats.is_member:
+                continue
+            if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
+                continue
+
             th_iter = AsyncIter(eligible_townhalls)
             async for lb_th in th_iter:
                 if stats.town_hall == lb_th:
@@ -544,29 +551,29 @@ class DonationsLeaderboard(Leaderboard):
     async def calculate(cls,parent:DiscordLeaderboard,season:aClashSeason):
         leaderboard = cls(parent,season)
 
-        if parent.is_global:
-            query = bot_client.coc_db.db__player_stats.find({
-                'is_member':True,
-                'season':season.id,
-                'donations_sent.season_total': {'$gt':0}
-                },
-                {'tag':1})
-        else:
-            leaderboard_clans = await leaderboard.parent.get_leaderboard_clans()
-            query = bot_client.coc_db.db__player_stats.find({
-                'is_member':True,
-                'season':season.id,
-                'donations_sent.season_total': {'$gt':0},
-                'home_clan': {'$in':[c.tag for c in leaderboard_clans]}
-                },
-                {'tag':1})
-        
-        member_tags = [p['tag'] async for p in query]        
-        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)        
+        filter_criteria = {
+            'is_member':True,
+            'activity':'donations_sent',
+            'change': {'$gt':0},
+            'timestamp': {
+                '$gt':season.season_start.int_timestamp,
+                '$lte':season.season_end.int_timestamp
+                }
+            }
+        query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
+        member_tags = [p['tag'] async for p in query]
+
+        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
+        leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None           
         
         a_iter = AsyncIter(leaderboard_players)
         async for player in a_iter:
             stats = await player.get_season_stats(season)
+            if not stats.is_member:
+                continue
+            if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
+                continue
+
             th_iter = AsyncIter(eligible_townhalls)
             async for lb_th in th_iter:
                 if stats.town_hall == lb_th:
@@ -631,14 +638,14 @@ class ClanGamesLeaderboard(Leaderboard):
 
         query_doc = {
             'is_member':True,
-            'season':season.id,
-            'clangames.score': {'$gt':0},
-            'clangames.clan': {'$in':[c.tag for c in leaderboard_clans]},            
-            '$expr': {
-                '$eq': ['$home_clan','$clangames.clan']
-                }
+            'activity':'clan_games',
+            'timestamp': {
+                '$gt':season.season_start.int_timestamp,
+                '$lte':season.season_end.int_timestamp
+                },            
+            'change': {'$gt':0}
             }
-        query = bot_client.coc_db.db__player_stats.find(query_doc,{'tag':1})
+        query = bot_client.coc_db.db__player_activity.find(query_doc,{'tag':1})
         member_tags = [p['tag'] async for p in query]
 
         leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
@@ -647,16 +654,20 @@ class ClanGamesLeaderboard(Leaderboard):
         async for player in a_iter:
             stats = await player.get_season_stats(season)
 
+            if not stats.is_member:
+                continue
+
             if parent.is_global:
-                lb_player = await ClanGamesLeaderboardPlayer.calculate(stats)
-                leaderboard.leaderboard_players['global'].append(lb_player)
+                if stats.home_clan_tag and stats.home_clan_tag == stats.clangames.clan_tag:
+                    lb_player = await ClanGamesLeaderboardPlayer.calculate(stats)
+                    leaderboard.leaderboard_players['global'].append(lb_player)
             
             else:
                 leaderboard_clans.sort(key=lambda x:(x.level,x.capital_hall),reverse=True)
 
                 clan_iter = AsyncIter(leaderboard_clans)
                 async for c in clan_iter:
-                    if stats.clangames.clan_tag == c.tag:
+                    if stats.home_clan_tag and stats.home_clan_tag == stats.clangames.clan_tag and stats.clangames.clan_tag == c.tag:
                         lb_player = await ClanGamesLeaderboardPlayer.calculate(stats)
                         leaderboard.leaderboard_players[c.tag].append(lb_player)
         
