@@ -147,6 +147,10 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         
         async with self._attributes._sync_lock:
             basic_clan = await BasicClan(self.tag)
+            await basic_clan._attributes.load_data()
+
+            if basic_clan._attributes._last_sync and basic_clan._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
+                return
             await basic_clan.update_last_sync(pendulum.now())
             tasks = [
                 basic_clan.clean_elders(),

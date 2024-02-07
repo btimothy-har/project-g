@@ -181,22 +181,10 @@ class BasicClan(AwaitLoader):
         
     @property
     def league_clan_channel(self) -> Optional[Union[discord.TextChannel,discord.Thread]]:
-        if not self.is_active_league_clan:
-            return None
-        channel = bot_client.bot.get_channel(self._attributes.league_clan_channel_id)
-        if isinstance(channel,(discord.TextChannel,discord.Thread)):
-            return channel
         return None
     
     @property
     def league_clan_role(self) -> Optional[discord.Role]:
-        if not self.is_active_league_clan:
-            return None
-        role_id = self._attributes.league_clan_role_id
-        for guild in bot_client.bot.guilds:
-            role = guild.get_role(role_id)
-            if isinstance(role,discord.Role):
-                return role
         return None
     
     ##################################################
@@ -521,7 +509,7 @@ class _ClanAttributes():
 
     __slots__ = [
         '_new',
-        '_last_loaded',
+        '_loaded',
         '_last_sync',
         'tag',
         'name',
@@ -540,9 +528,7 @@ class _ClanAttributes():
         'coleaders',
         'elders',
         'alliance_members',
-        'is_active_league_clan',
-        'league_clan_channel_id',
-        'league_clan_role_id'
+        'is_active_league_clan'
         ]
 
     def __new__(cls,tag:str):
@@ -550,6 +536,7 @@ class _ClanAttributes():
         if n_tag not in cls._cache:
             instance = super().__new__(cls)
             instance._new = True
+            instance._loaded = False
             cls._cache[n_tag] = instance
         return cls._cache[n_tag]
     
@@ -573,11 +560,8 @@ class _ClanAttributes():
             self.elders = None
             self.alliance_members = None
             self.is_active_league_clan = None
-            self.league_clan_channel_id = None
-            self.league_clan_role_id = None
 
             self._last_sync = None
-            self._last_loaded = pendulum.now().subtract(days=1)
             
         self._new = False
     
@@ -590,36 +574,36 @@ class _ClanAttributes():
         return self._sync_locks[self.tag]
 
     async def load(self):
-        diff = pendulum.now() - self._last_loaded
-        if diff.in_seconds() > 300:
-            clan_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
-            self.name = clan_db.get('name','') if clan_db else ''
-            self.badge = clan_db.get('badge','') if clan_db else ''
-            self.level = clan_db.get('level',0) if clan_db else 0
-            self.capital_hall = clan_db.get('capital_hall',0) if clan_db else 0
-            self.war_league_name = clan_db.get('war_league','') if clan_db else ''
-            self.abbreviation = clan_db.get('abbreviation','') if clan_db else ''
-            self.emoji = clan_db.get('emoji','') if clan_db else ''
-            self.unicode_emoji = clan_db.get('unicode_emoji','') if clan_db else ''
+        if not self._loaded:
+            await self.load_data()
+    
+    async def load_data(self):
+        clan_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
+        self.name = clan_db.get('name','') if clan_db else ''
+        self.badge = clan_db.get('badge','') if clan_db else ''
+        self.level = clan_db.get('level',0) if clan_db else 0
+        self.capital_hall = clan_db.get('capital_hall',0) if clan_db else 0
+        self.war_league_name = clan_db.get('war_league','') if clan_db else ''
+        self.abbreviation = clan_db.get('abbreviation','') if clan_db else ''
+        self.emoji = clan_db.get('emoji','') if clan_db else ''
+        self.unicode_emoji = clan_db.get('unicode_emoji','') if clan_db else ''
 
-            ls = clan_db.get('last_sync',0) if clan_db else 0
-            self._last_sync = pendulum.from_timestamp(ls) if ls else None
+        ls = clan_db.get('last_sync',0) if clan_db else 0
+        self._last_sync = pendulum.from_timestamp(ls) if ls else None
 
-            alliance_db = await bot_client.coc_db.db__alliance_clan.find_one({'_id':self.tag})
-            self.is_alliance_clan = True if alliance_db else False
-            self.recruitment_level = sorted(alliance_db.get('recruitment_level',[]) if alliance_db else [])
-            self.recruitment_info = alliance_db.get('recruitment_info','') if alliance_db else ''
-            self.description = alliance_db.get('description','') if alliance_db else ''
-            self.leader = alliance_db.get('leader',0) if alliance_db else 0
-            self.coleaders = alliance_db.get('coleaders',[]) if alliance_db else []
-            self.elders = alliance_db.get('elders',[]) if alliance_db else []
+        alliance_db = await bot_client.coc_db.db__alliance_clan.find_one({'_id':self.tag})
+        self.is_alliance_clan = True if alliance_db else False
+        self.recruitment_level = sorted(alliance_db.get('recruitment_level',[]) if alliance_db else [])
+        self.recruitment_info = alliance_db.get('recruitment_info','') if alliance_db else ''
+        self.description = alliance_db.get('description','') if alliance_db else ''
+        self.leader = alliance_db.get('leader',0) if alliance_db else 0
+        self.coleaders = alliance_db.get('coleaders',[]) if alliance_db else []
+        self.elders = alliance_db.get('elders',[]) if alliance_db else []
 
-            mem_query = bot_client.coc_db.db__player.find({'is_member':True,'home_clan':self.tag},{'_id':1})
-            self.alliance_members = [p['_id'] async for p in mem_query]
+        mem_query = bot_client.coc_db.db__player.find({'is_member':True,'home_clan':self.tag},{'_id':1})
+        self.alliance_members = [p['_id'] async for p in mem_query]
 
-            league_db = await bot_client.coc_db.db__war_league_clan_setup.find_one({'_id':self.tag})
-            self.is_active_league_clan = league_db.get('is_active',False) if league_db else False
-            self.league_clan_channel_id = league_db.get('channel',0) if league_db else 0
-            self.league_clan_role_id = league_db.get('role',0) if league_db else 0
-
-            self._last_loaded = pendulum.now()
+        league_db = await bot_client.coc_db.db__war_league_clan_setup.find_one({'_id':self.tag})
+        self.is_active_league_clan = league_db.get('is_active',False) if league_db else False
+        
+        self._loaded = True

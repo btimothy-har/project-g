@@ -107,6 +107,7 @@ class aPlayerActivity():
         if activity not in valid_activity_types:
             raise ValueError(f"Invalid activity type: {activity}.")
 
+        await player._sync_cache(force=True)
         new_entry = await bot_client.coc_db.db__player_activity.insert_one(
             {
                 'tag':player.tag,

@@ -317,7 +317,7 @@ class _PlayerAttributes():
 
     __slots__ = [
         '_new',
-        '_last_loaded',
+        '_loaded',
         '_last_sync',
         'tag',
         'name',
@@ -337,6 +337,7 @@ class _PlayerAttributes():
         if n_tag not in cls._cache:
             instance = super().__new__(cls)
             instance._new = True
+            instance._loaded = False
             cls._cache[n_tag] = instance
         return cls._cache[n_tag]
     
@@ -355,8 +356,7 @@ class _PlayerAttributes():
             self.last_removed = None
 
             self._last_sync = None
-            self._last_loaded = pendulum.now().subtract(days=1)
-        
+
         self._new = False
     
     @property
@@ -368,31 +368,33 @@ class _PlayerAttributes():
         return self._sync_locks[self.tag]
     
     async def load(self):
-        diff = pendulum.now() - self._last_loaded
-        if diff.in_seconds() > 300:
-            database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
-            self.name = database.get('name','') if database else ""
-            self.exp_level = database.get('xp_level','') if database else 0
-            self.town_hall_level = database.get('townhall','') if database else 0
-            self.discord_user = database.get('discord_user','') if database else 0
-            self.home_clan_tag = database.get('home_clan',None) if database else None
-            self.war_elo = database.get('war_elo',0) if database else 0
+        if not self._loaded:
+            await self.load_data()
+    
+    async def load_data(self):
+        database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
+        self.name = database.get('name','') if database else ""
+        self.exp_level = database.get('xp_level','') if database else 0
+        self.town_hall_level = database.get('townhall','') if database else 0
+        self.discord_user = database.get('discord_user','') if database else 0
+        self.home_clan_tag = database.get('home_clan',None) if database else None
+        self.war_elo = database.get('war_elo',0) if database else 0
 
-            self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
+        self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
 
-            fs = database.get('first_seen',0) if database else 0
-            self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
+        fs = database.get('first_seen',0) if database else 0
+        self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
 
-            lj = database.get('last_joined',0) if database else 0
-            self.last_joined = pendulum.from_timestamp(lj) if lj > 0 else None
+        lj = database.get('last_joined',0) if database else 0
+        self.last_joined = pendulum.from_timestamp(lj) if lj > 0 else None
 
-            lr = database.get('last_removed',0) if database else 0
-            self.last_removed = pendulum.from_timestamp(lr) if lr > 0 else None
+        lr = database.get('last_removed',0) if database else 0
+        self.last_removed = pendulum.from_timestamp(lr) if lr > 0 else None
 
-            ls = database.get('last_sync',0) if database else 0
-            self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
+        ls = database.get('last_sync',0) if database else 0
+        self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
-            self._last_loaded = pendulum.now()
+        self._last_loaded = pendulum.now()
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:

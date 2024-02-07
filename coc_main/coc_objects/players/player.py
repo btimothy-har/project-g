@@ -451,6 +451,11 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         
         async with self._attributes._sync_lock:
             basic_player = await BasicPlayer(self.tag)
+            await basic_player._attributes.load_data()
+
+            if basic_player._attributes._last_sync and basic_player._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
+                return
+            
             basic_player._attributes._last_sync = self.timestamp
 
             if basic_player.is_new:
