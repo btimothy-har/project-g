@@ -1,23 +1,17 @@
-import asyncio
 import pendulum
-import copy
 import coc
 
 from typing import *
-from redbot.core.utils import AsyncIter, bounded_gather
+from redbot.core.utils import AsyncIter
 
-from .default import TaskLoop
 
 from coc_main.api_client import BotClashClient as client
 from coc_main.cog_coc_client import ClashOfClansClient
-from coc_main.exceptions import InvalidTag, ClashAPIError
 
-from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.clans.clan import aClan
 from coc_main.discord.member import aMember
-from coc_main.discord.feeds.donations import ClanDonationFeed, ClanDataFeed
+from coc_main.discord.feeds.donations import ClanDonationFeed
 from coc_main.discord.feeds.member_movement import ClanMemberFeed
-from coc_main.discord.feeds.reminders import EventReminder
 from coc_main.discord.clan_link import ClanGuildLink
 
 bot_client = client()
