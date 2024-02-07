@@ -33,6 +33,11 @@ class ClanTasks():
     @coc.ClanEvents.total_clan_donations()
     async def on_clan_donation_change(old_clan:aClan,new_clan:aClan):
         await ClanDonationFeed.start_feed(new_clan,old_clan)
+
+    @coc.ClanEvents.member_count()
+    @coc.ClanEvents.total_clan_donations()
+    async def on_clan_activity(old_clan:aClan,new_clan:aClan):
+        await new_clan._sync_cache(force=True)
     
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_feed(member:coc.ClanMember,clan:aClan):

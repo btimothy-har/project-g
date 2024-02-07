@@ -131,6 +131,7 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_loot_elixir,
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
+                ClanTasks.on_clan_activity,
                 ClanTasks.on_clan_member_join_capture,
                 ClanTasks.on_clan_member_leave_capture
                 )
@@ -358,6 +359,11 @@ class ClashOfClansData(commands.Cog):
                 try:
                     tag = await bot_client.clan_queue.get()
                     n_tag = coc.utils.correct_tag(tag)
+
+                    if n_tag in bot_client.coc._clan_updates:
+                        bot_client.clan_queue.task_done()
+                        continue
+
                     try:
                         clan = await self.client.fetch_clan(n_tag)
                     except:
@@ -381,6 +387,11 @@ class ClashOfClansData(commands.Cog):
                 try:
                     tag = await bot_client.player_queue.get()
                     n_tag = coc.utils.correct_tag(tag)
+
+                    if n_tag in bot_client.coc._player_updates:
+                        bot_client.player_queue.task_done()
+                        continue
+                    
                     try:
                         player = await self.client.fetch_player(n_tag)
                     except:
