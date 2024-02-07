@@ -87,10 +87,7 @@ class ClanExcelExport():
         export = cls(clan,season)
 
         if os.path.exists(export.file_path):
-            if season.is_current_season:
-                os.remove(export.file_path)
-            else:
-                return export.file_path
+            os.remove(export.file_path)
         
         export.workbook = xlsxwriter.Workbook(export.file_path)
         await export.member_report()

@@ -124,3 +124,6 @@ class aTroop():
     @property
     def village(self) -> str:
         return self._game_troop.village
+    @property
+    def is_home_troop(self) -> bool:
+        return self.village == 'home'

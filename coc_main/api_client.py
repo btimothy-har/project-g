@@ -68,8 +68,7 @@ class DataQueue(asyncio.Queue):
 ############################################################
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
-        self.rate_limit = 1 / sleep_time
-        self.limiter = AsyncLimiter(1,sleep_time*1.2)
+        self.limiter = AsyncLimiter(1,sleep_time)
         super().__init__(sleep_time)
     
     @property
@@ -142,6 +141,8 @@ class RequestCounter():
 ############################################################
 class BotClashClient():
     _instance = None
+    _player_loop_tracker = {}
+    _clan_loop_tracker = {}
 
     def __new__(cls,bot:Optional[Red]=None):
         if cls._instance is None:
@@ -169,6 +170,7 @@ class BotClashClient():
             # SEASONS
             self._current_season = None
             self._tracked_seasons = []
+            self.last_season_check = None
 
             # API HELPERS
             self.client_keys = []
@@ -177,6 +179,18 @@ class BotClashClient():
 
             self._connector_task = None
             self._last_login = None
+
+            # CLIENT LOOP TIME
+            self.last_loop = {}
+            
+            self.player_loop_status = False
+            self.clan_loop_status = False
+
+            self.player_loop_runtime = deque(maxlen=1000)
+            self.clan_loop_runtime = deque(maxlen=1000)
+            self.war_loop_runtime = deque(maxlen=1000)
+            self.raid_loop_runtime = deque(maxlen=1000)
+            self.discord_loop_runtime = deque(maxlen=1000)
 
             # DISCORDLINKS
             self.discordlinks_sandbox = False
@@ -248,6 +262,11 @@ class BotClashClient():
         await instance.discordlinks_login()        
 
         bot.coc_client.add_events(
+            clash_event_error,
+            player_loop_start,
+            player_loop_end,
+            clan_loop_start,
+            clan_loop_end,
             clash_maintenance_start,
             clash_maintenance_complete,
             end_of_trophy_season,
@@ -267,6 +286,11 @@ class BotClashClient():
 
         for handler in self.discordlinks_log.handlers:
             self.discordlinks_log.removeHandler(handler)
+        
+        for handler in self.coc_main_log.handlers:
+            self.coc_main_log.removeHandler(handler)
+        for handler in self.coc_data_log.handlers:
+            self.coc_data_log.removeHandler(handler)
             
         self._is_initialized = False    
     
@@ -352,7 +376,7 @@ class BotClashClient():
             self.bot.coc_client = coc.EventsClient(
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
-                throttle_limit=rate_limit
+                throttle_limit=rate_limit,
                 )
             self.coc_main_log.info(f"New Client Created: {self.bot.coc_client} with {len(self.client_keys)} keys.")
 
@@ -646,6 +670,57 @@ class BotClashClient():
         else:
             self.last_status_update = pendulum.now()
             self.coc_main_log.info(f"Bot Status Updated: {text}.")
+
+@coc.ClientEvents.event_error()
+async def clash_event_error(exception:Exception):
+    if isinstance(exception,coc.NotFound):
+        return
+    
+    if str(exception) == "No active exception to reraise":
+        return
+    
+    try:
+        client = BotClashClient()
+    except:
+        pass
+    else:
+        if client.api_maintenance:
+            return
+        client.coc_main_log.exception(f"Clash Event Error: {exception}")
+
+@coc.ClientEvents.player_loop_start()
+async def player_loop_start(iteration_number:int):
+    client = BotClashClient()
+    client._player_loop_tracker[iteration_number] = pendulum.now()
+    client.player_loop_status = True
+
+@coc.ClientEvents.player_loop_finish()
+async def player_loop_end(iteration_number:int):
+    client = BotClashClient()
+    start = client._player_loop_tracker.get(iteration_number,None)
+    if start:
+        end = pendulum.now()
+        client.last_loop['player'] = end
+        client.player_loop_status = False
+        client.player_loop_runtime.append(end.diff(start).in_seconds())
+        del client._player_loop_tracker[iteration_number]
+
+@coc.ClientEvents.clan_loop_start()
+async def clan_loop_start(iteration_number:int):
+    client = BotClashClient()
+    client._clan_loop_tracker[iteration_number] = pendulum.now()
+    client.clan_loop_status = True
+
+@coc.ClientEvents.clan_loop_finish()
+async def clan_loop_end(iteration_number:int):
+    client = BotClashClient()
+    start = client._clan_loop_tracker.get(iteration_number,None)
+    if start:
+        end = pendulum.now()
+        client.last_loop['clan'] = end
+        client.clan_loop_status = False
+        client.clan_loop_runtime.append(end.diff(start).in_seconds())
+        del client._clan_loop_tracker[iteration_number]
 
 @coc.ClientEvents.maintenance_start()
 async def clash_maintenance_start():

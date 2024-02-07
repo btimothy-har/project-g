@@ -5,10 +5,10 @@ import pendulum
 from redbot.core.utils import AsyncIter,bounded_gather
 
 from .default import TaskLoop
-from ..api_client import BotClashClient as client
-from ..discord.guild import aGuild
-from ..discord.member import aMember
-from ..discord.recruiting_reminder import RecruitingReminder
+from coc_main.api_client import BotClashClient as client
+from coc_main.discord.guild import aGuild
+from coc_main.discord.member import aMember
+from coc_main.discord.recruiting_reminder import RecruitingReminder
 
 bot_client = client()
 
@@ -38,14 +38,6 @@ class DiscordGuildLoop(TaskLoop):
             pass
         await super().stop()
 
-    @property
-    def start_recruiting(self) -> bool:
-        try:
-            cog = bot_client.bot.get_cog('ClashOfClansTasks')
-            return cog.recruiting_loop_started
-        except:
-            return False
-
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
@@ -61,12 +53,13 @@ class DiscordGuildLoop(TaskLoop):
                 tasks = [self._run_single_loop(guild) async for guild in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
                                      
-                self.last_loop = pendulum.now()
+                et = pendulum.now()
+                bot_client.last_loop['guild'] = et
                 self._running = False
                 
                 try:
-                    runtime = self.last_loop-st
-                    self.dispatch_time.append(runtime.total_seconds())
+                    runtime = et - st
+                    bot_client.discord_loop_runtime.append(runtime.total_seconds())
                 except:
                     pass
 
@@ -75,10 +68,7 @@ class DiscordGuildLoop(TaskLoop):
 
         except Exception as exc:
             if self.loop_active:
-                bot_client.coc_main_log.exception(
-                    f"{self.guild_id}: FATAL GUILD LOOP ERROR. Attempting restart. {exc}"
-                    )
-                await self.report_fatal_error(
+                await TaskLoop.report_fatal_error(
                     message="FATAL GUILD LOOP ERROR",
                     error=exc,
                     )
@@ -97,6 +87,7 @@ class DiscordGuildLoop(TaskLoop):
             asyncio.create_task(self._update_application_panels(guild,locks)),
             asyncio.create_task(self._update_recruiting_reminder(guild,locks))
             ]
+        await asyncio.gather(*tasks)
     
     async def _save_member_roles(self,guild:discord.Guild,locks:dict):
         try:
@@ -180,6 +171,7 @@ class DiscordGuildLoop(TaskLoop):
                 )
     
     async def _update_recruiting_reminder(self,guild:discord.Guild,locks:dict):
+        return # Disabled for now
         if not self.start_recruiting:
             return
         

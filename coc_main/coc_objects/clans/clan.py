@@ -105,6 +105,10 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         self._level = value
     
     @property
+    def total_clan_donations(self) -> int:
+        return sum([member.donations for member in self.members]) + sum([member.received for member in self.members])
+    
+    @property
     def capital_hall(self) -> int:
         try:
             return [district.hall_level for district in self.capital_districts if district.name=="Capital Peak"][0]
@@ -134,20 +138,33 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         description = f"{EmojisClash.CLAN} Level {self.level}\u3000{EmojisCapitalHall.get(self.capital_hall)} CH {self.capital_hall}\u3000{war_league_str}"
         return description
     
-    async def _sync_cache(self):
-        if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
-            return
+    async def _sync_cache(self,force:bool=False):
+        if force:
+            pass
+        else:
+            if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
+                return
         
         if self._attributes._sync_lock.locked():
             return
         
         async with self._attributes._sync_lock:
             basic_clan = await BasicClan(self.tag)
+            await basic_clan._attributes.load_data()
+
+            if basic_clan._attributes._last_sync and basic_clan._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
+                return
+            
             await basic_clan.update_last_sync(pendulum.now())
-            tasks = [
-                basic_clan.clean_elders(),
-                basic_clan.clean_coleaders(),
-                ]
+            if bot_client.bot.user.id == 1031240380487831664:
+                #only nebula to handle elders/coleaders
+                tasks = [
+                    basic_clan.clean_elders(),
+                    basic_clan.clean_coleaders(),
+                    ]
+            else:
+                tasks = []
+
             if basic_clan.name != self.name:
                 tasks.append(basic_clan.set_name(self.name))
             if basic_clan.badge != self.badge:

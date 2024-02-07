@@ -17,7 +17,7 @@ from coc_main.utils.components import handle_command_error, clash_embed, Discord
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
-from coc_main.exceptions import ClashAPIError, InvalidTag
+from coc_main.exceptions import ClashAPIError, InvalidTag, InvalidUser
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -193,13 +193,19 @@ class Players(commands.Cog):
     
     @commands.Cog.listener("on_member_update")
     async def member_role_sync(self,before:discord.Member,after:discord.Member):
-        before_roles = sorted([r.id for r in before.roles])
-        after_roles = sorted([r.id for r in after.roles])
+        try:
+            before_roles = sorted([r.id for r in before.roles])
+            after_roles = sorted([r.id for r in after.roles])
 
-        if before_roles != after_roles:
-            member = await aMember(after.id,after.guild.id)
-            await member.sync_clan_roles()
-            await aMember.save_user_roles(after.id,after.guild.id)
+            if before_roles != after_roles:
+                try:
+                    member = await aMember(after.id,after.guild.id)
+                    await member.sync_clan_roles()
+                    await aMember.save_user_roles(after.id,after.guild.id)
+                except InvalidUser:
+                    pass
+        except Exception:
+            bot_client.coc_main_log.exception("Error in Player Cog member_role_sync.")
     
     async def cog_command_error(self,ctx,error):
         if isinstance(getattr(error,'original',None),ClashOfClansError):

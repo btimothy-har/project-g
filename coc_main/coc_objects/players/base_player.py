@@ -1,6 +1,7 @@
 import coc
 import pendulum
 import asyncio
+import random
 
 from typing import *
 
@@ -51,7 +52,7 @@ class BasicPlayer(AwaitLoader):
     async def load(self):
         await self._attributes.load()
         self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
-        await bot_client.player_queue.put(self.tag)
+        await bot_client.clan_queue.put(self.tag)
     
     ##################################################
     #####
@@ -94,33 +95,28 @@ class BasicPlayer(AwaitLoader):
     #####
     ##################################################
     @property
+    def _create_snapshot(self) -> bool:
+        if random.randint(1,100) == random.randint(1,100):
+            return True
+        
+    @property
     def name(self) -> str:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.name
     
     @property
     def exp_level(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.exp_level
     
     @property
     def town_hall_level(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.town_hall_level
     
     @property
     def discord_user(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.discord_user
     
     @property
     def is_member(self) -> bool:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.is_member
 
     @property
@@ -145,32 +141,22 @@ class BasicPlayer(AwaitLoader):
     
     @property
     def war_elo(self) -> float:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return round(self._attributes.war_elo,1)
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.first_seen
     
     @property
     def last_joined(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_joined
 
     @property
     def last_removed(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_removed
     
     @property
     def is_new(self) -> bool:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return False if self.first_seen else True
     
     ##################################################
@@ -370,7 +356,7 @@ class _PlayerAttributes():
             self.last_removed = None
 
             self._last_sync = None
-        
+
         self._new = False
     
     @property
@@ -383,32 +369,32 @@ class _PlayerAttributes():
     
     async def load(self):
         if not self._loaded:
-            database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
-            self.name = database.get('name','') if database else ""
-            self.exp_level = database.get('xp_level','') if database else 0
-            self.town_hall_level = database.get('townhall','') if database else 0
-            self.discord_user = database.get('discord_user','') if database else 0
-            self.home_clan_tag = database.get('home_clan',None) if database else None
-            self.war_elo = database.get('war_elo',0) if database else 0
+            await self.load_data()
+    
+    async def load_data(self):
+        database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
+        self.name = database.get('name','') if database else ""
+        self.exp_level = database.get('xp_level','') if database else 0
+        self.town_hall_level = database.get('townhall','') if database else 0
+        self.discord_user = database.get('discord_user','') if database else 0
+        self.home_clan_tag = database.get('home_clan',None) if database else None
+        self.war_elo = database.get('war_elo',0) if database else 0
 
-            self.is_member = database.get('is_member',False) if database else False
+        self.is_member = await self.eval_membership(database.get('is_member',False)) if database else False
 
-            fs = database.get('first_seen',0) if database else 0
-            self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
+        fs = database.get('first_seen',0) if database else 0
+        self.first_seen = pendulum.from_timestamp(fs) if fs > 0 else None
 
-            lj = database.get('last_joined',0) if database else 0
-            self.last_joined = pendulum.from_timestamp(lj) if lj > 0 else None
+        lj = database.get('last_joined',0) if database else 0
+        self.last_joined = pendulum.from_timestamp(lj) if lj > 0 else None
 
-            lr = database.get('last_removed',0) if database else 0
-            self.last_removed = pendulum.from_timestamp(lr) if lr > 0 else None
+        lr = database.get('last_removed',0) if database else 0
+        self.last_removed = pendulum.from_timestamp(lr) if lr > 0 else None
 
-            ls = database.get('last_sync',0) if database else 0
-            self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
+        ls = database.get('last_sync',0) if database else 0
+        self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
-            self._loaded = True
-        
-        eval_member = await self.eval_membership(self.is_member)
-        self.is_member = eval_member
+        self._loaded = True
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:

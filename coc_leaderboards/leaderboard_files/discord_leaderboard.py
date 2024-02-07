@@ -11,7 +11,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
 from coc_main.cog_coc_client import ClashOfClansClient, aClan
-from coc_main.cog_coc_tasks import ClashOfClansTasks
+from coc_data.cog_coc_data import ClashOfClansData
 
 from coc_main.discord.guild import ClanGuildLink
 
@@ -362,10 +362,7 @@ class Leaderboard():
         return BotClashClient()
     @property
     def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")    
-    @property
-    def tasks(self) -> ClashOfClansTasks:
-        return bot_client.bot.get_cog("ClashOfClansTasks")
+        return bot_client.bot.get_cog("ClashOfClansClient")
 
 ##################################################
 #####

@@ -7,15 +7,14 @@ from typing import *
 from redbot.core.utils import AsyncIter,bounded_gather
 from .default import TaskLoop
 
-from ..api_client import BotClashClient as client
-from ..cog_coc_client import ClashOfClansClient
-from ..exceptions import InvalidTag, ClashAPIError
+from coc_main.api_client import BotClashClient as client
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.exceptions import InvalidTag, ClashAPIError
 
-from ..coc_objects.clans.clan import aClan
-from ..coc_objects.events.raid_weekend import aRaidWeekend
-from ..discord.feeds.reminders import EventReminder
-from ..discord.feeds.raid_results import RaidResultsFeed, ClanDataFeed
-from ..discord.clan_link import ClanGuildLink
+from coc_main.coc_objects.clans.clan import aClan
+from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
+from coc_main.discord.feeds.reminders import EventReminder
+from coc_main.discord.feeds.raid_results import RaidResultsFeed
 
 bot_client = client()
 default_sleep = 60
@@ -117,27 +116,6 @@ class ClanRaidLoop(TaskLoop):
             pass
         await super().stop()
     
-    async def _reload_tags(self):
-        tags = []
-        client = DefaultRaidTasks._get_client()
-
-        tags.extend([clan.tag for clan in await client.get_registered_clans()])
-        tags.extend([clan.tag for clan in await client.get_alliance_clans()])
-
-        guild_iter = AsyncIter(bot_client.bot.guilds)
-        async for guild in guild_iter:
-            links = await ClanGuildLink.get_for_guild(guild.id)
-            tags.extend([link.tag for link in links])
-        
-        feeds = await ClanDataFeed.get_all()
-        tags.extend([feed.tag for feed in feeds])
-
-        reminders = await EventReminder.get_all()
-        tags.extend([reminder.tag for reminder in reminders])
-
-        self._tags = set(tags)
-        self._last_db_update = pendulum.now()
-    
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
@@ -148,32 +126,24 @@ class ClanRaidLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                # if pendulum.now().day_of_week not in [5,6,7,1]:
-                #     await asyncio.sleep(10)
-                #     continue
-
-                if (pendulum.now() - self._last_db_update).total_seconds() > 600:
-                    await self._reload_tags()
-
-                if len(self._tags) == 0:
+                c_tags = list(self._tags)
+                if len(c_tags) <= 0:
                     await asyncio.sleep(10)
                     continue
 
-                c_tags = copy.copy(self._tags)
-                tags = list(set(c_tags))
-
                 st = pendulum.now()
                 self._running = True
-                a_iter = AsyncIter(tags)
+                a_iter = AsyncIter(c_tags)
 
                 tasks = [self._run_single_loop(tag) async for tag in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
 
-                self.last_loop = pendulum.now()
+                et = pendulum.now()
+                bot_client.last_loop['raid'] = et
                 self._running = False
                 try:
-                    runtime = self.last_loop - st
-                    self.dispatch_time.append(runtime.total_seconds())
+                    runtime = et - st
+                    bot_client.raid_loop_runtime.append(runtime.total_seconds())
                 except:
                     pass
 
@@ -182,9 +152,6 @@ class ClanRaidLoop(TaskLoop):
 
         except Exception as exc:
             if self.loop_active:
-                bot_client.coc_main_log.exception(
-                    f"FATAL RAID LOOP ERROR. Attempting restart. {exc}"
-                    )
                 await TaskLoop.report_fatal_error(
                     message="FATAL RAID LOOP ERROR",
                     error=exc,
@@ -193,38 +160,34 @@ class ClanRaidLoop(TaskLoop):
     
     async def _run_single_loop(self,tag:str):
         try:
-            finished = False
             lock = self._locks[tag]
             if lock.locked():
                 return
             await lock.acquire()
             cached = self._cached.get(tag,None)
             
-            st = pendulum.now()
-            
-            async with self.api_limiter:
-                try:
-                    clan = await self.coc_client.fetch_clan(tag)
-                except InvalidTag:
-                    return self.loop.call_later(3600,self.unlock,lock)
-                except ClashAPIError:
-                    return self.loop.call_later(10,self.unlock,lock)
+            try:
+                clan = await self.coc_client.fetch_clan(tag)
+            except InvalidTag:
+                return self.loop.call_later(3600,self.unlock,lock)
+            except ClashAPIError:
+                return self.loop.call_later(10,self.unlock,lock)
             
             raid_log = None
             new_raid = None
             count = 0
-            async with self.api_limiter:
-                while True:
-                    try:
-                        count += 1
-                        raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                        break
-                    except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+            
+            while True:
+                try:
+                    count += 1
+                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+                    break
+                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
+                    return self.loop.call_later(10,self.unlock,lock)
+                except:
+                    if count > 5:
                         return self.loop.call_later(10,self.unlock,lock)
-                    except:
-                        if count > 5:
-                            return self.loop.call_later(10,self.unlock,lock)
-                        await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.5)
 
             wait = getattr(raid_log,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)
@@ -234,32 +197,18 @@ class ClanRaidLoop(TaskLoop):
                 self._cached[tag] = new_raid
             
             if cached and new_raid:
-                asyncio.create_task(self._dispatch_events(clan,cached,new_raid))
-            
-            finished = True
+                await self._dispatch_events(clan,cached,new_raid)
         
         except asyncio.CancelledError:
             return
         
         except Exception as exc:
             if self.loop_active:
-                bot_client.coc_main_log.exception(
-                    f"FATAL CAPITAL RAID LOOP ERROR: {tag}"
-                    )
                 await TaskLoop.report_fatal_error(
                     message=f"FATAL CAPITAL RAID LOOP ERROR: {tag}",
                     error=exc,
                     )
             return self.unlock(lock)
-
-        finally:
-            if finished:
-                et = pendulum.now()
-                try:
-                    runtime = et - st
-                    self.run_time.append(runtime.total_seconds())
-                except:
-                    pass
     
     async def _dispatch_events(self,clan:aClan,cached_raid:coc.RaidLogEntry,new_raid:coc.RaidLogEntry):        
         try:

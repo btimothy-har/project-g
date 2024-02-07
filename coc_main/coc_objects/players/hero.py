@@ -15,6 +15,12 @@ class aHero():
         hero._level = 0
         return hero
     
+    @classmethod
+    def get_hero(cls,name:str,th_level:int):
+        i = bot_client.coc.get_hero(name,townhall=th_level)
+        hero = cls(i,th_level)
+        return hero
+    
     def __init__(self,hero:coc.hero.Hero,th_level:int):
         self._game_hero = hero
         self._th_level = th_level

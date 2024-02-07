@@ -287,13 +287,22 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @cached_property
     def troop_strength(self) -> int:
-        return sum([troop.level for troop in self.troops if not troop.is_super_troop]) + sum([pet.level for pet in self.pets])
+        strg = sum([troop.level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.level for pet in self.pets])
+        return strg
     @cached_property
     def max_troop_strength(self) -> int:
-        return (sum([troop.max_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.max_level for pet in self.pets]))
+        strg = sum([troop.max_level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.max_level for pet in self.pets])
+        return strg
     @cached_property
     def min_troop_strength(self) -> int:
-        return (sum([troop.min_level for troop in self.troops if not troop.is_super_troop]) + sum([pet.min_level for pet in self.pets]))
+        strg = sum([troop.min_level for troop in self.troops if not troop.is_super_troop])
+        if len(self.pets) > 0:
+            strg += sum([pet.min_level for pet in self.pets])
+        return strg
     @cached_property
     def troop_strength_pct(self) -> float:
         try:
@@ -348,6 +357,27 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             return round((rushed_levels / min_levels)*100,2)
         except ZeroDivisionError:
             return 0
+    
+    @cached_property
+    def loot_gold(self) -> int:
+        achievement = self.get_achievement('Gold Grab')
+        return achievement.value if achievement else 0
+    @cached_property
+    def loot_elixir(self) -> int:
+        achievement = self.get_achievement('Elixir Escapade')
+        return achievement.value if achievement else 0
+    @cached_property
+    def loot_darkelixir(self) -> int:
+        achievement = self.get_achievement('Heroic Heist')
+        return achievement.value if achievement else 0
+    @cached_property
+    def clan_games(self) -> int:
+        achievement = self.get_achievement('Games Champion')
+        return achievement.value if achievement else 0
+    @cached_property
+    def capital_gold_looted(self) -> int:
+        achievement = self.get_achievement('Aggressive Capitalism')
+        return achievement.value if achievement else 0    
     
     ##################################################
     ### DATA FORMATTERS
@@ -421,6 +451,11 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         
         async with self._attributes._sync_lock:
             basic_player = await BasicPlayer(self.tag)
+            await basic_player._attributes.load_data()
+
+            if basic_player._attributes._last_sync and basic_player._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
+                return
+            
             basic_player._attributes._last_sync = self.timestamp
 
             if basic_player.is_new:
@@ -434,21 +469,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
                 tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
             if basic_player.town_hall_level != self.town_hall_level:
                 tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
-
-            if self.is_member:
-                current_season = await self.get_current_season()
-
-                if self.name != current_season.name:
-                    tasks.append(asyncio.create_task(current_season.update_name(self.name)))
-
-                if self.town_hall_level != current_season.town_hall:
-                    tasks.append(asyncio.create_task(current_season.update_townhall(self.town_hall_level)))
-
-                if getattr(self.home_clan,'tag',None) != getattr(current_season.home_clan,'tag',None):
-                    tasks.append(asyncio.create_task(current_season.update_home_clan(getattr(self.home_clan,'tag',None))))
-
-                if self.is_member != current_season.is_member:
-                    tasks.append(asyncio.create_task(current_season.update_member(self.is_member)))
             
             if tasks:
                 await asyncio.gather(*tasks)
@@ -463,16 +483,20 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         return await WarLeaguePlayer(self.tag,season)
 
     def get_hero(self,hero_name:str):
-        return next((hero for hero in self._heroes if hero.name == hero_name),None)
+        hero = next((hero for hero in self._heroes if hero.name == hero_name),None)
+        return aHero(hero,self.town_hall.level) if hero else None
     
-    def get_troop(self,name:str,is_home_troop:bool=False):
+    def get_troop(self,name:str,is_home_troop:bool=True):
         if is_home_troop:
-            return next((troop for troop in self._troops if troop.name == name),None)
+            troop = next((troop for troop in self._troops if troop.name == name and troop.village == 'home'),None)
         else:
-            return next((troop for troop in self._troops if troop.name == name and not troop.village == 'home'),None)
+            troop = next((troop for troop in self._troops if troop.name == name),None)
+        return aTroop(troop,self.town_hall.level) if troop else None
     
     def get_spell(self,name:str):
-        return next((spell for spell in self._spells if spell.name == name),None)
+        spell = next((spell for spell in self._spells if spell.name == name),None)
+        return aSpell(spell,self.town_hall.level) if spell else None
     
     def get_pet(self,name:str):
-        return next((pet for pet in self._pets if pet.name == name),None)
+        pet = next((pet for pet in self._pets if pet.name == name),None)
+        return aPet(pet,self.town_hall.level) if pet else None

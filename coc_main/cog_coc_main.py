@@ -55,7 +55,7 @@ class ClashOfClansMain(commands.Cog):
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
 
     ##################################################
-    ### COG LOAD
+    ### COG LOAD / UNLOAD
     ##################################################
     async def cog_load(self):
         self.bot.coc_log_path = f"{cog_data_path(self)}/logs"
@@ -71,36 +71,50 @@ class ClashOfClansMain(commands.Cog):
             os.makedirs(self.bot.coc_imggen_path)
 
         keys = await self.config.client_keys()
-            
+
         self.client = await BotClashClient.initialize(
             bot=self.bot,
             author=self.__author__,
             version=self.__version__,
             client_keys=keys,
             )
-    
-    ##################################################
-    ### COG LOAD
-    ##################################################
+        
     async def cog_unload(self):
         self.client._is_initialized = False
-        cog = self.bot.get_cog('ClashOfClansTasks')
-        if cog:
-            await cog.shutdown()
-
         await self.client.shutdown()
         del self.client
 
-    @commands.command(name="reloadg")
+    @commands.group(name="cocreload")
     @commands.is_owner()
-    async def command_reload_clash(self,ctx:commands.Context):
+    async def command_reload_project_g(self,ctx:commands.Context):
         """
-        Reload the Clash of Clans API Client.
+        Commands to reload Cog Configuration.
         """
+        if not ctx.invoked_subcommand:
+            pass
+    
+    @command_reload_project_g.command(name="nebula")
+    @commands.is_owner()
+    async def command_reload_nebula(self,ctx:commands.Context):
+        """
+        Reload N.E.B.U.L.A. Cogs.
+        """
+
+        await ctx.invoke(self.bot.get_command("reload"),'coc_data')
         await ctx.invoke(self.bot.get_command("reload"),'coc_commands', 'coc_leaderboards', 'g_eclipse', 'g_bank')
         await ctx.message.delete()
     
-    @commands.command(name="reloadkeys")
+    @command_reload_project_g.command(name="meteor")
+    @commands.is_owner()
+    async def command_reload_meteor(self,ctx:commands.Context):
+        """
+        Reload M.E.T.E.O.R. Cogs.
+        """
+
+        await ctx.invoke(self.bot.get_command("reload"),'coc_data')
+        await ctx.message.delete()
+    
+    @command_reload_project_g.command(name="keys")
     @commands.is_owner()
     async def command_reload_keys(self,ctx:commands.Context):
 
@@ -130,11 +144,3 @@ class ClashOfClansMain(commands.Cog):
 
         await self.config.client_keys.set(keys)
         await msg.edit(content=f"Found {len(keys)} keys. To login with these keys, reload the cog.")
-    
-    @commands.command(name="reloadapi")
-    @commands.is_owner()
-    async def command_reload_api(self,ctx:commands.Context):
-
-        await self.client.api_logout()
-        await self.client.api_login()
-        await ctx.reply(f"API Login reloaded.")
