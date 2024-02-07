@@ -1297,23 +1297,26 @@ class Bank(commands.Cog):
                         continue
 
                     all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
-                    if all_role_items and len(all_role_items) > 0:
 
-                        all_subscribed_users = []
-                        item_iter = AsyncIter(all_role_items)
-                        async for i in item_iter:
-                            async with i.lock:
-                                item = await ShopItem.get_by_id(i.id)
-                                all_subscribed_users.extend(list(item.subscription_log.keys()))
-                        
-                        if str(after.id) not in all_subscribed_users:
-                            await after.remove_roles(
-                                role,
-                                reason="User does not have a valid subscription."
-                                )
-                            bot_client.coc_main_log.info(
-                                f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
-                                )
+                    if all_role_items and len(all_role_items) > 0:
+                        subscription_items = [i for i in all_role_items if i.subscription]
+
+                        if len(subscription_items) > 0:
+                            all_subscribed_users = []
+                            item_iter = AsyncIter(subscription_items)
+                            async for i in item_iter:
+                                async with i.lock:
+                                    item = await ShopItem.get_by_id(i.id)
+                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
+                            
+                            if str(after.id) not in all_subscribed_users:
+                                await after.remove_roles(
+                                    role,
+                                    reason="User does not have a valid subscription."
+                                    )
+                                bot_client.coc_main_log.info(
+                                    f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
+                                    )
             
             if len(removed_roles) > 0:
                 r_iter = AsyncIter(removed_roles)
@@ -2487,10 +2490,10 @@ class Bank(commands.Cog):
             )
         message = await channel.send(embed=embed)
         thread = await channel.create_thread(
-            name=f"Penalty for {user.display_name}",
+            name=f"Penalty for {user.global_name}",
             message=message)
         
-        await interaction.followup.send(f"Penalty proposed for {user.mention} has been submitted.",ephemeral=True)
+        await interaction.followup.send(f"Your Penalty Proposal for {user.mention} has been submitted.",ephemeral=True)
         
     ##################################################
     ### USER INVENTORY

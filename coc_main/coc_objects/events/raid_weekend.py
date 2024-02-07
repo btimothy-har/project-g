@@ -191,9 +191,6 @@ class aRaidWeekend(AwaitLoader):
         raid_weekend.defense_log = [await aRaidClan(raid_weekend,data=defe) for defe in data.defense_log]
 
         raid_weekend.members = [await aRaidMember(raid_weekend,data=member) for member in data.members]
-
-        if raid_weekend.do_i_save:
-            await raid_weekend.save_to_database()
         
         return raid_weekend
 
