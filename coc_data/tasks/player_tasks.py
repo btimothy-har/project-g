@@ -198,27 +198,32 @@ class PlayerTasks():
     async def on_player_update_attack_wins(old_player:aPlayer,new_player:aPlayer):
         last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'attack_wins')
         ref_value = last_stat.new_value if last_stat else old_player.attack_wins
-        log = await aPlayerActivity.create_new(
-            player=new_player,
-            timestamp=new_player.timestamp,
-            activity="attack_wins",
-            change=max(0,new_player.attack_wins - ref_value),
-            new_value=new_player.attack_wins
-            )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Attack Wins changed to {new_player.attack_wins} (+{log.change}).")
+        change = max(0,new_player.attack_wins - ref_value)
+        if change > 0:
+            log = await aPlayerActivity.create_new(
+                player=new_player,
+                timestamp=new_player.timestamp,
+                activity="attack_wins",
+                change=change,
+                new_value=new_player.attack_wins
+                )
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Attack Wins changed to {new_player.attack_wins} (+{log.change}).")
     
     @coc.PlayerEvents.defense_wins()
     async def on_player_update_defense_wins(old_player:aPlayer,new_player:aPlayer):
         last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'defense_wins')
         ref_value = last_stat.new_value if last_stat else old_player.defense_wins
-        log = await aPlayerActivity.create_new(
-            player=new_player,
-            timestamp=new_player.timestamp,
-            activity="defense_wins",
-            change=max(0,new_player.defense_wins - ref_value),
-            new_value=new_player.defense_wins
-            )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Defense Wins changed to {new_player.defense_wins} (+{log.change}).")
+        change = max(0,new_player.defense_wins - ref_value)
+
+        if change > 0:
+            log = await aPlayerActivity.create_new(
+                player=new_player,
+                timestamp=new_player.timestamp,
+                activity="defense_wins",
+                change=change,
+                new_value=new_player.defense_wins
+                )
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Defense Wins changed to {new_player.defense_wins} (+{log.change}).")
     
     @coc.PlayerEvents.war_stars()
     async def on_player_update_war_stars(old_player:aPlayer,new_player:aPlayer):
@@ -237,27 +242,33 @@ class PlayerTasks():
     async def on_player_update_donations(old_player:aPlayer,new_player:aPlayer):
         last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_sent')
         ref_value = last_stat.new_value if last_stat else old_player.donations
-        log = await aPlayerActivity.create_new(
-            player=new_player,
-            timestamp=new_player.timestamp,
-            activity="donations_sent",
-            change=max(0,new_player.donations - ref_value),
-            new_value=new_player.donations
-            )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Sent changed to {new_player.donations} (+{log.change}).")
+        change = max(0,new_player.donations - ref_value)
+
+        if change > 0:
+            log = await aPlayerActivity.create_new(
+                player=new_player,
+                timestamp=new_player.timestamp,
+                activity="donations_sent",
+                change=change,
+                new_value=new_player.donations
+                )
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Sent changed to {new_player.donations} (+{log.change}).")
     
     @coc.PlayerEvents.received()
     async def on_player_update_received(old_player:aPlayer,new_player:aPlayer):
         last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_received')
         ref_value = last_stat.new_value if last_stat else old_player.received
-        log = await aPlayerActivity.create_new(
-            player=new_player,
-            timestamp=new_player.timestamp,
-            activity="donations_received",
-            change=max(0,new_player.received - ref_value),
-            new_value=new_player.received
-            )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Rcvd changed to {new_player.received} (+{log.change}).")
+        change = max(0,new_player.received - ref_value)
+
+        if change > 0:
+            log = await aPlayerActivity.create_new(
+                player=new_player,
+                timestamp=new_player.timestamp,
+                activity="donations_received",
+                change=change,
+                new_value=new_player.received
+                )
+            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Rcvd changed to {new_player.received} (+{log.change}).")
     
     @coc.PlayerEvents.clan_capital_contributions()
     async def on_player_update_capital_contributions(old_player:aPlayer,new_player:aPlayer):

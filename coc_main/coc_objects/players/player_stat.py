@@ -145,7 +145,7 @@ class aPlayerActivity():
 
         self.activity = database['activity']
         self.stat = database['stat'] if database['stat'] != '' else None
-        self.change = database['change'] if database['change'] != 0 else None
+        self.change = database['change'] if database['change'] != 0 else 0
         self.new_value = database['new_value'] if database['new_value'] != '' else None
 
         self._timestamp = database['timestamp']
