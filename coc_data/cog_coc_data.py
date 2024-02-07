@@ -261,30 +261,38 @@ class ClashOfClansData(commands.Cog):
         if self._lock_player_loop.locked():
             return
         
-        async with self._lock_player_loop:
-            # query = {
-            #     "$and": [
-            #         {"_id": {"$nin": list(bot_client.coc._player_updates)}},
-            #         {"$or": [
-            #             {"discord_user": {"$exists":True,"$gt":0}},
-            #             {"is_member": True}
-            #             ]}
-            #         ]
-            #     }
-
-            query = {"_id": {"$nin": list(bot_client.coc._player_updates)}}
-            
-            db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
-            tags = [p['_id'] async for p in db_query]
-
+        limit = 1000
+        
+        async def add_to_client(tags:List[str]):
             tag_iter = AsyncIter(tags)
             async for tag in tag_iter:
                 try:
                     player = await self.client.fetch_player(tag)
                 except:
-                    pass
+                    continue
                 else:
                     bot_client.coc.add_player_updates(player.tag)
+        
+        async with self._lock_player_loop:
+            query = {
+                "$and": [
+                    {"_id": {"$nin": list(bot_client.coc._player_updates)}},
+                    {"$or": [
+                        {"discord_user": {"$exists":True,"$gt":0}},
+                        {"is_member": True}
+                        ]}
+                    ]
+                }
+            db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
+            user_tags = [p['_id'] async for p in db_query]
+            limit -= len(user_tags)
+            await add_to_client(user_tags)
+
+            if limit > 0:
+                query = {"_id": {"$nin": list(bot_client.coc._player_updates)}}
+                db_query = bot_client.coc_db.db__player.find(query,{'_id':1}).limit(limit)
+                tags = [p['_id'] async for p in db_query]
+                await add_to_client(tags)            
     
     @tasks.loop(minutes=1)    
     async def update_clan_loop(self):
