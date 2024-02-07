@@ -262,15 +262,17 @@ class ClashOfClansData(commands.Cog):
             return
         
         async with self._lock_player_loop:
-            query = {
-                "$and": [
-                    {"_id": {"$nin": list(bot_client.coc._player_updates)}},
-                    {"$or": [
-                        {"discord_user": {"$exists":True,"$gt":0}},
-                        {"is_member": True}
-                        ]}
-                    ]
-                }
+            # query = {
+            #     "$and": [
+            #         {"_id": {"$nin": list(bot_client.coc._player_updates)}},
+            #         {"$or": [
+            #             {"discord_user": {"$exists":True,"$gt":0}},
+            #             {"is_member": True}
+            #             ]}
+            #         ]
+            #     }
+
+            query = {"_id": {"$nin": list(bot_client.coc._player_updates)}}
             
             db_query = bot_client.coc_db.db__player.find(query,{'_id':1})
             tags = [p['_id'] async for p in db_query]
