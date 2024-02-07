@@ -390,6 +390,8 @@ class ClashOfClansData(commands.Cog):
                     raise
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    if not bot_client._is_initialized:
+                        break
                     continue
         except asyncio.CancelledError:
             return
@@ -418,6 +420,8 @@ class ClashOfClansData(commands.Cog):
                     raise
                 except Exception:
                     bot_client.coc_main_log.exception(f"Error in Clan Queue Task")
+                    if not bot_client._is_initialized:
+                        break
                     continue
         except asyncio.CancelledError:
             return
