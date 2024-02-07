@@ -394,7 +394,7 @@ class _PlayerAttributes():
         ls = database.get('last_sync',0) if database else 0
         self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
-        self._last_loaded = pendulum.now()
+        self._loaded = True
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:
