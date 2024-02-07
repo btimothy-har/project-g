@@ -306,6 +306,20 @@ class ClashOfClansData(commands.Cog):
             limit -= len(user_tags)
             bot_client.coc.add_player_updates(*user_tags)
 
+            rem_query = {
+                "$and": [
+                    {"_id": {"$in": current}},
+                    {"$or": [
+                        {"discord_user": {"$exists":False}},
+                        {"discord_user": {"$lte":0}}
+                        ]}
+                    ]
+                }
+            
+            rem_db_query = bot_client.coc_db.db__player.find(rem_query,{'_id':1})
+            user_tags = [p['_id'] async for p in rem_db_query]
+            bot_client.coc.remove_player_updates(*user_tags)
+
             if self.is_global and limit > 0:
                 current = list(bot_client.coc._player_updates)
                 query = {"_id": {"$nin": current}}
@@ -391,7 +405,7 @@ class ClashOfClansData(commands.Cog):
                     if n_tag in bot_client.coc._player_updates:
                         bot_client.player_queue.task_done()
                         continue
-                    
+
                     try:
                         player = await self.client.fetch_player(n_tag)
                     except:
