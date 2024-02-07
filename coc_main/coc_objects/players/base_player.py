@@ -337,7 +337,7 @@ class _PlayerAttributes():
 
     __slots__ = [
         '_new',
-        '_loaded',
+        '_last_loaded',
         '_last_sync',
         'tag',
         'name',
@@ -357,7 +357,6 @@ class _PlayerAttributes():
         if n_tag not in cls._cache:
             instance = super().__new__(cls)
             instance._new = True
-            instance._loaded = False
             cls._cache[n_tag] = instance
         return cls._cache[n_tag]
     
@@ -388,8 +387,8 @@ class _PlayerAttributes():
         return self._sync_locks[self.tag]
     
     async def load(self):
-        #if not self._loaded:
-        if True:
+        diff = pendulum.now() - self._last_loaded
+        if diff.in_seconds() > 300:
             database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
             self.name = database.get('name','') if database else ""
             self.exp_level = database.get('xp_level','') if database else 0
@@ -412,7 +411,7 @@ class _PlayerAttributes():
             ls = database.get('last_sync',0) if database else 0
             self._last_sync = pendulum.from_timestamp(ls) if ls > 0 else None
 
-            self._loaded = True
+            self._last_loaded = pendulum.now()
     
     async def eval_membership(self,database_entry:bool):
         if database_entry and self.home_clan_tag:

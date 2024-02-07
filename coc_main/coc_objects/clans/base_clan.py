@@ -521,7 +521,7 @@ class _ClanAttributes():
 
     __slots__ = [
         '_new',
-        '_loaded',
+        '_last_loaded',
         '_last_sync',
         'tag',
         'name',
@@ -550,7 +550,6 @@ class _ClanAttributes():
         if n_tag not in cls._cache:
             instance = super().__new__(cls)
             instance._new = True
-            instance._loaded = False
             cls._cache[n_tag] = instance
         return cls._cache[n_tag]
     
@@ -590,8 +589,8 @@ class _ClanAttributes():
         return self._sync_locks[self.tag]
 
     async def load(self):
-        #if not self._loaded:
-        if True:
+        diff = pendulum.now() - self._last_loaded
+        if diff.in_seconds() > 300:
             clan_db = await bot_client.coc_db.db__clan.find_one({'_id':self.tag})
             self.name = clan_db.get('name','') if clan_db else ''
             self.badge = clan_db.get('badge','') if clan_db else ''
@@ -622,4 +621,4 @@ class _ClanAttributes():
             self.league_clan_channel_id = league_db.get('channel',0) if league_db else 0
             self.league_clan_role_id = league_db.get('role',0) if league_db else 0
 
-            self._loaded = True
+            self._last_loaded = pendulum.now()
