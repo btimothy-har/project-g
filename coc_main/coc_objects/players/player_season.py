@@ -80,12 +80,16 @@ class aPlayerSeason(AwaitLoader):
         self.home_clan = await aPlayerClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
         if self.home_clan:
-            a_iter = AsyncIter(season_entries)
-            ts = self.season.season_start.int_timestamp
+            a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
+            ts = None
             async for a in a_iter:
-                if a.clan_tag == a.home_clan_tag:
-                    self.time_in_home_clan += max(0,a._timestamp - ts)
-                ts = a._timestamp
+                if not ts:
+                    if a.clan_tag == a.home_clan_tag:
+                        ts = a._timestamp
+                if ts:
+                    if a.clan_tag == a.home_clan_tag:                   
+                        self.time_in_home_clan += max(0,a._timestamp - ts)
+                    ts = a._timestamp
         
         if self.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
             self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
