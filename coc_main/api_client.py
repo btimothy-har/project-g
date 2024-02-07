@@ -68,8 +68,6 @@ class DataQueue(asyncio.Queue):
 ############################################################
 class CustomThrottler(coc.BasicThrottler):
     def __init__(self,sleep_time):
-        self.rate_limit = 1 / sleep_time
-        sleep = 1 / (self.rate_limit * 3)
         self.limiter = AsyncLimiter(1,sleep_time)
         super().__init__(sleep_time)
     

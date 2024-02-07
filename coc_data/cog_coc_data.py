@@ -345,8 +345,9 @@ class ClashOfClansData(commands.Cog):
             )
 
         embed.add_field(
-            name="**Tasks Client**",
-            value=f"Season Check: " + (f"<t:{bot_client.last_season_check.int_timestamp}:R>" if bot_client.last_season_check else "None"),
+            name="**Data Client**",
+            value=f"Season Check: " + (f"<t:{bot_client.last_season_check.int_timestamp}:R>" if bot_client.last_season_check else "None")
+                + f"\nIs Global: {self.is_global}",
             inline=False
             )
         

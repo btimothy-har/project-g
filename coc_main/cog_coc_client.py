@@ -719,7 +719,7 @@ class ClashOfClansClient(commands.Cog):
             value="```ini"
                 + f"\n{'[Maintenance]':<15} {self.api_maintenance}"
                 + f"\n{'[API Keys]':<15} " + f"{bot_client.num_keys:,}"
-                + f"\n{'[API Requests]':<15} " + f"{(bot_client.coc.http.rate_limit / 5) - bot_client.coc.http._HTTPClient__lock._value:,} / {(bot_client.coc.http.rate_limit / 5):,}" + f" (Waiting: {waiters:,})"
+                + f"\n{'[API Requests]':<15} " + f"{bot_client.coc.http.lock_limit - bot_client.coc.http._HTTPClient__lock._value:,} / {bot_client.coc.http.lock_limit:,}" + f" (Waiting: {waiters:,})"
                 + "```",
             inline=False
             )
