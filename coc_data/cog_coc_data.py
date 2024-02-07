@@ -125,7 +125,9 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_loot_elixir,
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
-                ClanTasks.on_clan_check_snapshot
+                ClanTasks.on_clan_check_snapshot,
+                ClanTasks.on_clan_member_join_capture,
+                ClanTasks.on_clan_member_leave_capture
                 )
             try:
                 self.update_player_loop.start()
@@ -160,6 +162,7 @@ class ClashOfClansData(commands.Cog):
     ### COG UNLOAD
     ##################################################
     async def cog_unload(self):
+
         async def unload_nebula_tasks():
             try:
                 self.update_clan_loop.cancel()
@@ -209,7 +212,9 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_loot_elixir,
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
-                ClanTasks.on_clan_check_snapshot
+                ClanTasks.on_clan_check_snapshot,
+                ClanTasks.on_clan_member_join_capture,
+                ClanTasks.on_clan_member_leave_capture
                 )
             
         bot_client.coc.remove_clan_updates(*list(bot_client.coc._clan_updates))
@@ -320,9 +325,9 @@ class ClashOfClansData(commands.Cog):
             reminders = await EventReminder.get_all()
             tags.extend([reminder.tag for reminder in reminders])
 
-            tags = list(set(tags))
+            tags = list(set([t for t in tags if t not in current]))
             limit -= len(tags)
-            bot_client.coc.add_clan_updates(*[t for t in tags if t not in current])
+            bot_client.coc.add_clan_updates(*tags)
 
             if self.is_global and limit > 0:
                 current = list(bot_client.coc._clan_updates)

@@ -44,10 +44,22 @@ class ClanTasks():
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_feed(member:coc.ClanMember,clan:aClan):
         await ClanMemberFeed.member_join(clan,member)
+
+    @coc.ClanEvents.member_join()
+    async def on_clan_member_join_capture(member:coc.ClanMember,clan:aClan):
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(member.tag)
+        await n_player._sync_cache()
     
     @coc.ClanEvents.member_leave()
     async def on_clan_member_leave_feed(member:coc.ClanMember,clan:aClan):
         await ClanMemberFeed.member_leave(clan,member)
+
+    @coc.ClanEvents.member_leave()
+    async def on_clan_member_leave_capture(member:coc.ClanMember,clan:aClan):
+        client = ClanTasks._get_client()
+        n_player = await client.fetch_player(member.tag)
+        await n_player._sync_cache()
     
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_role(member:coc.ClanMember,clan:aClan):
