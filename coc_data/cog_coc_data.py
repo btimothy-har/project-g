@@ -569,20 +569,6 @@ class ClashOfClansData(commands.Cog):
             bot_client.coc_data_log.setLevel(logging.INFO)
             bot_client.coc_main_log.info("Clash Data Stream disabled.")
             await ctx.reply("Clash Data Stream disabled.")
-    
-    @command_group_clash_data.command(name="httplog")
-    @commands.is_owner()
-    async def command_httplog(self,ctx:commands.Context):
-        """
-        Turns on HTTP logging for the Clash of Clans API.
-        """
-        current = logging.getLogger("coc.http").level
-        if current == logging.DEBUG:
-            logging.getLogger("coc.http").setLevel(logging.INFO)
-            await ctx.tick()
-        else:
-            logging.getLogger("coc.http").setLevel(logging.DEBUG)
-            await ctx.tick()
 
 class RefreshStatus(DefaultView):
     def __init__(self,context:Union[discord.Interaction,commands.Context]):

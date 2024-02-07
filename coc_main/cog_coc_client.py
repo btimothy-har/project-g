@@ -2,6 +2,7 @@ import asyncio
 import coc
 import discord
 import pendulum
+import logging
 
 from typing import *
 
@@ -772,6 +773,20 @@ class ClashOfClansClient(commands.Cog):
         embed = await self.status_embed()
         view = RefreshStatus(ctx)
         await ctx.reply(embed=embed,view=view)
+    
+    @command_group_coc_api_client.command(name="httplog")
+    @commands.is_owner()
+    async def command_httplog(self,ctx:commands.Context):
+        """
+        Turns on HTTP logging for the Clash of Clans API.
+        """
+        current = logging.getLogger("coc.http").level
+        if current == logging.DEBUG:
+            logging.getLogger("coc.http").setLevel(logging.INFO)
+            await ctx.tick()
+        else:
+            logging.getLogger("coc.http").setLevel(logging.DEBUG)
+            await ctx.tick()
 
 class RefreshStatus(DefaultView):
     def __init__(self,context:Union[discord.Interaction,commands.Context]):
