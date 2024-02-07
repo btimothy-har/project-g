@@ -678,12 +678,14 @@ async def clash_event_error(exception:Exception):
     if isinstance(exception,coc.NotFound):
         return
     
+    if str(exception) == "No active exception to reraise":
+        return
+    
     try:
         client = BotClashClient()
     except:
         pass
     else:
-        client.coc_main_log.exception(f"{dir(exception)}")
         if client.api_maintenance:
             return
         client.coc_main_log.exception(f"Clash Event Error: {exception}")
