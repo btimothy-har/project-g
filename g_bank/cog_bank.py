@@ -929,8 +929,12 @@ class Bank(commands.Cog):
             return
         
         async with self._reward_lock_clan_capital:
+            bot_client.coc_main_log.info("Test Clan Capital Contribution Reward")
+
             if not self.use_rewards:
                 return
+            
+            bot_client.coc_main_log.info("Running Clan Capital Contribution Reward")
             
             activity_type = 'capital_contribution'
             event_logs = await aPlayerActivity.get_by_type_for_bank(activity_type)

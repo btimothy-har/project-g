@@ -95,8 +95,7 @@ class aPlayerActivity():
     async def get_by_type_for_bank(cls,activity:str) -> List[Optional['aPlayerActivity']]:
         filter_criteria = {
             'activity':activity,
-            'read_by_bank':False,
-            'legacy_conversion':{"$exists": False}
+            'read_by_bank':False
             }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',1)
         entries = [cls(entry) async for entry in query]
