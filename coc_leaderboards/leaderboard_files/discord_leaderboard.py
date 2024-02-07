@@ -399,7 +399,7 @@ class ClanWarLeaderboard(Leaderboard):
             stats = await player.get_season_stats(season)
             if not stats.is_member:
                 continue
-            
+
             th_iter = AsyncIter(eligible_townhalls)
             async for lb_th in th_iter:
                 if parent.is_global:
@@ -564,7 +564,7 @@ class DonationsLeaderboard(Leaderboard):
                 }
             }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
-        member_tags = [p['tag'] async for p in query]
+        member_tags = list(set([p['tag'] async for p in query]))
 
         leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
         leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None           
@@ -649,7 +649,7 @@ class ClanGamesLeaderboard(Leaderboard):
             'change': {'$gt':0}
             }
         query = bot_client.coc_db.db__player_activity.find(query_doc,{'tag':1})
-        member_tags = [p['tag'] async for p in query]
+        member_tags = list(set([p['tag'] async for p in query]))
 
         leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
         
