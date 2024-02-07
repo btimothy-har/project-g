@@ -202,6 +202,9 @@ class ClashOfClansData(commands.Cog):
                 ClanTasks.on_clan_check_snapshot
                 )
             
+        bot_client.coc.remove_clan_updates(*list(bot_client.coc._clan_updates))
+        bot_client.coc.remove_player_updates(*list(bot_client.coc._player_updates))
+            
         #NEBULA Bot
         if self.bot.user.id == 1031240380487831664:
             await unload_nebula_tasks()        
