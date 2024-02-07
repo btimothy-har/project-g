@@ -101,32 +101,22 @@ class BasicPlayer(AwaitLoader):
         
     @property
     def name(self) -> str:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.name
     
     @property
     def exp_level(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.exp_level
     
     @property
     def town_hall_level(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.town_hall_level
     
     @property
     def discord_user(self) -> int:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.discord_user
     
     @property
     def is_member(self) -> bool:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.is_member
 
     @property
@@ -151,32 +141,22 @@ class BasicPlayer(AwaitLoader):
     
     @property
     def war_elo(self) -> float:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return round(self._attributes.war_elo,1)
     
     @property
     def first_seen(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.first_seen
     
     @property
     def last_joined(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_joined
 
     @property
     def last_removed(self) -> Optional[pendulum.DateTime]:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return self._attributes.last_removed
     
     @property
     def is_new(self) -> bool:
-        if not self._attributes._loaded:
-            raise CacheNotReady(f"{self} has not been loaded.")
         return False if self.first_seen else True
     
     ##################################################
