@@ -367,6 +367,6 @@ class Leaderboards(commands.Cog):
             all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
 
             tasks = [lb.update_leaderboard() for lb in all_leaderboards]
-            await bounded_gather(*tasks,return_exceptions=True,limit=1)
+            await bounded_gather(*tasks,return_exceptions=True)
             et = pendulum.now()
             bot_client.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")
