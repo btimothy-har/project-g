@@ -683,7 +683,7 @@ async def clash_event_error(exception:Exception):
     except:
         pass
     else:
-        client.coc_main_log.exception(isinstance(exception,None))
+        client.coc_main_log.exception(f"{exception is None}")
         if client.api_maintenance:
             return
         client.coc_main_log.exception(f"Clash Event Error: {exception}")
