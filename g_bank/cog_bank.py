@@ -726,7 +726,7 @@ class Bank(commands.Cog):
         if not user:
             return 0
         
-        member = aMember(member.id)
+        member = aMember(user.id)
         guild_user = self.bank_guild.get_member(user.id)
         reward_tag = await member._get_reward_account_tag()
 
