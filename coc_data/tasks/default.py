@@ -1,5 +1,6 @@
 import asyncio
 import pendulum
+import coc
 import copy
 
 from typing import *
@@ -27,6 +28,7 @@ class TaskLoop():
     def __init__(self):
         self._active = False
         self._running = False
+        self._tags = set()
 
         self._last_db_update = pendulum.now().subtract(minutes=30)
         
@@ -59,6 +61,12 @@ class TaskLoop():
     async def stop(self):
         self._active = False
     
+    def add_to_loop(self,*tags:str):
+        for tag in tags:
+            if not isinstance(tag, str):
+                raise TypeError("clan tag must be of type str not {0!r}".format(tag))
+            self._tags.add(coc.utils.correct_tag(tag))
+
     def unlock(self,lock:asyncio.Lock):
         try:
             lock.release()

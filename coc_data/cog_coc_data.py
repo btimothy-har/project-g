@@ -325,9 +325,11 @@ class ClashOfClansData(commands.Cog):
             reminders = await EventReminder.get_all()
             tags.extend([reminder.tag for reminder in reminders])
 
-            tags = list(set([t for t in tags if t not in current]))
-            limit -= len(tags)
-            bot_client.coc.add_clan_updates(*tags)
+            loop_tags = list(set([t for t in tags if t not in current]))
+            limit -= len(loop_tags)
+            bot_client.coc.add_clan_updates(*loop_tags)
+            self._war_loop.add_to_loop(*loop_tags)
+            self._raid_loop.add_to_loop(*loop_tags)
 
             if self.is_global and limit > 0:
                 current = list(bot_client.coc._clan_updates)

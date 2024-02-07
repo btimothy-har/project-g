@@ -117,16 +117,14 @@ class ClanRaidLoop(TaskLoop):
                     await asyncio.sleep(10)
                     continue
 
-                c_tags = copy.copy(bot_client.coc._clan_updates)
-                tags = list(c_tags)
-
-                if len(tags) <= 0:
+                c_tags = list(self._tags)
+                if len(c_tags) <= 0:
                     await asyncio.sleep(10)
                     continue
 
                 st = pendulum.now()
                 self._running = True
-                a_iter = AsyncIter(tags)
+                a_iter = AsyncIter(c_tags)
 
                 tasks = [self._run_single_loop(tag) async for tag in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
