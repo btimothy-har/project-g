@@ -131,7 +131,6 @@ class ClashOfClansData(commands.Cog):
                 PlayerTasks.on_player_update_loot_elixir,
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
-                ClanTasks.on_clan_check_snapshot,
                 ClanTasks.on_clan_member_join_capture,
                 ClanTasks.on_clan_member_leave_capture
                 )

@@ -38,7 +38,7 @@ class ECLIPSE(commands.Cog):
 
     An **E**xtraordinarily **C**ool **L**ooking **I**nteractive & **P**rofessional **S**earch **E**ngine.
 
-    Your Clash of Clans database of attack strategies, guides and war bases.a
+    Your Clash of Clans database of attack strategies, guides and war bases.
     """
 
     __author__ = bot_client.author
