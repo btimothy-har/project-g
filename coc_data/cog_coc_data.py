@@ -442,17 +442,18 @@ class ClashOfClansData(commands.Cog):
     
     @command_group_clash_data.command(name="resetloops")
     @commands.is_owner()
-    async def subcommand_clash_data_setglobal(self,ctx:commands.Context,scope:int):
-        """Toggle if the Data loop should accept a global scope."""
+    async def subcommand_clash_data_resetloops(self,ctx:commands.Context):
+        """Reset all Data Loops."""
 
-        if scope == 1:
-            self.is_global = True
-            await self.config.global_scope.set(1)
-            await ctx.reply("Global Scope enabled.")
-        else:
-            self.is_global = False
-            await self.config.global_scope.set(0)
-            await ctx.reply("Global Scope disabled.")
+        async with self._lock_player_loop:
+            current_list = list(bot_client.coc._player_updates)
+            bot_client.coc.remove_player_updates(*current_list)
+
+        async with self._lock_clan_loop:
+            current_list = list(bot_client.coc._clan_updates)
+            bot_client.coc.remove_clan_updates(*current_list)
+
+        await ctx.reply("Data Loops reset.")
     
     @command_group_clash_data.command(name="stream")
     @commands.is_owner()
