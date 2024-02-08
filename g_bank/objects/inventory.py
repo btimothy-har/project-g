@@ -299,7 +299,7 @@ class UserInventory(AwaitLoader):
             user = ctx.user
         
         if len(self.items) > 0:
-            elig_items = [i for i in self.items if i.type in ['cash','basic'] or (i.subscription and i.expiration)]
+            elig_items = [i for i in self.items if (i.type in ['cash','basic'] or (i.subscription and i.expiration)) and i.guild_id == ctx.guild.id]
             a_iter = AsyncIter(elig_items)
 
             async for item in a_iter:
