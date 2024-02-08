@@ -1582,7 +1582,7 @@ class Bank(commands.Cog):
         M
         """
 
-        await bot_client.coc_db.db__user_item.delete_many({})
+        await bot_client.coc_db.db__user_item.delete_many({'legacy_migration':True})
 
         find_inventory = bot_client.coc_db.db__user_inventory.find({})
 
@@ -1612,11 +1612,11 @@ class Bank(commands.Cog):
 
         subscription_items = await ShopItem.get_subscription_items()
 
-        i_iter = AsyncIter(subscription_items.items())
+        i_iter = AsyncIter(subscription_items)
         async for item in i_iter:
             if not item.guild:
                 continue
-            sub_logs = AsyncIter(item.subscription_log)
+            sub_logs = AsyncIter(item.subscription_log.items())
             async for user,time in sub_logs:
                 user = item.guild.get_member(user)
                 if not user:
