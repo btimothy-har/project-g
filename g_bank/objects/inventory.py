@@ -112,7 +112,7 @@ class InventoryItem(ShopItem):
     
     async def _update_timestamp(self,timestamp:pendulum.DateTime):
         await bot_client.coc_db.db__user_item.update_one(
-            {'_id':self._id},
+            {'_id':self._inv_id},
             {'$set':{'timestamp':timestamp.int_timestamp}}
             )
         self.timestamp = timestamp
