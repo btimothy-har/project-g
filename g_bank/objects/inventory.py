@@ -159,7 +159,10 @@ class UserInventory(AwaitLoader):
         find_item = [i for i in self.items if i.id == item.id]
         if len(find_item) == 0:
             return None
-        return sorted(find_item,lambda x: x.timestamp.int_timestamp)
+        return sorted(
+            find_item,
+            key=lambda x: x.timestamp.int_timestamp
+            )
     
     def has_item(self,item:ShopItem,quantity:int=1):
         i = self.get_item(item)
