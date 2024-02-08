@@ -186,9 +186,9 @@ class UserInventory(AwaitLoader):
                 await member.send(new_item.buy_message)
         
         if new_item.type in ['role']:
-            if new_item.bidirectional_role:
-                member = new_item.guild.get_member(self.user.id)
+            member = new_item.guild.get_member(self.user.id)
 
+            if new_item.bidirectional_role:                
                 if new_item.assigns_role in member.roles:
                     await new_item.remove_from_inventory()
                 else:
@@ -207,13 +207,11 @@ class UserInventory(AwaitLoader):
                 await member.add_roles(item.assigns_role)        
         return new_item
 
-    async def purchase_item(self,item:ShopItem,free_purchase:bool=False):
+    async def purchase_item(self,item:ShopItem):
         member = item.guild.get_member(self.user.id)
-        await item.purchase(member,free_purchase=free_purchase)
+        await item.purchase(member)
         item = await self.add_item_to_inventory(item)
         
-        if free_purchase:
-            return item
         await bank.withdraw_credits(self.user,item.price)
         return item
 
