@@ -489,7 +489,7 @@ class Bank(commands.Cog):
                 goldpass_tag=redeem_tag
                 )
             await item.lock_item()
-            
+
             if ticket.channel:
                 ret_channel = {
                     'channel_id': ticket.channel.id,
@@ -1437,7 +1437,7 @@ class Bank(commands.Cog):
                 + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
                 + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
                 + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
-                + (f"\nChange your main account with `/bank main`." if pendulum.now() > next_change else f"\nYou can change your main account in: <t:{next_change.int_timestamp}:R>."),
+                + (f"\nChange your main account with `/bank set-main`." if pendulum.now() > next_change else f"\nYou can change your main account in: <t:{next_change.int_timestamp}:R>."),
             inline=True
             )
         return embed
