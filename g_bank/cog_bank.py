@@ -1599,16 +1599,10 @@ class Bank(commands.Cog):
                 item = await ShopItem.get_by_id(i)
                 if not item:
                     continue
-                if not item.guild:
-                    continue
-
-                user = item.guild.get_member(user)
-                if not user:
-                    continue
 
                 r = range(qty)
                 for _ in r:
-                    await InventoryItem.add_for_user(user,item,is_migration=True)
+                    await InventoryItem.add_for_user(int(user),item,is_migration=True)
 
         subscription_items = await ShopItem.get_subscription_items()
 

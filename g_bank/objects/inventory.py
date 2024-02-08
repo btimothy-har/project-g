@@ -153,17 +153,17 @@ class InventoryItem(ShopItem):
         bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user} {getattr(user,'name','Invalid User')}.")
 
     @classmethod
-    async def add_for_user(cls,user:discord.Member,item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
+    async def add_for_user(cls,user:Union[int,discord.Member],item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
         new_item = await bot_client.coc_db.db__user_item.insert_one(
             {
-                'user':user.id,
+                'user':getattr(user,'id',user),
                 'timestamp':pendulum.now().int_timestamp,
                 'in_inventory':True,
                 'item':item.db_json(),
                 'legacy_migration':is_migration
                 }
             )        
-        bot_client.coc_main_log.info(f"{item.id} {item.name} added to {user.id} {user.name}.")
+        bot_client.coc_main_log.info(f"{item.id} {item.name} added to {getattr(user,'id',user)} {getattr(user,'name','')}.")
         return await cls.get_by_id(str(new_item.inserted_id))
     
 class UserInventory(AwaitLoader):
