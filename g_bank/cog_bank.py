@@ -1304,7 +1304,7 @@ class Bank(commands.Cog):
                     is_subscription_role = len([i for i in all_role_items if i.subscription]) > 0
 
                     if is_subscription_role:
-                        chk = [i for i in inventory.items if i.assigns_role.id == role.id and i.subscription]
+                        chk = [i for i in inventory.items if getattr(i.assigns_role,'id',None) == role.id and i.subscription]
                         if len(chk) == 0:
                             await after.remove_roles(
                                 role,
