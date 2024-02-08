@@ -310,10 +310,10 @@ class UserInventory(AwaitLoader):
                         inventory_text += f"\nPurchased from: {item.guild.name}"
                     if item.type in ['cash']:
                         inventory_text += f"\nRedeem this by talking to <@{bot_client.bot.user.id}>."
-                    if item.type in ['role']:
-                        inventory_text += f"\nGrants: {getattr(item.assigns_role,'mention','Unknown')}"
-                    if item.subscription and item.expiration:
-                        inventory_text += f"\nExpires: <t:{item.expiration.int_timestamp}:R>"                            
+                if item.type in ['role']:
+                    inventory_text += f"\nGrants: {getattr(item.assigns_role,'mention','Unknown')}"
+                if item.subscription and item.expiration:
+                    inventory_text += f"\nExpires: <t:{item.expiration.int_timestamp}:R>"                            
 
         embed = await clash_embed(
             context=ctx,
