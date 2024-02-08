@@ -1800,7 +1800,7 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK-ADMIN COMMAND GROUPS
     ##################################################
-    @commands.group(name="bankadmin")
+    @commands.group(name="bank")
     @commands.guild_only()
     async def command_group_bank(self,ctx):
         """
