@@ -1256,9 +1256,10 @@ class Bank(commands.Cog):
                         else:
                             m_iter = AsyncIter(minister_members)
                             async for member in m_iter:
-                                inventory = await UserInventory(member)
-                                if not inventory.has_item(one_year_pass):
-                                    await inventory.add_item_to_inventory(one_year_pass)
+                                if getattr(one_year_pass.assigns_role,'id',0) not in [r.id for r in member.roles]:
+                                    inventory = await UserInventory(member)
+                                    item = await inventory.add_item_to_inventory(one_year_pass)
+                                    await item.lock_item()
 
                 try:
                     bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
@@ -1273,9 +1274,10 @@ class Bank(commands.Cog):
                             if len(staff_members) > 0:
                                 m_iter = AsyncIter(staff_members)
                                 async for member in m_iter:
-                                    inventory = await UserInventory(member)
-                                    if not inventory.has_item(bpass):
-                                        await inventory.add_item_to_inventory(bpass)
+                                    if getattr(bpass.assigns_role,'id',0) not in [r.id for r in member.roles]:
+                                        inventory = await UserInventory(member)
+                                        item = await inventory.add_item_to_inventory(bpass)
+                                        await item.lock_item()
 
             except Exception as exc:
                 await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."

@@ -12,6 +12,7 @@ from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient
 from coc_main.utils.components import clash_embed
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from .item import ShopItem
 
@@ -302,7 +303,7 @@ class UserInventory(AwaitLoader):
             a_iter = AsyncIter(elig_items)
 
             async for item in a_iter:
-                inventory_text += f"\n\n**{item.name}**"
+                inventory_text += f"\n\n{(EmojisUI.LOCK if item._is_locked else '')}**{item.name}**"
                 inventory_text += (f"\n{item.description}" if len(item.description) > 0 else "")
                 if getattr(user,'id',None) == self.user.id:
                     if item.type in ['basic']:
