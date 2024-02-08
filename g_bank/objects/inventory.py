@@ -87,7 +87,7 @@ class InventoryItem(ShopItem):
 
         self._inv_id = item_dict['_id']
         self._is_legacy = item_dict.get('legacy_migration',False)
-        self._is_locked = item_dict.get('locked',False)
+        self._is_locked = item_dict.get('is_locked',False)
 
         super().__init__(item_dict['item'])
 
