@@ -1577,7 +1577,7 @@ class Bank(commands.Cog):
     @command_group_bank_admin.command(name="migrateshop")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin_migrate_shop(self,ctx:commands.Context,id:str):        
+    async def subcommand_bank_admin_migrate_shop(self,ctx:commands.Context):        
         """
         M
         """
@@ -1591,7 +1591,7 @@ class Bank(commands.Cog):
 
             user = inv.get('_id',0)
 
-            i_iter = AsyncIter(user_inv)
+            i_iter = AsyncIter(user_inv.items())
             async for i,qty in i_iter:
                 item = await ShopItem.get_by_id(i)
                 if not item:
@@ -1608,7 +1608,7 @@ class Bank(commands.Cog):
 
         subscription_items = await ShopItem.get_subscription_items()
 
-        i_iter = AsyncIter(subscription_items)
+        i_iter = AsyncIter(subscription_items.items())
         async for item in i_iter:
             sub_logs = AsyncIter(item.subscription_log)
             async for user,time in sub_logs:
