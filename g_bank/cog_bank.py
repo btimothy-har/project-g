@@ -2558,7 +2558,8 @@ class Bank(commands.Cog):
         get_item = await ShopItem.get_by_id(item)
 
         inventory = await UserInventory(user)
-        await inventory.add_item_to_inventory(get_item)
+        user_item = await inventory.add_item_to_inventory(get_item)
+        await user_item.lock_item()
         return await interaction.followup.send(f"1x **{get_item.name}** has been distributed to {user.mention}.",ephemeral=True)
 
     ##################################################
