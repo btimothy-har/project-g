@@ -32,8 +32,8 @@ bot_client = BotClashClient()
 class InventoryItem(ShopItem):
 
     @classmethod
-    async def get_by_id(cls,item_id:str):
-        query = await bot_client.coc_db.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
+    async def get_by_id(cls,item_id:str) -> Optional['InventoryItem']:
+        query = await bot_client.coc_db.db__user_item.find_one({'_id':bson.ObjectId(item_id)})
         if query:
             return cls(query)
         return None
