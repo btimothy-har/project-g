@@ -179,7 +179,7 @@ class UserInventory(AwaitLoader):
         self.items = []
     
     def _assistant_json(self) -> List[dict]:
-        return [i.to_json() for i in self.inventory if i.type in ['cash']]
+        return [i.to_json() for i in self.items if i.type in ['cash']]
     
     async def load(self):
         self.items = await InventoryItem.get_for_user(self.user)
