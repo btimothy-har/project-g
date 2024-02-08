@@ -1321,7 +1321,7 @@ class Bank(commands.Cog):
                     if not role:
                         continue
 
-                    chk_inv = [i for i in inventory.items if i.assigns_role.id == role.id]
+                    chk_inv = [i for i in inventory.items if getattr(i.assigns_role,'id',None) == role.id]
                     if len(chk_inv) > 0:
                         await after.add_roles(
                             role,
