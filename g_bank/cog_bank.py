@@ -2493,7 +2493,11 @@ class Bank(commands.Cog):
             return await interaction.followup.send("You don't have that item.")
         
         if find_item._is_locked:
-            return await interaction.followup.send("This item is locked and cannot be gifted.")        
+            return await interaction.followup.send("This item is locked and cannot be gifted.")
+
+        if getattr(find_item.assigns_role,'id',0) == self.bank_penalty_role.id:
+            await find_item.extend(1)
+            return await interaction.followup.send("Don't be a moron. Your jail time has been extended by 24 hours.")
         
         await find_item.gift_to_user(user)        
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{find_item.name}**.")

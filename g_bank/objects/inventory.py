@@ -142,6 +142,14 @@ class InventoryItem(ShopItem):
                     pass
         user = self.guild.get_member(self.user)
         bot_client.coc_main_log.info(f"{self.id} {self.name} reinstated to {self.user} {getattr(user,'name','Invalid User')}.")
+    
+    async def extend(self,days:int):
+        self.subscription_duration += days
+        await bot_client.coc_db.db__user_item.update_one(
+            {'_id':self._inv_id},
+            {'$set':{'item.subscription_duration':self.subscription_duration}}
+            )
+        bot_client.coc_main_log.info(f"{self.id} {self.name} extended by {days} days for {self.user} {getattr(bot_client.bot.get_user(self.user),'name','Invalid User')}.")
 
     async def remove_from_inventory(self):
         self.in_inventory = False
