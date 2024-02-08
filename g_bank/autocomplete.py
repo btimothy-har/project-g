@@ -152,7 +152,7 @@ async def autocomplete_redeem_items(interaction:discord.Interaction,current:str)
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
         inv = await UserInventory(interaction.user)
-        guild_items = [i for i in inv.items if i.guild_id == interaction.guild.id and not i._is_locked]
+        guild_items = [i for i in inv.items if i.guild_id == interaction.guild.id and not i._is_locked and i.is_user_accessible]
 
         if not current:
             selection = guild_items

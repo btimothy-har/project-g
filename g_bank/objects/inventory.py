@@ -109,6 +109,13 @@ class InventoryItem(ShopItem):
         else:
             expiry_time = self.timestamp.add(days=self.subscription_duration)
         return expiry_time
+
+    @property
+    def is_user_accessible(self) -> bool:
+        if self.type in ['cash','basic']:
+            return True
+        if self.subscription and self.expiration:
+            return True
     
     async def _update_timestamp(self,timestamp:pendulum.DateTime):
         await bot_client.coc_db.db__user_item.update_one(
@@ -299,7 +306,7 @@ class UserInventory(AwaitLoader):
             user = ctx.user
         
         if len(self.items) > 0:
-            elig_items = [i for i in self.items if (i.type in ['cash','basic'] or (i.subscription and i.expiration)) and i.guild_id == ctx.guild.id]
+            elig_items = [i for i in self.items if i.is_user_accessible and i.guild_id == ctx.guild.id]
             a_iter = AsyncIter(elig_items)
 
             async for item in a_iter:
@@ -318,7 +325,7 @@ class UserInventory(AwaitLoader):
         embed = await clash_embed(
             context=ctx,
             title=f"{self.user.display_name}'s Inventory",
-            message=f"**Total Items:** {len(self.items)}"
+            message=f"**Total Items:** {len(elig_items)}"
                 + inventory_text
                 + f"\n\u200b",
             thumbnail=self.user.display_avatar.with_static_format('png'),

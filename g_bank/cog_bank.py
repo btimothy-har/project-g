@@ -397,6 +397,7 @@ class Bank(commands.Cog):
             user_id=user.id,
             item_id=item_id
             )
+        await item.lock_item()
         ret_channel = {
             'channel_id': ticket.channel.id,
             'channel_name': ticket.channel.name,
@@ -487,6 +488,8 @@ class Bank(commands.Cog):
                 item_id=item_id,
                 goldpass_tag=redeem_tag
                 )
+            await item.lock_item()
+            
             if ticket.channel:
                 ret_channel = {
                     'channel_id': ticket.channel.id,
