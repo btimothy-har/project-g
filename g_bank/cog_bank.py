@@ -2594,7 +2594,7 @@ class Bank(commands.Cog):
     async def app_command_distribute_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
         await interaction.response.defer(ephemeral=True)
 
-        if user.id == interaction.user.id:
+        if user.id not in bot_client.bot.owner_ids and user.id == interaction.user.id:
             return await interaction.followup.send("You can't give items to yourself!",ephemeral=True)
         if user.bot:
             return await interaction.followup.send("You can't give items to bots!",ephemeral=True)
