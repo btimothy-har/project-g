@@ -240,10 +240,7 @@ class Bank(commands.Cog):
                 await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
             return
 
-    async def _send_log(self,user:discord.User,done_by:discord.User,amount:int,comment:str) -> discord.Embed:
-        if amount == 0:
-            return
-        
+    async def _send_log(self,user:discord.User,done_by:discord.User,amount:int,comment:str) -> discord.Embed:        
         await self._log_queue.put({
             'user_id': user.id,
             'done_by_id': done_by.id,
