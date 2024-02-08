@@ -1240,6 +1240,7 @@ class Bank(commands.Cog):
     
     @tasks.loop(minutes=5.0)
     async def staff_item_grant(self):
+        return 
         async with self._subscription_lock:
             try:
                 find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
@@ -1282,9 +1283,36 @@ class Bank(commands.Cog):
                 bot_client.coc_main_log.exception(
                     f"Error granting Vault Passes to Staff."
                     )
+
+    @tasks.loop(minutes=1.0)
+    async def subscription_item_expiry(self):
+        return
+
+        if self._subscription_lock.locked():
+            return
+        
+        async with self._subscription_lock:
+            items = await InventoryItem.get_expiring_items()
+
+            i_iter = AsyncIter(items)
+            async for item in i_iter:
+                try:
+                    if not item.guild:
+                        continue
+
+                    if pendulum.now() > item.expiration:
+                        await item.remove_from_inventory()
+                    
+                except Exception as exc:
+                    await self.bot.send_to_owners(f"An error while expiring Shop Item for User {item.user}. Check logs for details."
+                        + f"```{exc}```")
+                    bot_client.coc_main_log.exception(
+                        f"Error expiring Shop Item {item.id} {item.name} for {item.user}."
+                        )
     
     @commands.Cog.listener("on_member_update")
     async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
+        return
         
         async with self._subscription_lock:
             inventory = await UserInventory(after)
@@ -1326,31 +1354,6 @@ class Bank(commands.Cog):
                             role,
                             reason="User has a valid role purchase."
                             )
-
-    @tasks.loop(minutes=1.0)
-    async def subscription_item_expiry(self):
-
-        if self._subscription_lock.locked():
-            return
-        
-        async with self._subscription_lock:
-            items = await InventoryItem.get_expiring_items()
-
-            i_iter = AsyncIter(items)
-            async for item in i_iter:
-                try:
-                    if not item.guild:
-                        continue
-
-                    if pendulum.now() > item.expiration:
-                        await item.remove_from_inventory()
-                    
-                except Exception as exc:
-                    await self.bot.send_to_owners(f"An error while expiring Shop Item for User {item.user}. Check logs for details."
-                        + f"```{exc}```")
-                    bot_client.coc_main_log.exception(
-                        f"Error expiring Shop Item {item.id} {item.name} for {item.user}."
-                        )
 
     ############################################################
     ############################################################

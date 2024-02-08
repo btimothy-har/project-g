@@ -256,10 +256,10 @@ class ShopItem():
         r_stock = self._random_stock[self.id]
         r_stock_ts = pendulum.from_timestamp(r_stock['timestamp'])
         
-        if pendulum.now() > r_stock_ts.add(minutes=random.randint(5,20)):
+        if pendulum.now() > r_stock_ts.add(minutes=random.randint(0,10)):
             rand_num = random.random()
             if rand_num < self._availability:
-                self._random_stock[self.id]['stock'] = self._stock = 0                
+                self._random_stock[self.id]['stock'] = self._stock = 1
             else:
                 self._random_stock[self.id]['stock'] = self._stock = 0
             self._random_stock[self.id]['timestamp'] = pendulum.now().int_timestamp
@@ -285,20 +285,6 @@ class ShopItem():
                         return_document=ReturnDocument.AFTER
                         )
                     self._stock = item['stock']
-    
-    async def expire_item(self,user:Union[discord.Member,discord.User]):
-        async with self.lock:
-            doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
-            self.subscription_log = doc.get('subscription_log',{})
-            if str(user.id) in self.subscription_log:
-                del self.subscription_log[str(user.id)]            
-                await bot_client.coc_db.db__shop_item.update_one(
-                    {'_id':self._id},
-                    {'$set':
-                        {'subscription_log':self.subscription_log}
-                        }
-                    )
-                bot_client.coc_main_log.info(f"{self.id} {self.name} expired for {user.id} {user.name}.")
 
     async def restock(self,quantity:int=1):
         async with self.lock:
