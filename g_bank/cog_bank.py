@@ -175,14 +175,14 @@ class Bank(commands.Cog):
             if admin_role and admin_role not in guild_user.roles:
                 await guild_user.add_roles(admin_role)
         
-        # self.subscription_item_expiry.start()
-        # self.staff_item_grant.start()
+        self.subscription_item_expiry.start()
+        self.staff_item_grant.start()
 
         self._log_task = asyncio.create_task(self._log_task_loop())
     
     async def cog_unload(self):
-        # self.subscription_item_expiry.cancel()
-        # self.staff_item_grant.cancel()
+        self.subscription_item_expiry.cancel()
+        self.staff_item_grant.cancel()
 
         self.progress_reward_townhall.cancel()
         self.progress_reward_hero_upgrade.cancel()
@@ -1239,119 +1239,119 @@ class Bank(commands.Cog):
             await asyncio.sleep(5)
             self._log_task = asyncio.create_task(self._log_task_loop())
     
-    # @tasks.loop(minutes=5.0)
-    # async def staff_item_grant(self):
-    #     async with self._subscription_lock:
-    #         try:
-    #             find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
+    @tasks.loop(minutes=5.0)
+    async def staff_item_grant(self):
+        async with self._subscription_lock:
+            try:
+                find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
 
-    #             minister_role = self.bank_guild.get_role(self.guild_minister)
-    #             if minister_role:
-    #                 minister_members = minister_role.members
-    #                 if len(minister_members) > 0:
-    #                     try:
-    #                         one_year_pass = [p for p in find_pass if p.name == "Base Vault Pass (1 year)"][0]
-    #                     except IndexError:
-    #                         pass
-    #                     else:
-    #                         m_iter = AsyncIter(minister_members)
-    #                         async for member in m_iter:
-    #                             inventory = await UserInventory(member)
-    #                             if not inventory.has_item(one_year_pass):
-    #                                 await inventory.add_item_to_inventory(one_year_pass)
+                minister_role = self.bank_guild.get_role(self.guild_minister)
+                if minister_role:
+                    minister_members = minister_role.members
+                    if len(minister_members) > 0:
+                        try:
+                            one_year_pass = [p for p in find_pass if p.name == "Base Vault Pass (1 year)"][0]
+                        except IndexError:
+                            pass
+                        else:
+                            m_iter = AsyncIter(minister_members)
+                            async for member in m_iter:
+                                inventory = await UserInventory(member)
+                                if not inventory.has_item(one_year_pass):
+                                    await inventory.add_item_to_inventory(one_year_pass)
 
-    #             try:
-    #                 bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
-    #             except IndexError:
-    #                 pass
-    #             else:
-    #                 staff_roles = AsyncIter(self.guild_staff)
-    #                 async for role_id in staff_roles:
-    #                     role = self.bank_guild.get_role(role_id)
-    #                     if role:
-    #                         staff_members = role.members
-    #                         if len(staff_members) > 0:
-    #                             m_iter = AsyncIter(staff_members)
-    #                             async for member in m_iter:
-    #                                 inventory = await UserInventory(member)
-    #                                 if not inventory.has_item(bpass):
-    #                                     await inventory.add_item_to_inventory(bpass)
+                try:
+                    bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
+                except IndexError:
+                    pass
+                else:
+                    staff_roles = AsyncIter(self.guild_staff)
+                    async for role_id in staff_roles:
+                        role = self.bank_guild.get_role(role_id)
+                        if role:
+                            staff_members = role.members
+                            if len(staff_members) > 0:
+                                m_iter = AsyncIter(staff_members)
+                                async for member in m_iter:
+                                    inventory = await UserInventory(member)
+                                    if not inventory.has_item(bpass):
+                                        await inventory.add_item_to_inventory(bpass)
 
-    #         except Exception as exc:
-    #             await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."
-    #                 + f"```{exc}```")
-    #             bot_client.coc_main_log.exception(
-    #                 f"Error granting Vault Passes to Staff."
-    #                 )
+            except Exception as exc:
+                await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."
+                    + f"```{exc}```")
+                bot_client.coc_main_log.exception(
+                    f"Error granting Vault Passes to Staff."
+                    )
     
-    # @commands.Cog.listener("on_member_update")
-    # async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
+    @commands.Cog.listener("on_member_update")
+    async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
         
-    #     async with self._subscription_lock:
-    #         inventory = await UserInventory(after)
+        async with self._subscription_lock:
+            inventory = await UserInventory(after)
 
-    #         new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
-    #         removed_roles = [r for r in [r.id for r in before.roles] if r not in [r.id for r in after.roles]]
+            new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
+            removed_roles = [r for r in [r.id for r in before.roles] if r not in [r.id for r in after.roles]]
             
-    #         if len(new_roles) > 0:
-    #             r_iter = AsyncIter(new_roles)
-    #             async for role_id in r_iter:
-    #                 role = after.guild.get_role(role_id)
-    #                 if not role:
-    #                     continue
+            if len(new_roles) > 0:
+                r_iter = AsyncIter(new_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
 
-    #                 all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
-    #                 is_subscription_role = len([i for i in all_role_items if i.subscription]) > 0
+                    all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                    is_subscription_role = len([i for i in all_role_items if i.subscription]) > 0
 
-    #                 if is_subscription_role:
-    #                     chk = [i for i in inventory.items if i.assigns_role.id == role.id and i.subscription]
-    #                     if len(chk) == 0:
-    #                         await after.remove_roles(
-    #                             role,
-    #                             reason="User does not have a valid subscription."
-    #                             )
-    #                         bot_client.coc_main_log.info(
-    #                             f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
-    #                             )
+                    if is_subscription_role:
+                        chk = [i for i in inventory.items if i.assigns_role.id == role.id and i.subscription]
+                        if len(chk) == 0:
+                            await after.remove_roles(
+                                role,
+                                reason="User does not have a valid subscription."
+                                )
+                            bot_client.coc_main_log.info(
+                                f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
+                                )
             
-    #         if len(removed_roles) > 0:
-    #             r_iter = AsyncIter(removed_roles)
-    #             async for role_id in r_iter:
-    #                 role = after.guild.get_role(role_id)
-    #                 if not role:
-    #                     continue
+            if len(removed_roles) > 0:
+                r_iter = AsyncIter(removed_roles)
+                async for role_id in r_iter:
+                    role = after.guild.get_role(role_id)
+                    if not role:
+                        continue
 
-    #                 chk_inv = [i for i in inventory.items if i.assigns_role.id == role.id]
-    #                 if len(chk_inv) > 0:
-    #                     await after.add_roles(
-    #                         role,
-    #                         reason="User has a valid role purchase."
-    #                         )
+                    chk_inv = [i for i in inventory.items if i.assigns_role.id == role.id]
+                    if len(chk_inv) > 0:
+                        await after.add_roles(
+                            role,
+                            reason="User has a valid role purchase."
+                            )
 
-    # @tasks.loop(minutes=1.0)
-    # async def subscription_item_expiry(self):
+    @tasks.loop(minutes=1.0)
+    async def subscription_item_expiry(self):
 
-    #     if self._subscription_lock.locked():
-    #         return
+        if self._subscription_lock.locked():
+            return
         
-    #     async with self._subscription_lock:
-    #         items = await InventoryItem.get_expiring_items()
+        async with self._subscription_lock:
+            items = await InventoryItem.get_expiring_items()
 
-    #         i_iter = AsyncIter(items)
-    #         async for item in i_iter:
-    #             try:
-    #                 if not item.guild:
-    #                     continue
+            i_iter = AsyncIter(items)
+            async for item in i_iter:
+                try:
+                    if not item.guild:
+                        continue
 
-    #                 if pendulum.now() > item.expiration:
-    #                     await item.remove_from_inventory()
+                    if pendulum.now() > item.expiration:
+                        await item.remove_from_inventory()
                     
-    #             except Exception as exc:
-    #                 await self.bot.send_to_owners(f"An error while expiring Shop Item for User {item.user}. Check logs for details."
-    #                     + f"```{exc}```")
-    #                 bot_client.coc_main_log.exception(
-    #                     f"Error expiring Shop Item {item.id} {item.name} for {item.user}."
-    #                     )
+                except Exception as exc:
+                    await self.bot.send_to_owners(f"An error while expiring Shop Item for User {item.user}. Check logs for details."
+                        + f"```{exc}```")
+                    bot_client.coc_main_log.exception(
+                        f"Error expiring Shop Item {item.id} {item.name} for {item.user}."
+                        )
 
     ############################################################
     ############################################################
