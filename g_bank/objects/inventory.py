@@ -120,7 +120,7 @@ class InventoryItem(ShopItem):
         bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user.id} {self.user.name}.")
 
     @classmethod
-    async def add_for_user(cls,user:discord.Member,item:ShopItem,is_migration:False) -> 'InventoryItem':
+    async def add_for_user(cls,user:discord.Member,item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
         new_item = await bot_client.coc_db.db__user_item.insert_one(
             {
                 'user':user.id,
