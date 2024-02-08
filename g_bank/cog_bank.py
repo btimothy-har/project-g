@@ -1573,50 +1573,6 @@ class Bank(commands.Cog):
         """
         if not ctx.invoked_subcommand:
             pass
-    
-    @command_group_bank_admin.command(name="migrateshop")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def subcommand_bank_admin_migrate_shop(self,ctx:commands.Context):        
-        """
-        M
-        """
-
-        await bot_client.coc_db.db__user_item.delete_many({})
-
-        find_inventory = bot_client.coc_db.db__user_inventory.find({})
-
-        async for inv in find_inventory:
-            user_inv = inv.get('inventory',{})
-            if not user_inv:
-                continue
-
-            user = inv.get('_id',0)
-
-            for i,qty in user_inv.items():
-                item = await ShopItem.get_by_id(i)
-                if not item:
-                    continue
-
-                r = range(qty)
-                for _ in r:
-                    await InventoryItem.add_for_user(int(user),item,is_migration=True)
-
-        subscription_items = await ShopItem.get_subscription_items()
-
-        i_iter = AsyncIter(subscription_items)
-        async for item in i_iter:
-            if not item.guild:
-                continue
-            
-            for user,time in item.subscription_log.items():
-                user = item.guild.get_member(int(user))
-                if not user:
-                    continue
-                n_item = await InventoryItem.add_for_user(user,item,is_migration=True)
-                await n_item._update_timestamp(pendulum.from_timestamp(time))
-        
-        await ctx.reply("Migration Complete.")
 
     @command_group_bank_admin.command(name="unread")
     @commands.guild_only()
