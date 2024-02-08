@@ -1595,8 +1595,7 @@ class Bank(commands.Cog):
 
             user = inv.get('_id',0)
 
-            i_iter = AsyncIter(user_inv.items())
-            async for i,qty in i_iter:
+            for i,qty in user_inv.items():
                 item = await ShopItem.get_by_id(i)
                 if not item:
                     continue
@@ -1610,7 +1609,6 @@ class Bank(commands.Cog):
                 r = range(qty)
                 for _ in r:
                     await InventoryItem.add_for_user(user,item,is_migration=True)
-                    bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
 
         subscription_items = await ShopItem.get_subscription_items()
 
@@ -1618,14 +1616,13 @@ class Bank(commands.Cog):
         async for item in i_iter:
             if not item.guild:
                 continue
-            sub_logs = AsyncIter(item.subscription_log.items())
-            async for user,time in sub_logs:
-                user = item.guild.get_member(user)
+            
+            for user,time in item.subscription_log.items():
+                user = item.guild.get_member(int(user))
                 if not user:
                     continue
                 n_item = await InventoryItem.add_for_user(user,item,is_migration=True)
                 await n_item._update_timestamp(pendulum.from_timestamp(time))
-                bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
         
         await ctx.reply("Migration Complete.")
 
