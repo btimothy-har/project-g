@@ -175,14 +175,14 @@ class Bank(commands.Cog):
             if admin_role and admin_role not in guild_user.roles:
                 await guild_user.add_roles(admin_role)
         
-        self.subscription_item_expiry.start()
-        self.staff_item_grant.start()
+        # self.subscription_item_expiry.start()
+        # self.staff_item_grant.start()
 
         self._log_task = asyncio.create_task(self._log_task_loop())
     
     async def cog_unload(self):
-        self.subscription_item_expiry.cancel()
-        self.staff_item_grant.cancel()
+        # self.subscription_item_expiry.cancel()
+        # self.staff_item_grant.cancel()
 
         self.progress_reward_townhall.cancel()
         self.progress_reward_hero_upgrade.cancel()
