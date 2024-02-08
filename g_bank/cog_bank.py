@@ -1791,16 +1791,16 @@ class Bank(commands.Cog):
         embed = await clash_embed(
             context=context,
             title=f"**Guild Bank Accounts**",
-            message=f"`{'Current':<10}` {self.current_account.balance:,} {currency}"
-                + f"\n`{'Sweep':<10}` {self.sweep_account.balance:,} {currency}"
-                + f"\n`{'Reserve':<10}` {self.reserve_account.balance:,} {currency}"
+            message=f"`{'Current':<10}` {int(self.current_account.balance):,} {currency}"
+                + f"\n`{'Sweep':<10}` {int(self.sweep_account.balance):,} {currency}"
+                + f"\n`{'Reserve':<10}` {int(self.reserve_account.balance):,} {currency}"
                 + f"\n`{'Total':<10}` {total_balance:,} {currency}"
                 + f"\n\nNew Monthly Balance (est.): {len(members) * 25000:,} {currency}",
             timestamp=pendulum.now()
             )
         return embed
 
-    @command_group_bank_admin.command(name="globalbal",aliases=['gbal'])
+    @command_group_bank.command(name="globalbal",aliases=['gbal'])
     @commands.guild_only()
     @commands.check(is_bank_admin)
     async def subcommand_bank_global_balances(self,ctx:commands.Context):
