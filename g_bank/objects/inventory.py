@@ -144,6 +144,9 @@ class InventoryItem(ShopItem):
         bot_client.coc_main_log.info(f"{self.id} {self.name} reinstated to {self.user} {getattr(user,'name','Invalid User')}.")
     
     async def extend(self,days:int):
+        if self.subscription_duration == 0:
+            return
+
         self.subscription_duration += days
         await bot_client.coc_db.db__user_item.update_one(
             {'_id':self._inv_id},
@@ -207,6 +210,7 @@ class InventoryItem(ShopItem):
                 except:
                     pass
         
+        await self.extend(7)        
         bot_client.coc_main_log.info(f"{self.id} {self.name} gifted to {self.user} {getattr(user,'name','Invalid User')}.")
 
     @classmethod

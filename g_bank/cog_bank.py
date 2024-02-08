@@ -2499,7 +2499,7 @@ class Bank(commands.Cog):
             await find_item.extend(1)
             return await interaction.followup.send("Don't be a moron. Your jail time has been extended by 24 hours.")
         
-        await find_item.gift_to_user(user)        
+        await find_item.gift_to_user(user)
         return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{find_item.name}**.")
     
     ##################################################
