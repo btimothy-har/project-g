@@ -1598,6 +1598,8 @@ class Bank(commands.Cog):
                 item = await ShopItem.get_by_id(i)
                 if not item:
                     continue
+                if not item.guild:
+                    continue
 
                 user = item.guild.get_member(user)
                 if not user:
@@ -1612,6 +1614,8 @@ class Bank(commands.Cog):
 
         i_iter = AsyncIter(subscription_items.items())
         async for item in i_iter:
+            if not item.guild:
+                continue
             sub_logs = AsyncIter(item.subscription_log)
             async for user,time in sub_logs:
                 user = item.guild.get_member(user)
