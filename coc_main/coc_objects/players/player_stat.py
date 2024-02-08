@@ -194,7 +194,8 @@ class aPlayerStat():
         'tag',
         'season',
         'description',
-        'season_total'
+        'season_total',
+        'last_capture'
         ]
     
     def __init__(self,tag:str,season:aClashSeason,description:str,activities:List[aPlayerActivity]):
@@ -204,10 +205,14 @@ class aPlayerStat():
 
         if len(activities) == 0:
             self.season_total = 0
+            self.last_capture = 0
         else:
             self.season_total = sum([activity.change for activity in activities])
+            self.last_capture = activities[-1].new_value
 
     def __str__(self):
+        if self.last_capture >= 2000000000:
+            return "max"
         if self.season_total >= 100000:
             return f"{numerize.numerize(self.season_total,2)}"
         else:

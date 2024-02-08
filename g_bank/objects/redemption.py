@@ -14,6 +14,7 @@ from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisClash
 
+from .inventory import InventoryItem
 from .item import ShopItem
 
 # db__redemption = {
@@ -133,7 +134,10 @@ class RedemptionTicket():
                     return_document=ReturnDocument.AFTER
                     )
                 self.close_user = new_doc['close_user']
-                self.close_timestamp = pendulum.from_timestamp(new_doc['close_timestamp'])            
+                self.close_timestamp = pendulum.from_timestamp(new_doc['close_timestamp'])        
+
+            item = await self.get_item()
+            await item.remove_from_inventory()
         return self
     
     async def reverse_redemption(self) -> 'RedemptionTicket':
@@ -150,10 +154,12 @@ class RedemptionTicket():
                     )
                 self.close_user = None
                 self.close_timestamp = None
+            item = await self.get_item()
+            await item.remove_from_inventory()
         return self
     
-    async def get_item(self) -> Optional[ShopItem]:
-        return await ShopItem.get_by_id(self.item_id)
+    async def get_item(self) -> Optional[InventoryItem]:
+        return await InventoryItem.get_by_id(self.item_id)
     
     async def get_embed(self):
         gp_account = await self.coc_client.fetch_player(self.goldpass_tag) if self.goldpass_tag else None

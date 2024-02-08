@@ -34,7 +34,7 @@ from coc_data.tasks.war_tasks import ClanWarLoop
 from coc_data.tasks.raid_tasks import ClanRaidLoop
 
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
-from .objects.inventory import UserInventory
+from .objects.inventory import InventoryItem, UserInventory
 from .objects.item import ShopItem
 from .objects.redemption import RedemptionTicket
 from .views.store_manager import AddItem
@@ -366,9 +366,8 @@ class Bank(commands.Cog):
         if not member.is_member:
             return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
         
-        item = await ShopItem.get_by_id(item_id)
-        inventory = await UserInventory(user)
-        if not inventory.has_item(item):
+        item = await InventoryItem.get_by_id(item_id)
+        if not item.in_inventory:
             return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
 
         embed = await self.redemption_terms_conditions()
@@ -398,7 +397,12 @@ class Bank(commands.Cog):
             user_id=user.id,
             item_id=item_id
             )
-        return f"The redemption ticket for {user.display_name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
+        ret_channel = {
+            'channel_id': ticket.channel.id,
+            'channel_name': ticket.channel.name,
+            'jump_url': ticket.channel.jump_url
+            }
+        return f"The redemption ticket for {user.display_name} has been created: {ret_channel}."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
@@ -410,7 +414,7 @@ class Bank(commands.Cog):
         fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
 
-        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 7]
+        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 9]
 
         if len(eligible_accounts) == 0:
             return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."
@@ -447,14 +451,13 @@ class Bank(commands.Cog):
             if not member.is_member:
                 return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
             
-            item = await ShopItem.get_by_id(item_id)
-            inventory = await UserInventory(user)
-            if not inventory.has_item(item):
+            item = await InventoryItem.get_by_id(item_id)
+            if not item.in_inventory:
                 return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
             
             redeem_account = await self.client.fetch_player(redeem_tag)
-            if not redeem_account or redeem_account.town_hall.level < 7:
-                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            if not redeem_account or redeem_account.town_hall.level < 9:
+                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 9 or higher."
             
             embed = await self.redemption_terms_conditions()
             embed.add_field(
@@ -535,8 +538,6 @@ class Bank(commands.Cog):
             return
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
-        inventory = await UserInventory(message.guild.get_member(ticket.user_id))
-        item = await ShopItem.get_by_id(ticket.item_id)
         
         if message.content.startswith("Redemption marked as fulfilled by"):
             if len(message.mentions) == 0:
@@ -544,11 +545,9 @@ class Bank(commands.Cog):
 
             redemption_user = message.mentions[0].id                
             await ticket.complete_redemption(redemption_user)
-            await inventory.remove_item_from_inventory(item)
         
         if message.content.startswith("Fulfillment reversed by"):
             await ticket.reverse_redemption()
-            await inventory.add_item_to_inventory(item)
 
     ############################################################
     #####
@@ -1241,12 +1240,13 @@ class Bank(commands.Cog):
     
     @tasks.loop(minutes=5.0)
     async def staff_item_grant(self):
+        return 
         async with self._subscription_lock:
             try:
                 find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
 
                 minister_role = self.bank_guild.get_role(self.guild_minister)
-                if minister_role:                    
+                if minister_role:
                     minister_members = minister_role.members
                     if len(minister_members) > 0:
                         try:
@@ -1256,9 +1256,9 @@ class Bank(commands.Cog):
                         else:
                             m_iter = AsyncIter(minister_members)
                             async for member in m_iter:
-                                if one_year_pass.assigns_role not in member.roles:
-                                    inventory = await UserInventory(member)
-                                    await inventory.purchase_item(one_year_pass,True)
+                                inventory = await UserInventory(member)
+                                if not inventory.has_item(one_year_pass):
+                                    await inventory.add_item_to_inventory(one_year_pass)
 
                 try:
                     bpass = [p for p in find_pass if p.name == "Base Vault Pass (30 days)"][0]
@@ -1273,19 +1273,50 @@ class Bank(commands.Cog):
                             if len(staff_members) > 0:
                                 m_iter = AsyncIter(staff_members)
                                 async for member in m_iter:
-                                    if bpass.assigns_role not in member.roles:
-                                        inventory = await UserInventory(member)
-                                        await inventory.purchase_item(bpass,True)
+                                    inventory = await UserInventory(member)
+                                    if not inventory.has_item(bpass):
+                                        await inventory.add_item_to_inventory(bpass)
+
             except Exception as exc:
                 await self.bot.send_to_owners(f"An error while granting Vault Passes to Staff. Check logs for details."
                     + f"```{exc}```")
                 bot_client.coc_main_log.exception(
                     f"Error granting Vault Passes to Staff."
                     )
+
+    @tasks.loop(minutes=1.0)
+    async def subscription_item_expiry(self):
+        return
+
+        if self._subscription_lock.locked():
+            return
+        
+        async with self._subscription_lock:
+            items = await InventoryItem.get_expiring_items()
+
+            i_iter = AsyncIter(items)
+            async for item in i_iter:
+                try:
+                    if not item.guild:
+                        continue
+
+                    if pendulum.now() > item.expiration:
+                        await item.remove_from_inventory()
+                    
+                except Exception as exc:
+                    await self.bot.send_to_owners(f"An error while expiring Shop Item for User {item.user}. Check logs for details."
+                        + f"```{exc}```")
+                    bot_client.coc_main_log.exception(
+                        f"Error expiring Shop Item {item.id} {item.name} for {item.user}."
+                        )
     
     @commands.Cog.listener("on_member_update")
     async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
+        return
+        
         async with self._subscription_lock:
+            inventory = await UserInventory(after)
+
             new_roles = [r for r in [r.id for r in after.roles] if r not in [r.id for r in before.roles]]
             removed_roles = [r for r in [r.id for r in before.roles] if r not in [r.id for r in after.roles]]
             
@@ -1297,26 +1328,18 @@ class Bank(commands.Cog):
                         continue
 
                     all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
+                    is_subscription_role = len([i for i in all_role_items if i.subscription]) > 0
 
-                    if all_role_items and len(all_role_items) > 0:
-                        subscription_items = [i for i in all_role_items if i.subscription]
-
-                        if len(subscription_items) > 0:
-                            all_subscribed_users = []
-                            item_iter = AsyncIter(subscription_items)
-                            async for i in item_iter:
-                                async with i.lock:
-                                    item = await ShopItem.get_by_id(i.id)
-                                    all_subscribed_users.extend(list(item.subscription_log.keys()))
-                            
-                            if str(after.id) not in all_subscribed_users:
-                                await after.remove_roles(
-                                    role,
-                                    reason="User does not have a valid subscription."
-                                    )
-                                bot_client.coc_main_log.info(
-                                    f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
-                                    )
+                    if is_subscription_role:
+                        chk = [i for i in inventory.items if getattr(i.assigns_role,'id',None) == role.id and i.subscription]
+                        if len(chk) == 0:
+                            await after.remove_roles(
+                                role,
+                                reason="User does not have a valid subscription."
+                                )
+                            bot_client.coc_main_log.info(
+                                f"Removed Role {role.name} from {after.display_name} ({after.id}) due to invalid subscription."
+                                )
             
             if len(removed_roles) > 0:
                 r_iter = AsyncIter(removed_roles)
@@ -1324,80 +1347,13 @@ class Bank(commands.Cog):
                     role = after.guild.get_role(role_id)
                     if not role:
                         continue
-                    if role.id == self.bank_penalty_role.id:
-                        all_role_items = await ShopItem.get_by_role_assigned(role.guild.id,role.id)
-                        if all_role_items and len(all_role_items) == 0:
-                            continue
 
-                        all_subscribed_users = []
-                        item_iter = AsyncIter(all_role_items)
-                        async for i in item_iter:
-                            async with i.lock:
-                                item = await ShopItem.get_by_id(i.id)
-                                all_subscribed_users.extend(list(item.subscription_log.keys()))
-                        
-                        if str(after.id) in all_subscribed_users:
-                            await after.add_roles(
-                                role,
-                                reason="User has a valid subscription."
-                                )
-
-    @tasks.loop(seconds=1.0)
-    async def subscription_item_expiry(self):
-        if self._subscription_lock.locked():
-            return
-        
-        async with self._subscription_lock:
-            items = await ShopItem.get_subscription_items()
-
-            i_iter = AsyncIter(items)
-            async for item in i_iter:
-                try:
-                    if not item.guild:
-                        continue
-                                    
-                    u_iter = AsyncIter(list(item.subscription_log.items()))
-                    async for user_id,timestamp in u_iter:
-                        try:
-                            user = item.guild.get_member(int(user_id))
-                            if not user:
-                                continue
-
-                            if item.type == 'role' and item.assigns_role.id not in [r.id for r in user.roles]:
-                                await item.expire_item(user)
-
-                            expiry_time = await item.compute_user_expiry(user.id)
-
-                            if expiry_time and pendulum.now() >= expiry_time:
-                                if item.type == 'role' and item.assigns_role and item.assigns_role.is_assignable():
-                                    if item.assigns_role in user.roles:
-                                        await user.remove_roles(
-                                            item.assigns_role,
-                                            reason="Role Item expired."
-                                            )
-                                else:
-                                    inventory = await UserInventory(user)
-                                    await inventory.remove_item_from_inventory(item)
-                                
-                                await item.expire_item(user)
-                                try:
-                                    await user.send(f"Your {item.name} has expired.")
-                                except:
-                                    pass
-                    
-                        except Exception as exc:
-                            await self.bot.send_to_owners(f"An error while expiring Shop Items for User {user_id}. Check logs for details."
-                                + f"```{exc}```")
-                            bot_client.coc_main_log.exception(
-                                f"Error expiring Shop Item {item.id} {item.name} for {user_id}."
-                                )
-                
-                except Exception as exc:
-                    await self.bot.send_to_owners(f"An error while expiring Shop Items. Check logs for details."
-                        + f"```{exc}```")
-                    bot_client.coc_main_log.exception(
-                        f"Error expiring Shop Item {item.id} {item.name}."
-                        )
+                    chk_inv = [i for i in inventory.items if getattr(i.assigns_role,'id',None) == role.id]
+                    if len(chk_inv) > 0:
+                        await after.add_roles(
+                            role,
+                            reason="User has a valid role purchase."
+                            )
 
     ############################################################
     ############################################################
@@ -1423,27 +1379,7 @@ class Bank(commands.Cog):
     ##### - shop-items / restock
     #####    
     ############################################################
-    ############################################################    
-    
-    ##################################################
-    ### PARENT COMMAND GROUPS
-    ##################################################
-    @commands.group(name="bank")
-    @commands.guild_only()
-    async def command_group_bank(self,ctx):
-        """
-        Group for Bank-related Commands.
-
-        **This is a command group. To use the sub-commands below, follow the syntax: `$bank [sub-command]`.**
-        """
-        if not ctx.invoked_subcommand:
-            pass
-
-    app_command_group_bank = app_commands.Group(
-        name="bank",
-        description="Group for Bank Commands. Equivalent to [p]bank.",
-        guild_only=True
-        )
+    ############################################################
     
     ##################################################
     ### BALANCE
@@ -1504,17 +1440,6 @@ class Bank(commands.Cog):
             inline=True
             )
         return embed
-
-    @commands.command(name="unread")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_bank_unread_activity(self,ctx:commands.Context,id:str):
-        
-        activity = await aPlayerActivity.get_by_id(id)
-        if not activity:
-            return await ctx.reply("No such activity.")
-        await activity.mark_as_unread()
-        await ctx.tick()        
     
     @commands.command(name="balance",aliases=['bal'])
     @commands.guild_only()
@@ -1614,12 +1539,6 @@ class Bank(commands.Cog):
             timestamp=pendulum.now()
             )        
         return embed
-
-    @commands.command(name="debugitem")
-    async def command_debug(self,ctx:commands.Context):
-        items = await ShopItem.get_by_guild(ctx.guild.id)
-        for item in items:
-            await ctx.reply(f"{item.name} ({item.id}) {item.guild_id}")
     
     @commands.command(name="payday")
     @commands.guild_only()
@@ -1641,15 +1560,95 @@ class Bank(commands.Cog):
 
         await interaction.response.defer()        
         embed = await self.helper_payday(interaction)
-        await interaction.followup.send(embed=embed)         
+        await interaction.followup.send(embed=embed)
+
+    ##################################################
+    ### BANK-ADMIN COMMAND GROUPS
+    ##################################################
+    @commands.group(name="bankadmin",aliases=["bank-admin","badm"])
+    @commands.is_owner()
+    @commands.guild_only()
+    async def command_group_bank_admin(self,ctx):
+        """
+        Group for Bank Admin-related Commands.
+        **This is a command group. To use the sub-commands below, follow the syntax: `$bankadmin [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+    
+    @command_group_bank_admin.command(name="migrateshop")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_admin_migrate_shop(self,ctx:commands.Context):        
+        """
+        M
+        """
+
+        await bot_client.coc_db.db__user_item.delete_many({'legacy_migration':True})
+
+        find_inventory = bot_client.coc_db.db__user_inventory.find({})
+
+        async for inv in find_inventory:
+            user_inv = inv.get('inventory',{})
+            if not user_inv:
+                continue
+
+            user = inv.get('_id',0)
+
+            i_iter = AsyncIter(user_inv.items())
+            async for i,qty in i_iter:
+                item = await ShopItem.get_by_id(i)
+                if not item:
+                    continue
+                if not item.guild:
+                    continue
+
+                user = item.guild.get_member(user)
+                if not user:
+                    continue
+
+                r = range(qty)
+                for _ in r:
+                    await InventoryItem.add_for_user(user,item,is_migration=True)
+                    bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
+
+        subscription_items = await ShopItem.get_subscription_items()
+
+        i_iter = AsyncIter(subscription_items)
+        async for item in i_iter:
+            if not item.guild:
+                continue
+            sub_logs = AsyncIter(item.subscription_log.items())
+            async for user,time in sub_logs:
+                user = item.guild.get_member(user)
+                if not user:
+                    continue
+                n_item = await InventoryItem.add_for_user(user,item,is_migration=True)
+                await n_item._update_timestamp(pendulum.from_timestamp(time))
+                bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
+        
+        await ctx.reply("Migration Complete.")
+
+    @command_group_bank_admin.command(name="unread")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def subcommand_bank_admin_unread_activity(self,ctx:commands.Context,id:str):        
+        """
+        Marks a player activity as unread.
+        """
+        activity = await aPlayerActivity.get_by_id(id)
+        if not activity:
+            return await ctx.reply("No such activity.")
+        await activity.mark_as_unread()
+        await ctx.tick()
     
     ##################################################
     ### BANK / TOGGLEREWARDS
     ##################################################
-    @command_group_bank.command(name="runtaxes")
+    @command_group_bank_admin.command(name="runtaxes")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_run_month_end_taxes(self,ctx:commands.Context):
+    async def subcommand_bank_admin_run_month_end_taxes(self,ctx:commands.Context):
         """
         Manually run the Month-End Tax Calculation.
         """
@@ -1657,10 +1656,10 @@ class Bank(commands.Cog):
         await self.apply_bank_taxes()
         await msg.edit(content="Month-End Tax Complete.")
 
-    @command_group_bank.command(name="runsweep")
+    @command_group_bank_admin.command(name="runsweep")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_run_month_end_sweep(self,ctx:commands.Context):
+    async def subcommand_bank_admin_run_month_end_sweep(self,ctx:commands.Context):
         """
         Manually run the Month-End Sweep.
         """
@@ -1668,22 +1667,21 @@ class Bank(commands.Cog):
         await self.month_end_sweep()
         await msg.edit(content="Month-End Sweep Complete.")
 
-    @command_group_bank.command(name="togglerewards")
+    @command_group_bank_admin.command(name="togglerewards")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_toggle_rewards(self,ctx:commands.Context):
+    async def subcommand_bank_admin_toggle_rewards(self,ctx:commands.Context):
         """
         Enable or Disable Currency Rewards.
         """
-
         self.use_rewards = not self.use_rewards
         await self.config.use_rewards.set(self.use_rewards)
         await ctx.reply(f"Currency Rewards have been {'Enabled' if self.use_rewards else 'Disabled'}.")
     
-    @command_group_bank.command(name="logchannel")
+    @command_group_bank_admin.command(name="logchannel")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_set_log_channel(self,ctx:commands.Context,channel_id:int):
+    async def subcommand_bank_admin_set_log_channel(self,ctx:commands.Context,channel_id:int):
         """
         Enable or Disable Currency Rewards.
         """
@@ -1697,10 +1695,10 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN
     ##################################################
-    @command_group_bank.group(name="admin")
+    @command_group_bank_admin.group(name="users")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin(self,ctx:commands.Context):
+    async def subcommand_bank_admin_users(self,ctx:commands.Context):
         """
         [Owner-only] Commands to manage Bank Administrators.
         """
@@ -1710,10 +1708,10 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN / SET
     ##################################################
-    @subcommand_bank_admin.command(name="set")
+    @subcommand_bank_admin_users.command(name="set")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin_set(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_users_set(self,ctx:commands.Context,member:discord.Member):
         """
         [Owner-only] Add a Bank Admin.
         """        
@@ -1733,10 +1731,10 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN / DELETE
     ##################################################
-    @subcommand_bank_admin.command(name="delete")
+    @subcommand_bank_admin_users.command(name="delete")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin_delete(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_users_delete(self,ctx:commands.Context,member:discord.Member):
         """
         [Owner-only] Deletes a Bank Admin.
         """
@@ -1757,10 +1755,10 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN / SHOW
     ##################################################
-    @subcommand_bank_admin.command(name="show")
+    @subcommand_bank_admin_users.command(name="show")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin_show(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_users_show(self,ctx:commands.Context,member:discord.Member):
         """
         [Owner only] Lists the current Bank Admins.
         """
@@ -1776,7 +1774,7 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN / PASS ROLE
     ##################################################
-    @command_group_bank.command(name="passrole")
+    @command_group_bank_admin.command(name="passrole")
     @commands.guild_only()
     @commands.is_owner()
     async def subcommand_set_pass_role(self,ctx:commands.Context,role:discord.Role):
@@ -1793,7 +1791,7 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / ADMIN / PENALTY ROLE
     ##################################################
-    @command_group_bank.command(name="penrole")
+    @command_group_bank_admin.command(name="penrole")
     @commands.guild_only()
     @commands.is_owner()
     async def subcommand_set_pen_role(self,ctx:commands.Context,role:discord.Role):
@@ -1806,6 +1804,25 @@ class Bank(commands.Cog):
         self._bank_penalty_role = role.id
         await self.config.bank_penalty_role.set(self.bank_penalty_role.id)
         await ctx.reply(f"Bank Penalty Role set to {role.name} `{role.id}`.")
+    
+    ##################################################
+    ### BANK-ADMIN COMMAND GROUPS
+    ##################################################
+    @commands.group(name="bank")
+    @commands.guild_only()
+    async def command_group_bank(self,ctx):
+        """
+        Group for Bank-related Commands.
+        **This is a command group. To use the sub-commands below, follow the syntax: `$bank [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    app_command_group_bank = app_commands.Group(
+        name="bank",
+        description="Group for Bank Commands. Equivalent to [p]bank.",
+        guild_only=True
+        )
 
     ##################################################
     ### BANK / GLOBALBAL
@@ -1832,7 +1849,7 @@ class Bank(commands.Cog):
             )
         return embed
 
-    @command_group_bank.command(name="globalbal",aliases=['gbal'])
+    @command_group_bank_admin.command(name="globalbal",aliases=['gbal'])
     @commands.guild_only()
     @commands.check(is_bank_admin)
     async def subcommand_bank_global_balances(self,ctx:commands.Context):
@@ -1846,8 +1863,7 @@ class Bank(commands.Cog):
         description="[Bank Admin only] Display Global Account Balances.")
     @app_commands.guild_only()
     @app_commands.check(is_bank_admin)
-    async def app_command_global_balances(self,interaction:discord.Interaction):
-        
+    async def app_command_global_balances(self,interaction:discord.Interaction):        
         await interaction.response.defer()
         embed = await self.helper_global_account_balances(interaction)        
         await interaction.followup.send(embed=embed)
@@ -1886,7 +1902,7 @@ class Bank(commands.Cog):
     async def command_bank_leaderboard(self,ctx:commands.Context):
         """
         Displays the Economy Leaderboard for this Server.
-        """        
+        """
 
         leaderboard = await self._helper_leaderboard(ctx)
         if not leaderboard:
@@ -1916,7 +1932,7 @@ class Bank(commands.Cog):
     ##################################################
     ### BANK / PRIMARY ACCOUNT
     ##################################################
-    @command_group_bank.command(name="main")
+    @command_group_bank.command(name="setmain",aliases=['main'])
     @commands.guild_only()
     async def command_bank_set_primary_account(self,ctx:commands.Context):
         """
@@ -1963,7 +1979,7 @@ class Bank(commands.Cog):
         
         return await msg.edit(content=f"Your main account has been set to **{sel_account.town_hall.emoji} {sel_account.name} {sel_account.tag}**.",embed=None,view=None)
     
-    @app_command_group_bank.command(name="main",
+    @app_command_group_bank.command(name="set-main",
         description="Set the Main Account for your Bank Rewards.")
     async def app_command_bank_set_primary_account(self,interaction:discord.Interaction):
 
@@ -2136,8 +2152,7 @@ class Bank(commands.Cog):
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Deposit."
-                )
-            
+                )            
         if account_type == 'clan':
             clan = await self.client.from_clan_abbreviation(account_id)
 
@@ -2146,8 +2161,7 @@ class Bank(commands.Cog):
                 amount=amount,
                 user_id=ctx.author.id,
                 comment=f"Manual Withdrawal."
-                )
-        
+                )        
         if account_type == 'user':
             user = ctx.bot.get_user(account_id)
             if not user:
@@ -2295,45 +2309,7 @@ class Bank(commands.Cog):
         Funds are withdrawn from Global or Clan Accounts.
         """
 
-        if user.bot:
-            return await ctx.reply("You can't reward a bot.")
-
-        if account_type_or_clan_abbreviation in global_accounts:
-            if not is_bank_admin(ctx):
-                return await ctx.reply("You don't have permission to do this.")            
-            account = await MasterAccount(account_type_or_clan_abbreviation)
-
-        else:
-            try:
-                clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
-            except InvalidAbbreviation as exc:
-                return await ctx.reply(exc.message)
-            
-            check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
-            if not check_permissions:
-                return await ctx.reply("You don't have permission to do this.")            
-            account = await ClanAccount(clan)
-            if account.balance - amount <= -100000:
-                return await ctx.reply(f"Insufficient funds. {clan.title} has {account.balance:,} {await bank.get_currency_name()}.")
-        
-        if amount < 0:
-            user_bal = await bank.get_balance(user)
-            if user_bal + amount < 0:
-                amount = user_bal * -1
-
-        await account.withdraw(
-            amount=amount,
-            user_id=ctx.author.id,
-            comment=f"Reward transfer to {user.name} {user.id}."
-            )
-        await bank.deposit_credits(user,amount)
-        await self._send_log(
-            user=user,
-            done_by=ctx.author,
-            amount=amount,
-            comment=f"Reward distribution."
-            )
-        await ctx.tick()
+        await ctx.reply(f"Please use the Slash command `/bank distribute` instead.",delete_after=60)
     
     @app_command_group_bank.command(name="distribute",
         description="Distribute a set amount of money to a Discord User.")
@@ -2342,6 +2318,7 @@ class Bank(commands.Cog):
     @app_commands.describe(
         select_account="Select an Account to withdraw the reward from.",
         amount="The amount to distribute.",
+        reason="The reason for the distribution.",
         user="Select a User to distribute to.",
         role="Select a Role to distribute to."
         )
@@ -2349,6 +2326,7 @@ class Bank(commands.Cog):
         interaction:discord.Interaction,
         select_account:str,
         amount:int,
+        reason:str,
         user:Optional[discord.Member]=None,
         role:Optional[discord.Role]=None):
         
@@ -2367,14 +2345,14 @@ class Bank(commands.Cog):
                 await account.withdraw(
                     amount=a,
                     user_id=interaction.user.id,
-                    comment=f"Reward transfer to {user.name} {user.id}."
+                    comment=f"Reward transfer to {user.name} {user.id}. Reason: {reason}"
                     )
                 await bank.deposit_credits(user,amount)
                 await self._send_log(
                     user=user,
                     done_by=interaction.user,
                     amount=a,
-                    comment=f"Reward distribution."
+                    comment=reason
                     )
                 return user
             except:
@@ -2415,68 +2393,23 @@ class Bank(commands.Cog):
             return await interaction.followup.send(f"Rewarded {user.mention} with {amount:,} {currency}.",ephemeral=True)
         else:
             return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
-    
-    @app_command_group_bank.command(name="distribute-all",
-        description="Distribute a set amount of money to all Discord Users.")
-    @app_commands.check(is_owner)
-    @app_commands.autocomplete(select_account=autocomplete_eligible_accounts)
-    @app_commands.describe(
-        select_account="Select an Account to withdraw the reward from.",
-        amount="The amount to distribute."
-        )
-    async def app_command_bank_reward_all(self,
-        interaction:discord.Interaction,
-        select_account:str,
-        amount:int):
-        
-        await interaction.response.defer()
-
-        async def _helper_reward_user(account:BankAccount,user:discord.Member):
-            try:
-                await account.withdraw(
-                    amount=amount,
-                    user_id=interaction.user.id,
-                    comment=f"Reward transfer to {user.name} {user.id}."
-                    )
-                await bank.deposit_credits(user,amount)
-                await self._send_log(
-                    user=user,
-                    done_by=interaction.user,
-                    amount=amount,
-                    comment=f"Reward distribution."
-                    )
-                return user
-            except:
-                return None
-            
-        currency = await bank.get_currency_name()
-
-        if select_account in global_accounts:
-            if not is_bank_admin(interaction):
-                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
-            account = await MasterAccount(select_account)
-            
-        else:
-            clan = await self.client.fetch_clan(select_account)
-            check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
-            if not check_permissions:
-                return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)
-            account = await ClanAccount(clan)
-
-        count = 0
-        u_iter = AsyncIter(interaction.client.users)
-        async for user in u_iter:
-            if user.bot:
-                continue
-            await _helper_reward_user(account,user)
-            count += 1
-        
-        return await interaction.followup.send(f"Distributed {amount:,} {currency} to {count} members (each).",ephemeral=True)
 
     ##################################################
     ### BANK / PENALTY
-    ##################################################    
-    @app_command_group_bank.command(name="penalty",
+    ##################################################
+    @command_group_bank.group(name="penalize",aliases=['penalty','pen'])
+    @commands.guild_only()
+    @commands.check(is_coleader_or_bank_admin)
+    async def subcommand_group_bank_penalty(self,ctx:commands.Context):
+        """
+        Propose a user to be penalized.
+
+        Penalties are subject to approval by Bank Admins.
+        """
+
+        await ctx.reply(f"Please use the Slash command `/bank penalize` instead.",delete_after=60)
+
+    @app_command_group_bank.command(name="penalize",
         description="Propose a user to be penalized. Usable by Staff Members.")
     @app_commands.check(_staff_check)
     @app_commands.choices(duration=pen_duration_sel)
@@ -2618,26 +2551,26 @@ class Bank(commands.Cog):
     ##################################################
     ### SHOP ITEM GROUP
     ##################################################    
-    @commands.group(name="shopmanage")
+    @commands.group(name="shopset",aliases=['shopmanage'])
     @commands.admin()
     @commands.guild_only()
-    async def command_group_shop_item(self,ctx:commands.Context):
+    async def command_group_shop_set(self,ctx:commands.Context):
         """
         Group Command to help manage Shop Items.
         """
         if not ctx.invoked_subcommand:
             pass
     
-    app_command_group_shopitem = app_commands.Group(
-        name="shop-manage",
-        description="Group for Shop Item commands. Equivalent to [p]shopmanage.",
+    app_command_group_shop_set = app_commands.Group(
+        name="shop-set",
+        description="Group for Shop Config commands. Equivalent to [p]shopset.",
         guild_only=True
         )
     
     ##################################################
     ### SHOP ITEM / DISTRIBUTE
     ##################################################
-    @command_group_shop_item.command(name="distribute")
+    @command_group_shop_set.command(name="distribute")
     @commands.admin()
     @commands.guild_only()
     async def subcommand_item_distribute(self,ctx:commands.Context):
@@ -2647,9 +2580,9 @@ class Bank(commands.Cog):
         This bypasses all checks and will distribute the item directly to the user's inventory.
         """
 
-        await ctx.reply(f"For a better experience, use the Slash Command `/shop-manage distribute` to do this action.")
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-set distribute` to do this action.")
     
-    @app_command_group_shopitem.command(
+    @app_command_group_shop_set.command(
         name="distribute",
         description="Administratively distribute an item to a specified user."
         )
@@ -2663,7 +2596,7 @@ class Bank(commands.Cog):
     async def app_command_distribute_item(self,interaction:discord.Interaction,item:str,user:discord.Member):        
         await interaction.response.defer(ephemeral=True)
 
-        if user.id == interaction.user.id:
+        if user.id not in bot_client.bot.owner_ids and user.id == interaction.user.id:
             return await interaction.followup.send("You can't give items to yourself!",ephemeral=True)
         if user.bot:
             return await interaction.followup.send("You can't give items to bots!",ephemeral=True)
@@ -2671,37 +2604,13 @@ class Bank(commands.Cog):
         get_item = await ShopItem.get_by_id(item)
 
         inventory = await UserInventory(user)
-        await inventory.purchase_item(get_item,True)
-
+        await inventory.add_item_to_inventory(get_item)
         return await interaction.followup.send(f"1x **{get_item.name}** has been distributed to {user.mention}.",ephemeral=True)
-
-    @app_command_group_shopitem.command(
-        name="distribute-all",
-        description="Administratively distribute an item to all users."
-        )
-    @app_commands.check(is_owner)
-    @app_commands.autocomplete(item=autocomplete_distribute_items)
-    @app_commands.describe(
-        item="Select an item to distribute. Only Basic items can be distributed."
-        )
-    async def app_command_distribute_all_item(self,interaction:discord.Interaction,item:str):
-        await interaction.response.defer(ephemeral=True)
-        count = 0
-        u_iter = AsyncIter(interaction.client.users)
-        async for user in u_iter:
-            if user.bot:
-                continue
-            count += 1
-            get_item = await ShopItem.get_by_id(item)
-            inventory = await UserInventory(user)
-            await inventory.purchase_item(get_item,True)
-
-        return await interaction.followup.send(f"1x **{get_item.name}** has been added to {count} users.",ephemeral=True)
 
     ##################################################
     ### SHOP ITEM / REDEEM
     ##################################################
-    @command_group_shop_item.command(name="redeem")
+    @command_group_shop_set.command(name="redeem")
     @commands.admin()
     @commands.guild_only()
     async def subcommand_item_redeem(self,ctx:commands.Context):
@@ -2711,9 +2620,9 @@ class Bank(commands.Cog):
         Only usable if item exists in the user's inventory.
         """
 
-        await ctx.reply(f"For a better experience, use the Slash Command `/shop-manage redeem` to do this action.")
+        await ctx.reply(f"For a better experience, use the Slash Command `/shop-set redeem` to do this action.")
     
-    @app_command_group_shopitem.command(
+    @app_command_group_shop_set.command(
         name="redeem",
         description="Redeems an item from a user's inventory."
         )
@@ -2777,7 +2686,7 @@ class Bank(commands.Cog):
                 inline=False)
         return embed
     
-    @command_group_shop_item.command(name="status")   
+    @command_group_shop_set.command(name="status")   
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_item_status(self,ctx:commands.Context):
@@ -2787,7 +2696,7 @@ class Bank(commands.Cog):
         embed = await self._shop_overview_embed(ctx)
         await ctx.reply(embed=embed)
     
-    @app_command_group_shopitem.command(
+    @app_command_group_shop_set.command(
         name="status",
         description="Overview of the Guild Store."
         )
@@ -2845,7 +2754,7 @@ class Bank(commands.Cog):
         workbook.close()
         return report_file
     
-    @command_group_shop_item.command(name="export")   
+    @command_group_shop_set.command(name="export")   
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_item_export(self,ctx:commands.Context):
@@ -2873,7 +2782,7 @@ class Bank(commands.Cog):
             attachments=[discord.File(rpfile)]
             )
     
-    @app_command_group_shopitem.command(
+    @app_command_group_shop_set.command(
         name="export",
         description="Export Shop Items for the Guild to Excel."
         )
@@ -2906,7 +2815,7 @@ class Bank(commands.Cog):
     ##################################################
     ### SHOP ITEM / ADD
     ################################################## 
-    @command_group_shop_item.command(name="add")   
+    @command_group_shop_set.command(name="additem",aliases=['add'])   
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_item_add(self,ctx:commands.Context):
@@ -2918,8 +2827,8 @@ class Bank(commands.Cog):
         view = AddItem(ctx)
         await view.start()
     
-    @app_command_group_shopitem.command(
-        name="add",
+    @app_command_group_shop_set.command(
+        name="add-item",
         description="Adds a Shop Item."
         )
     @app_commands.guild_only()
@@ -2933,7 +2842,7 @@ class Bank(commands.Cog):
     ##################################################
     ### SHOP ITEM / DELETE
     ################################################## 
-    @command_group_shop_item.command(name="delete")   
+    @command_group_shop_set.command(name="delete-item",aliases=['delete','del'])   
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_item_delete(self,ctx:commands.Context,item_id:str):
@@ -2948,8 +2857,8 @@ class Bank(commands.Cog):
         await item.delete()
         await ctx.tick()
     
-    @app_command_group_shopitem.command(
-        name="delete",
+    @app_command_group_shop_set.command(
+        name="delete-item",
         description="Delete a Shop Item."
         )
     @app_commands.guild_only()
@@ -3005,7 +2914,7 @@ class Bank(commands.Cog):
                 )
         return modal
 
-    @command_group_shop_item.command(name="edit")   
+    @command_group_shop_set.command(name="edititem",aliases=['edit'])
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_edit_item(self,ctx:commands.Context):
@@ -3021,8 +2930,8 @@ class Bank(commands.Cog):
         """
         await ctx.reply(f"Use the Slash Command `/shop-manage edit` to do this action.")
     
-    @app_command_group_shopitem.command(
-        name="edit",
+    @app_command_group_shop_set.command(
+        name="edit-item",
         description="Edits a Shop Item in the Store. Not all parameters can be edited."
         )
     @app_commands.guild_only()
@@ -3107,7 +3016,7 @@ class Bank(commands.Cog):
     ##################################################
     ### SHOP ITEM / RESTOCK
     ################################################## 
-    @command_group_shop_item.command(name="restock")   
+    @command_group_shop_set.command(name="restockitem",aliases=['restock'])
     @commands.admin()
     @commands.guild_only()
     async def subcommand_shop_item_restock(self,ctx:commands.Context,item_id:str,amount:int):
@@ -3125,8 +3034,8 @@ class Bank(commands.Cog):
         await item.restock(amount)
         await ctx.reply(f"Restocked {item} by {amount}. New stock: {item.stock}.")
     
-    @app_command_group_shopitem.command(
-        name="restock",
+    @app_command_group_shop_set.command(
+        name="restock-item",
         description="Restocks a Shop Item."
         )
     @app_commands.guild_only()
