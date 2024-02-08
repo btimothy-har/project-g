@@ -136,7 +136,9 @@ class ShopItem():
 
         self.name = database_entry.get('name','')
         self.price = database_entry.get('price',0)
+
         self._stock = database_entry.get('stock',0)
+
         self.category = database_entry.get('category','') if len(database_entry.get('category','')) > 0 else "Uncategorized"
         self.description = database_entry.get('description',"")
         self.buy_message = database_entry.get('buy_message',"")
@@ -162,6 +164,27 @@ class ShopItem():
         if isinstance(other,ShopItem):
             return self.id == other.id
         return False
+
+    def db_json(self) -> dict:
+        return {
+            '_id':self._id,
+            'guild_id':self.guild_id,
+            'type':self.type,
+            'name':self.name,
+            'price':self.price,
+            'stock':self._stock,
+            'description':self.description,
+            'category':self.category,
+            'buy_message':self.buy_message,
+            'exclusive_role':self.exclusive_role,
+            'required_role':self._required_role,
+            'show_in_store':self.show_in_store,
+            'disabled':self.disabled,
+            'role_id':self.role_id,
+            'bidirectional_role':self.bidirectional_role,
+            'random_items':self.random_items,
+            'subscription_duration':self.subscription_duration
+            }
     
     def _assistant_json(self) -> dict:        
         self._randomize_stock()
@@ -200,6 +223,16 @@ class ShopItem():
     @property
     def subscription(self) -> bool:
         return self.subscription_duration > 0
+    @property
+    def _availability(self) -> float:
+        if self.price <= 10000:
+            return 0.4 * (10000 - self.price) / 10000 + 0.5
+        elif self.price <= 100000:
+            return 0.25 * (100000 - self.price) / 90000 + 0.05
+        elif self.price <= 500000:
+            return 0.04 * (500000 - self.price) / 400000 + 0.01
+        else:
+            return 0.001 
     
     def can_i_buy(self,member:discord.Member) -> bool:
         if self.disabled:
@@ -219,52 +252,19 @@ class ShopItem():
     def _randomize_stock(self):
         if self.type not in ['cash']:
             return
-        if self._stock < 1:
-            return
         
-        r_int = random.randint(1,10)
-
         r_stock = self._random_stock[self.id]
         r_stock_ts = pendulum.from_timestamp(r_stock['timestamp'])
-        if pendulum.now() > r_stock_ts.add(minutes=r_int):
-            factor = max(15-self._stock,6)
-            rand = random.randint(1,factor)
-            if rand != 1:
-                self._stock = 0
+        
+        if pendulum.now() > r_stock_ts.add(minutes=random.randint(5,20)):
+            rand_num = random.random()
+            if rand_num < self._availability:
+                self._random_stock[self.id]['stock'] = self._stock = 0                
             else:
-                self._stock = 1
-            self._random_stock[self.id]['stock'] = self._stock
+                self._random_stock[self.id]['stock'] = self._stock = 0
             self._random_stock[self.id]['timestamp'] = pendulum.now().int_timestamp
         else:
-            self._stock = r_stock['stock']        
-    
-    async def compute_user_expiry(self,user_id:int) -> Optional[pendulum.DateTime]:
-        if not self.subscription:
-            return None
-        if self.assigns_role:
-            expiration_times = []
-            role_items = await ShopItem.get_by_role_assigned(self.guild_id,self.role_id)
-            i_iter = AsyncIter([r for r in role_items if r.subscription])
-            async for item in i_iter:
-                timestamp = item.subscription_log.get(str(user_id),None)
-                if timestamp:
-                    if bot_client.bot.user.id == 828838353977868368:
-                        expiry_time = pendulum.from_timestamp(timestamp).add(minutes=item.subscription_duration)
-                    else:
-                        expiry_time = pendulum.from_timestamp(timestamp).add(days=item.subscription_duration)
-                    expiration_times.append(expiry_time)
-            if len(expiration_times) > 0:
-                return max(expiration_times)
-            return None
-        else:
-            timestamp = self.subscription_log.get(str(user_id),None)
-            if timestamp:
-                if bot_client.bot.user.id == 828838353977868368:
-                    expiry_time = pendulum.from_timestamp(timestamp).add(minutes=self.subscription_duration)
-                else:
-                    expiry_time = pendulum.from_timestamp(timestamp).add(days=self.subscription_duration)
-                return expiry_time
-            return None
+            self._stock = r_stock['stock']
 
     async def purchase(self,user:discord.Member,free_purchase:bool=False):
         quantity = 1
@@ -275,25 +275,16 @@ class ShopItem():
                 if not self.can_i_buy(user):
                     raise CannotPurchase(self)
 
-            if self.subscription:
-                doc = await bot_client.coc_db.db__shop_item.find_one({'_id':self._id})
-                self.subscription_log = doc.get('subscription_log',{})
-                self.subscription_log[str(user.id)] = pendulum.now().timestamp()
-
-                await bot_client.coc_db.db__shop_item.update_one(
-                    {'_id':self._id},
-                    {'$set':
-                        {'subscription_log':self.subscription_log}
-                        }
-                    )
-
             if self._stock > 0:
-                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
-                    {'_id':self._id},
-                    {'$inc': {'stock':-quantity}},
-                    return_document=ReturnDocument.AFTER
-                    )
-                self._stock = item['stock']
+                if self.id in self._random_stock:
+                    self._random_stock[self.id]['stock'] = 0
+                else:
+                    item = await bot_client.coc_db.db__shop_item.find_one_and_update(
+                        {'_id':self._id},
+                        {'$inc': {'stock':-quantity}},
+                        return_document=ReturnDocument.AFTER
+                        )
+                    self._stock = item['stock']
     
     async def expire_item(self,user:Union[discord.Member,discord.User]):
         async with self.lock:
