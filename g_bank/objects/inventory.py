@@ -71,6 +71,7 @@ class InventoryItem(ShopItem):
         self.in_inventory = item_dict['in_inventory']
 
         self._inv_id = item_dict['_id']
+        self._is_legacy = item_dict.get('legacy_migration',False)
         super().__init__(item_dict['item'])
 
     # def to_json(self) -> dict:
@@ -119,16 +120,17 @@ class InventoryItem(ShopItem):
         bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user.id} {self.user.name}.")
 
     @classmethod
-    async def add_for_user(cls,user:discord.Member,item:ShopItem) -> 'InventoryItem':
+    async def add_for_user(cls,user:discord.Member,item:ShopItem,is_migration:False) -> 'InventoryItem':
         new_item = await bot_client.coc_db.db__user_item.insert_one(
             {
                 'user':user.id,
                 'timestamp':pendulum.now().int_timestamp,
                 'in_inventory':True,
-                'item':item.db_json()
+                'item':item.db_json(),
+                'legacy_migration':is_migration
                 }
-            )
-        bot_client.coc_main_log.info(f"{new_item.id} {new_item.name} added to {user.id} {user.name}.")
+            )        
+        bot_client.coc_main_log.info(f"{item.id} {item.name} added to {user.id} {user.name}.")
         return await cls.get_by_id(str(new_item.inserted_id))
     
 class UserInventory(AwaitLoader):

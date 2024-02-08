@@ -1582,6 +1582,8 @@ class Bank(commands.Cog):
         M
         """
 
+        await bot_client.coc_db.db__user_item.delete_many({})
+
         find_inventory = bot_client.coc_db.db__user_inventory.find({})
 
         async for inv in find_inventory:
@@ -1603,7 +1605,7 @@ class Bank(commands.Cog):
 
                 r = range(qty)
                 for _ in r:
-                    await InventoryItem.add_for_user(user,item)
+                    await InventoryItem.add_for_user(user,item,is_migration=True)
                     bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
 
         subscription_items = await ShopItem.get_subscription_items()
@@ -1615,7 +1617,7 @@ class Bank(commands.Cog):
                 user = item.guild.get_member(user)
                 if not user:
                     continue
-                n_item = await InventoryItem.add_for_user(user,item)
+                n_item = await InventoryItem.add_for_user(user,item,is_migration=True)
                 await n_item._update_timestamp(pendulum.from_timestamp(time))
                 bot_client.coc_main_log.info(f"Added {item.id} {item.name} to {user.display_name} ({user.id}).")
         
