@@ -1,5 +1,6 @@
 import discord
 import random
+import pendulum
 
 from typing import *
 from functools import cached_property
@@ -10,7 +11,7 @@ from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectM
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.item import ShopItem
-from ..objects.inventory import UserInventory
+from ..objects.inventory import UserInventory, InventoryItem
 
 bot_client = BotClashClient()
 
@@ -256,8 +257,11 @@ class UserStore(DefaultView):
         if not purchase_button.disabled:
             can_buy = self.current_item.can_i_buy(self.guild.get_member(interaction.user.id))
             can_spend = await bank.can_spend(user,self.current_item.price)
+            
+            last_purchase = await InventoryItem.find_last_purchase(user,self.current_item) if self.current_item.type in ['cash'] else None
+            within_cooldown = last_purchase and pendulum.now() <= last_purchase.timestamp.add(hours=24)
 
-            if not can_buy or not can_spend:
+            if not can_buy or not can_spend or within_cooldown:
                 purchase_button.disabled = True
                 if not can_spend:
                     purchase_button.label = f"You cannot afford this item."
@@ -267,6 +271,9 @@ class UserStore(DefaultView):
 
                 elif isinstance(self.current_item.stock,int) and self.current_item.stock < 1:
                     purchase_button.label = "This item is out of stock."
+                
+                elif within_cooldown:
+                    purchase_button.label = "This item is on cooldown."
 
                 else:
                     purchase_button.label = "You cannot purchase this item."

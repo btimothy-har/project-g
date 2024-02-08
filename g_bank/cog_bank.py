@@ -366,9 +366,8 @@ class Bank(commands.Cog):
         if not member.is_member:
             return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
         
-        item = await ShopItem.get_by_id(item_id)
-        inventory = await UserInventory(user)
-        if not inventory.has_item(item):
+        item = await InventoryItem.get_by_id(item_id)
+        if not item.in_inventory:
             return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
 
         embed = await self.redemption_terms_conditions()
@@ -398,7 +397,12 @@ class Bank(commands.Cog):
             user_id=user.id,
             item_id=item_id
             )
-        return f"The redemption ticket for {user.display_name} has been created: {getattr(ticket.channel,'id','No channel')}. To link to the user to the channel, wrap the channel ID as follows: <#channel_id>."
+        ret_channel = {
+            'channel_id': ticket.channel.id,
+            'channel_name': ticket.channel.name,
+            'jump_url': ticket.channel.jump_url
+            }
+        return f"The redemption ticket for {user.display_name} has been created: {ret_channel}."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
         member = aMember(user.id)
@@ -410,7 +414,7 @@ class Bank(commands.Cog):
         fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
 
-        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 7]
+        eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 9]
 
         if len(eligible_accounts) == 0:
             return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."
@@ -447,14 +451,13 @@ class Bank(commands.Cog):
             if not member.is_member:
                 return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
             
-            item = await ShopItem.get_by_id(item_id)
-            inventory = await UserInventory(user)
-            if not inventory.has_item(item):
+            item = await InventoryItem.get_by_id(item_id)
+            if not item.in_inventory:
                 return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
             
             redeem_account = await self.client.fetch_player(redeem_tag)
-            if not redeem_account or redeem_account.town_hall.level < 7:
-                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 7 or higher."
+            if not redeem_account or redeem_account.town_hall.level < 9:
+                return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 9 or higher."
             
             embed = await self.redemption_terms_conditions()
             embed.add_field(
@@ -535,8 +538,6 @@ class Bank(commands.Cog):
             return
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
-        inventory = await UserInventory(message.guild.get_member(ticket.user_id))
-        item = await ShopItem.get_by_id(ticket.item_id)
         
         if message.content.startswith("Redemption marked as fulfilled by"):
             if len(message.mentions) == 0:
@@ -544,11 +545,9 @@ class Bank(commands.Cog):
 
             redemption_user = message.mentions[0].id                
             await ticket.complete_redemption(redemption_user)
-            await inventory.remove_item_from_inventory(item)
         
         if message.content.startswith("Fulfillment reversed by"):
             await ticket.reverse_redemption()
-            await inventory.add_item_to_inventory(item)
 
     ############################################################
     #####

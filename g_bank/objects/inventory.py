@@ -37,6 +37,20 @@ class InventoryItem(ShopItem):
         if query:
             return cls(query)
         return None
+    
+    @classmethod
+    async def find_last_purchase(cls,user:discord.Member,item:ShopItem) -> Optional['InventoryItem']:
+        filter_document = {
+            'user':user.id,
+            'item.id':item.id,
+            'in_inventory':False
+            }
+        
+        db_query = bot_client.coc_db.db__user_item.find(filter_document).sort('timestamp',-1).limit(1)
+        query = await db_query.to_list(length=None)
+        if len(query) > 0:
+            return cls(query[0])
+        return None
 
     @classmethod
     async def get_for_user(cls,user:Union[discord.Member,discord.User]) -> List['InventoryItem']:
@@ -74,14 +88,13 @@ class InventoryItem(ShopItem):
         self._is_legacy = item_dict.get('legacy_migration',False)
         super().__init__(item_dict['item'])
 
-    # def to_json(self) -> dict:
-    #     return {
-    #         '_id': self.id,
-    #         'name': self.name,
-    #         'description': self.description,
-    #         'type': self.type,
-    #         'inventory_quantity': self.quantity,
-    #         }
+    def to_json(self) -> dict:
+        return {
+            '_id': str(self._inv_id),
+            'name': self.name,
+            'description': self.description,
+            'type': self.type
+            }
     
     @property
     def expiration(self) -> Optional[pendulum.DateTime]:
@@ -92,7 +105,7 @@ class InventoryItem(ShopItem):
             expiry_time = self.timestamp.add(minutes=self.subscription_duration)
         else:
             expiry_time = self.timestamp.add(days=self.subscription_duration)
-        return expiry_time   
+        return expiry_time
     
     async def _update_timestamp(self,timestamp:pendulum.DateTime):
         await bot_client.coc_db.db__user_item.update_one(
@@ -100,6 +113,25 @@ class InventoryItem(ShopItem):
             {'$set':{'timestamp':timestamp.int_timestamp}}
             )
         self.timestamp = timestamp
+    
+    async def reinstate(self):
+        self.in_inventory = True
+        await bot_client.coc_db.db__user_item.update_one(
+            {'_id':self._inv_id},
+            {'$set':{'in_inventory':True}}
+            )
+        if self.assigns_role:
+            member = self.guild.get_member(self.user)
+            if member and self.assigns_role:
+                try:
+                    await member.add_roles(
+                        self.assigns_role,
+                        reason=f"Reinstated to inventory {self.id} {self.name}."
+                        )
+                except:
+                    pass
+        user = self.guild.get_member(self.user)
+        bot_client.coc_main_log.info(f"{self.id} {self.name} reinstated to {self.user} {getattr(user,'name','Invalid User')}.")
 
     async def remove_from_inventory(self):
         self.in_inventory = False
