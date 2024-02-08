@@ -104,7 +104,7 @@ class InventoryItem(ShopItem):
     async def remove_from_inventory(self):
         self.in_inventory = False
         await bot_client.coc_db.db__user_item.update_one(
-            {'_id':self._id},
+            {'_id':self._inv_id},
             {'$set':{'in_inventory':False}}
             )
         if self.assigns_role:
@@ -117,7 +117,8 @@ class InventoryItem(ShopItem):
                         )
                 except:
                     pass
-        bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user.id} {self.user.name}.")
+        user = self.guild.get_member(self.user)
+        bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user} {getattr(user,'name','Invalid User')}.")
 
     @classmethod
     async def add_for_user(cls,user:discord.Member,item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
@@ -211,7 +212,7 @@ class UserInventory(AwaitLoader):
         member = item.guild.get_member(self.user.id)
         await item.purchase(member)
         item = await self.add_item_to_inventory(item)
-        
+
         await bank.withdraw_credits(self.user,item.price)
         return item
 
