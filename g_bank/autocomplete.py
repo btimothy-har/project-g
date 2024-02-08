@@ -152,20 +152,20 @@ async def autocomplete_redeem_items(interaction:discord.Interaction,current:str)
 async def autocomplete_gift_items(interaction:discord.Interaction,current:str):
     try:
         inv = await UserInventory(interaction.user)
-        guild_items = [i for i in inv.inventory if i.guild_id == interaction.guild.id]
+        guild_items = [i for i in inv.items if i.guild_id == interaction.guild.id and not i._is_locked]
 
         if not current:
             selection = guild_items
             return [app_commands.Choice(
-                name=f"{item.name} (Qty: {item.quantity})",
-                value=item.id)
+                name=f"{item.name} (Purchased: {item.timestamp.format('YYYY-MM-DD')})",
+                value=str(item._inv_id))
             for item in random.sample(selection,min(len(selection),5))
             ]
         else:
-            selection = [item for item in guild_items if current.lower() in item.name.lower() or current.lower() == item.id.lower()]
+            selection = [item for item in guild_items if current.lower() in item.name.lower()]
             return [app_commands.Choice(
-                name=f"{item.name} (Qty: {item.quantity})",
-                value=item.id)
+                name=f"{item.name} (Purchased: {item.timestamp.format('YYYY-MM-DD')})",
+                value=str(item._inv_id))
             for item in random.sample(selection,min(len(selection),5))
             ]
     except Exception:

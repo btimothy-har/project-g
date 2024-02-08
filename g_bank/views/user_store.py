@@ -294,7 +294,7 @@ class UserStore(DefaultView):
         await interaction.response.defer()
         currency = await bank.get_currency_name()
 
-        item = await ShopItem.get_by_id(self.current_item.id)
+        item = self.current_item
 
         if not item.can_i_buy(self.guild.get_member(interaction.user.id)) or not await bank.can_spend(self.guild.get_member(interaction.user.id),item.price):
             embed = await clash_embed(

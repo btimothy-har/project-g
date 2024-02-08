@@ -86,6 +86,8 @@ class InventoryItem(ShopItem):
 
         self._inv_id = item_dict['_id']
         self._is_legacy = item_dict.get('legacy_migration',False)
+        self._is_locked = item_dict.get('locked',False)
+
         super().__init__(item_dict['item'])
 
     def to_json(self) -> dict:
@@ -151,6 +153,45 @@ class InventoryItem(ShopItem):
                     pass
         user = self.guild.get_member(self.user)
         bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user} {getattr(user,'name','Invalid User')}.")
+    
+    async def lock_item(self):
+        self._is_locked = True
+        await bot_client.coc_db.db__user_item.update_one(
+            {'_id':self._inv_id},
+            {'$set':{'is_locked':True}}
+            )
+    
+    async def gift_to_user(self,user:discord.Member):
+        if self.assigns_role:
+            member = self.guild.get_member(self.user)
+            if member and self.assigns_role in member.roles:
+                try:
+                    await member.remove_roles(
+                        self.assigns_role,
+                        reason=f"Gifted away item {self.id} {self.name}."
+                        )
+                except:
+                    pass
+
+        self.user = user.id
+        self._is_locked = True
+        await bot_client.coc_db.db__user_item.update_one(
+            {'_id':self._inv_id},
+            {'$set':{'user': user.id, 'is_locked': True}}
+            )
+        
+        if self.assigns_role:
+            member = self.guild.get_member(user.id)
+            if member:
+                try:
+                    await member.add_roles(
+                        self.assigns_role,
+                        reason=f"Received item {self.id} {self.name}."
+                        )
+                except:
+                    pass
+        
+        bot_client.coc_main_log.info(f"{self.id} {self.name} gifted to {self.user} {getattr(user,'name','Invalid User')}.")
 
     @classmethod
     async def add_for_user(cls,user:Union[int,discord.Member],item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
@@ -257,7 +298,9 @@ class UserInventory(AwaitLoader):
             user = ctx.user
         
         if len(self.items) > 0:
-            a_iter = AsyncIter(self.items)
+            elig_items = [i for i in self.items if i.type in ['cash','basic'] or (i.subscription and i.expiration)]
+            a_iter = AsyncIter(elig_items)
+
             async for item in a_iter:
                 inventory_text += f"\n\n**{item.name}**"
                 inventory_text += (f"\n{item.description}" if len(item.description) > 0 else "")

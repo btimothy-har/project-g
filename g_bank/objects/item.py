@@ -269,11 +269,8 @@ class ShopItem():
     async def purchase(self,user:discord.Member,free_purchase:bool=False):
         quantity = 1
         async with self.lock:
-            if free_purchase:
-                pass
-            else:
-                if not self.can_i_buy(user):
-                    raise CannotPurchase(self)
+            if not self.can_i_buy(user):
+                raise CannotPurchase(self)
 
             if self._stock > 0:
                 if self.id in self._random_stock:

@@ -1238,9 +1238,9 @@ class Bank(commands.Cog):
             await asyncio.sleep(5)
             self._log_task = asyncio.create_task(self._log_task_loop())
     
-    @tasks.loop(minutes=5.0)
+    @tasks.loop(minutes=10.0)
     async def staff_item_grant(self):
-        return 
+
         async with self._subscription_lock:
             try:
                 find_pass = await ShopItem.get_by_guild_named(self.bank_guild.id,"Base Vault Pass")
@@ -1286,8 +1286,6 @@ class Bank(commands.Cog):
 
     @tasks.loop(minutes=1.0)
     async def subscription_item_expiry(self):
-        return
-
         if self._subscription_lock.locked():
             return
         
@@ -1311,9 +1309,7 @@ class Bank(commands.Cog):
                         )
     
     @commands.Cog.listener("on_member_update")
-    async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):
-        return
-        
+    async def subscription_item_check_valid(self,before:discord.Member,after:discord.Member):        
         async with self._subscription_lock:
             inventory = await UserInventory(after)
 
@@ -1575,50 +1571,6 @@ class Bank(commands.Cog):
         """
         if not ctx.invoked_subcommand:
             pass
-    
-    @command_group_bank_admin.command(name="migrateshop")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def subcommand_bank_admin_migrate_shop(self,ctx:commands.Context):        
-        """
-        M
-        """
-
-        await bot_client.coc_db.db__user_item.delete_many({'legacy_migration':True})
-
-        find_inventory = bot_client.coc_db.db__user_inventory.find({})
-
-        async for inv in find_inventory:
-            user_inv = inv.get('inventory',{})
-            if not user_inv:
-                continue
-
-            user = inv.get('_id',0)
-
-            for i,qty in user_inv.items():
-                item = await ShopItem.get_by_id(i)
-                if not item:
-                    continue
-
-                r = range(qty)
-                for _ in r:
-                    await InventoryItem.add_for_user(int(user),item,is_migration=True)
-
-        subscription_items = await ShopItem.get_subscription_items()
-
-        i_iter = AsyncIter(subscription_items)
-        async for item in i_iter:
-            if not item.guild:
-                continue
-            
-            for user,time in item.subscription_log.items():
-                user = item.guild.get_member(int(user))
-                if not user:
-                    continue
-                n_item = await InventoryItem.add_for_user(user,item,is_migration=True)
-                await n_item._update_timestamp(pendulum.from_timestamp(time))
-        
-        await ctx.reply("Migration Complete.")
 
     @command_group_bank_admin.command(name="unread")
     @commands.guild_only()
@@ -1749,7 +1701,7 @@ class Bank(commands.Cog):
     @subcommand_bank_admin_users.command(name="show")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_admin_users_show(self,ctx:commands.Context,member:discord.Member):
+    async def subcommand_bank_admin_users_show(self,ctx:commands.Context):
         """
         [Owner only] Lists the current Bank Admins.
         """
@@ -1768,10 +1720,13 @@ class Bank(commands.Cog):
     @command_group_bank_admin.command(name="passrole")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_set_pass_role(self,ctx:commands.Context,role:discord.Role):
+    async def subcommand_set_pass_role(self,ctx:commands.Context,role:discord.Role=None):
         """
         [Owner-only] Sets a role to use as the Bank Pass Role.
-        """   
+        """
+        if not role:
+            return await ctx.reply(f"The Bank Penalty Role is currently set to {self.bank_penalty_role.name} `{self.bank_penalty_role.id}`.")
+        
         if role.guild.id != self.bank_guild.id:
             return await ctx.reply("Role must be from the Bank Server.")
              
@@ -1785,10 +1740,13 @@ class Bank(commands.Cog):
     @command_group_bank_admin.command(name="penrole")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_set_pen_role(self,ctx:commands.Context,role:discord.Role):
+    async def subcommand_set_pen_role(self,ctx:commands.Context,role:discord.Role=None):
         """
         [Owner-only] Sets a role to use as the Bank Penalty Role.
         """   
+        if not role:
+            return await ctx.reply(f"The Bank Penalty Role is currently set to {self.bank_penalty_role.name} `{self.bank_penalty_role.id}`.")
+        
         if role.guild.id != self.bank_guild.id:
             return await ctx.reply("Role must be from the Bank Server.")
              
@@ -2521,23 +2479,22 @@ class Bank(commands.Cog):
         user="Select a user to gift to."
         )
     async def app_command_user_gift(self,interaction:discord.Interaction,item:str,user:discord.Member):        
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         if user.id == interaction.user.id:
-            return await interaction.followup.send("You can't gift yourself!",ephemeral=True)
+            return await interaction.followup.send("You can't gift yourself!")
         if user.bot:
-            return await interaction.followup.send("You can't gift bots!",ephemeral=True)
+            return await interaction.followup.send("You can't gift bots!")
         
-        item = await ShopItem.get_by_id(item)
-
-        inventory = await UserInventory(interaction.user)
-        if not inventory.has_item(item):
-            return await interaction.followup.send(f"You don't have that item.",ephemeral=True)
-        gift = await inventory.gift_item(item,user)
-        if not gift:
-            return await interaction.followup.send(f"Could not gift the item. You either don't have this item or the user already has this item.",ephemeral=True)
+        find_item = await InventoryItem.get_by_id(item)
+        if not find_item or not find_item.in_inventory:
+            return await interaction.followup.send("You don't have that item.")
         
-        return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{gift.name}**.",ephemeral=True)
+        if find_item._is_locked:
+            return await interaction.followup.send("This item is locked and cannot be gifted.")        
+        
+        await find_item.gift_to_user(user)        
+        return await interaction.followup.send(f"Yay! You've gifted {user.mention} 1x **{find_item.name}**.")
     
     ##################################################
     ### SHOP ITEM GROUP
