@@ -542,7 +542,7 @@ class ClanWarLeagues(commands.Cog):
         await self.config.banned_users.set(list(self.banned_users))
         await ctx.reply(f"{user.display_name} `{user.id}` is now banned from participating in future CWL.")
     
-    @app_command_group_cwl.command(name="ban-",
+    @app_command_group_cwl.command(name="ban",
         description="Ban a user from participating in future CWL.")
     @app_commands.describe(user="The user to ban.")
     @app_commands.check(is_cwl_leader)
