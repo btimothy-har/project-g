@@ -473,6 +473,9 @@ class ClanWarLeagues(commands.Cog):
         cwlmenu = CWLPlayerMenu(ctx,season,await aMember(ctx.author.id))
 
         if pendulum.now() < season.cwl_start:
+            if ctx.author.id in self.banned_users:
+                await ctx.reply("You have been banned from participating in CWL.")
+                return
             await cwlmenu.start_signup()
         else:
             await cwlmenu.show_live_cwl()
@@ -488,6 +491,9 @@ class ClanWarLeagues(commands.Cog):
         cwlmenu = CWLPlayerMenu(interaction,season,aMember(interaction.user.id))
 
         if pendulum.now() < season.cwl_start.subtract(days=1): 
+            if interaction.user.id in self.banned_users:
+                await interaction.edit_original_response(content="You have been banned from participating in CWL.")
+                return
             await cwlmenu.start_signup()
         else:
             await cwlmenu.show_live_cwl()
