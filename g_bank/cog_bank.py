@@ -837,7 +837,7 @@ class Bank(commands.Cog):
                     return
                 
                 hero = aHero.get_hero(player_activity_log.stat,player_activity_log.town_hall.level)
-                upgrades = range(player_activity_log.new_value - player_activity_log.change,player_activity_log.new_value+1)
+                upgrades = range(player_activity_log.new_value - player_activity_log.change,player_activity_log.new_value)
 
                 async for u in AsyncIter(upgrades):                
                     reward = 0 if u <= hero.min_level else 1000
