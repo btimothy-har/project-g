@@ -27,6 +27,7 @@ from coc_main.discord.member import aMember
 from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
 from coc_main.utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.checks import is_admin, is_owner
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
 
@@ -795,13 +796,13 @@ class Bank(commands.Cog):
                 await self.current_account.withdraw(
                     amount = new_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Townhall Bonus (x{multi})for {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    comment = f"Townhall Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=new_reward,
-                    comment=f"Townhall Bonus (x{multi})for {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    comment=f"Townhall Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
                     )
 
             except Exception as e:
@@ -849,13 +850,13 @@ class Bank(commands.Cog):
                     await self.current_account.withdraw(
                         amount = new_rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus (x{multi}) for {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
+                        comment = f"Hero Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=new_rew,
-                        comment=f"Hero Bonus (x{multi}) for {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
+                        comment=f"Hero Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
 
             except Exception as e:
@@ -912,13 +913,13 @@ class Bank(commands.Cog):
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Capital Gold Bonus (x{mult}) for {player_activity_log.name} ({player_activity_log.tag}): {increment}"
+                    comment = f"Capital Gold Bonus (x{mult}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {increment}"
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=total_reward,
-                    comment=f"Capital Gold Bonus (x{mult}) for {player_activity_log.name} ({player_activity_log.tag}): Donated {increment:,} Gold to {target_clan.name}."
+                    comment=f"Capital Gold Bonus (x{mult}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Donated {increment:,} Gold to {target_clan.name}."
                     )
 
             except Exception as e:
@@ -964,13 +965,13 @@ class Bank(commands.Cog):
                     await self.current_account.deposit(
                         amount = penalty,
                         user_id = self.bot.user.id,
-                        comment = f"Clan War Penalty for {player.name} ({player.tag})."
+                        comment = f"Clan War Penalty for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=(penalty * -1),
-                        comment=f"Clan War Penalty for {player.name} ({player.tag})."
+                        comment=f"Clan War Penalty for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
             
                 participation = 50
@@ -986,13 +987,13 @@ class Bank(commands.Cog):
                     await self.current_account.withdraw(
                         amount = total_reward,
                         user_id = self.bot.user.id,
-                        comment = f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        comment = f"Clan War Reward (x{multiplier}) for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=total_reward,
-                        comment=f"Clan War Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        comment=f"Clan War Reward (x{multiplier}) for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
             except Exception:
                 bot_client.coc_main_log.exception(f"Clan War Ended Rewards: {player.tag}")
@@ -1030,13 +1031,13 @@ class Bank(commands.Cog):
                     await self.current_account.deposit(
                         amount = penalty,
                         user_id = self.bot.user.id,
-                        comment = f"Raid Weekend Penalty for {player.name} ({player.tag})."
+                        comment = f"Raid Weekend Penalty for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=(penalty * -1),
-                        comment=f"Raid Weekend Penalty for {player.name} ({player.tag})."
+                        comment=f"Raid Weekend Penalty for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
 
                 reward = 20 * (sum([a.new_destruction for a in player.attacks]) // 5)
@@ -1048,13 +1049,13 @@ class Bank(commands.Cog):
                     await self.current_account.withdraw(
                         amount = total_reward,
                         user_id = self.bot.user.id,
-                        comment = f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        comment = f"Raid Weekend Reward (x{multiplier}) for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=total_reward,
-                        comment=f"Raid Weekend Reward (x{multiplier}) for {player.name} ({player.tag})."
+                        comment=f"Raid Weekend Reward (x{multiplier}) for {EmojisTownHall.get(f_player.town_hall.level)} {player.name} ({player.tag})."
                         )
             except Exception:
                 bot_client.coc_main_log.exception(f"Raid Weekend Ended Rewards: {player.tag}")
