@@ -6,7 +6,7 @@ import re
 
 from typing import *
 
-from redbot.core import commands, app_commands
+from redbot.core import Config, commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
@@ -53,6 +53,13 @@ class ClanWarLeagues(commands.Cog):
     def __init__(self,bot:Red,version:int):
         self.bot = bot
         self.sub_v = version
+        
+        self.banned_users = set()
+        self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
+        default_global = {
+            "banned_users":[]
+            }
+        self.config.register_global(**default_global)
 
         self._cwl_channel_listener = 1194618178760876042 if bot_client.bot.user.id == 1031240380487831664 else 1194618586610802688
 
@@ -68,6 +75,9 @@ class ClanWarLeagues(commands.Cog):
                 await asyncio.sleep(1)            
             ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
             ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
+
+        a = await self.config.banned_users()
+        self.banned_users = set(a)
 
         asyncio.create_task(load_events())
     
@@ -510,6 +520,66 @@ class ClanWarLeagues(commands.Cog):
         season = self.active_war_league_season
         menu = CWLSeasonSetup(interaction,season)
         await menu.start()
+    
+    ##################################################
+    ### CWL / ban-user
+    ##################################################
+    @command_group_cwl.command(name="ban", aliases=["banuser","ban-user"])
+    @commands.check(is_cwl_leader)
+    @commands.guild_only()
+    async def subcommand_cwl_ban_user(self,ctx:commands.Context,user:discord.Member):
+        """
+        Bans a user from participating in future CWL.
+        """
+
+        self.banned_users.add(user.id)
+        await self.config.banned_users.set(list(self.banned_users))
+        await ctx.reply(f"{user.display_name} `{user.id}` is now banned from participating in future CWL.")
+    
+    @app_command_group_cwl.command(name="ban-",
+        description="Ban a user from participating in future CWL.")
+    @app_commands.describe(user="The user to ban.")
+    @app_commands.check(is_cwl_leader)
+    @app_commands.guild_only()
+    async def sub_appcommand_cwl_ban_user(self,interaction:discord.Interaction,user:discord.Member):
+        
+        await interaction.response.defer()
+
+        self.banned_users.add(user.id)
+        await self.config.banned_users.set(list(self.banned_users))
+        await interaction.edit_original_response(content=f"{user.display_name} `{user.id}`is now banned from participating in future CWL.")
+    
+    ##################################################
+    ### CWL / unban-user
+    ##################################################
+    @command_group_cwl.command(name="unban", aliases=["unbanuser","unban-user"])
+    @commands.check(is_cwl_leader)
+    @commands.guild_only()
+    async def subcommand_cwl_unban_user(self,ctx:commands.Context,user:discord.Member):
+        """
+        Unbans a user from participating in future CWL.
+        """
+        if user.id not in self.banned_users:
+            return await ctx.reply(f"{user.display_name} `{user.id}` is not banned from participating in future CWL.")
+
+        self.banned_users.remove(user.id)
+        await self.config.banned_users.set(list(self.banned_users))
+        await ctx.reply(f"{user.display_name} `{user.id}` is now unbanned from participating in future CWL.")
+    
+    @app_command_group_cwl.command(name="unban",
+        description="Unban a user from participating in future CWL.")
+    @app_commands.describe(user="The user to ban.")
+    @app_commands.check(is_cwl_leader)
+    @app_commands.guild_only()
+    async def sub_appcommand_unban_user(self,interaction:discord.Interaction,user:discord.Member):
+        
+        await interaction.response.defer()
+        if user.id not in self.banned_users:
+            return await interaction.edit_original_response(content=f"{user.display_name} `{user.id}` is not banned from participating in future CWL.")
+
+        self.banned_users.remove(user.id)
+        await self.config.banned_users.set(list(self.banned_users))
+        await interaction.edit_original_response(content=f"{user.display_name} `{user.id}` is now unbanned from participating in future CWL.")
     
     ##################################################
     ### CWL / CLAN
