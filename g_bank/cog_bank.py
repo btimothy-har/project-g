@@ -778,7 +778,7 @@ class Bank(commands.Cog):
                     return            
                 if player_activity_log.change <= 0:
                     return            
-                player = await self.client.get_player(player_activity_log.tag)            
+                player = await self.client.fetch_player(player_activity_log.tag)            
                 if player.hero_rushed_pct > 0:
                     reward = 0
                 elif player_activity_log.new_value <= 9:
