@@ -317,6 +317,8 @@ class UserInventory(AwaitLoader):
         if isinstance(ctx,discord.Interaction):
             user = ctx.user
         
+        elig_items = []
+        
         if len(self.items) > 0:
             elig_items = [i for i in self.items if i.is_user_accessible and i.type in ['basic','cash']]
             elig_items.extend([i for i in self.items if i.type in ['role'] and i.assigns_role])
