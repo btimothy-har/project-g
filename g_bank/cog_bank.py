@@ -2620,7 +2620,7 @@ class Bank(commands.Cog):
             value="```ini"
                 + f"\n{'[Total Items]':<15} {len(guild_items):>3}"
                 + f"\n{'[In Store]':<15} {len([i for i in guild_items if i.show_in_store]):>3}"
-                + f"\n{'[Stock Out]':<15} {len([i for i in guild_items if i.stock == 0]):>3}"
+                + f"\n{'[Stock Out]':<15} {len([i for i in guild_items if i.stock == 0 and i.type != 'cash']):>3}"
                 + "```",
             inline=True)
         embed.add_field(
@@ -2637,7 +2637,7 @@ class Bank(commands.Cog):
                 name=f"**Needing Restock**",
                 value=f"Use the `/shop-manage restock` command to restock items."
                     + "\n- "
-                    + "\n- ".join([f"{str(i)}" for i in guild_items if i.stock == 0])
+                    + "\n- ".join([f"{str(i)}" for i in guild_items if i.stock == 0 and i.type != 'cash'])
                     + "\n\u200b",
                 inline=False)
         return embed

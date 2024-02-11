@@ -79,7 +79,7 @@ async def autocomplete_store_items(interaction:discord.Interaction,current:str):
 async def autocomplete_store_items_restock(interaction:discord.Interaction,current:str):
     try:
         items = await ShopItem.get_by_guild(interaction.guild.id)
-        guild_items = [i for i in items if i._stock >= 0]
+        guild_items = [i for i in items if i._stock >= 0 and i.type != 'cash']
 
         if not current:
             selection = guild_items

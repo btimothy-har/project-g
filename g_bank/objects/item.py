@@ -232,7 +232,20 @@ class ShopItem():
         elif self.price <= 500000:
             return 0.04 * (500000 - self.price) / 400000 + 0.01
         else:
-            return 0.001 
+            return 0.001
+    
+    @property
+    def _reset_interval(self) -> int:
+        if self.price <= 10000:
+            return 3
+        elif self.price <= 50000:
+            return 5
+        elif self.price <= 100000:
+            return 10
+        elif self.price <= 500000:
+            return 30
+        else:
+            return 60
     
     def can_i_buy(self,member:discord.Member) -> bool:
         if self.disabled:
@@ -256,7 +269,7 @@ class ShopItem():
         r_stock = self._random_stock[self.id]
         r_stock_ts = pendulum.from_timestamp(r_stock['timestamp'])
         
-        if pendulum.now() > r_stock_ts.add(minutes=random.randint(0,10)):
+        if pendulum.now() > r_stock_ts.add(minutes=random.randint(int(self._reset_interval/2),self._reset_interval)):
             rand_num = random.random()
             if rand_num < self._availability:
                 self._random_stock[self.id]['stock'] = self._stock = 1
