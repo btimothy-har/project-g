@@ -56,6 +56,8 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
 
         self._pets = super().pets
         self._pets_cached = False
+
+        bot_client.coc_main_log.info(f"{type(self._clan)}")
     
     def __str__(self):
         return f"{self.name} ({self.tag})"
