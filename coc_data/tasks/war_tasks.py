@@ -45,6 +45,8 @@ class DefaultWarTasks():
             tasks = [DefaultWarTasks._add_player_to_cache(m.tag) for m in war.members]
             await bounded_gather(*tasks)
 
+            await war.save_to_database()
+            
             if clan.is_active_league_clan and war.type == ClanWarType.CWL:
                 return
             
@@ -86,6 +88,8 @@ class DefaultWarTasks():
             
             tasks = [DefaultWarTasks._add_player_to_cache(m.tag) for m in war.members]
             await bounded_gather(*tasks)
+
+            await war.save_to_database()
             
             if clan.is_active_league_clan and war.type == ClanWarType.CWL:
                 return
@@ -124,6 +128,7 @@ class DefaultWarTasks():
                     await link.reset_clan_war_role()
 
             await asyncio.sleep(120)
+            await war.save_to_database()
             client = DefaultWarTasks._get_client()
 
             new_clan = await client.fetch_clan(clan.tag)
@@ -155,6 +160,9 @@ class DefaultWarTasks():
         try:
             if war.state != 'inWar':
                 return
+            
+            if war.do_i_save:
+                await war.save_to_database()
             
             time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
             if clan.is_registered_clan and len(clan.abbreviation) > 0 and time_remaining > 3600:

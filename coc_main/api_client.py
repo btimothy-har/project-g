@@ -451,7 +451,7 @@ class BotClashClient():
         return sum(self.clan_api)/len(self.clan_api) if len(self.clan_api) > 0 else 0
     
     @property
-    def api_current_throughput(self) -> (float, float):
+    def api_current_throughput(self) -> Tuple[float, float]:
         nt = process_time()
 
         diff = nt - self.api_counter.sent_time
@@ -462,7 +462,7 @@ class BotClashClient():
         return sent_avg, rcvd_avg
     
     @property
-    def rcvd_stats(self) -> (float, float, float):
+    def rcvd_stats(self) -> Tuple[float, float, float]:
         if len(self.api_counter.rcvd) == 0:
             return 0,0,0
         avg = sum(self.api_counter.rcvd)/len(self.api_counter.rcvd)
@@ -471,7 +471,7 @@ class BotClashClient():
         return avg, last, maxr
     
     @property
-    def sent_stats(self) -> (float, float, float):
+    def sent_stats(self) -> Tuple[float, float, float]:
         if len(self.api_counter.sent) == 0:
             return 0,0,0
         avg = sum(self.api_counter.sent)/len(self.api_counter.sent)
