@@ -149,9 +149,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             hero_ph = []
             for hero_name in HeroAvailability.return_all_unlocked(self.town_hall.level):
                 hero = self.get_hero(hero_name)
-                if hero:
-                    hero = aHero(hero,self.town_hall.level)
-                else:
+                if not hero:
                     hero = aHero._not_yet_unlocked(hero_name,self.town_hall.level)
                 hero_ph.append(hero)
             self._heroes = hero_ph
@@ -167,11 +165,9 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             troops_ph = []
             for troop_name in TroopAvailability.return_all_unlocked(self.town_hall.level):
                 troop = self.get_troop(name=troop_name,is_home_troop=True)
-                if troop:
-                    troop = aTroop(troop,self.town_hall.level)
-                else:
+                if not troop:
                     if troop_name not in coc.SUPER_TROOP_ORDER:
-                        troop = aTroop._not_yet_unlocked(troop_name,self.town_hall.level)
+                        troop = aTroop._not_yet_unlocked(troop_name,self.town_hall.level)                    
                 if troop:
                     troops_ph.append(troop)
             self._troops = troops_ph
@@ -187,11 +183,10 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             spells_ph = []
             for spell_name in SpellAvailability.return_all_unlocked(self.town_hall.level):
                 spell = self.get_spell(name=spell_name)
-                if spell:
-                    spell = aSpell(spell,self.town_hall.level)
-                else:
+                if not spell:
                     spell = aSpell._not_yet_unlocked(spell_name,self.town_hall.level)
-                spells_ph.append(spell)
+                if spell:
+                    spells_ph.append(spell)
             self._spells = spells_ph
             self._spells_cached = True
         return self._spells
