@@ -295,29 +295,14 @@ class ClanWarLoop(TaskLoop):
                 self._cached[tag] = cached_events = {}
         
             cached_war = cached_events.get('current_war',None)
-            try:
-                clan = await self.coc_client.fetch_clan(tag)
-            except InvalidTag:
-                return self.loop.call_later(3600,self.unlock,lock)
-            except ClashAPIError:
-                return self.loop.call_later(10,self.unlock,lock)
+            
+            clan = await bot_client.coc.get_clan(tag,cls=aClan)
             
             if not getattr(clan,'public_war_log',False):
-                return self.loop.call_later(10,self.unlock,lock)
+                return self.loop.call_later(60,self.unlock,lock)
             
-            current_war = None
-            count = 0
-            while True:
-                try:
-                    count += 1
-                    current_war = await self.fetch_current_war(tag)
-                    break
-                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
-                    return self.loop.call_later(10,self.unlock,lock)
-                except:
-                    if count > 5:
-                        return self.loop.call_later(10,self.unlock,lock)
-                    await asyncio.sleep(0.5)
+            current_war = None            
+            current_war = await self.fetch_current_war(tag)
             
             wait = getattr(current_war,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)
@@ -343,10 +328,14 @@ class ClanWarLoop(TaskLoop):
             
             if cached_war and current_war:
                 await self._dispatch_events(clan,cached_war,current_war,is_current=True)
-
+        
+        except (coc.NotFound,coc.Maintenance):
+            return self.loop.call_later(3600,self.unlock,lock)
+        except coc.PrivateWarLog:
+            return self.loop.call_later(60,self.unlock,lock)        
         except asyncio.CancelledError:
             return
-        
+                
         except Exception as exc:
             if self.loop_active:
                 await TaskLoop.report_fatal_error(

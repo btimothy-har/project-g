@@ -166,7 +166,7 @@ class ClanRaidLoop(TaskLoop):
             await lock.acquire()
             cached = self._cached.get(tag,None)
         
-            clan = await bot_client.coc.get_clan(tag)     
+            clan = await bot_client.coc.get_clan(tag,cls=aClan)
 
             bot_client.coc_main_log.info(f"{clan.tag} {clan.name} {isinstance(clan,aClan)}")       
             
