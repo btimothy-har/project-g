@@ -10,6 +10,8 @@ from coc_main.discord.guild import aGuild
 from coc_main.discord.member import aMember
 from coc_main.discord.recruiting_reminder import RecruitingReminder
 
+from coc_main.exceptions import ClashAPIError
+
 bot_client = client()
 
 class DiscordGuildLoop(TaskLoop):
@@ -104,6 +106,9 @@ class DiscordGuildLoop(TaskLoop):
             a_iter = AsyncIter(guild.members)
             tasks = [aMember.save_user_roles(member.id,guild.id) async for member in a_iter if not member.bot]
             await bounded_gather(*tasks,semaphore=self._task_semaphore)
+        
+        except ClashAPIError:
+            return
                 
         except Exception:
             bot_client.coc_main_log.exception(
@@ -144,6 +149,9 @@ class DiscordGuildLoop(TaskLoop):
         try:
             m_guild = aGuild(guild.id)
             await m_guild.update_clan_panels()
+        
+        except ClashAPIError:
+            return
 
         except Exception:
             bot_client.coc_main_log.exception(
@@ -164,6 +172,9 @@ class DiscordGuildLoop(TaskLoop):
         try:
             m_guild = aGuild(guild.id)
             await m_guild.update_apply_panels()
+        
+        except ClashAPIError:
+            return
 
         except Exception:
             bot_client.coc_main_log.exception(

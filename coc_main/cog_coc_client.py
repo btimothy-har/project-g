@@ -77,16 +77,6 @@ class ClashOfClansClient(commands.Cog):
     def clan_api_avg(self) -> float:
         return bot_client.clan_api_avg
     
-    async def get_player_from_loop(self,tag:str) -> Optional[aPlayer]:
-        n_tag = coc.utils.correct_tag(tag)
-        task_cog = self.bot.get_cog("ClashOfClansTasks")
-        return task_cog.player_loop._cached.get(n_tag,None)
-    
-    async def get_clan_from_loop(self,tag:str) -> Optional[aClan]:
-        n_tag = coc.utils.correct_tag(tag)
-        task_cog = self.bot.get_cog("ClashOfClansTasks")
-        return task_cog.clan_loop._cached.get(n_tag,None)
-    
     @commands.command(name="convertstat")
     @commands.is_owner()
     async def command_convert_stat(self,ctx:commands.Context):
@@ -446,26 +436,13 @@ class ClashOfClansClient(commands.Cog):
         if not coc.utils.is_valid_tag(n_tag):
             raise InvalidTag(n_tag)
         
-        count = 0
         player = None        
-        while True:
-            try:
-                count += 1
-                player = await self.client.coc.get_player(n_tag,cls=aPlayer)
-                break
-            except coc.NotFound as exc:
-                raise InvalidTag(n_tag) from exc
-            except (coc.Maintenance,coc.GatewayError) as exc:
-                cached = await self.get_player_from_loop(n_tag)
-                if cached:
-                    player = cached
-                else:
-                    raise ClashAPIError(exc)
-                break
-            except:
-                if count > 3:
-                    raise ClashAPIError()
-                await asyncio.sleep(1)
+        try:
+            player = await self.client.coc.get_player(n_tag,cls=aPlayer)
+        except coc.NotFound as exc:
+            raise InvalidTag(n_tag) from exc
+        except (coc.Maintenance,coc.GatewayError) as exc:
+            raise ClashAPIError(exc)
                     
         return player
     
@@ -535,40 +512,30 @@ class ClashOfClansClient(commands.Cog):
         if not coc.utils.is_valid_tag(n_tag):
             raise InvalidTag(n_tag)
         
-        count = 0
         clan = None       
-        while True:
-            try:
-                count += 1
-                clan = await self.client.coc.get_clan(n_tag,cls=aClan)
-                break
-            except coc.NotFound as exc:
-                raise InvalidTag(n_tag) from exc
-            except (coc.GatewayError,coc.Maintenance) as exc:
-                cached = await self.get_clan_from_loop(n_tag)
-                if cached:
-                    clan = cached
-                else:
-                    raise ClashAPIError(exc) from exc
-                break
-            except:
-                if count > 3:
-                    raise ClashAPIError()
-                await asyncio.sleep(1)
+        try:
+            clan = await self.client.coc.get_clan(n_tag,cls=aClan)
+        except coc.NotFound as exc:
+            raise InvalidTag(n_tag) from exc
+        except (coc.GatewayError,coc.Maintenance) as exc:
+            raise ClashAPIError(exc) from exc
             
         return clan
 
     async def fetch_many_clans(self,*tags) -> List[aClan]:
-        tasks = []
-
+        clans = []
         a_iter = AsyncIter(tags)
-        tasks = [self.fetch_clan(tag) async for tag in a_iter]
-        ret = await bounded_gather(*tasks,limit=1,return_exceptions=True)
 
-        if len([e for e in ret if isinstance(e,ClashAPIError)]) > 0:
-            raise ClashAPIError([e for e in ret if isinstance(e,ClashAPIError)][0])
+        async for tag in a_iter:
+            try:
+                c = await bot_client.coc.get_clan(tag,cls=aClan)
+                clans.append(c)
+            except coc.NotFound:
+                pass
+            except (coc.GatewayError,coc.Maintenance) as exc:
+                raise ClashAPIError(exc) from exc
         
-        ret_clans = [p for p in ret if isinstance(p,aClan)]
+        ret_clans = [p for p in clans if isinstance(p,aClan)]
         return ret_clans
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
