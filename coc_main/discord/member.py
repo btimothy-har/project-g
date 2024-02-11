@@ -532,7 +532,7 @@ class aMember(AwaitLoader):
         last_u_ts = pendulum.from_timestamp(last_updated)
         return last_u_ts.add(hours=168)
     
-    async def set_reward_account(self,tag:str) -> (bool, int):
+    async def set_reward_account(self,tag:str) -> Tuple[bool, int]:
         if not self.discord_member:
             raise InvalidUser(self.user_id)
 
