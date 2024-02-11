@@ -165,30 +165,15 @@ class ClanRaidLoop(TaskLoop):
                 return
             await lock.acquire()
             cached = self._cached.get(tag,None)
-            
-            try:
-                clan = await self.coc_client.fetch_clan(tag)
-            except InvalidTag:
-                return self.loop.call_later(3600,self.unlock,lock)
-            except ClashAPIError:
-                return self.loop.call_later(10,self.unlock,lock)
+        
+            clan = await bot_client.coc.get_clan(tag)     
+
+            bot_client.coc_main_log.info(f"{clan.tag} {clan.name} {isinstance(clan,aClan)}")       
             
             raid_log = None
-            new_raid = None
-            count = 0
+            new_raid = None            
             
-            while True:
-                try:
-                    count += 1
-                    raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
-                    break
-                except (coc.NotFound,coc.PrivateWarLog,coc.Maintenance,coc.GatewayError):
-                    return self.loop.call_later(10,self.unlock,lock)
-                except:
-                    if count > 5:
-                        return self.loop.call_later(10,self.unlock,lock)
-                    await asyncio.sleep(0.5)
-
+            raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
             wait = getattr(raid_log,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)
                 
@@ -199,6 +184,10 @@ class ClanRaidLoop(TaskLoop):
             if cached and new_raid:
                 await self._dispatch_events(clan,cached,new_raid)
         
+        except (coc.NotFound,coc.Maintenance):
+            return self.loop.call_later(3600,self.unlock,lock)
+        except coc.PrivateWarLog:
+            return self.loop.call_later(60,self.unlock,lock)        
         except asyncio.CancelledError:
             return
         
