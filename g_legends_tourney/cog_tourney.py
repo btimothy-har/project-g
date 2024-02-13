@@ -320,7 +320,7 @@ class LegendsTourney(commands.Cog):
                 embeds = await self.leaderboard_previous_season_embed()
             
             else:
-                embeds = await self.leaderboard_previous_season_embed()
+                embeds = await self.leaderboard_future_season_embed()
             
             new_msg = []
             messages = await self.config.lb_messages()
