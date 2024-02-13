@@ -45,8 +45,7 @@ class LegendsTourney(commands.Cog):
             "info_channel": 1206586918066978826 if bot.user.id == 828838353977868368 else 0,
             "info_message": 0,
             "lb_channel": 1206596691151552553 if bot.user.id == 828838353977868368 else 0,
-            "lb_messages": [],
-            "season": "2-2024",
+            "lb_messages": []
             }
 
         self._update_lock = asyncio.Lock()
@@ -78,7 +77,6 @@ class LegendsTourney(commands.Cog):
     async def cog_load(self):
         self._info_channel = await self.config.info_channel()
         self._lb_channel = await self.config.lb_channel()
-        #self._tourney_season = await self.config.season()
         self._tourney_season = '3-2024'
 
         asyncio.create_task(self.load_info_embed())
@@ -157,12 +155,9 @@ class LegendsTourney(commands.Cog):
         tournament_db = bot_client.coc_db.db__event_participant.find(db_query)
 
         participants = []
-        n = 100
         async for participant in tournament_db:
-            while len(participants) <= n:
-                player = await self.fetch_participant(participant['tag'])
-                player.legend_statistics.current_season.trophies = random.randint(5000,7000)
-                participants.append(player)
+            player = await self.fetch_participant(participant['tag'])
+            participants.append(player)
         return participants
     
     async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
@@ -282,7 +277,7 @@ class LegendsTourney(commands.Cog):
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
-                    message=f"### {EmojisLeagues.LEGEND_LEAGUE} {days_difference} to go!"
+                    message=f"### {EmojisLeagues.LEGEND_LEAGUE} {days_difference} Days to go!"
                         + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
                         + f"\nTotal Participants: {len(elig_participants):,}\n\n"
                         + player_text,
@@ -313,12 +308,10 @@ class LegendsTourney(commands.Cog):
             
             # is current season
             if self._tourney_season == last_season.next_season().id:
-                embeds = await self.leaderboard_current_season_embed()                
-            
+                embeds = await self.leaderboard_current_season_embed()            
             # update for previous season
             elif self._tourney_season == last_season.id:
-                embeds = await self.leaderboard_previous_season_embed()
-            
+                embeds = await self.leaderboard_previous_season_embed()            
             else:
                 embeds = await self.leaderboard_future_season_embed()
             
