@@ -221,7 +221,7 @@ class TournamentApplicationMenu(discord.ui.View):
         add_link_view = RegistrationMenu(interaction,interaction.user)
         await add_link_view._start_add_link()
     
-    async def _callback_cancel(self,interaction:discord.Interaction,button:discord.ui.Button):
+    async def _callback_check(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         
         chk_registration = await self.tournament_cog.fetch_participant_for_user(interaction.user.id)
