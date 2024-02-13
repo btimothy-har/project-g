@@ -211,7 +211,44 @@ class LegendsTourney(commands.Cog):
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
-                    message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n\n"
+                    message=f"Total Participants: {len(elig_participants):,}"
+                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n\n"
+                        + player_text,
+                    show_author=False
+                    )
+            else:
+                embed = await clash_embed(
+                    context=self.bot,
+                    message=player_text,
+                    show_author=False
+                    )
+            embeds.append(embed)
+        return embeds
+
+    async def leaderboard_previous_season_embed(self):
+        participants = await self.fetch_all_participants()
+        elig_participants = [p for p in participants if getattr(getattr(p,'legend_statistics',None),'previous_season',None)]
+        elig_participants.sort(key=lambda x: x.legend_statistics.previous_season.trophies,reverse=True)
+
+        #chunk the list into 30s
+        chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
+        c_iter = AsyncIter(chunks)
+
+        embeds = []
+        async for i,chunk in c_iter.enumerate(start=1):
+            player_text = "\n".join([
+                f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.previous_season.trophies:,}` <@{p.discord_user}>" for p in chunk])
+            if i == 1:
+                season = await aClashSeason(self._tourney_season)
+                days_difference = pendulum.now().diff(season.trophy_season_start).in_days()
+                season_length = season.trophy_season_end.diff(season.trophy_season_start).in_days()
+
+                embed = await clash_embed(
+                    context=self.bot,
+                    title=f"1LxAG Legends League Tournament",
+                    message=f"### Day {days_difference} of {season_length}"
+                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
+                        + f"\nTotal Participants: {len(elig_participants):,}\n\n"
                         + player_text,
                     show_author=False
                     )
@@ -239,32 +276,43 @@ class LegendsTourney(commands.Cog):
             # is current season
             if self._tourney_season == last_season.next_season().id:
                 embeds = await self.leaderboard_current_season_embed()                
-                messages = await self.config.lb_messages()
-                if len(messages) == 0:
-                    new_msg = []
-                    e_iter = AsyncIter(embeds)
-                    async for i,embed in e_iter.enumerate(start=1):
-                        message = await self.lb_channel.send(embed=embed)
-                        new_msg.append(message.id)
-                    await self.config.lb_messages.set(new_msg)
-                else:
-                    e_iter = AsyncIter(embeds)
-                    async for i,embed in e_iter.enumerate(start=1):
-                        try:
-                            message = await self.lb_channel.fetch_message(messages[i-1])
-                        except discord.NotFound:
-                            message = await self.lb_channel.send(embed=embed)
-                            messages[i-1] = message.id
-                        except IndexError:
-                            message = await self.lb_channel.send(embed=embed)
-                            messages.append(message.id)
-                        else:
-                            await message.edit(embed=embed)
-                    await self.config.lb_messages.set(messages)
             
             # update for previous season
             if self._tourney_season == last_season.id:
-                return
+                embeds = await self.leaderboard_previous_season_embed()
+            
+            new_msg = []
+            messages = await self.config.lb_messages()
+            if len(messages) == 0:                    
+                e_iter = AsyncIter(embeds)
+                async for i,embed in e_iter.enumerate(start=1):
+                    message = await self.lb_channel.send(embed=embed)
+                    new_msg.append(message.id)
+            else:
+                e_iter = AsyncIter(embeds)
+                async for i,embed in e_iter.enumerate(start=1):
+                    try:
+                        message = await self.lb_channel.fetch_message(messages[i-1])
+                    except discord.NotFound:
+                        message = await self.lb_channel.send(embed=embed)
+                        new_msg.append(message.id)
+                    except IndexError:
+                        message = await self.lb_channel.send(embed=embed)
+                        new_msg.append(message.id)
+                    else:
+                        await message.edit(embed=embed)
+                        new_msg.append(message.id)
+                
+                extra_msgs = [m for m in messages if m not in new_msg]
+                m_iter = AsyncIter(extra_msgs)
+                async for m_id in m_iter:
+                    try:
+                        message = await self.lb_channel.fetch_message(m_id)
+                    except discord.NotFound:
+                        pass
+                    else:
+                        await message.delete()
+            await self.config.lb_messages.set(new_msg)
     
     async def update_info_embed(self):
         pass

@@ -114,6 +114,22 @@ class aClashSeason(AwaitLoader):
         return pendulum.datetime(self.season_start.add(months=1).year, self.season_start.add(months=1).month, 1, 8)
     
     @property
+    def trophy_season_start(self):
+        last_day_of_last_month = pendulum.datetime(self.season_start.subtract(months=1).year, self.season_start.subtract(months=1).month, 1).end_of('month')
+        for day in range(last_day_of_last_month.day, 0, -1):
+            date = pendulum.datetime(last_day_of_last_month.year, last_day_of_last_month.month, day,5,0,0)
+            if date.day_of_week == pendulum.MONDAY:
+                return date
+                
+    @property
+    def trophy_season_end(self):
+        last_day_of_this_month = pendulum.datetime(self.season_start.year, self.season_start.month, 1).end_of('month')
+        for day in range(last_day_of_this_month.day, 0, -1):
+            date = pendulum.datetime(last_day_of_this_month.year, last_day_of_this_month.month, day,5,0,0)
+            if date.day_of_week == pendulum.MONDAY:
+                return date
+    
+    @property
     def cwl_start(self):
         return self.season_start
     
