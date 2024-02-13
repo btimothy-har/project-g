@@ -228,7 +228,7 @@ class TournamentApplicationMenu(discord.ui.View):
 
         if chk_registration:
             embed = await clash_embed(
-                context=self.ctx,
+                context=interaction,
                 message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
                     + f"\n\nIf you would like to cancel your registration, click on the button below.",
                 )
@@ -236,7 +236,7 @@ class TournamentApplicationMenu(discord.ui.View):
             await interaction.followup.send(embed=embed,view=cancel_view,ephemeral=True)
         else:
             embed = await clash_embed(
-                context=self.ctx,
+                context=interaction,
                 message=f"You are currently **NOT** registered for the Tournament."
                     + f"\n\nIf you would like to register, click on the Register button above.",
                 )
