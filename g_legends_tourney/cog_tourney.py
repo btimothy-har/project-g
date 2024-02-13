@@ -44,7 +44,7 @@ class LegendsTourney(commands.Cog):
         default_global = {
             "info_channel": 1206586918066978826 if bot.user.id == 828838353977868368 else 0,
             "info_message": 0,
-            "lb_channel": 1206586918066978826 if bot.user.id == 828838353977868368 else 0,
+            "lb_channel": 1206596691151552553 if bot.user.id == 828838353977868368 else 0,
             "lb_messages": [],
             "season": "2-2024",
             }
