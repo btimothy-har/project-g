@@ -90,7 +90,7 @@ class LegendsTourney(commands.Cog):
         embeds = []
         embed = await clash_embed(
             context=self.bot,
-            title="**1Legion & The Assassins Guild proudly presents...**",
+            title="*1Legion & The Assassins Guild proudly presents...*",
             message=f"## {EmojisLeagues.LEGEND_LEAGUE} Legends League Tournament: March 2024 {EmojisLeagues.LEGEND_LEAGUE}"
                 + f"\n\n### __Cash Prizes__"
                 + f"\n🥇 **1st**: USD 50"
@@ -100,7 +100,7 @@ class LegendsTourney(commands.Cog):
                 + f"\n**6th - 10th**: USD 15"
                 + f"\n**11th - 15th**: USD 10"
                 + f"\n\n*Cash Prizes will be distributed via PayPal. You __must__ have a PayPal account to receive your prizes. Winners will be contacted after the tournament.*"
-                + f"\n\n### __Gold Pass Prizes__"
+                + f"\n### __Gold Pass Prizes__"
                 + f"\n{EmojisTownHall.TH16} **TH16 Players**"
                 + f"\nAll Players who finish above 5,700 trophies will be eligible for a lucky draw. 10 lucky winners will be selected for a Gold Pass!"
                 + f"\n\n{EmojisTownHall.TH13} {EmojisTownHall.TH14} {EmojisTownHall.TH15} **TH13 - TH15 Players**"
@@ -119,7 +119,8 @@ class LegendsTourney(commands.Cog):
                 + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
                 + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
                 + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
-                + f"\n\n### __Designated Clans__",
+                + f"\n\n### Designated Clans"
+                + f"- [Assassins #92G9J8CG](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%2392G9J8CG)",
             show_author=False)
         embeds.append(embed_2)
         
