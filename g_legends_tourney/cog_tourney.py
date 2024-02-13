@@ -208,11 +208,16 @@ class LegendsTourney(commands.Cog):
             player_text = "\n".join([
                 f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.current_season.trophies:,}` <@{p.discord_user}>" for p in chunk])
             if i == 1:
+                season = await aClashSeason(self._tourney_season)
+                days_difference = pendulum.now().diff(season.trophy_season_start).in_days()
+                season_length = season.trophy_season_end.diff(season.trophy_season_start).in_days()
+
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
-                    message=f"Total Participants: {len(elig_participants):,}"
-                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n\n"
+                    message=f"### Day {days_difference} of {season_length}"
+                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
+                        + f"\nTotal Participants: {len(elig_participants):,}\n\n"
                         + player_text,
                     show_author=False
                     )
@@ -239,15 +244,10 @@ class LegendsTourney(commands.Cog):
             player_text = "\n".join([
                 f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.previous_season.trophies:,}` <@{p.discord_user}>" for p in chunk])
             if i == 1:
-                season = await aClashSeason(self._tourney_season)
-                days_difference = pendulum.now().diff(season.trophy_season_start).in_days()
-                season_length = season.trophy_season_end.diff(season.trophy_season_start).in_days()
-
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
-                    message=f"### Day {days_difference} of {season_length}"
-                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
+                    message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
                         + f"\nTotal Participants: {len(elig_participants):,}\n\n"
                         + player_text,
                     show_author=False
@@ -264,7 +264,9 @@ class LegendsTourney(commands.Cog):
     @tasks.loop(minutes=15.0)
     async def tourney_update_loop(self):
         if self._update_lock.locked():
-            return        
+            return
+        
+        await self.bot.wait_until_ready()
         
         async with self._update_lock:
 
