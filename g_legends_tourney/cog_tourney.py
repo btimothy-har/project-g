@@ -17,7 +17,8 @@ from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.players.player import aPlayer
 from coc_main.discord.add_delete_link import AddLinkMenu
-from coc_main.utils.components import clash_embed, DiscordButton, DiscordSelectMenu, DiscordModal
+from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal
+from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisLeagues
 from coc_main.exceptions import ClashAPIError, InvalidTag
 
@@ -107,8 +108,15 @@ class LegendsTourney(commands.Cog):
         
         return player
     
-    async def register_participant(self,tag:str,user_id:int) -> aPlayer:
+    async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
+        db_query = {'event_id':self.event_id,'discord_user':user_id,'is_participant':True}
+        tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)
 
+        if not tournament_db:
+            return None
+        return await self.fetch_participant(tournament_db['tag'])
+    
+    async def register_participant(self,tag:str,user_id:int) -> aPlayer:
         db_query = {'event_id':self.event_id,'tag':tag}
         await bot_client.coc_db.db__event_participant.update_one(
             db_query,
@@ -121,6 +129,14 @@ class LegendsTourney(commands.Cog):
             upsert=True
             )
         return await self.fetch_participant(tag)
+    
+    async def withdraw_participant(self,user_id:int) -> Optional[aPlayer]:
+        db_query = {'event_id':self.event_id,'discord_user':user_id}
+        await bot_client.coc_db.db__event_participant.update_many(
+            db_query,
+            {'$set':{'is_participant': False}},
+            )
+        return await self.fetch_participant_for_user(user_id)
     
     @tasks.loop(minutes=15.0)
     async def tourney_update_loop(self):
@@ -162,12 +178,25 @@ class TournamentApplicationMenu(discord.ui.View):
         return bot_client.bot.get_cog("ClashOfClansClient")
     
     @property
+    def tournament_cog(self) -> LegendsTourney:
+        return bot_client.bot.get_cog("LegendsTourney")
+    
+    @property
     def button_registration(self) -> DiscordButton:
         return DiscordButton(
             function=self._callback_registration,
             label="Register",
             emoji=EmojisLeagues.LEGEND_LEAGUE,
             style=discord.ButtonStyle.blurple
+            )
+    
+    @property
+    def button_cancel(self) -> DiscordButton:
+        return DiscordButton(
+            function=self._callback_check,
+            label="Cancel/Check",
+            emoji=EmojisUI.REFRESH,
+            style=discord.ButtonStyle.grey
             )
 
     async def on_timeout(self):
@@ -176,6 +205,7 @@ class TournamentApplicationMenu(discord.ui.View):
     def reload_items(self):
         self.clear_items()
         self.add_item(self.button_registration)
+        self.add_item(self.button_cancel)
     
     async def _callback_registration(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
@@ -185,6 +215,29 @@ class TournamentApplicationMenu(discord.ui.View):
         
         add_link_view = RegistrationMenu(interaction,interaction.user)
         await add_link_view._start_add_link()
+    
+    async def _callback_cancel(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
+        chk_registration = await self.tournament_cog.fetch_participant_for_user(interaction.user.id)
+
+        if chk_registration:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
+                    + f"\n\nIf you would like to cancel your registration, click on the button below.",
+                )
+            cancel_view = CancelRegistrationMenu(interaction,interaction.user)
+            await interaction.followup.send(embed=embed,view=cancel_view,ephemeral=True)
+        else:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"You are currently **NOT** registered for the Tournament."
+                    + f"\n\nIf you would like to register, click on the Register button above.",
+                )
+            await interaction.followup.send(embed=embed,ephemeral=True)
+        
+        return
 
 ##################################################
 #####
@@ -192,7 +245,6 @@ class TournamentApplicationMenu(discord.ui.View):
 #####
 ##################################################
 class RegistrationMenu(AddLinkMenu):
-
     def __init__(self,context:discord.Interaction,member:discord.Member):
         super().__init__(context,member)
         self.add_link_modal.title = 'Tournament Registration'
@@ -201,14 +253,6 @@ class RegistrationMenu(AddLinkMenu):
     def tournament_cog(self) -> LegendsTourney:
         return bot_client.bot.get_cog("LegendsTourney")
     
-    async def interaction_check(self,interaction:discord.Interaction):
-        if interaction.user.id != self.member.id:
-            await interaction.response.send_message(
-                content="This doesn't belong to you!", ephemeral=True
-                )
-            return False
-        return True
-    
     ##################################################
     #####
     ##### STANDARD APPLICATION FUNCTIONS
@@ -216,6 +260,17 @@ class RegistrationMenu(AddLinkMenu):
     ##################################################
     async def _start_add_link(self):
         self.is_active = True
+
+        chk_participant = await self.tournament_cog.fetch_participant_for_user(self.member.id)
+        if chk_participant:
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"You are already registered for the Tournament with the account **{chk_participant.tag} {chk_participant.clean_name}**."
+                    + f"\n\nPlease cancel your registration before registering with another account.",
+                success=False
+                )
+            return await self.ctx.followup.send(embed=embed,ephemeral=True)
+
         embed = await clash_embed(
             context=self.ctx,
             message=f"To register your Clash of Clans account for the Tournament, you will need:"
@@ -261,7 +316,7 @@ class RegistrationMenu(AddLinkMenu):
             verify = False
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account {self.add_link_account.tag} {self.add_link_account.name} is already registered as a participant.",
+                message=f"The account **{self.add_link_account.tag} {self.add_link_account.name}** is already registered as a participant.",
                 success=False
                 )
             await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
@@ -271,7 +326,7 @@ class RegistrationMenu(AddLinkMenu):
             await self.tournament_cog.register_participant(tag,self.member.id)
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account **{self.add_link_account.tag}** is now registered for the 1LxGuild Legends League Tournament!",
+                message=f"The account **{self.add_link_account.tag} {self.add_link_account.name}** is now registered for the 1LxGuild Legends League Tournament! All the best!",
                 success=True
                 )
             await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
@@ -282,4 +337,62 @@ class RegistrationMenu(AddLinkMenu):
                 success=False
                 )
             await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
+        self.stop()
+
+##################################################
+#####
+##### USER CANCEL REGISTRATION MENU
+#####
+##################################################
+class CancelRegistrationMenu(DefaultView):
+    def __init__(self,context:discord.Interaction,member:discord.Member):
+
+        self.button_cancel_registration = DiscordButton(
+            function=self._callback_cancel_registration,
+            label="Cancel Registration",
+            emoji=EmojisUI.CANCEL,
+            style=discord.ButtonStyle.red
+            )
+        self.button_exit = DiscordButton(
+            function=self._callback_exit,
+            label="Exit",
+            emoji=EmojisUI.EXIT,
+            style=discord.ButtonStyle.grey
+            )
+        
+        super().__init__(context,timeout=120)
+        self.add_item(self.button_cancel_registration)
+        self.add_item(self.button_exit)
+        self.is_active = True
+
+    @property
+    def tournament_cog(self) -> LegendsTourney:
+        return bot_client.bot.get_cog("LegendsTourney")
+    
+    ##################################################
+    #####
+    ##### STANDARD APPLICATION FUNCTIONS
+    #####
+    ##################################################
+    async def _callback_cancel_registration(self,interaction:discord.Interaction,button:discord.ui.Button):
+
+        await interaction.response.defer(ephemeral=True)
+        self.is_active = False
+        await self.tournament_cog.withdraw_participant(interaction.user.id)
+        embed = await clash_embed(
+            context=self.ctx,
+            message=f"Your registration for the Tournament has been cancelled.",
+            success=True
+            )
+        await interaction.followup.edit_message(interaction.message.id,embed=embed,view=None)
+    
+    async def _callback_exit(self,interaction:discord.Interaction,button:discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        self.is_active = False
+        embed = await clash_embed(
+            context=self.ctx,
+            message=f"Registration closed.",
+            success=True
+            )
+        await interaction.followup.edit_message(interaction.message.id,embed=embed,view=None)
         self.stop()
