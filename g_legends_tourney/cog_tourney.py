@@ -79,7 +79,7 @@ class LegendsTourney(commands.Cog):
         self._info_channel = await self.config.info_channel()
         self._lb_channel = await self.config.lb_channel()
         #self._tourney_season = await self.config.season()
-        self._tourney_season = '1-2024'
+        self._tourney_season = '3-2024'
 
         asyncio.create_task(self.load_info_embed())
 
@@ -207,7 +207,7 @@ class LegendsTourney(commands.Cog):
         embeds = []
         async for i,chunk in c_iter.enumerate(start=1):
             player_text = "\n".join([
-                f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.current_season.trophies:,}` <@{p.discord_user}>" for p in chunk if p.legend_statistics.current_season.trophies >= 5000])
+                f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {p.legend_statistics.current_season.trophies:<6,}` <@{p.discord_user}>" for p in chunk if p.legend_statistics.current_season.trophies >= 5000])
             if i == 1:
                 season = await aClashSeason(self._tourney_season)
                 days_difference = pendulum.now().diff(season.trophy_season_start).in_days() + 1
@@ -243,12 +243,47 @@ class LegendsTourney(commands.Cog):
         embeds = []
         async for i,chunk in c_iter.enumerate(start=1):
             player_text = "\n".join([
-                f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.previous_season.trophies:,}` <@{p.discord_user}>" for p in chunk])
+                f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {p.legend_statistics.previous_season.trophies:<6,}` <@{p.discord_user}>" for p in chunk])
             if i == 1:
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
                     message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
+                        + f"\nTotal Participants: {len(elig_participants):,}\n\n"
+                        + player_text,
+                    show_author=False
+                    )
+            else:
+                embed = await clash_embed(
+                    context=self.bot,
+                    message=player_text,
+                    show_author=False
+                    )
+            embeds.append(embed)
+        return embeds
+
+    async def leaderboard_future_season_embed(self):
+        participants = await self.fetch_all_participants()
+        elig_participants = participants
+        elig_participants.sort(key=lambda x: x.trophies,reverse=True)
+
+        #chunk the list into 30s
+        chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
+        c_iter = AsyncIter(chunks)
+
+        embeds = []
+        async for i,chunk in c_iter.enumerate(start=1):
+            player_text = "\n".join([
+                f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {'':<6,}` <@{p.discord_user}>" for p in chunk])
+            if i == 1:
+                season = await aClashSeason(self._tourney_season)
+                days_difference = pendulum.now().diff(season.trophy_season_start,abs=False).in_days()
+
+                embed = await clash_embed(
+                    context=self.bot,
+                    title=f"1LxAG Legends League Tournament",
+                    message=f"### {EmojisLeagues.LEGEND_LEAGUE} {days_difference} to go!"
+                        + f"\nLast Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>"
                         + f"\nTotal Participants: {len(elig_participants):,}\n\n"
                         + player_text,
                     show_author=False
@@ -281,7 +316,10 @@ class LegendsTourney(commands.Cog):
                 embeds = await self.leaderboard_current_season_embed()                
             
             # update for previous season
-            if self._tourney_season == last_season.id:
+            elif self._tourney_season == last_season.id:
+                embeds = await self.leaderboard_previous_season_embed()
+            
+            else:
                 embeds = await self.leaderboard_previous_season_embed()
             
             new_msg = []
