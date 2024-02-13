@@ -41,6 +41,7 @@ class BasicPlayer(AwaitLoader):
     def __init__(self,tag:str):
         self.tag = coc.utils.correct_tag(tag)
         self._attributes = _PlayerAttributes(tag=self.tag)
+        self._discord_user = None
         self.home_clan = None
 
     def __str__(self):
@@ -113,7 +114,12 @@ class BasicPlayer(AwaitLoader):
     
     @property
     def discord_user(self) -> int:
+        if self._discord_user:
+            return self._discord_user
         return self._attributes.discord_user
+    @discord_user.setter
+    def discord_user(self,value:int):
+        self._discord_user = value
     
     @property
     def is_member(self) -> bool:

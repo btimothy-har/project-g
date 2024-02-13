@@ -714,7 +714,7 @@ class ClanGamesLeaderboard(Leaderboard):
                         name=f"{clan.emoji} **{clan.clean_name}**",
                         value=f"`{'':<3}{'Score':>6}{'Time':>13}{'':<2}`\n"
                             + "\n".join([
-                            f"`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.name)}"
+                            f"`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.clean_name)}"
                             for i,p in enumerate(wl_players[:3],start=1)]),
                         inline=False
                         )
