@@ -119,7 +119,7 @@ class LegendsTourney(commands.Cog):
                 + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
                 + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
                 + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
-                + f"\n\n### Designated Clans"
+                + f"\n### Designated Clans"
                 + f"\n- [Assassins #92G9J8CG](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%2392G9J8CG)",
             show_author=False)
         embeds.append(embed_2)
@@ -258,21 +258,27 @@ class TournamentApplicationMenu(discord.ui.View):
         chk_registration = await self.tournament_cog.fetch_participant_for_user(interaction.user.id)
 
         if chk_registration:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
-                    + f"\n\nIf you would like to cancel your registration, click on the button below.",
-                )
-            cancel_view = CancelRegistrationMenu(interaction,interaction.user)
-            await interaction.followup.send(embed=embed,view=cancel_view,ephemeral=True)
+            if pendulum.now().int_timestamp < 1709096400:
+                embed = await clash_embed(
+                    context=interaction,
+                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
+                        + f"\n\nIf you would like to cancel your registration, click on the button below.",
+                    )
+                cancel_view = CancelRegistrationMenu(interaction,interaction.user)
+                await interaction.followup.send(embed=embed,view=cancel_view,ephemeral=True)
+            else:
+                embed = await clash_embed(
+                    context=interaction,
+                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.",
+                    )
+                await interaction.followup.send(embed=embed,ephemeral=True)
         else:
             embed = await clash_embed(
                 context=interaction,
                 message=f"You are currently **NOT** registered for the Tournament."
                     + f"\n\nIf you would like to register, click on the Register button above.",
                 )
-            await interaction.followup.send(embed=embed,ephemeral=True)
-        
+            await interaction.followup.send(embed=embed,ephemeral=True)        
         return
 
 ##################################################
