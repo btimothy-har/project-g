@@ -120,7 +120,7 @@ class LegendsTourney(commands.Cog):
                 + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
                 + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n\n### Designated Clans"
-                + f"- [Assassins #92G9J8CG](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%2392G9J8CG)",
+                + f"\n- [Assassins #92G9J8CG](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%2392G9J8CG)",
             show_author=False)
         embeds.append(embed_2)
         
