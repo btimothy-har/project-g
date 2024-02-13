@@ -86,16 +86,21 @@ class LegendsTourney(commands.Cog):
             message = await self.info_channel.fetch_message(info_message_id)
         except:
             message = None
-        if not message:
-            embed = await clash_embed(
-                context=self.bot,
-                title="1LxGuild Legends League Tournament",
-                message="### League Season: March 2024",
-                show_author=False
-                )
-            view = TournamentApplicationMenu()
+        
+        embed = await clash_embed(
+            context=self.bot,
+            title="1LxGuild Legends League Tournament",
+            message="### League Season: March 2024",
+            show_author=False
+            )
+        view = TournamentApplicationMenu()
+
+        if not message:            
             message = await self.info_channel.send(embed=embed,view=view)
             await self.config.info_message.set(message.id)
+        
+        if message:
+            await message.edit(embed=embed,view=view)
         
     async def fetch_participant(self,tag:str) -> aPlayer:
         player = await self.client.fetch_player(tag)
