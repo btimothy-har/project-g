@@ -1,4 +1,5 @@
 import coc
+import random
 import discord
 import asyncio
 import hashlib
@@ -155,9 +156,12 @@ class LegendsTourney(commands.Cog):
         tournament_db = bot_client.coc_db.db__event_participant.find(db_query)
 
         participants = []
+        n = 100
         async for participant in tournament_db:
-            player = await self.fetch_participant(participant['tag'])
-            participants.append(player)
+            while len(participants) <= n:
+                player = await self.fetch_participant(participant['tag'])
+                player.legend_statistics.current_season.trophies = random.randint(5000,7000)
+                participants.append(player)
         return participants
     
     async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
@@ -202,12 +206,12 @@ class LegendsTourney(commands.Cog):
         embeds = []
         async for i,chunk in c_iter.enumerate(start=1):
             player_text = "\n".join([
-                f"{p.town_hall.emoji} `{p.clean_name:<30} {p.legend_statistics.current_season.trophies:,}`" for p in chunk])
+                f"{p.town_hall.emoji} `{p.clean_name:<20} {p.legend_statistics.current_season.trophies:,}` <@{p.discord_user}>" for p in chunk])
             if i == 1:
                 embed = await clash_embed(
                     context=self.bot,
                     title=f"1LxAG Legends League Tournament",
-                    message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n"
+                    message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n\n"
                         + player_text,
                     show_author=False
                     )
