@@ -86,12 +86,13 @@ class LegendsTourney(commands.Cog):
             message = await self.info_channel.fetch_message(info_message_id)
         except:
             message = None
-        
+
+        embeds = []
         embed = await clash_embed(
             context=self.bot,
             title="**1Legion & The Assassins Guild proudly presents...**",
             message=f"## {EmojisLeagues.LEGEND_LEAGUE} Legends League Tournament: March 2024 {EmojisLeagues.LEGEND_LEAGUE}"
-                + f"\n\n###__Cash Prizes__"
+                + f"\n\n### __Cash Prizes__"
                 + f"\n🥇 **1st**: USD 50"
                 + f"\n🥈 **2nd**: USD 35"
                 + f"\n🥉 **3rd**: USD 25"
@@ -99,30 +100,37 @@ class LegendsTourney(commands.Cog):
                 + f"\n**6th - 10th**: USD 15"
                 + f"\n**11th - 15th**: USD 10"
                 + f"\n\n*Cash Prizes will be distributed via PayPal. You __must__ have a PayPal account to receive your prizes. Winners will be contacted after the tournament.*"
-                + f"\n\n###__Gold Pass Prizes__"
+                + f"\n\n### __Gold Pass Prizes__"
                 + f"\n{EmojisTownHall.TH16} **TH16 Players**"
                 + f"\nAll Players who finish above 5,700 trophies will be eligible for a lucky draw. 10 lucky winners will be selected for a Gold Pass!"
                 + f"\n\n{EmojisTownHall.TH13} {EmojisTownHall.TH14} {EmojisTownHall.TH15} **TH13 - TH15 Players**"
                 + f"\nThe top 5 finishing players in each Town Hall level will receive a Gold Pass."
-                + f"\n\n*Gold Passes are distributed via The Guild's inventory system. Details will be provided after the tournament.*"
-                + f"\n\n###__Rules & Regulations__"
-                + f"\n1. This Tournament is open to the Clash of Clans Community."
-                + f"\n2. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
-                + f"\n3. Withdrawing from the Tournament is allowed any time before <t:1709096400:f>."
-                + f"\n4. You must stay and join in The Guild's Discord Server to participate in the Tournament."
-                + f"\n5. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
-                + f"\n6. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
-                + f"\n\n###__Designated Clans__",
+                + f"\n\n*Gold Passes are distributed via The Guild's inventory system. Details will be provided after the tournament.*",
             show_author=False)
+        embeds.append(embed)
+
+        embed_2 = await clash_embed(
+            context=self.bot,
+            title="**Rules & Regulations**",
+            message=f"1. The Tournament will be held during the in-game March 2024 Legend League Season."
+                + f"\n2. This Tournament is open to the Clash of Clans Community."
+                + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
+                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:1709096400:f>."
+                + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
+                + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
+                + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
+                + f"\n\n### __Designated Clans__",
+            show_author=False)
+        embeds.append(embed_2)
         
         view = TournamentApplicationMenu()
 
         if not message:            
-            message = await self.info_channel.send(embed=embed,view=view)
+            message = await self.info_channel.send(embeds=embeds,view=view)
             await self.config.info_message.set(message.id)
         
         if message:
-            await message.edit(embed=embed,view=view)
+            await message.edit(embeds=embeds,view=view)
         
     async def fetch_participant(self,tag:str) -> aPlayer:
         player = await self.client.fetch_player(tag)
