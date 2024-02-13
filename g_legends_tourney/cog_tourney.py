@@ -10,6 +10,7 @@ from discord.ext import tasks
 
 from redbot.core import Config, commands, app_commands
 from redbot.core.commands import Context
+from redbot.core.utils import AsyncIter
 from redbot.core.bot import Red
 
 from coc_main.api_client import BotClashClient as client
@@ -79,6 +80,11 @@ class LegendsTourney(commands.Cog):
         self._tourney_season = await self.config.season()
 
         asyncio.create_task(self.load_info_embed())
+
+        self.tourney_update_loop.start()
+    
+    async def cog_unload(self):
+        self.tourney_update_loop.cancel()
     
     async def load_info_embed(self):
         info_message_id = await self.config.info_message()
@@ -90,7 +96,7 @@ class LegendsTourney(commands.Cog):
         embeds = []
         embed = await clash_embed(
             context=self.bot,
-            title="*1Legion & The Assassins Guild proudly presents...*",
+            title="*1LegioN & The Assassins Guild proudly presents...*",
             message=f"## {EmojisLeagues.LEGEND_LEAGUE} Legends League Tournament: March 2024 {EmojisLeagues.LEGEND_LEAGUE}"
                 + f"\n\n### __Cash Prizes__"
                 + f"\n🥇 **1st**: USD 50"
@@ -144,6 +150,16 @@ class LegendsTourney(commands.Cog):
         
         return player
     
+    async def fetch_all_participants(self) -> List[aPlayer]:
+        db_query = {'event_id':self.event_id,'is_participant':True}
+        tournament_db = bot_client.coc_db.db__event_participant.find(db_query)
+
+        participants = []
+        async for participant in tournament_db:
+            player = await self.fetch_participant(participant['tag'])
+            participants.append(player)
+        return participants
+    
     async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
         db_query = {'event_id':self.event_id,'discord_user':user_id,'is_participant':True}
         tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)
@@ -173,12 +189,41 @@ class LegendsTourney(commands.Cog):
             {'$set':{'is_participant': False}},
             )
         return await self.fetch_participant_for_user(user_id)
+
+    async def leaderboard_current_season_embed(self):
+        participants = await self.fetch_all_participants()
+        elig_participants = [p for p in participants if getattr(getattr(p,'legend_statistics',None),'current_season',None)]
+        elig_participants.sort(key=lambda x: x.legend_statistics.current_season.trophies,reverse=True)
+
+        #chunk the list into 30s
+        chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
+        c_iter = AsyncIter(chunks)
+
+        embeds = []
+        async for i,chunk in c_iter.enumerate(start=1):
+            player_text = "\n".join([
+                f"{p.town_hall.emoji} `{p.clean_name:<30} {p.legend_statistics.current_season.trophies:,}`" for p in chunk])
+            if i == 1:
+                embed = await clash_embed(
+                    context=self.bot,
+                    title=f"1LxAG Legends League Tournament",
+                    message=f"Last Refreshed: <t:{int(pendulum.now().int_timestamp)}:R>\n"
+                        + player_text,
+                    show_author=False
+                    )
+            else:
+                embed = await clash_embed(
+                    context=self.bot,
+                    message=player_text,
+                    show_author=False
+                    )
+            embeds.append(embed)
+        return embeds
     
     @tasks.loop(minutes=15.0)
     async def tourney_update_loop(self):
         if self._update_lock.locked():
-            return
-        
+            return        
         
         async with self._update_lock:
 
@@ -189,7 +234,29 @@ class LegendsTourney(commands.Cog):
             
             # is current season
             if self._tourney_season == last_season.next_season().id:
-                return
+                embeds = await self.leaderboard_current_season_embed()                
+                messages = await self.config.lb_messages()
+                if len(messages) == 0:
+                    new_msg = []
+                    e_iter = AsyncIter(embeds)
+                    async for i,embed in e_iter.enumerate(start=1):
+                        message = await self.lb_channel.send(embed=embed)
+                        new_msg.append(message.id)
+                    await self.config.lb_messages.set(new_msg)
+                else:
+                    e_iter = AsyncIter(embeds)
+                    async for i,embed in e_iter.enumerate(start=1):
+                        try:
+                            message = await self.lb_channel.fetch_message(messages[i-1])
+                        except discord.NotFound:
+                            message = await self.lb_channel.send(embed=embed)
+                            messages[i-1] = message.id
+                        except IndexError:
+                            message = await self.lb_channel.send(embed=embed)
+                            messages.append(message.id)
+                        else:
+                            await message.edit(embed=embed)
+                    await self.config.lb_messages.set(messages)
             
             # update for previous season
             if self._tourney_season == last_season.id:
