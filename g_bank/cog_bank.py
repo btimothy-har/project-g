@@ -359,11 +359,6 @@ class Bank(commands.Cog):
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
         
-        member = aMember(user.id)
-        await member.load()
-        if not member.is_member:
-            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
-        
         item = await InventoryItem.get_by_id(item_id)
         if not item.in_inventory:
             return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
@@ -444,11 +439,6 @@ class Bank(commands.Cog):
             
             if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
                 return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
-            
-            member = aMember(user.id)
-            await member.load()
-            if not member.is_member:
-                return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
             
             item = await InventoryItem.get_by_id(item_id)
             if not item.in_inventory:
