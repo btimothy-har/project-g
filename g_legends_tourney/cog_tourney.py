@@ -81,7 +81,10 @@ class LegendsTourney(commands.Cog):
     
     async def load_info_embed(self):
         info_message_id = await self.config.info_message()
-        message = await self.info_channel.fetch_message(info_message_id)
+        try:
+            message = await self.info_channel.fetch_message(info_message_id)
+        except:
+            message = None
         if not message:
             embed = await clash_embed(
                 context=self.bot,
