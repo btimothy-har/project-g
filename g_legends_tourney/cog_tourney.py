@@ -89,7 +89,7 @@ class LegendsTourney(commands.Cog):
             embed = await clash_embed(
                 context=self.bot,
                 title="1LxGuild Legends League Tournament",
-                description="### League Season: March 2024",
+                message="### League Season: March 2024",
                 show_author=False
                 )
             view = TournamentApplicationMenu()
