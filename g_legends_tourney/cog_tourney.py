@@ -355,7 +355,7 @@ class CancelRegistrationMenu(DefaultView):
         self.button_cancel_registration = DiscordButton(
             function=self._callback_cancel_registration,
             label="Cancel Registration",
-            emoji=EmojisUI.CANCEL,
+            emoji=EmojisUI.NO,
             style=discord.ButtonStyle.red
             )
         self.button_exit = DiscordButton(
