@@ -90,42 +90,29 @@ class LegendsTourney(commands.Cog):
         embed = await clash_embed(
             context=self.bot,
             title="**1Legion & The Assassins Guild proudly presents...**",
-            message=f"### {EmojisLeagues.LEGEND_LEAGUE} Legends League Tournament: March 2024 {EmojisLeagues.LEGEND_LEAGUE}",
-            show_author=False
-            )
-        embed.add_field(
-            name=f"**Cash Prizes**",
-            value=f"\n**1st**: USD 50"
-                + f"\n**2nd**: USD 35"
-                + f"\n**3rd**: USD 25"
-                + f"\n\n**4th - 5th**: USD 20"
-                + f"\n\n**6th - 10th**: USD 15"
-                + f"\n\n**11th - 15th**: USD 10"
+            message=f"# {EmojisLeagues.LEGEND_LEAGUE} Legends League Tournament: March 2024 {EmojisLeagues.LEGEND_LEAGUE}"
+                + f"\n\n### Cash Prizes"
+                + f"\n🥇 **1st**: USD 50"
+                + f"\n🥈 **2nd**: USD 35"
+                + f"\n🥉 **3rd**: USD 25"
+                + f"\n**4th - 5th**: USD 20"
+                + f"\n**6th - 10th**: USD 15"
+                + f"\n**11th - 15th**: USD 10"
                 + f"\n\n*Cash Prizes will be distributed via PayPal. You __must__ have a PayPal account to receive your prizes. Winners will be contacted after the tournament.*"
-                + f"\n\u200b",
-            inline=False
-            )        
-        embed.add_field(
-            name=f"**Gold Pass Prizes**",
-            value=f"{EmojisTownHall.TH16} **TH16 Players**"
+                + f"\n\n### Gold Pass Prizes"
+                + f"{EmojisTownHall.TH16} **TH16 Players**"
                 + f"\nAll Players who finish above 5,700 trophies will be eligible for a lucky draw. 10 lucky winners will be selected for a Gold Pass!"
                 + f"\n\n{EmojisTownHall.TH13} {EmojisTownHall.TH14} {EmojisTownHall.TH15} **TH13 - TH15 Players**"
                 + f"\nThe top 5 finishing players in each Town Hall level will receive a Gold Pass."
                 + f"\n\n*Gold Passes are distributed via The Guild's inventory system. Details will be provided after the tournament.*"
-                + f"\n\u200b",
-            inline=False
-            )
-        embed.add_field(
-            name=f"**Rules & Regulations**",
-            value=f"1. This Tournament is open to the Clash of Clans Community."
-                + f"2. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
-                + f"3. Withdrawing from the Tournament is allowed any time before <t:1709096400:f>."
-                + f"4. You must stay and join in The Guild's Discord Server to participate in the Tournament."
-                + f"5. Your account must be a member of one the designated clans for the Tournament for at least __ days during the Tournament period."
-                + f"6. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
-                + f"\n\u200b",
-            inline=False
-            )
+                + f"\n\n### Rules & Regulations"
+                + f"\n1. This Tournament is open to the Clash of Clans Community."
+                + f"\n2. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
+                + f"\n3. Withdrawing from the Tournament is allowed any time before <t:1709096400:f>."
+                + f"\n4. You must stay and join in The Guild's Discord Server to participate in the Tournament."
+                + f"\n5. Your account must be a member of one the designated clans for the Tournament for at least __ days during the Tournament period."
+                + f"\n6. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season.",
+            show_author=False)   
         
         view = TournamentApplicationMenu()
 
