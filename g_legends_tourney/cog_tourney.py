@@ -414,56 +414,10 @@ class TournamentApplicationMenu(discord.ui.View):
     
     async def _callback_check(self,interaction:discord.Interaction,button:discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
-        
-        chk_registration = await self.tournament_cog.fetch_participant_for_user(interaction.user.id)
+        self.reload_items()
+        await interaction.followup.edit_message(interaction.message.id,view=self)
 
-        if chk_registration:
-            tourn_season = await aClashSeason(self.tournament_cog._tourney_season)
-            check_window_start = tourn_season.trophy_season_start.add(days=2)
-            check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
-
-            time_spent = 0
-
-            snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
-            a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
-            ts = None
-            async for a in a_iter:
-                if not ts:
-                    if a.clan_tag in tournament_clans:
-                        ts = a._timestamp
-                if ts:
-                    if a.clan_tag in tournament_clans:
-                        time_spent += max(0,a._timestamp - ts)
-                    ts = a._timestamp
-            
-            tourn_period = tourn_season.trophy_season_end.diff(tourn_season.trophy_season_start).in_hours()
-            time_spent_hours = (time_spent//3600) + 48
-            time_spent_percent = max((time_spent_hours/tourn_period)*100,100)
-
-            if pendulum.now().int_timestamp < 1709096400:
-                embed = await clash_embed(
-                    context=interaction,
-                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
-                        + f"\n\nYou have spent **{time_spent_percent}%** of the Tournament Period in the designated clans."
-                        + f"\n\nIf you would like to cancel your registration, click on the button below.",
-                    )
-                cancel_view = CancelRegistrationMenu(interaction,interaction.user)
-                await interaction.followup.send(embed=embed,view=cancel_view,ephemeral=True)
-            else:
-                embed = await clash_embed(
-                    context=interaction,
-                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
-                        + f"\n\nYou have spent **{time_spent_percent}%** of the Tournament Period in the designated clans.",
-                    )
-                await interaction.followup.send(embed=embed,ephemeral=True)
-        else:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You are currently **NOT** registered for the Tournament."
-                    + f"\n\nIf you would like to register, click on the Register button above.",
-                )
-            await interaction.followup.send(embed=embed,ephemeral=True)        
-        return
+        await CancelRegistrationMenu.respond(interaction)
 
 ##################################################
 #####
@@ -581,6 +535,64 @@ class RegistrationMenu(AddLinkMenu):
 #####
 ##################################################
 class CancelRegistrationMenu(DefaultView):
+    @classmethod
+    async def respond(cls,interaction:discord.Interaction):
+        
+        menu = cls(interaction,interaction.user)
+        chk_registration = await menu.tournament_cog.fetch_participant_for_user(interaction.user.id)
+
+        if chk_registration:
+            tourn_season = await aClashSeason(menu.tournament_cog._tourney_season)
+
+            if pendulum.now() > tourn_season.trophy_season_start:
+                check_window_start = tourn_season.trophy_season_start.add(days=2)
+                check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
+
+                time_spent = 0
+
+                snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
+                a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
+                ts = None
+                async for a in a_iter:
+                    if not ts:
+                        if a.clan_tag in tournament_clans:
+                            ts = a._timestamp
+                    if ts:
+                        if a.clan_tag in tournament_clans:
+                            time_spent += max(0,a._timestamp - ts)
+                        ts = a._timestamp
+                
+                tourn_period = tourn_season.trophy_season_end.diff(tourn_season.trophy_season_start).in_hours()
+                time_spent_hours = (time_spent//3600) + 48
+                time_spent_str = f"You have spent **{min((time_spent_hours/tourn_period)*100,100)}%** of the Tournament Period in the designated clans.\n\n"
+                
+            else:
+                time_spent_str = ""
+
+            if pendulum.now().int_timestamp < 1709096400:
+                embed = await clash_embed(
+                    context=interaction,
+                    message=f"You are currently registered with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.\n\n"
+                        + time_spent_str
+                        + f"If you would like to cancel your registration, click on the button below.",
+                    )
+                await interaction.followup.send(embed=embed,view=menu,ephemeral=True)
+            else:
+                embed = await clash_embed(
+                    context=interaction,
+                    message=f"You are currently registered with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.\n\n"
+                        + time_spent_str,
+                    )
+                await interaction.followup.send(embed=embed,ephemeral=True)
+        else:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"You are currently **NOT** registered for the Tournament."
+                    + f"\n\nIf you would like to register, click on the Register button above.",
+                )
+            await interaction.followup.send(embed=embed,ephemeral=True)        
+        return
+    
     def __init__(self,context:discord.Interaction,member:discord.Member):
 
         self.button_cancel_registration = DiscordButton(
