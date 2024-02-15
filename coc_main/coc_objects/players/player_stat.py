@@ -90,6 +90,20 @@ class aPlayerActivity():
         query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',-1)
         entries = [cls(entry) async for entry in query]
         return sorted(entries,key=lambda x: x._timestamp)
+
+    @classmethod
+    async def get_by_player_datetime(cls,tag:str,start:pendulum.DateTime,end:pendulum.DateTime) -> List[Optional['aPlayerActivity']]:
+        filter_criteria = {
+            'tag':tag,
+            'timestamp': {
+                '$gt':start.int_timestamp,
+                '$lte':end.int_timestamp
+                }
+            }
+        
+        query = bot_client.coc_db.db__player_activity.find(filter_criteria).sort('timestamp',-1)
+        entries = [cls(entry) async for entry in query]
+        return sorted(entries,key=lambda x: x._timestamp)
     
     @classmethod
     async def get_by_type_for_bank(cls,activity:str) -> List[Optional['aPlayerActivity']]:

@@ -17,7 +17,8 @@ from redbot.core.bot import Red
 from coc_main.api_client import BotClashClient as client
 from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.coc_objects.season.season import aClashSeason
-from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
+from coc_main.coc_objects.players.player_stat import aPlayerActivity
 from coc_main.discord.add_delete_link import AddLinkMenu
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal
 from coc_main.utils.constants.ui_emojis import EmojisUI
@@ -29,6 +30,8 @@ bot_client = client()
 default_global = {
     "global_scope": 0,
     }
+
+tournament_clans = ['#2LVJ98RR0','#92G9J8CG']
 
 class LegendsTourney(commands.Cog):
     """1LxGuild Legends League Tournament March 2024"""
@@ -93,6 +96,8 @@ class LegendsTourney(commands.Cog):
         except:
             message = None
 
+        tourn_season = await aClashSeason(self._tourney_season)
+
         embeds = []
         embed = await clash_embed(
             context=self.bot,
@@ -121,12 +126,12 @@ class LegendsTourney(commands.Cog):
             message=f"1. The Tournament will be held during the in-game March 2024 Legend League Season."
                 + f"\n2. This Tournament is open to the Clash of Clans Community."
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
-                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:1709096400:f>."
+                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=2).int_timestamp}:f>."
                 + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
-                + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period."
+                + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period. You may check your current time spent with the `Cancel/Check` button below."
                 + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n### Designated Clans"
-                + f"\n- [Assassins #92G9J8CG](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%2392G9J8CG)",
+                + f"\n- [1LegioN #2LVJ98RR0](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%232LVJ98RR0)",
             show_author=False)
         embeds.append(embed_2)
         
@@ -168,19 +173,21 @@ class LegendsTourney(commands.Cog):
             return None
         return await self.fetch_participant(tournament_db['tag'])
     
-    async def register_participant(self,tag:str,user_id:int) -> aPlayer:
-        db_query = {'event_id':self.event_id,'tag':tag}
+    async def register_participant(self,player:aPlayer,user_id:int) -> aPlayer:
+        db_query = {'event_id':self.event_id,'tag':player.tag}
         await bot_client.coc_db.db__event_participant.update_one(
             db_query,
             {'$set':{
-                'tag': tag,
+                'tag': player.tag,
                 'event_id': self.event_id,
                 'is_participant': True,
                 'discord_user': user_id
                 }},
             upsert=True
             )
-        return await self.fetch_participant(tag)
+        if player.discord_user <= 0:
+            await BasicPlayer.set_discord_link(player.tag,user_id)
+        return await self.fetch_participant(player.tag)
     
     async def withdraw_participant(self,user_id:int) -> Optional[aPlayer]:
         db_query = {'event_id':self.event_id,'discord_user':user_id}
@@ -411,10 +418,33 @@ class TournamentApplicationMenu(discord.ui.View):
         chk_registration = await self.tournament_cog.fetch_participant_for_user(interaction.user.id)
 
         if chk_registration:
+            tourn_season = await aClashSeason(self.tournament_cog._tourney_season)
+            check_window_start = tourn_season.trophy_season_start.add(days=2)
+            check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
+
+            time_spent = 0
+
+            snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
+            a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
+            ts = None
+            async for a in a_iter:
+                if not ts:
+                    if a.clan_tag in tournament_clans:
+                        ts = a._timestamp
+                if ts:
+                    if a.clan_tag in tournament_clans:
+                        time_spent += max(0,a._timestamp - ts)
+                    ts = a._timestamp
+            
+            tourn_period = tourn_season.trophy_season_end.diff(tourn_season.trophy_season_start).in_hours()
+            time_spent_hours = (time_spent//3600) + 48
+            time_spent_percent = max((time_spent_hours/tourn_period)*100,100)
+
             if pendulum.now().int_timestamp < 1709096400:
                 embed = await clash_embed(
                     context=interaction,
                     message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
+                        + f"\n\nYou have spent **{time_spent_percent}%** of the Tournament Period in the designated clans."
                         + f"\n\nIf you would like to cancel your registration, click on the button below.",
                     )
                 cancel_view = CancelRegistrationMenu(interaction,interaction.user)
@@ -422,7 +452,8 @@ class TournamentApplicationMenu(discord.ui.View):
             else:
                 embed = await clash_embed(
                     context=interaction,
-                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.",
+                    message=f"You are currently registered for the Tournament with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**."
+                        + f"\n\nYou have spent **{time_spent_percent}%** of the Tournament Period in the designated clans.",
                     )
                 await interaction.followup.send(embed=embed,ephemeral=True)
         else:
@@ -528,7 +559,7 @@ class RegistrationMenu(AddLinkMenu):
             return self.stop_menu()
 
         if verify:
-            await self.tournament_cog.register_participant(tag,self.member.id)
+            await self.tournament_cog.register_participant(self.add_link_account,self.member.id)
             embed = await clash_embed(
                 context=self.ctx,
                 message=f"The account **{self.add_link_account.town_hall.emoji} {self.add_link_account.tag} {self.add_link_account.name}** is now registered for the 1LxGuild Legends League Tournament! All the best!",
