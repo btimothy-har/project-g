@@ -1488,46 +1488,47 @@ class Bank(commands.Cog):
         is_staff = True if self.guild_staff and set(self.guild_staff).intersection(set([r.id for r in getattr(member.discord_member,'roles',[])])) else False
         is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
-        if member.last_payday:
-            if member.last_payday.add(days=1) > pendulum.now():
-                embed = await clash_embed(
-                    context=context,
-                    message=f"You can claim your next payday <t:{member.last_payday.add(days=1).int_timestamp}:R>.",
-                    success=False,
-                    timestamp=pendulum.now()
-                    )        
-                return embed        
-            
-        try:
-            mee6user = await Mee6Rank._get_player(
-                bot_client.bot.get_cog("Mee6Rank"),
-                member.discord_member,
-                get_avatar=False
-                )
-        except:
-            mee6user = None        
+        async with member.user_lock:
+            if member.last_payday:
+                if member.last_payday.add(days=1) > pendulum.now():
+                    embed = await clash_embed(
+                        context=context,
+                        message=f"You can claim your next payday <t:{member.last_payday.add(days=1).int_timestamp}:R>.",
+                        success=False,
+                        timestamp=pendulum.now()
+                        )        
+                    return embed        
+                
+            try:
+                mee6user = await Mee6Rank._get_player(
+                    bot_client.bot.get_cog("Mee6Rank"),
+                    member.discord_member,
+                    get_avatar=False
+                    )
+            except:
+                mee6user = None        
 
-        basic_payout = 50
-        xp_bonus = 10 * (mee6user.level // 10 if mee6user else 0)
-        staff_bonus = 2 * (basic_payout + xp_bonus) if is_staff or is_minister else 0
-        boost_bonus = 1000 if is_booster else 0
+            basic_payout = 50
+            xp_bonus = 10 * (mee6user.level // 10 if mee6user else 0)
+            staff_bonus = 2 * (basic_payout + xp_bonus) if is_staff or is_minister else 0
+            boost_bonus = 1000 if is_booster else 0
 
-        total_payout = basic_payout + xp_bonus + boost_bonus + staff_bonus
-        await bank.deposit_credits(member.discord_member,total_payout)
-        await member.set_last_payday(pendulum.now())
+            total_payout = basic_payout + xp_bonus + boost_bonus + staff_bonus
+            await bank.deposit_credits(member.discord_member,total_payout)
+            await member.set_last_payday(pendulum.now())
 
-        embed = await clash_embed(
-            context=context,
-            message=f"Here's some money, {member.mention}! You received:"
-                + f"\n\nBase Payout: {basic_payout} {currency}"
-                + f"\nXP Bonus: {xp_bonus:,} {currency}"
-                + (f"\nStaff Bonus: {staff_bonus:,} {currency}" if staff_bonus > 0 else "")
-                + f"\nNitro Bonus: {boost_bonus:,} {currency}"
-                + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
-            success=True,
-            timestamp=pendulum.now()
-            )        
-        return embed
+            embed = await clash_embed(
+                context=context,
+                message=f"Here's some money, {member.mention}! You received:"
+                    + f"\n\nBase Payout: {basic_payout} {currency}"
+                    + f"\nXP Bonus: {xp_bonus:,} {currency}"
+                    + (f"\nStaff Bonus: {staff_bonus:,} {currency}" if staff_bonus > 0 else "")
+                    + f"\nNitro Bonus: {boost_bonus:,} {currency}"
+                    + f"\n\nTotal: {total_payout:,} {currency}. You now have: {await bank.get_balance(member.discord_member):,} {currency}.",
+                success=True,
+                timestamp=pendulum.now()
+                )        
+            return embed
     
     @commands.command(name="payday")
     @commands.guild_only()

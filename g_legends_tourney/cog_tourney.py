@@ -31,7 +31,7 @@ default_global = {
     "global_scope": 0,
     }
 
-tournament_clans = ['#2LVJ98RR0','#92G9J8CG']
+tournament_clans = ['#2LVJ98RR0']
 
 class LegendsTourney(commands.Cog):
     """1LxGuild Legends League Tournament March 2024"""
@@ -45,10 +45,11 @@ class LegendsTourney(commands.Cog):
         self.event_id = hashlib.sha256(_id.encode()).hexdigest()
 
         default_global = {
-            "info_channel": 1206586918066978826 if bot.user.id == 828838353977868368 else 0,
+            "info_channel": 1206586918066978826 if bot.user.id == 828838353977868368 else 1207540522181468200,
             "info_message": 0,
-            "lb_channel": 1206596691151552553 if bot.user.id == 828838353977868368 else 0,
-            "lb_messages": []
+            "lb_channel": 1206596691151552553 if bot.user.id == 828838353977868368 else 1207540552120406016,
+            "lb_messages": [],
+            "participant_role": 1207526837429993532
             }
 
         self._update_lock = asyncio.Lock()
@@ -68,7 +69,7 @@ class LegendsTourney(commands.Cog):
         return self.bot.get_channel(self._info_channel)
     @property
     def lb_channel(self) -> Optional[discord.TextChannel]:
-        return self.bot.get_channel(self._lb_channel)    
+        return self.bot.get_channel(self._lb_channel)
     @property
     def guild(self) -> Optional[discord.Guild]:
         if self.info_channel:
@@ -76,11 +77,17 @@ class LegendsTourney(commands.Cog):
         if self.lb_channel:
             return self.lb_channel.guild
         return None
+    @property
+    def participant_role(self) -> Optional[discord.Role]:
+        if self.guild:
+            return self.guild.get_role(self._participant_role)
+        return None
 
     async def cog_load(self):
         self._info_channel = await self.config.info_channel()
         self._lb_channel = await self.config.lb_channel()
-        self._tourney_season = '2-2024'
+        self._participant_role = await self.config.participant_role()
+        self._tourney_season = '3-2024'
 
         asyncio.create_task(self.load_info_embed())
 
@@ -90,6 +97,8 @@ class LegendsTourney(commands.Cog):
         self.tourney_update_loop.cancel()
     
     async def load_info_embed(self):
+        await self.bot.wait_until_ready()
+
         info_message_id = await self.config.info_message()
         try:
             message = await self.info_channel.fetch_message(info_message_id)
@@ -128,8 +137,9 @@ class LegendsTourney(commands.Cog):
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
                 + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
                 + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
-                + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period. You may check your current time spent with the `Cancel/Check` button below."
-                + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
+                + f"\n6. Your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
+                + f"\n7. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
+                + f"\n8. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n### Designated Clans"
                 + f"\n- [1LegioN #2LVJ98RR0](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%232LVJ98RR0)",
             show_author=False)
@@ -152,6 +162,9 @@ class LegendsTourney(commands.Cog):
         
         player.is_participant = tournament_db.get('is_participant',False) if tournament_db else False
         player.discord_user = tournament_db.get('discord_user',0) if tournament_db else 0
+        
+        registration_timestamp = tournament_db.get('timestamp',0) if tournament_db else 0
+        player.registration_timestamp = pendulum.from_timestamp(registration_timestamp) if registration_timestamp else None
         
         return player
     
@@ -181,12 +194,16 @@ class LegendsTourney(commands.Cog):
                 'tag': player.tag,
                 'event_id': self.event_id,
                 'is_participant': True,
-                'discord_user': user_id
+                'discord_user': user_id,
+                'timestamp': pendulum.now().int_timestamp
                 }},
             upsert=True
             )
         if player.discord_user <= 0:
             await BasicPlayer.set_discord_link(player.tag,user_id)
+        
+        user = self.guild.get_member(user_id)
+        await user.add_roles(self.participant_role)
         return await self.fetch_participant(player.tag)
     
     async def withdraw_participant(self,user_id:int) -> Optional[aPlayer]:
@@ -195,6 +212,11 @@ class LegendsTourney(commands.Cog):
             db_query,
             {'$set':{'is_participant': False}},
             )
+        user = self.guild.get_member(user_id)
+        try:
+            await user.remove_roles(self.participant_role)
+        except:
+            pass
         return await self.fetch_participant_for_user(user_id)
 
     async def leaderboard_current_season_embed(self):
@@ -541,11 +563,11 @@ class CancelRegistrationMenu(DefaultView):
         menu = cls(interaction,interaction.user)
         chk_registration = await menu.tournament_cog.fetch_participant_for_user(interaction.user.id)
 
-        if chk_registration:
-            tourn_season = await aClashSeason(menu.tournament_cog._tourney_season)
+        tourn_season = await aClashSeason(menu.tournament_cog._tourney_season)
 
+        if chk_registration:
             if pendulum.now() > tourn_season.trophy_season_start:
-                check_window_start = tourn_season.trophy_season_start.add(days=3)
+                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
                 check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
                 time_spent = 0
@@ -562,14 +584,14 @@ class CancelRegistrationMenu(DefaultView):
                             time_spent += max(0,a._timestamp - ts)
                         ts = a._timestamp
                 
-                tourn_period = tourn_season.trophy_season_end.diff(tourn_season.trophy_season_start).in_hours()
-                time_spent_hours = (time_spent//3600) + 72
+                tourn_period = tourn_season.trophy_season_end.diff(check_window_start).in_hours()
+                time_spent_hours = (time_spent//3600)
                 time_spent_str = f"You have spent **{int(min((time_spent_hours/tourn_period)*100,100))}%** of the Tournament Period in the designated clans.\n\n"
                 
             else:
                 time_spent_str = ""
 
-            if pendulum.now().int_timestamp < 1709096400:
+            if pendulum.now() < tourn_season.trophy_season_start.add(days=3):
                 embed = await clash_embed(
                     context=interaction,
                     message=f"You are currently registered with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.\n\n"
