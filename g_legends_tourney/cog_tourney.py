@@ -126,7 +126,7 @@ class LegendsTourney(commands.Cog):
             message=f"1. The Tournament will be held during the in-game March 2024 Legend League Season."
                 + f"\n2. This Tournament is open to the Clash of Clans Community."
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
-                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=2).int_timestamp}:f>."
+                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
                 + f"\n5. You must stay and join in The Guild's Discord Server to participate in the Tournament."
                 + f"\n6. Your account must be a member of one the designated clans for the Tournament at least 70% of the time during the Tournament period. You may check your current time spent with the `Cancel/Check` button below."
                 + f"\n7. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
@@ -545,7 +545,7 @@ class CancelRegistrationMenu(DefaultView):
             tourn_season = await aClashSeason(menu.tournament_cog._tourney_season)
 
             if pendulum.now() > tourn_season.trophy_season_start:
-                check_window_start = tourn_season.trophy_season_start.add(days=2)
+                check_window_start = tourn_season.trophy_season_start.add(days=3)
                 check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
                 time_spent = 0
@@ -563,8 +563,8 @@ class CancelRegistrationMenu(DefaultView):
                         ts = a._timestamp
                 
                 tourn_period = tourn_season.trophy_season_end.diff(tourn_season.trophy_season_start).in_hours()
-                time_spent_hours = (time_spent//3600) + 48
-                time_spent_str = f"You have spent **{min((time_spent_hours/tourn_period)*100,100)}%** of the Tournament Period in the designated clans.\n\n"
+                time_spent_hours = (time_spent//3600) + 72
+                time_spent_str = f"You have spent **{int(min((time_spent_hours/tourn_period)*100,100))}%** of the Tournament Period in the designated clans.\n\n"
                 
             else:
                 time_spent_str = ""
@@ -576,7 +576,7 @@ class CancelRegistrationMenu(DefaultView):
                         + time_spent_str
                         + f"If you would like to cancel your registration, click on the button below.",
                     )
-                await interaction.followup.send(embed=embed,view=menu,ephemeral=True)
+                menu.message = await interaction.followup.send(embed=embed,view=menu,ephemeral=True,wait=True)
             else:
                 embed = await clash_embed(
                     context=interaction,
@@ -594,7 +594,6 @@ class CancelRegistrationMenu(DefaultView):
         return
     
     def __init__(self,context:discord.Interaction,member:discord.Member):
-
         self.button_cancel_registration = DiscordButton(
             function=self._callback_cancel_registration,
             label="Cancel Registration",
@@ -607,6 +606,7 @@ class CancelRegistrationMenu(DefaultView):
             emoji=EmojisUI.EXIT,
             style=discord.ButtonStyle.grey
             )
+        self.message = None
         
         super().__init__(context,timeout=120)
         self.add_item(self.button_cancel_registration)
@@ -616,6 +616,10 @@ class CancelRegistrationMenu(DefaultView):
     @property
     def tournament_cog(self) -> LegendsTourney:
         return bot_client.bot.get_cog("LegendsTourney")
+    
+    async def on_timeout(self):
+        if self.message:
+            await self.message.edit(view=None)
     
     ##################################################
     #####
