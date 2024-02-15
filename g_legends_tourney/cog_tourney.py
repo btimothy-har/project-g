@@ -121,10 +121,8 @@ class LegendsTourney(commands.Cog):
                 + f"\n**11th - 15th**: USD 10"
                 + f"\n\n*Cash Prizes will be distributed via PayPal. You __must__ have a PayPal account to receive your prizes. Winners will be contacted after the tournament.*"
                 + f"\n### __Gold Pass Prizes__"
-                + f"\n{EmojisTownHall.TH16} **TH16 Players**"
-                + f"\nAll Players who finish above 5,700 trophies will be eligible for a lucky draw. 10 lucky winners will be selected for a Gold Pass!"
-                + f"\n\n{EmojisTownHall.TH13} {EmojisTownHall.TH14} {EmojisTownHall.TH15} **TH13 - TH15 Players**"
-                + f"\nThe top 5 finishing players in each Town Hall level will receive a Gold Pass."
+                + f"\n- {EmojisTownHall.TH16} **TH16:** All Players who finish above 5,700 trophies will be eligible for a lucky draw. 10 lucky winners will be selected for a Gold Pass!"
+                + f"\n- {EmojisTownHall.TH13} {EmojisTownHall.TH14} {EmojisTownHall.TH15} **TH13 - TH15:** The top 5 finishing players in each Town Hall level will receive a Gold Pass."
                 + f"\n\n*Gold Passes are distributed via The Guild's inventory system. Details will be provided after the tournament.*",
             show_author=False)
         embeds.append(embed)
