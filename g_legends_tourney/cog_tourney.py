@@ -80,7 +80,7 @@ class LegendsTourney(commands.Cog):
     async def cog_load(self):
         self._info_channel = await self.config.info_channel()
         self._lb_channel = await self.config.lb_channel()
-        self._tourney_season = '3-2024'
+        self._tourney_season = '2-2024'
 
         asyncio.create_task(self.load_info_embed())
 
