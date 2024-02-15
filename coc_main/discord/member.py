@@ -3,6 +3,7 @@ import pendulum
 import asyncio
 
 from typing import *
+from collections import defaultdict
 
 from async_property import AwaitLoader
 from redbot.core import commands
@@ -24,6 +25,7 @@ bot_client = client()
 class aMember(AwaitLoader):
     _global = {}
     _local = {}
+    _payday_lock = defaultdict(asyncio.Lock)
 
     __slots__ = [
         '_is_new',
@@ -76,6 +78,10 @@ class aMember(AwaitLoader):
         if not self.guild_id:
             return None
         return {'guild':self.guild_id,'user':self.user_id}
+    
+    @property
+    def user_lock(self) -> asyncio.Lock:
+        return self._payday_lock[self.user_id]
 
     async def _get_scope_clans(self) -> List[str]:
         if self.guild:
