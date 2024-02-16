@@ -135,9 +135,10 @@ class LegendsTourney(commands.Cog):
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
                 + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
                 + f"\n5. You must join and stay in The Guild's Discord Server throughout the Tournament to participate."
-                + f"\n6. Your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
+                + f"\n6. For TH16 participants, your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
                 + f"\n7. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
-                + f"\n8. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
+                + f"\n8. TH13 - TH15 participants do not need to meet the time spent requirement."
+                + f"\n9. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n### Designated Clans"
                 + f"\n- [1LegioN #2LVJ98RR0](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%232LVJ98RR0)",
             show_author=False)
