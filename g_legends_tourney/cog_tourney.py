@@ -175,6 +175,11 @@ class LegendsTourney(commands.Cog):
         async for participant in tournament_db:
             player = await self.fetch_participant(participant['tag'])
             participants.append(player)
+        
+        if self.guild:
+            left_participants = [p for p in participants if not self.guild.get_member(p.discord_user)]
+            await asyncio.gather(*[self.withdraw_participant(p.discord_user) for p in left_participants])
+        
         return participants
     
     async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
@@ -320,7 +325,7 @@ class LegendsTourney(commands.Cog):
             embeds.append(embed)
         return embeds
     
-    @tasks.loop(minutes=10.0)
+    @tasks.loop(minutes=5.0)
     async def tourney_update_loop(self):
         if self._update_lock.locked():
             return
