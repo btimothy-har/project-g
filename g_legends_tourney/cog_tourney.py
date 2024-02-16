@@ -221,7 +221,7 @@ class LegendsTourney(commands.Cog):
     async def leaderboard_current_season_embed(self):
         participants = await self.fetch_all_participants()
         elig_participants = [p for p in participants if getattr(getattr(p,'legend_statistics',None),'current_season',None)]
-        elig_participants.sort(key=lambda x: x.legend_statistics.current_season.trophies,reverse=True)
+        elig_participants.sort(key=lambda x: (x.town_hall.level,x.legend_statistics.current_season.trophies),reverse=True)
 
         #chunk the list into 30s
         chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
@@ -257,7 +257,7 @@ class LegendsTourney(commands.Cog):
     async def leaderboard_previous_season_embed(self):
         participants = await self.fetch_all_participants()
         elig_participants = [p for p in participants if getattr(getattr(p,'legend_statistics',None),'previous_season',None)]
-        elig_participants.sort(key=lambda x: x.legend_statistics.previous_season.trophies,reverse=True)
+        elig_participants.sort(key=lambda x: (x.town_hall.level,x.legend_statistics.previous_season.trophies),reverse=True)
 
         #chunk the list into 30s
         chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
@@ -288,7 +288,7 @@ class LegendsTourney(commands.Cog):
     async def leaderboard_future_season_embed(self):
         participants = await self.fetch_all_participants()
         elig_participants = participants
-        elig_participants.sort(key=lambda x: x.trophies,reverse=True)
+        elig_participants.sort(key=lambda x: (x.town_hall.level,x.trophies),reverse=True)
 
         #chunk the list into 30s
         chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]
@@ -297,7 +297,7 @@ class LegendsTourney(commands.Cog):
         embeds = []
         async for i,chunk in c_iter.enumerate(start=1):
             player_text = "\n".join([
-                f"{p.town_hall.emoji} `{p.clean_name[:15]:<20}` <@{p.discord_user}>" for p in chunk])
+                f"\u200E{p.town_hall.emoji} `{p.clean_name[:15]:<20}` <@{p.discord_user}>\u200F" for p in chunk])
             if i == 1:
                 season = await aClashSeason(self._tourney_season)
                 days_difference = pendulum.now().diff(season.trophy_season_start,abs=False).in_days()
@@ -320,7 +320,7 @@ class LegendsTourney(commands.Cog):
             embeds.append(embed)
         return embeds
     
-    @tasks.loop(minutes=15.0)
+    @tasks.loop(minutes=10.0)
     async def tourney_update_loop(self):
         if self._update_lock.locked():
             return
