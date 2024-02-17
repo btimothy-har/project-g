@@ -244,6 +244,7 @@ class UserStore(DefaultView):
         user = self.guild.get_member(interaction.user.id)
 
         purchase_button = self.purchase_button
+        purchase_button.disabled = False
         inventory = await UserInventory(interaction.user)
 
         if inventory.has_item(self.current_item) and (self.current_item.type in ['cash'] or self.current_item.subscription):
@@ -292,6 +293,11 @@ class UserStore(DefaultView):
     
     async def _purchase_item(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
+
+        self.purchase_button.disabled = True
+        self.purchase_button.label = "Processing..."
+        await interaction.message.edit(view=self)
+
         currency = await bank.get_currency_name()
 
         item = self.current_item
@@ -404,7 +410,7 @@ class UserStore(DefaultView):
                 )
         return item_embed
     
-    @property
+    @cached_property
     def purchase_button(self):
         return DiscordButton(
             function=self._purchase_item,
