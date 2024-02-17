@@ -397,7 +397,7 @@ class ClanWarLeaderboard(Leaderboard):
         a_iter = AsyncIter(leaderboard_players)
         async for player in a_iter:            
             stats = await player.get_season_stats(season)
-            if not stats.is_member:
+            if not stats.is_member or not stats.home_clan:
                 continue
 
             th_iter = AsyncIter(eligible_townhalls)
