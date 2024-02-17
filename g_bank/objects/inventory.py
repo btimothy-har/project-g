@@ -262,7 +262,7 @@ class UserInventory(AwaitLoader):
         i = self.get_item(item)
         if not i:
             return False
-        if len(i) <= quantity:
+        if len(i) < quantity:
             return False
         return True
     
