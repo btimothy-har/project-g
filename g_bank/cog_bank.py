@@ -25,6 +25,7 @@ from coc_main.coc_objects.events.raid_weekend import aRaidMember
 from coc_main.discord.member import aMember
 
 from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
+from coc_main.exceptions import InvalidTag
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
@@ -1398,7 +1399,10 @@ class Bank(commands.Cog):
         next_change = await member.get_reward_timer()
         reward_tag = await member._get_reward_account_tag()
         if reward_tag:
-            reward_account = await self.client.fetch_player(reward_tag)
+            try:
+                reward_account = await self.client.fetch_player(reward_tag)
+            except InvalidTag:
+                reward_account = None
         else:
             reward_account = None        
         
