@@ -154,8 +154,9 @@ class RedemptionTicket():
                     )
                 self.close_user = None
                 self.close_timestamp = None
+                
             item = await self.get_item()
-            await item.remove_from_inventory()
+            await item.reinstate()
         return self
     
     async def get_item(self) -> Optional[InventoryItem]:
