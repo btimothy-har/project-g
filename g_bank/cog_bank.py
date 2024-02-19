@@ -531,11 +531,11 @@ class Bank(commands.Cog):
         
         ticket = await RedemptionTicket.get_by_id(redemption_id)
         
-        if message.content.startswith(f"Hey <@{ticket.user_id}, your redemption has been fulfilled"):
-            if len(message.mentions) == 0:
+        if "your redemption has been fulfilled" in message.content:
+            if len(message.mentions) < 2:
                 return await message.reply(f"Could not find a completing user. Please try again.")
 
-            redemption_user = message.mentions[0].id                
+            redemption_user = message.mentions[1].id                
             await ticket.complete_redemption(redemption_user)
         
         if message.content.startswith("Fulfillment reversed by"):
