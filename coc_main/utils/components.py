@@ -1,5 +1,6 @@
 import discord
 import pendulum
+import coc
 
 from typing import *
 from redbot.core import commands
@@ -21,8 +22,22 @@ async def handle_command_error(
     message:Optional[discord.Message]=None):
 
     bot_client = client()
-    
-    if isinstance(exception,ClashOfClansError):
+
+    if isinstance(exception,coc.NotFound):
+        error_embed = await clash_embed(
+            context=bot_client.bot,
+            message="The Tag you provided doesn't seem to exist.",
+            success=False,
+            timestamp=pendulum.now()
+            )            
+    elif isinstance(exception,coc.GatewayError) or isinstance(exception,coc.Maintenance):
+        error_embed = await clash_embed(
+            context=bot_client.bot,
+            message="The Clash of Clans API is currently unavailable.",
+            success=False,
+            timestamp=pendulum.now()
+            )    
+    elif isinstance(exception,ClashOfClansError):
         error_embed = await clash_embed(
             context=bot_client.bot,
             message=f"**Error**: {exception.message}",

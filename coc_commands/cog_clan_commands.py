@@ -77,10 +77,29 @@ class Clans(commands.Cog):
         return bot_client.bot.get_cog("ClashOfClansClient")
     
     async def cog_command_error(self,ctx,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
+        original = getattr(error,'original',None)
+        if isinstance(original,coc.NotFound):
             embed = await clash_embed(
                 context=ctx,
-                message=f"{error.original.message}",
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
+            embed = await clash_embed(
+                context=ctx,
+                message="The Clash of Clans API is currently unavailable.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        elif isinstance(original,ClashOfClansError):
+            embed = await clash_embed(
+                context=ctx,
+                message=f"{original.message}",
                 success=False,
                 timestamp=pendulum.now()
                 )
@@ -89,13 +108,30 @@ class Clans(commands.Cog):
         await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
 
     async def cog_app_command_error(self,interaction,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
+        original = getattr(error,'original',None)
+        embed = None
+        if isinstance(original,coc.NotFound):
             embed = await clash_embed(
                 context=interaction,
-                message=f"{error.original.message}",
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )            
+        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
+            embed = await clash_embed(
+                context=interaction,
+                message="The Clash of Clans API is currently unavailable.",
+                success=False,
+                timestamp=pendulum.now()
+                )            
+        elif isinstance(original,ClashOfClansError):
+            embed = await clash_embed(
+                context=interaction,
+                message=f"{original.message}",
                 success=False,
                 timestamp=pendulum.now()
                 )
+        if embed:
             if interaction.response.is_done():
                 await interaction.edit_original_response(embed=embed,view=None)
             else:
