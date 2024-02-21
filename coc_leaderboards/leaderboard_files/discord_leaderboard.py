@@ -221,7 +221,7 @@ class DiscordLeaderboard():
             return await bot_client.coc.get_alliance_clans()
         elif self.guild:
             guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
-            clans = await bot_client.coc.get_clans([link.tag for link in guild_links])
+            clans = [c async for c in bot_client.coc.get_clans([link.tag for link in guild_links])]
             return clans
         else:
             return []
