@@ -519,7 +519,11 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             )
         return await channel.send(embed=embed)
     
-    application_accounts = [p async for p in bot_client.coc.get_players(application.get('tags',[]))]
+    tags = application.get('tags',[])
+    if len(tags) > 0:
+        application_accounts = [p async for p in bot_client.coc.get_players(tags)]
+    else:
+        application_accounts = []
 
     clan_tags = application.get('clans',[])
     if len(clan_tags) == 0:
