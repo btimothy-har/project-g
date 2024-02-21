@@ -207,7 +207,7 @@ class ClashClient(coc.EventsClient):
         return clan
     
     async def get_registered_clans(self) -> List[coc.Clan]:
-        if self.bot_client.api_maintenance:
+        if getattr(self.bot_client,'api_maintenance',False):
             raise coc.Maintenance()
         
         filter = {
@@ -226,7 +226,7 @@ class ClashClient(coc.EventsClient):
             )
 
     async def get_alliance_clans(self) -> List[coc.Clan]:
-        if self.bot_client.api_maintenace:
+        if getattr(self.bot_client,'api_maintenance',False):
             raise coc.Maintenance()
         
         query = self.bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
