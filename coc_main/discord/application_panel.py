@@ -3,6 +3,7 @@ import discord
 import re
 import pendulum
 import bson
+import coc 
 
 from typing import *
 
@@ -470,7 +471,7 @@ class ClanApplyMenuUser(discord.ui.View):
             )
 
         q_tags = [q for q in modal.children if q.label == "Your Clash Player Tags, separated by spaces."][0]
-        tags = re.split('[^a-zA-Z0-9]', q_tags.value)
+        tags = [coc.utils.correct_tag(i) for i in re.split('[^a-zA-Z0-9]', q_tags.value) if coc.utils.is_valid_tag(i)]
         clans = modal.clans if len(modal.clans) > 0 else []
         api_error = False
 
