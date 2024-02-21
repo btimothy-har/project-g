@@ -647,14 +647,14 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         channel_name += f"-th{th}"
     
     await channel.edit(name=channel_name.lower())
-    await asyncio.sleep(5)
 
     c_iter = AsyncIter(application_clans)
     async for c in c_iter:
         link = await ClanGuildLink.get_link(c.tag,channel.guild.id)
         if getattr(link,'coleader_role',None):
             await channel.send(f"{application.get('bot_prefix','.')}add {link.coleader_role.mention}")
-            if len(channel.threads) > 0:                
+            if len(channel.threads) > 0:   
+                await asyncio.sleep(3)
                 thread = channel.threads[0]
                 await thread.send(
                     f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
