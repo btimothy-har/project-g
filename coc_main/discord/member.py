@@ -93,7 +93,7 @@ class aMember(AwaitLoader):
         
     async def load(self):
         rts = pendulum.from_timestamp(aMember._master_scope.get('timestamp',pendulum.now().subtract(hours=3).int_timestamp))
-        if pendulum.now().int_timestamp - rts > 3600:
+        if pendulum.now().int_timestamp - rts.int_timestamp > 3600:
             await aMember._update_scopes()
 
         self._scope_clans = aMember._master_scope.get(self.guild_id,[]) if self.guild_id else aMember._master_scope.get('global',[])
