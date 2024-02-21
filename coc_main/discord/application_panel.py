@@ -347,7 +347,7 @@ class ClanApplyMenuUser(discord.ui.View):
     ##################################################
     async def load_items(self):
         if self.clan_tags:
-            self.clans = await self.coc_client.fetch_many_clans(*self.clan_tags)
+            self.clans = [a async for a in bot_client.coc.get_clans(self.clan_tags)]
 
         self.is_active = True
         dropdown_options = []

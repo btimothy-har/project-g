@@ -248,7 +248,7 @@ class NewMemberMenu(DefaultView):
     async def _select_home_clan(self,account:aPlayer):
         await account._sync_cache()
         linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
-        guild_clans = await self.client.fetch_many_clans(*[c.tag for c in linked_clans])
+        guild_clans = [a async for a in bot_client.coc.get_clans([c.tag for c in linked_clans]) if a.is_alliance_clan]
 
         alliance_clans = sorted([c for c in guild_clans if c.is_alliance_clan],key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
