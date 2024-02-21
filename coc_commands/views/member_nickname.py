@@ -27,7 +27,7 @@ class MemberNicknameMenu(DefaultView):
         super().__init__(context,300)
 
         self.member = aMember(member.id,self.guild.id)
-        self.for_self = self.user.id == self.member.user_id
+        self.for_self = self.user.id == member.id
     
     @property
     def client(self) -> ClashOfClansClient:

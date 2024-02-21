@@ -469,7 +469,8 @@ class ClanWarLeagues(commands.Cog):
         """
         
         season = self.active_war_league_season
-        cwlmenu = CWLPlayerMenu(ctx,season,await aMember(ctx.author.id))
+        member = await aMember(ctx.author.id)
+        cwlmenu = CWLPlayerMenu(ctx,season,member)
 
         if pendulum.now() < season.cwl_start:
             if ctx.author.id in self.banned_users:
@@ -487,7 +488,8 @@ class ClanWarLeagues(commands.Cog):
         await interaction.response.defer()
 
         season = self.active_war_league_season
-        cwlmenu = CWLPlayerMenu(interaction,season,aMember(interaction.user.id))
+        member = await aMember(interaction.user.id)
+        cwlmenu = CWLPlayerMenu(interaction,season,member)
 
         if pendulum.now() < season.cwl_start.subtract(days=1): 
             if interaction.user.id in self.banned_users:

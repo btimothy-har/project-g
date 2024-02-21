@@ -400,11 +400,7 @@ class Bank(commands.Cog):
         return f"The redemption ticket for {user.display_name} has been created: {ret_channel}."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
-        member = aMember(user.id)
-        await member.load()
-
-        if not member.is_member:
-            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
+        member = await aMember(user.id)
         
         if bot_client.api_maintenance:
             return f"The Clash of Clans API is currently unavailable. Please try again later."
@@ -719,7 +715,7 @@ class Bank(commands.Cog):
         if not user:
             return 0
         
-        member = aMember(user.id)
+        member = await aMember(user.id)
         guild_user = self.bank_guild.get_member(user.id)
         reward_tag = await member._get_reward_account_tag()
 
@@ -1920,11 +1916,10 @@ class Bank(commands.Cog):
         Set the Main Account for your Bank Rewards.
         """        
         
-        member = aMember(ctx.author.id)
-        await member.load()
+        member = await aMember(ctx.author.id)
         
         all_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
-        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 9]
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
@@ -1935,7 +1930,7 @@ class Bank(commands.Cog):
             message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
-                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Must be at least Town Hall 9."
                 + f"\n- Will receive Bank Rewards at a higher rate."
                 + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()
@@ -1965,11 +1960,10 @@ class Bank(commands.Cog):
 
         await interaction.response.defer()
 
-        member = aMember(interaction.user.id,self.bank_guild.id)
-        await member.load()
+        member = await aMember(interaction.user.id,self.bank_guild.id)
         
         all_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
-        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 9]
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
@@ -1980,7 +1974,7 @@ class Bank(commands.Cog):
             message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
-                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Must be at least Town Hall 9."
                 + f"\n- Will receive Bank Rewards at a higher rate."
                 + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()

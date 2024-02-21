@@ -63,6 +63,7 @@ class AddLinkMenu(DefaultView):
     ################################################## 
     async def _start_add_link(self):
         self.is_active = True
+        await self.member.load()
         embed = await clash_embed(
             context=self.ctx,
             message=f"To link a new Clash Account, you will need:"

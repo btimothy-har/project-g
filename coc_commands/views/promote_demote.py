@@ -248,8 +248,7 @@ class MemberRankMenu():
 
             report_output += f"{EmojisUI.TASK_CHECK} {self.member.mention} is now a **{new_rank}** in {clan.title}.\n"
 
-            m = aMember(self.member.user_id,self.member.guild_id)
-            await m.load()
+            m = await aMember(self.member.user_id,self.member.guild_id)
             roles_added, roles_removed = await m.sync_clan_roles(self.ctx,force=True)
             
             for role in roles_added:

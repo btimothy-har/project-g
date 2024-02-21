@@ -54,7 +54,7 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
     try:
         await interaction.response.defer()
 
-        member = aMember(member.id,member.guild.id)
+        member = await aMember(member.id,member.guild.id)
         accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
         menu = PlayerProfileMenu(interaction,accounts)
         await menu.start()
@@ -201,7 +201,6 @@ class Players(commands.Cog):
                 try:
                     member = await aMember(after.id,after.guild.id)
                     await member.sync_clan_roles()
-                    await aMember.save_user_roles(after.id,after.guild.id)
                 except InvalidUser:
                     pass
         except Exception:

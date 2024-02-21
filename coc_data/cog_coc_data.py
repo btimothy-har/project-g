@@ -246,9 +246,6 @@ class ClashOfClansData(commands.Cog):
             await unload_meteor_tasks()
         
         bot_client.coc_main_log.info(f"Stopped Clash Data Loop.")
-
-        aMember._global = {}
-        aMember._local = {}
     
     ############################################################
     #####
