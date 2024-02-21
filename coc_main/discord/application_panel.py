@@ -605,6 +605,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         thumbnail=member.display_avatar
         )
     if len(other_accounts) > 0:
+        other_accounts_embed_text = ""
         list_oa = [p async for p in bot_client.coc.get_players(other_accounts[:5])]                
         list_oa.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
 
