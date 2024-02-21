@@ -495,7 +495,6 @@ class BasicClan(AwaitLoader):
                 {'$set':{'last_sync':timestamp.int_timestamp}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")
 
 class _ClanAttributes():
     """

@@ -1451,8 +1451,9 @@ class Bank(commands.Cog):
             )
         
         if context.guild.id == self.bank_guild.id:
+            last_payday = await member.get_last_payday()
             embed.description += "\nNext payday: "
-            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
+            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if last_payday and last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
         
         embed.description += "\n\u200b"
         
@@ -1525,17 +1526,17 @@ class Bank(commands.Cog):
         is_staff = True if self.guild_staff and set(self.guild_staff).intersection(set([r.id for r in getattr(member.discord_member,'roles',[])])) else False
         is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
-        async with member.user_lock:
-            if member.last_payday:
-                if member.last_payday.add(days=1) > pendulum.now():
-                    embed = await clash_embed(
-                        context=context,
-                        message=f"You can claim your next payday <t:{member.last_payday.add(days=1).int_timestamp}:R>.",
-                        success=False,
-                        timestamp=pendulum.now()
-                        )        
-                    return embed        
+        last_payday = await member.get_last_payday()
+        if last_payday and last_payday.add(days=1) > pendulum.now():
+            embed = await clash_embed(
+                context=context,
+                message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
+                success=False,
+                timestamp=pendulum.now()
+                )        
+            return embed
                 
+        async with member.payday_lock:
             try:
                 mee6user = await Mee6Rank._get_player(
                     bot_client.bot.get_cog("Mee6Rank"),
