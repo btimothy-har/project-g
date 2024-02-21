@@ -381,8 +381,13 @@ class LegendsTourney(commands.Cog):
                         await message.delete()
             await self.config.lb_messages.set(new_msg)
     
-    async def update_info_embed(self):
-        pass
+    @commands.command(name="ltreg")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_register_participant(self,ctx:commands.Context,tag:str,user:discord.Member):
+        player = await bot_client.coc.get_player(tag)
+        await self.register_participant(player,user.id)
+        await ctx.send(f"Registered {player.name} for the Tournament.") 
 
 ##################################################
 #####
