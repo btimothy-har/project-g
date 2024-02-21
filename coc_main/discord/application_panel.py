@@ -354,7 +354,7 @@ class ClanApplyMenuUser(discord.ui.View):
 
         tags_query = bot_client.coc_db.db__player.find({'discord_user':self.member.id},{'_id':1})
         account_tags = [db['_id'] async for db in tags_query]
-        accounts = [p async for p in bot_client.get_players(account_tags[:10])]
+        accounts = [p async for p in bot_client.coc.get_players(account_tags[:10])]
 
         if len(accounts) == 0:
             button = DiscordButton(
