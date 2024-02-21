@@ -17,8 +17,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import humanize_list
+from redbot.core.utils import AsyncIter,bounded_gather
 
 from .coc_objects.season.season import aClashSeason
+from .utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
 from .exceptions import *
 
 coc_main_logger = logging.getLogger("coc.main")
@@ -131,6 +133,126 @@ class RequestCounter():
                 self.current_rcvd = 0
                 self.rcvd_time = nt
             self.current_rcvd += 1
+
+class ClashClient(coc.EventsClient):
+    def __init__(self,**options):
+        super().__init__(**options)
+    
+    @property
+    def bot_client(self) -> 'BotClashClient':
+        return BotClashClient()
+    
+    async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[coc.Player]:
+        if self.bot_client.api_maintenance:
+            raise coc.Maintenance()
+        
+        if not season or season.id not in [s.id for s in self.bot_client.tracked_seasons]:
+            season = self.bot_client.current_season
+        
+        if season.is_current:
+            query = self.bot_client.coc_db.db__player.find(
+                {
+                    'home_clan':clan.tag,
+                    'is_member':True
+                    },
+                {'_id':1}
+                )
+            tags = [p['_id'] async for p in query]
+            ret_players = [p async for p in self.get_players(tags)]
+            return sorted(
+                ret_players,
+                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+                reverse=True
+                )
+        else:
+            filter_criteria = {
+                {
+                'is_member':True,
+                'home_clan':clan.tag,
+                'timestamp': {
+                    '$gt':season.season_start.int_timestamp,
+                    '$lte':season.season_end.int_timestamp
+                    }
+                }
+            }
+            query = self.bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
+            tags = [p['tag'] async for p in query]
+
+            players = [p async for p in self.get_players(tags)]
+            season_stats = await bounded_gather(*[p.get_season_stats(season) for p in players])
+            season_members = [s.tag for s in season_stats if s.is_member and s.home_clan_tag == clan.tag]
+            ret_players = [p for p in players if p.tag in season_members]
+            return sorted(
+                ret_players,
+                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+                reverse=True
+                )
+    
+    ############################################################
+    #####
+    ##### COMMON CLAN HELPERS
+    #####
+    ############################################################
+    async def from_clan_abbreviation(self,abbreviation:str) -> coc.Clan:
+        query = await self.bot_client.coc_db.db__clan.find_one(
+            {
+                'abbreviation':abbreviation.upper()
+                },
+            {'_id':1}
+            )
+        if query:
+            clan = await self.get_clan(query['_id'])
+            return clan        
+        clan = await self.get_clan(abbreviation)
+        return clan
+    
+    async def get_registered_clans(self) -> List[coc.Clan]:
+        if getattr(self.bot_client,'api_maintenance',False):
+            raise coc.Maintenance()
+        
+        filter = {
+            "emoji": {
+                "$exists": True,
+                "$ne": ""
+                }
+            }
+        query = self.bot_client.coc_db.db__clan.find(filter,{'_id':1})            
+        tags = [c['_id'] async for c in query]
+        ret_clans = [c async for c in self.get_clans(tags)]
+        return sorted(
+            ret_clans,
+            key=lambda x:(x.level,x.capital_hall),
+            reverse=True
+            )
+
+    async def get_alliance_clans(self) -> List[coc.Clan]:
+        if getattr(self.bot_client,'api_maintenance',False):
+            raise coc.Maintenance()
+        
+        query = self.bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
+        tags = [c['_id'] async for c in query]
+        ret_clans = [c async for c in self.get_clans(tags)]
+        return sorted(
+            ret_clans,
+            key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),
+            reverse=True
+            )
+
+    async def get_war_league_clans(self) -> List[coc.Clan]:
+        if self.bot_client.api_maintenance:
+            raise coc.Maintenance()
+        
+        filter = {
+            'is_active':True
+            }
+        query = self.bot_client.coc_db.db__war_league_clan_setup.find(filter,{'_id':1})            
+        tags = [c['_id'] async for c in query]
+        ret_clans = [c async for c in self.get_clans(tags)]
+        return sorted(
+            ret_clans,
+            key=lambda x:(MultiplayerLeagues.get_index(x.war_league_name),x.level,x.capital_hall),
+            reverse=True
+            )
 
 ############################################################
 ############################################################
@@ -373,7 +495,7 @@ class BotClashClient():
             raise LoginNotSet(f"Clash API Keys are not set.")
                 
         if not getattr(self.bot,"coc_client",None):
-            self.bot.coc_client = coc.EventsClient(
+            self.bot.coc_client = ClashClient(
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit,
@@ -399,7 +521,7 @@ class BotClashClient():
             raise LoginNotSet(f"Clash API Password is not set.")
 
         if not getattr(self.bot,"coc_client",None):
-            self.bot.coc_client = coc.EventsClient(
+            self.bot.coc_client = ClashClient(
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='project-g',
                 load_game_data=coc.LoadGameData(always=True),
@@ -420,7 +542,7 @@ class BotClashClient():
         self.coc_main_log.debug(f"Logged out of Clash API client.")
     
     @property
-    def coc(self) -> coc.EventsClient:
+    def coc(self) -> ClashClient:
         return self.bot.coc_client
     
     @property

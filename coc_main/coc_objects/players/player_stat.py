@@ -18,6 +18,7 @@ valid_activity_types = [
     'change_war_option',
     'change_label',
     'upgrade_townhall',
+    'upgrade_townhall_weapon',
     'upgrade_hero',
     'upgrade_troop',
     'upgrade_spell',

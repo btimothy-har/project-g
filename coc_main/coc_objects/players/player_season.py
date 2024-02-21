@@ -9,7 +9,7 @@ from .player_clangames import aPlayerClanGames
 from .season_lock import PlayerSeason
 
 from ..season.season import aClashSeason
-from ..clans.player_clan import aPlayerClan
+from ..clans.clan import BasicClan
 
 from ...api_client import BotClashClient as client
 from ...utils.utils import check_rtl
@@ -77,7 +77,7 @@ class aPlayerSeason(AwaitLoader):
         self.is_member = season_entries[-1].is_member
         
         self.home_clan_tag = season_entries[-1].home_clan_tag
-        self.home_clan = await aPlayerClan(tag=self.home_clan_tag) if self.home_clan_tag else None
+        self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
         if self.home_clan:
             a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])

@@ -80,9 +80,9 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            registered_members = await self.coc_client.fetch_many_players(*self.clan.alliance_members)
+            registered_members = [p async for p in bot_client.coc.get_players(self.clan.alliance_members)]
 
-        self.members_in_clan = await self.coc_client.fetch_many_players(*[member.tag for member in self.clan.members])
+        self.members_in_clan = [p async for p in bot_client.coc.get_players([m.tag for m in self.clan.members])]
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan
         self.is_active = True

@@ -354,7 +354,7 @@ class ClanApplyMenuUser(discord.ui.View):
 
         tags_query = bot_client.coc_db.db__player.find({'discord_user':self.member.id},{'_id':1})
         account_tags = [db['_id'] async for db in tags_query]
-        accounts = await self.coc_client.fetch_many_players(*account_tags[:10])
+        accounts = [p async for p in bot_client.get_players(account_tags[:10])]
 
         if len(accounts) == 0:
             button = DiscordButton(
@@ -469,11 +469,6 @@ class ClanApplyMenuUser(discord.ui.View):
             ephemeral=True
             )
 
-        def get_client() -> ClashOfClansClient:
-            return bot_client.bot.get_cog("ClashOfClansClient")
-        
-        coc_client = get_client()
-
         q_tags = [q for q in modal.children if q.label == "Your Clash Player Tags, separated by spaces."][0]
         tags = re.split('[^a-zA-Z0-9]', q_tags.value)
         clans = modal.clans if len(modal.clans) > 0 else []
@@ -483,26 +478,6 @@ class ClanApplyMenuUser(discord.ui.View):
         q2 = modal.children[2] if len(modal.children) > 2 else None
         q3 = modal.children[3] if len(modal.children) > 3 else None
         q4 = modal.children[4] if len(modal.children) > 4 else None
-
-        try:
-            accounts = await coc_client.fetch_many_players(*tags)
-        except ClashAPIError:
-            api_error = True
-        else:
-            tags = [a.tag for a in accounts]
-            tasks = [BasicPlayer.set_discord_link(player.tag,interaction.user.id) for player in accounts if player.discord_user == 0]
-            if len(tasks) > 0:
-                await asyncio.gather(*tasks)
-            
-            if len(clans) == 0:
-                eligible_townhalls = set([a.town_hall.level for a in accounts])
-                linked_clans = await ClanGuildLink.get_for_guild(interaction.guild.id)
-                guild_clans = await coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
-
-                async for clan in AsyncIter(guild_clans):
-                    recruiting_ths = set(clan.recruitment_level)
-                    if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
-                        clans.append(clan)
         
         application = await bot_client.coc_db.db__clan_application.insert_one(
             {
@@ -527,14 +502,13 @@ class ClanApplyMenuUser(discord.ui.View):
 
         if interaction.guild.id == 680798075685699691:
             await modal.panel.listener_channel.send(
-                f"Tags: {[a.tag for a in accounts]}"
+                f"Tags: {tags}"
                 )
         modal.view.application_id = application_id
         modal.view.stop()
 
 async def listener_user_application(channel:discord.TextChannel,application_id:str):
     newline = "\n"
-    coc_client = bot_client.bot.get_cog("ClashOfClansClient")
 
     application = await bot_client.coc_db.db__clan_application.find_one({'_id':bson.ObjectId(application_id)})
     if not application:
@@ -545,11 +519,22 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             )
         return await channel.send(embed=embed)
     
-    application_accounts = await coc_client.fetch_many_players(*application.get('tags',[]))
-    application_clans = await asyncio.gather(*(coc_client.fetch_clan(tag=i) for i in application.get('clans',[])),return_exceptions=True)
-    
+    application_accounts = [p async for p in bot_client.coc.get_players(application.get('tags',[]))]
+
+    clan_tags = application.get('clans',[])
+    if len(clan_tags) == 0:
+        application_clans = []
+        eligible_townhalls = set([a.town_hall.level for a in accounts])
+        linked_clans = await ClanGuildLink.get_for_guild(channel.guild.id)
+
+        async for clan in bot_client.coc.get_clans([c.tag for c in linked_clans]):
+            recruiting_ths = set(clan.recruitment_level)
+            if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
+                application_clans.append(clan)
+    else:
+        application_clans = [c async for c in bot_client.coc.get_clans(clan_tags)]
+
     member = channel.guild.get_member(application.get('applicant_id',0))
-    clans = [c for c in application_clans if isinstance(c,aClan)]
 
     application_embed = await clash_embed(
         context=bot_client.bot,
@@ -559,8 +544,8 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             + f"\n<t:{int(member.created_at.timestamp())}:f>"
             + f"\n\n**Joined {member.guild.name}**"
             + f"\n<t:{int(member.joined_at.timestamp())}:f>"
-            + (f"\n\n**Applied to Clans**" if len(clans) > 0 else "")
-            + (f"\n{newline.join([c.title for c in clans])}" if len(clans) > 0 else "")
+            + (f"\n\n**Applied to Clans**" if len(application_clans) > 0 else "")
+            + (f"\n{newline.join([c.title for c in application_clans])}" if len(application_clans) > 0 else "")
             + f"\n\u200b",
         thumbnail=member.display_avatar)
     
@@ -589,9 +574,10 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             inline=False
             )
         
-    aa = [a for a in application_accounts if isinstance(a,aPlayer)]
- 
-    accounts = sorted(aa,key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+    accounts = sorted(
+        [a for a in application_accounts if isinstance(a,aPlayer)],
+        key=lambda x:(x.town_hall.level,x.exp_level),reverse=True
+        )
     accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
 
     tags_query = bot_client.coc_db.db__player.find({'discord_user':member.id},{'_id':1})
@@ -603,6 +589,8 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
     else:
         accounts_embed_text = ""
         async for a in AsyncIter(accounts):
+            if a.discord_user == 0:
+                await BasicPlayer.set_discord_link(a.tag,member.id)
             accounts_embed_text += account_recruiting_summary(a)
     
     accounts_embed = await clash_embed(
@@ -612,17 +600,9 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         thumbnail=member.display_avatar
         )
     if len(other_accounts) > 0:
-        list_oa = []
-        other_accounts_embed_text = ""
-        async for a in AsyncIter(other_accounts[:5]):
-            try:
-                account = await coc_client.fetch_player(tag=a)
-            except Exception:
-                continue
-            else:
-                list_oa.append(account)
-        
+        list_oa = [p async for p in bot_client.coc.get_players(other_accounts[:5])]                
         list_oa.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+
         async for a in AsyncIter(list_oa):
             other_accounts_embed_text += f"{a.title}\n\u200b\u3000{EmojisClash.CLAN} {a.clan_description}\n\n"
 
@@ -637,8 +617,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         {'$set':{
             'ticket_channel':channel.id
             }
-        }
-        )
+        })
                 
     await channel.send(embed=application_embed)
     await channel.send(embed=accounts_embed)
@@ -652,7 +631,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         elif channel.guild.id == 688449973553201335: #arix
             channel_name += f"{re.split('📝', channel.name)[0]}-"
     
-    for c in clans:
+    for c in application_clans:
         if c.unicode_emoji:
             channel_name += f"{c.unicode_emoji}"
         else:
@@ -662,12 +641,14 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         channel_name += f"-th{th}"
     
     await channel.edit(name=channel_name.lower())
-    async for c in AsyncIter(clans):
+    await asyncio.sleep(5)
+
+    c_iter = AsyncIter(application_clans)
+    async for c in c_iter:
         link = await ClanGuildLink.get_link(c.tag,channel.guild.id)
         if getattr(link,'coleader_role',None):
             await channel.send(f"{application.get('bot_prefix','.')}add {link.coleader_role.mention}")
-            if len(channel.threads) > 0:
-                await asyncio.sleep(5)
+            if len(channel.threads) > 0:                
                 thread = channel.threads[0]
                 await thread.send(
                     f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",

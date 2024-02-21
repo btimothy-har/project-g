@@ -36,9 +36,8 @@ class DefaultRaidTasks():
     async def _raid_start(clan:aClan,raid:aRaidWeekend):           
         try:
             await asyncio.sleep(120)
-            coc_client = DefaultRaidTasks._get_client()
 
-            new_clan = await coc_client.fetch_clan(clan.tag)
+            new_clan = await bot_client.coc.get_clan(clan.tag)
             raid.starting_trophies = new_clan.capital_points
             await raid.save_to_database()
 
@@ -59,7 +58,7 @@ class DefaultRaidTasks():
             await asyncio.sleep(180)
             coc_client = DefaultRaidTasks._get_client()
             
-            new_clan = await coc_client.fetch_clan(tag=clan.tag)
+            new_clan = await bot_client.coc.get_clan(clan.tag)
             raid.ending_trophies = new_clan.capital_points
             await raid.save_to_database()
 

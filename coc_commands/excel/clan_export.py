@@ -8,8 +8,6 @@ from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWe
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
-from coc_main.discord.member import aMember
-
 members_headers = [
     'Tag',
     'Name',
@@ -105,7 +103,7 @@ class ClanExcelExport():
             members_worksheet.write(row,col,header,bold)
             col += 1
         
-        members = await self.client.fetch_members_by_season(self.clan,self.season)
+        members = await bot_client.coc.get_members_by_season(self.clan,self.season)
         async for m in AsyncIter(members):
             col = 0
             row += 1
@@ -125,7 +123,7 @@ class ClanExcelExport():
             m_data.append(stats.tag)
             m_data.append(stats.name)
 
-            m_data.append(aMember(m.discord_user).name)
+            m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'name',''))
 
             m_data.append(f"{stats.home_clan.name} ({stats.home_clan_tag})")
             m_data.append(stats.time_in_home_clan / (24*60*60))

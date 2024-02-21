@@ -2,6 +2,7 @@ import discord
 import pendulum
 import re
 import bson
+import coc
 
 from typing import *
 
@@ -215,12 +216,12 @@ class DiscordLeaderboard():
                 return True
         return False    
     
-    async def get_leaderboard_clans(self) -> List[aClan]:
+    async def get_leaderboard_clans(self) -> List[coc.Clan]:
         if self.is_global:
-            return await self.client.get_alliance_clans()
+            return await bot_client.coc.get_alliance_clans()
         elif self.guild:
             guild_links = await ClanGuildLink.get_for_guild(self.guild_id)
-            clans = await self.client.fetch_many_clans(*[link.tag for link in guild_links])
+            clans = await bot_client.coc.get_clans([link.tag for link in guild_links])
             return clans
         else:
             return []
@@ -389,13 +390,11 @@ class ClanWarLeaderboard(Leaderboard):
                 }
             }
         query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
-        member_tags = list(set([p['tag'] async for p in query]))
-        
-        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
+        member_tags = list(set([p['tag'] async for p in query]))        
+
         leaderboard_clans = await leaderboard.parent.get_leaderboard_clans()
 
-        a_iter = AsyncIter(leaderboard_players)
-        async for player in a_iter:            
+        async for player in bot_client.coc.get_players(member_tags):            
             stats = await player.get_season_stats(season)
             if not stats.is_member or not stats.home_clan:
                 continue
@@ -480,12 +479,9 @@ class ResourceLootLeaderboard(Leaderboard):
         query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
 
         member_tags = list(set([p['tag'] async for p in query]))
-
-        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
         leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None
         
-        a_iter = AsyncIter(leaderboard_players)
-        async for player in a_iter:
+        async for player in bot_client.coc.get_players(member_tags):
             stats = await player.get_season_stats(season)
             if not stats.is_member:
                 continue
@@ -566,11 +562,9 @@ class DonationsLeaderboard(Leaderboard):
         query = bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
         member_tags = list(set([p['tag'] async for p in query]))
 
-        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
-        leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None           
-        
-        a_iter = AsyncIter(leaderboard_players)
-        async for player in a_iter:
+        leaderboard_clans = await leaderboard.parent.get_leaderboard_clans() if not parent.is_global else None
+
+        async for player in bot_client.coc.get_players(member_tags):
             stats = await player.get_season_stats(season)
             if not stats.is_member:
                 continue
@@ -650,11 +644,8 @@ class ClanGamesLeaderboard(Leaderboard):
             }
         query = bot_client.coc_db.db__player_activity.find(query_doc,{'tag':1})
         member_tags = list(set([p['tag'] async for p in query]))
-
-        leaderboard_players = await leaderboard.client.fetch_many_players(*member_tags)
         
-        a_iter = AsyncIter(leaderboard_players)
-        async for player in a_iter:
+        async for player in bot_client.coc.get_players(member_tags):
             stats = await player.get_season_stats(season)
 
             if not stats.is_member:
@@ -698,7 +689,7 @@ class ClanGamesLeaderboard(Leaderboard):
 
             a_iter = AsyncIter(wl_players[:20])
             async for i,p in a_iter.enumerate(start=1):
-                clan = await self.client.fetch_clan(p.clangames_clan_tag)
+                clan = await bot_client.coc.get_clan(p.clangames_clan_tag)
                 leaderboard_text += f"\n`{i:<3}{p.score:>6,}{p.time_to_completion:>13}{'':<2}`\u3000{clan.emoji}{EmojisTownHall.get(p.stats.town_hall)} {re.sub('[_*/]','',p.clean_name)}"
             embed.description += leaderboard_text
         

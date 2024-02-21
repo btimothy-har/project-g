@@ -15,7 +15,7 @@ from .clan_link import ClanGuildLink
 from ..api_client import BotClashClient as client
 
 from ..coc_objects.players.player import BasicPlayer
-from ..coc_objects.clans.player_clan import aPlayerClan
+from ..coc_objects.clans.clan import BasicClan
 
 from ..exceptions import InvalidUser, InvalidGuild, InvalidTag, CacheNotReady
 from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
@@ -23,8 +23,12 @@ from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
 bot_client = client()
 
 class aMember(AwaitLoader):
-    _global = {}
-    _local = {}
+    _master_scope = {}
+    _rk_members = set()
+    _rk_elders = set()
+    _rk_coleaders = set()
+    _rk_leaders = set()
+    _role_lock = defaultdict(asyncio.Lock)
     _payday_lock = defaultdict(asyncio.Lock)
 
     __slots__ = [
@@ -34,36 +38,36 @@ class aMember(AwaitLoader):
         'user_id',
         'guild_id',
         'accounts',
-        'last_payday',
+        'is_member',
+        'is_elder',
+        'is_coleader',
+        'is_leader'
         'last_role_sync'
         ]
-
-    def __new__(cls,user_id,guild_id=None):
-        if guild_id:
-            i = (guild_id,user_id)
-            if (guild_id,user_id) not in cls._local:
-                instance = super().__new__(cls)
-                instance._is_new = True
-                cls._local[i] = instance
-            return cls._local[i]
-        else:
-            if user_id not in cls._global:
-                instance = super().__new__(cls)
-                instance._is_new = True
-                cls._global[user_id] = instance
-            return cls._global[user_id]
+    
+    @classmethod
+    async def _update_scopes(cls):
+        guilds = AsyncIter(bot_client.bot.guilds)
+        async for guild in guilds:
+            cls._master_scope[guild.id] = [link.tag for link in await ClanGuildLink.get_for_guild(guild.id)]
+        
+        cls._master_scope['global'] = [clan.tag for clan in await bot_client.coc.get_alliance_clans()]
+        cls._master_scope['timestamp'] = pendulum.now().int_timestamp
 
     def __init__(self,user_id:int,guild_id:Optional[int]=None):
         self.user_id = user_id
         self.guild_id = guild_id
-        
-        if self._is_new:
-            self._lock = asyncio.Lock()
-            self._scope_clans = []
 
-            self.accounts = []
-            self.last_payday = pendulum.now()
-            self.last_role_sync = pendulum.now()
+        self._scope_clans = aMember._master_scope.get(self.guild_id,[]) if self.guild_id else aMember._master_scope.get('global',[])
+
+        self.accounts = []
+        self.is_member = (self.user_id,self.guild_id) in list(aMember._rk_members)
+        self.is_elder = (self.user_id,self.guild_id) in list(aMember._rk_elders)
+        self.is_coleader = (self.user_id,self.guild_id) in list(aMember._rk_coleaders)
+        self.is_leader = (self.user_id,self.guild_id) in list(aMember._rk_leaders)
+
+        self.last_payday = pendulum.now()
+        self.last_role_sync = pendulum.now()
         
         self._is_new = False
 
@@ -80,22 +84,21 @@ class aMember(AwaitLoader):
         return {'guild':self.guild_id,'user':self.user_id}
     
     @property
-    def user_lock(self) -> asyncio.Lock:
+    def role_lock(self) -> asyncio.Lock:
+        return self._role_lock[self.user_id]
+    
+    @property
+    def payday_lock(self) -> asyncio.Lock:
         return self._payday_lock[self.user_id]
-
-    async def _get_scope_clans(self) -> List[str]:
-        if self.guild:
-            return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild.id)]
-        else:
-            client_cog = bot_client.bot.get_cog('ClashOfClansClient')
-            return [clan.tag for clan in await client_cog.get_alliance_clans()]
         
     async def load(self):
-        self._scope_clans = await self._get_scope_clans()
+        rts = pendulum.from_timestamp(aMember._master_scope.get('timestamp',pendulum.now().subtract(hours=3).int_timestamp))
+        if pendulum.now().int_timestamp - rts.int_timestamp > 3600:
+            await aMember._update_scopes()
+
+        self._scope_clans = aMember._master_scope.get(self.guild_id,[]) if self.guild_id else aMember._master_scope.get('global',[])
         query = bot_client.coc_db.db__player.find(
-            {
-                'discord_user':self.user_id
-                },
+            {'discord_user':self.user_id},
             {'_id':1,'is_member':1,'home_clan':1}
             )
         self.accounts = [await BasicPlayer(db['_id']) async for db in query]
@@ -108,12 +111,33 @@ class aMember(AwaitLoader):
         except:
             pass
 
-        query = await bot_client.coc_db.db__discord_member.find(
-            {'_id':self.db_id},
-            {'_id':1,'guild_id':1,'last_payday':1,'last_role_sync':1}
-            ).to_list(length=None)
-        db_lastpayday = [db.get('last_payday',0) for db in query]
-        self.last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
+        if len(self.member_accounts) > 0:
+            self.is_member = True
+            aMember._rk_members.add((self.user_id,self.guild_id))
+        elif self.is_member:
+            self.is_member = False
+            aMember._rk_members.discard((self.user_id,self.guild_id))
+        
+        if len(self.elder_clans) > 0:
+            self.is_elder = True
+            aMember._rk_elders.add((self.user_id,self.guild_id))
+        elif self.is_elder:
+            self.is_elder = False
+            aMember._rk_elders.discard((self.user_id,self.guild_id))
+        
+        if len(self.coleader_clans) > 0:
+            self.is_coleader = True
+            aMember._rk_coleaders.add((self.user_id,self.guild_id))
+        elif self.is_coleader:
+            self.is_coleader = False
+            aMember._rk_coleaders.discard((self.user_id,self.guild_id))
+        
+        if len(self.leader_clans) > 0:
+            self.is_leader = True
+            aMember._rk_leaders.add((self.user_id,self.guild_id))
+        elif self.is_leader:
+            self.is_leader = False
+            aMember._rk_leaders.discard((self.user_id,self.guild_id))
     
     ##################################################
     ### DISCORD MEMBER ATTRIBUTES
@@ -182,7 +206,7 @@ class aMember(AwaitLoader):
     def member_tags(self) -> List[str]:
         return [a.tag for a in self.member_accounts]
     @property
-    def home_clans(self) -> List[aPlayerClan]:
+    def home_clans(self) -> List[BasicClan]:
         accounts = self.member_accounts
         mem = []
         for a in accounts:
@@ -194,38 +218,37 @@ class aMember(AwaitLoader):
             )
         return mem
     @property
-    def leader_clans(self) -> List[aPlayerClan]:
+    def leader_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id == hc.leader]    
     @property
-    def coleader_clans(self) -> List[aPlayerClan]:
+    def coleader_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id in hc.coleaders or self.user_id == hc.leader]    
     @property
-    def elder_clans(self) -> List[aPlayerClan]:
+    def elder_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id in hc.elders or self.user_id in hc.coleaders or self.user_id == hc.leader]
-    @property
-    def is_member(self) -> bool:
-        return len(self.member_accounts) > 0
-    @property
-    def is_elder(self) -> bool:
-        return len(self.elder_clans) > 0
-    @property
-    def is_coleader(self) -> bool:
-        return len(self.coleader_clans) > 0
-    @property
-    def is_leader(self) -> bool:
-        return len(self.leader_clans) > 0
 
     ##################################################
     ### BANK ATTRIBUTES
-    ##################################################    
+    ##################################################
+    async def get_last_payday(self) -> Optional[pendulum.DateTime]:
+        async with self.payday_lock:
+            query = await bot_client.coc_db.db__discord_member.find(
+                {'_id':self.db_id},
+                {'_id':1,'guild_id':1,'last_payday':1}
+                ).to_list(length=None)        
+            db_lastpayday = [db.get('last_payday',0) for db in query]
+
+            last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
+            return last_payday
+        
     async def set_last_payday(self,timestamp:pendulum.DateTime):
-        self.last_payday = timestamp
+        last_payday = timestamp
         await bot_client.coc_db.db__discord_member.update_one(
             {'_id':self.db_id},
             {'$set':{
                 'user_id':self.user_id,
                 'guild_id':self.guild_id,
-                'last_payday':getattr(self.last_payday,'int_timestamp',None)
+                'last_payday':getattr(last_payday,'int_timestamp',None)
                 }
             },
             upsert=True)
@@ -242,23 +265,10 @@ class aMember(AwaitLoader):
         if not user.guild:
             raise InvalidGuild(user.guild_id)
         
-        await cls(user_id)
-        
         try:
             await user.sync_clan_roles()
         except CacheNotReady:
             pass
-        
-        await bot_client.coc_db.db__discord_member.update_one(
-            {'_id':user.db_id},
-            {'$set':{
-                'user_id':user.user_id,
-                'guild_id':user.guild_id,
-                'roles':[str(r.id) for r in user.discord_member.roles if r.is_assignable()],
-                'last_role_save':pendulum.now().int_timestamp
-                }
-            },
-            upsert=True)
      
     async def restore_user_roles(self) -> Tuple[List[Optional[discord.Role]],List[Optional[discord.Role]]]:
         if not self.discord_member:
@@ -269,21 +279,23 @@ class aMember(AwaitLoader):
         if not self.guild:
             return added_roles, failed_roles
         
-        db_saved_roles = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
-        saved_roles = db_saved_roles.get('roles',[]) if db_saved_roles else []
+        async with self.role_lock:
+            db_saved_roles = await bot_client.coc_db.db__discord_member.find_one({'_id':self.db_id})
+            saved_roles = db_saved_roles.get('roles',[]) if db_saved_roles else []
 
-        async for role_id in AsyncIter(saved_roles):
-            role = self.guild.get_role(int(role_id))
-            if not role:
-                continue
-            if role.is_assignable():
-                try:
-                    await self.discord_member.add_roles(role)
-                except (discord.Forbidden,discord.NotFound):
-                    failed_roles.append(role)
-                else:
-                    added_roles.append(role)
-        return added_roles, failed_roles
+            r_iter = AsyncIter(saved_roles)
+            async for role_id in r_iter:
+                role = self.guild.get_role(int(role_id))
+                if not role:
+                    continue
+                if role.is_assignable():
+                    try:
+                        await self.discord_member.add_roles(role)
+                    except (discord.Forbidden,discord.NotFound):
+                        failed_roles.append(role)
+                    else:
+                        added_roles.append(role)
+            return added_roles, failed_roles
 
     async def sync_clan_roles(self,
         context:Optional[Union[discord.Interaction,commands.Context]]=None,
@@ -304,9 +316,7 @@ class aMember(AwaitLoader):
             if ls and pendulum.now().int_timestamp - ls < 600:
                 return roles_added, roles_removed
     
-        async with self._lock:
-            await self.load()
-
+        async with self.role_lock:
             #Assassins guild Member Role
             if self.guild.id == 1132581106571550831:
                 global_member = await aMember(self.user_id)
@@ -402,7 +412,9 @@ class aMember(AwaitLoader):
                 {'$set':{
                     'user_id':self.user_id,
                     'guild_id':self.guild_id,
-                    'last_role_sync':pendulum.now().int_timestamp
+                    'roles':[str(r.id) for r in self.discord_member.roles if r.is_assignable()],
+                    'last_role_save':pendulum.now().int_timestamp,
+                    'last_role_sync':pendulum.now().int_timestamp,
                     }
                 },
                 upsert=True)
@@ -457,8 +469,7 @@ class aMember(AwaitLoader):
             raise InvalidUser(self.user_id)
         
         default_tag = await self._get_default_account_tag()
-        client = bot_client.bot.get_cog('ClashOfClansClient')
-        default_account = await client.fetch_player(default_tag) if default_tag else None
+        default_account = await bot_client.coc.get_player(default_tag) if default_tag else None
 
         if not default_account:
             new_nickname = self.discord_member.name

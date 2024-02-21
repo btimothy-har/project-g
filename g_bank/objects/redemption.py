@@ -1,3 +1,4 @@
+import coc
 import asyncio
 import pendulum
 import bson
@@ -163,17 +164,32 @@ class RedemptionTicket():
         return await InventoryItem.get_by_id(self.item_id)
     
     async def get_embed(self):
-        gp_account = await self.coc_client.fetch_player(self.goldpass_tag) if self.goldpass_tag else None
         item = await self.get_item()
 
-        embed = await clash_embed(
-            context=bot_client.bot,
-            title=f"Redemption: {getattr(self.user,'display_name','Unknown User')}",
-            message=f"Ticket ID: `{self.id}`"
-                + f"\nUser: {getattr(self.user,'mention','Unknown User')}"
-                + (f"\n{EmojisClash.GOLDPASS} [{gp_account.title}]({gp_account.share_link})" if gp_account else ""),
-            timestamp=self.open_timestamp,
-            )
+        try:
+            gp_account = await bot_client.coc.get_player(self.goldpass_tag) if self.goldpass_tag else None
+        except coc.NotFound:
+            gp_account = None
+        except (coc.Maintenance,coc.GatewayError):
+            embed = await clash_embed(
+                context=bot_client.bot,
+                title=f"Redemption: {getattr(self.user,'display_name','Unknown User')}",
+                message="*The Clash of Clans API is currently unavailable.*"
+                    + f"\n\nTicket ID: `{self.id}`"
+                    + f"\nUser: {getattr(self.user,'mention','Unknown User')}"
+                    + (f"\n{EmojisClash.GOLDPASS} {self.goldpass_tag}" if self.goldpass_tag else ""),
+                timestamp=self.open_timestamp,
+                )
+        else:
+            embed = await clash_embed(
+                context=bot_client.bot,
+                title=f"Redemption: {getattr(self.user,'display_name','Unknown User')}",
+                message=f"Ticket ID: `{self.id}`"
+                    + f"\nUser: {getattr(self.user,'mention','Unknown User')}"
+                    + (f"\n{EmojisClash.GOLDPASS} [{gp_account.title}]({gp_account.share_link})" if gp_account else ""),
+                timestamp=self.open_timestamp,
+                )
+            
         embed.add_field(
             name=f"Redeeming: {item.name}",
             value=f"`{self.item_id}`"

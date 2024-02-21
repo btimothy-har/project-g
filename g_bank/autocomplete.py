@@ -29,7 +29,7 @@ async def autocomplete_eligible_accounts(interaction:discord.Interaction,current
                 sel_accounts.extend(global_accounts)
 
         if is_bank_admin(interaction):
-            clans = await client.get_alliance_clans()
+            clans = await bot_client.coc.get_alliance_clans()
         else:
             user = await aMember(interaction.user.id)
             clans = user.coleader_clans

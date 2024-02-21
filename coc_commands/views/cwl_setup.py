@@ -63,7 +63,7 @@ class CWLSeasonSetup(DefaultView):
     ### START / STOP CALL
     ##################################################
     async def start(self):
-        cwl_clans = await self.client.get_war_league_clans()
+        cwl_clans = await bot_client.coc.get_war_league_clans()
         if len(cwl_clans) == 0:
             embed = await clash_embed(
                 context=self.ctx,
@@ -176,7 +176,7 @@ class CWLSeasonSetup(DefaultView):
             self.clan_selector = None
 
         if not self.season.cwl_signup_lock:
-            clans = await self.client.get_war_league_clans()
+            clans = await bot_client.coc.get_war_league_clans()
 
             options = []
             async for c in AsyncIter(clans):

@@ -61,8 +61,7 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        fetch_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
-        linked_clans = [c for c in fetch_clans if c.is_alliance_clan]
+        linked_clans = [c async for c in bot_client.coc.get_clans([c.tag for c in linked_clans]) if c.is_alliance_clan]
         
         embeds = []
         if self.id == 688449973553201335:
@@ -93,7 +92,7 @@ class aGuild():
             )
         # Overwrite for Alliance Home Server
         if self.id in [1132581106571550831,680798075685699691]:
-            family_clans = await self.coc_client.get_alliance_clans()
+            family_clans = await bot_client.coc.get_alliance_clans()
             async for clan in AsyncIter(family_clans):
                 if clan.tag not in [c.tag for c in clans]:
                     linked_servers = await ClanGuildLink.get_links_for_clan(clan.tag)
@@ -121,8 +120,7 @@ class aGuild():
 
         if len(guild_panels) == 0 or len(linked_clans) == 0:
             return
-        fetch_clans = await self.coc_client.fetch_many_clans(*[c.tag for c in linked_clans])
-        all_clans = [c for c in fetch_clans if c.is_alliance_clan]
+        all_clans = [c async for c in bot_client.coc.get_clans([c.tag for c in linked_clans]) if c.is_alliance_clan]
         
         if self.id == 688449973553201335:
             arix_rank = {

@@ -62,7 +62,7 @@ class UserProfileMenu(DefaultView):
     ### START / STOP
     ##################################################
     async def start(self):
-        await self.member
+        await self.member.load()
         
         self.is_active = True
         embed = await UserProfileMenu.profile_embed(self.ctx,self.member)
@@ -103,9 +103,7 @@ class UserProfileMenu(DefaultView):
     ##################################################
     @staticmethod
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
-
-        client = UserProfileMenu.coc_client()
-        m_accounts = await client.fetch_many_players(*member.account_tags)
+        m_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
 
         m_accounts.sort(
             key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),

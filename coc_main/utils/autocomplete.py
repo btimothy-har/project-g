@@ -70,8 +70,7 @@ async def autocomplete_clans(interaction:discord.Interaction,current:str):
 
 async def autocomplete_war_league_clans(interaction:discord.Interaction,current:str):
     try:
-        client_cog = bot_client.bot.get_cog("ClashOfClansClient")
-        league_clans = await client_cog.get_war_league_clans()
+        league_clans = await bot_client.coc.get_war_league_clans()
 
         if current:
             clans = [c for c in league_clans 

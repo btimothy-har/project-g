@@ -189,7 +189,7 @@ class ClashServerConfig(commands.Cog):
             title=f"**Linked Clans: {ctx.guild.name}**"
             )
         async for link in AsyncIter(clan_links):
-            clan = await self.client.fetch_clan(link.tag)
+            clan = await bot_client.coc.get_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
                 value=f"Co-Leader Role: {getattr(link.coleader_role,'mention','None')}"
@@ -213,7 +213,7 @@ class ClashServerConfig(commands.Cog):
             title=f"**Linked Clans: {interaction.guild.name}**"
             )
         async for link in AsyncIter(clan_links):
-            clan = await self.client.fetch_clan(link.tag)
+            clan = await bot_client.coc.get_clan(link.tag)
             embed.add_field(
                 name=f"**{clan.title}**",
                 value=f"Co-Leader Role: {getattr(link.coleader_role,'mention','None')}"

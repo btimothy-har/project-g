@@ -303,7 +303,7 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_roster(self):
-        roster_players = await self.client.fetch_many_players(*[p.tag for p in self.clan.master_roster])
+        roster_players = [p async for p in bot_client.coc.get_players([p.tag for p in self.clan.master_roster])]
         roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(

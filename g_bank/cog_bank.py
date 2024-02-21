@@ -400,20 +400,18 @@ class Bank(commands.Cog):
         return f"The redemption ticket for {user.display_name} has been created: {ret_channel}."
 
     async def _prompt_user_reward_account(self,channel:discord.TextChannel,user:discord.Member,message:str,*args,**kwargs) -> str:
-        member = aMember(user.id)
-        await member.load()
-
-        if not member.is_member:
-            return f"The user {user.name} (ID: {user.id}) is not a member of any Guild Clan. Only active Clan Members are eligible for redemptions."
+        member = await aMember(user.id)
         
-        fetch_all_accounts = await self.client.fetch_many_players(*member.account_tags)
+        if bot_client.api_maintenance:
+            return f"The Clash of Clans API is currently unavailable. Please try again later."
+        
+        fetch_all_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
         fetch_all_accounts.sort(key=lambda a: a.town_hall.level,reverse=True)
 
         eligible_accounts = [a for a in fetch_all_accounts if a.town_hall.level >= 9]
 
         if len(eligible_accounts) == 0:
-            return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."
-        
+            return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."        
         if len(eligible_accounts) == 1:
             return f"The user selected the account: {eligible_accounts[0].overview_json()}."
         
@@ -430,7 +428,7 @@ class Bank(commands.Cog):
             if wait or not view.selected_account:
                 return f"The user did not respond or cancelled process."
             
-            select_account = await self.client.fetch_player(view.selected_account)
+            select_account = await bot_client.coc.get_player(view.selected_account)
             return f"The user selected the account: {select_account.name_json()}."
 
     async def _assistant_redeem_clashofclans(self,guild:discord.Guild,channel:discord.TextChannel,user:discord.Member,item_id:str,redeem_tag:str,*args,**kwargs) -> str:
@@ -445,7 +443,7 @@ class Bank(commands.Cog):
             if not item.in_inventory:
                 return f"The user {user.name} (ID: {user.id}) does not have the item {item.name} in their inventory."
             
-            redeem_account = await self.client.fetch_player(redeem_tag)
+            redeem_account = await bot_client.coc.get_player(redeem_tag)
             if not redeem_account or redeem_account.town_hall.level < 9:
                 return f"The account {redeem_tag} is not eligible for redemption. Accounts must be valid and of Townhall Level 9 or higher."
             
@@ -566,7 +564,7 @@ class Bank(commands.Cog):
                     comment="EOS to Sweep & Reserve Accounts."
                     )
         
-        alliance_clans = await self.client.get_alliance_clans()
+        alliance_clans = await bot_client.coc.get_alliance_clans()
             
         sweep_balance = self.sweep_account.balance
         distribution_per_clan = (sweep_balance * 0.7) / len(alliance_clans)
@@ -639,7 +637,7 @@ class Bank(commands.Cog):
 
         if owner_bal > 0:
             await bank.withdraw_credits(owner,owner_bal)
-            as_clan = await self.client.from_clan_abbreviation("AS")
+            as_clan = await bot_client.coc.from_clan_abbreviation("AS")
             clan_account = await ClanAccount(as_clan)
             await clan_account.deposit(
                 amount=owner_bal,
@@ -717,7 +715,7 @@ class Bank(commands.Cog):
         if not user:
             return 0
         
-        member = aMember(user.id)
+        member = await aMember(user.id)
         guild_user = self.bank_guild.get_member(user.id)
         reward_tag = await member._get_reward_account_tag()
 
@@ -762,15 +760,21 @@ class Bank(commands.Cog):
         async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
             try:
                 await player_activity_log.mark_as_read()
-
                 if not player_activity_log.is_member:
-                    return            
+                    return
+                
                 member = self.bot.get_user(player_activity_log.discord_user)
                 if not member:
                     return            
                 if player_activity_log.change <= 0:
-                    return            
-                player = await self.client.fetch_player(player_activity_log.tag)            
+                    return
+                
+                try:
+                    player = await bot_client.coc.get_player(player_activity_log.tag)
+                except (coc.Maintenance,coc.GatewayError):
+                    await player_activity_log.mark_as_unread()
+                    return
+                
                 if player.hero_rushed_pct > 0:
                     reward = 0
                 elif player_activity_log.new_value <= 9:
@@ -880,7 +884,14 @@ class Bank(commands.Cog):
                 if not player_activity_log.stat:
                     return
                 
-                target_clan = await self.client.fetch_clan(player_activity_log.stat)
+                try:
+                    target_clan = await bot_client.coc.get_clan(player_activity_log.stat)
+                except coc.NotFound:
+                    return
+                except (coc.Maintenance,coc.GatewayError):
+                    await player_activity_log.mark_as_unread()
+                    return
+
                 if not target_clan:
                     return
                 if not target_clan.is_alliance_clan:
@@ -939,7 +950,16 @@ class Bank(commands.Cog):
     async def clan_war_ended_rewards(self,clan:aClan,war:aClanWar):
         async def war_bank_rewards(player:aWarPlayer):
             try:
-                f_player = await self.client.fetch_player(player.tag)
+                while True:
+                    try:
+                        f_player = await bot_client.coc.get_player(player.tag)
+                        break
+                    except coc.NotFound:
+                        return
+                    except (coc.Maintenance,coc.GatewayError):
+                        await asyncio.sleep(5)
+                        continue
+
                 member = self.bot.get_user(f_player.discord_user)
                 if not member:
                     return
@@ -1004,7 +1024,16 @@ class Bank(commands.Cog):
     async def raid_weekend_ended_rewards(self,clan:aClan,raid:aRaidWeekend):
         async def raid_bank_rewards(player:aRaidMember):
             try:
-                f_player = await self.client.fetch_player(player.tag)
+                while True:
+                    try:
+                        f_player = await bot_client.coc.get_player(player.tag)
+                        break
+                    except coc.NotFound:
+                        return
+                    except (coc.Maintenance,coc.GatewayError):
+                        await asyncio.sleep(5)
+                        continue
+
                 member = self.bot.get_user(f_player.discord_user)
                 if not member:
                     return
@@ -1103,14 +1132,14 @@ class Bank(commands.Cog):
         if not self.use_rewards:
             return
         
+        while bot_client.api_maintenance:
+            await asyncio.sleep(60)
+        
         reward_per_trophy = 20
         query = bot_client.coc_db.db__player.find({'is_member':True},{'_id':1})
 
         member_tags = [q['_id'] async for q in query]
-        members = await self.client.fetch_many_players(*member_tags)
-        
-        a_iter = AsyncIter(members)
-        tasks = [_distribute_rewards(player) async for player in a_iter]
+        tasks = [_distribute_rewards(player) async for player in bot_client.coc.get_players(member_tags)]
         await bounded_gather(*tasks,return_exceptions=True,limit=1)
     
     async def member_clan_games_rewards(self):
@@ -1147,12 +1176,12 @@ class Bank(commands.Cog):
         if not self.use_rewards:
             return
         
+        while bot_client.api_maintenance:
+            await asyncio.sleep(60)
+        
         query = bot_client.coc_db.db__player.find({'is_member':True},{'_id':1})
         member_tags = [q['_id'] async for q in query]
-        members = await self.client.fetch_many_players(*member_tags)
-
-        a_iter = AsyncIter(members)
-        tasks = [_distribute_rewards(player) async for player in a_iter]
+        tasks = [_distribute_rewards(player) async for player in bot_client.coc.get_players(member_tags)]
         await bounded_gather(*tasks,return_exceptions=True,limit=1)
     
     ############################################################
@@ -1400,10 +1429,8 @@ class Bank(commands.Cog):
         reward_tag = await member._get_reward_account_tag()
         if reward_tag:
             try:
-                reward_account = await self.client.fetch_player(reward_tag)
-            except ClashAPIError as e:
-                raise e from e
-            except:
+                reward_account = await bot_client.coc.get_player(reward_tag)
+            except coc.NotFound:
                 reward_account = None
         else:
             reward_account = None        
@@ -1420,8 +1447,9 @@ class Bank(commands.Cog):
             )
         
         if context.guild.id == self.bank_guild.id:
+            last_payday = await member.get_last_payday()
             embed.description += "\nNext payday: "
-            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if member.last_payday and member.last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
+            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if last_payday and last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
         
         embed.description += "\n\u200b"
         
@@ -1446,7 +1474,7 @@ class Bank(commands.Cog):
         """
         
         if clan_abbreviation:
-            clan = await self.client.from_clan_abbreviation(clan_abbreviation)
+            clan = await bot_client.coc.from_clan_abbreviation(clan_abbreviation)
             embed = await self.helper_show_balance(ctx,clan)
         else:
             embed = await self.helper_show_balance(ctx)
@@ -1465,7 +1493,7 @@ class Bank(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         if clan:
-            s_clan = await self.client.fetch_clan(clan)
+            s_clan = await bot_client.coc.get_clan(clan)
             embed = await self.helper_show_balance(interaction,s_clan)
 
         elif user:
@@ -1494,17 +1522,17 @@ class Bank(commands.Cog):
         is_staff = True if self.guild_staff and set(self.guild_staff).intersection(set([r.id for r in getattr(member.discord_member,'roles',[])])) else False
         is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
-        async with member.user_lock:
-            if member.last_payday:
-                if member.last_payday.add(days=1) > pendulum.now():
-                    embed = await clash_embed(
-                        context=context,
-                        message=f"You can claim your next payday <t:{member.last_payday.add(days=1).int_timestamp}:R>.",
-                        success=False,
-                        timestamp=pendulum.now()
-                        )        
-                    return embed        
+        last_payday = await member.get_last_payday()
+        if last_payday and last_payday.add(days=1) > pendulum.now():
+            embed = await clash_embed(
+                context=context,
+                message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
+                success=False,
+                timestamp=pendulum.now()
+                )        
+            return embed
                 
+        async with member.payday_lock:
             try:
                 mee6user = await Mee6Rank._get_player(
                     bot_client.bot.get_cog("Mee6Rank"),
@@ -1888,11 +1916,10 @@ class Bank(commands.Cog):
         Set the Main Account for your Bank Rewards.
         """        
         
-        member = aMember(ctx.author.id)
-        await member.load()
+        member = await aMember(ctx.author.id)
         
-        all_accounts = await self.client.fetch_many_players(*member.account_tags)
-        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        all_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 9]
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
@@ -1903,7 +1930,7 @@ class Bank(commands.Cog):
             message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
-                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Must be at least Town Hall 9."
                 + f"\n- Will receive Bank Rewards at a higher rate."
                 + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()
@@ -1918,8 +1945,7 @@ class Bank(commands.Cog):
         if not view.selected_account:
             return await msg.edit(content="You did not select an account.",embed=None,view=None)
         
-        sel_account = await self.client.fetch_player(view.selected_account)
-        
+        sel_account = await bot_client.coc.get_player(view.selected_account)        
         chk, timestamp = await member.set_reward_account(sel_account.tag)
         if not chk:
             ts = pendulum.from_timestamp(timestamp)
@@ -1934,11 +1960,10 @@ class Bank(commands.Cog):
 
         await interaction.response.defer()
 
-        member = aMember(interaction.user.id,self.bank_guild.id)
-        await member.load()
+        member = await aMember(interaction.user.id,self.bank_guild.id)
         
-        all_accounts = await self.client.fetch_many_players(*member.account_tags)
-        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 7]
+        all_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
+        eligible_accounts = [a for a in all_accounts if a.is_member and a.town_hall.level >= 9]
         eligible_accounts.sort(key=lambda a: (a.town_hall.level,a.exp_level),reverse=True)
 
         if len(eligible_accounts) == 0:
@@ -1949,7 +1974,7 @@ class Bank(commands.Cog):
             message=f"**Choose from one of your accounts below as your Main Rewards Account.**"
                 + f"\n\nThis account:"
                 + f"\n- Must be a registered member account."
-                + f"\n- Must be at least Town Hall 7."
+                + f"\n- Must be at least Town Hall 9."
                 + f"\n- Will receive Bank Rewards at a higher rate."
                 + f"\n\nIf not set, or your main account becomes ineligible, your highest TH account will be used. You can only change your main account once every 7 days.",
             timestamp=pendulum.now()
@@ -1961,7 +1986,7 @@ class Bank(commands.Cog):
         if wait or not view.selected_account:
             return await interaction.edit_original_response(content=f"Did not receive a response.",embed=None,view=None)
         
-        sel_account = await self.client.fetch_player(view.selected_account)
+        sel_account = await bot_client.coc.get_player(view.selected_account)
         chk, timestamp = await member.set_reward_account(sel_account.tag)
         if not chk:
             ts = pendulum.from_timestamp(timestamp)
@@ -1989,7 +2014,7 @@ class Bank(commands.Cog):
             account = await MasterAccount(account_type_or_clan_abbreviation)
         
         else:
-            clan = await self.client.from_clan_abbreviation(account_type_or_clan_abbreviation)
+            clan = await bot_client.coc.from_clan_abbreviation(account_type_or_clan_abbreviation)
             check_permissions = True if (is_bank_admin(ctx) or ctx.author.id == clan.leader or ctx.author.id in clan.coleaders) else False
 
             if not check_permissions:
@@ -2039,10 +2064,7 @@ class Bank(commands.Cog):
             account = await MasterAccount(select_account)
         
         else:
-            try:
-                clan = await self.client.fetch_clan(select_account)
-            except InvalidAbbreviation as exc:
-                return await interaction.followup.send(exc.message)
+            clan = await bot_client.coc.get_clan(select_account)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
 
             if not check_permissions:
@@ -2103,7 +2125,7 @@ class Bank(commands.Cog):
                 comment=f"Manual Deposit."
                 )            
         if account_type == 'clan':
-            clan = await self.client.from_clan_abbreviation(account_id)
+            clan = await bot_client.coc.from_clan_abbreviation(account_id)
 
             account = await ClanAccount(clan)
             await account.deposit(
@@ -2144,18 +2166,14 @@ class Bank(commands.Cog):
                 return await interaction.followup.send(f"Deposited {amount:,} {currency} to {select_account.capitalize()} account.",ephemeral=True)
             
             else:
-                try:
-                    clan = await self.client.fetch_clan(select_account)
-                except InvalidAbbreviation as exc:
-                    return await interaction.followup.send(exc.message,ephemeral=True)
-                else:
-                    account = await ClanAccount(clan)
-                    await account.deposit(
-                        amount=amount,
-                        user_id=interaction.user.id,
-                        comment=f"Manual Deposit."
-                        )
-                    return await interaction.followup.send(f"Deposited {amount:,} {currency} to {clan.title}.",ephemeral=True)
+                clan = await bot_client.coc.get_clan(select_account)
+                account = await ClanAccount(clan)
+                await account.deposit(
+                    amount=amount,
+                    user_id=interaction.user.id,
+                    comment=f"Manual Deposit."
+                    )
+                return await interaction.followup.send(f"Deposited {amount:,} {currency} to {clan.title}.",ephemeral=True)
         
         if user:
             await bank.deposit_credits(user,amount)
@@ -2189,7 +2207,7 @@ class Bank(commands.Cog):
                 )
             
         if account_type == 'clan':
-            clan = await self.client.from_clan_abbreviation(account_id)
+            clan = await bot_client.coc.from_clan_abbreviation(account_id)
 
             account = await ClanAccount(clan)
             await account.withdraw(
@@ -2231,9 +2249,9 @@ class Bank(commands.Cog):
                 return await interaction.followup.send(f"Withdrew {amount:,} {currency} from {select_account.capitalize()} account.",ephemeral=True)
             
             else:
-                clan = await self.client.fetch_clan(select_account)
-            
+                clan = await bot_client.coc.get_clan(select_account)            
                 account = await ClanAccount(clan)
+
                 await account.withdraw(
                     amount=amount,
                     user_id=interaction.user.id,
@@ -2318,7 +2336,7 @@ class Bank(commands.Cog):
             account = await MasterAccount(select_account)
             
         else:
-            clan = await self.client.fetch_clan(select_account)
+            clan = await bot_client.coc.get_clan(select_account)
             check_permissions = True if (is_bank_admin(interaction) or interaction.user.id == clan.leader or interaction.user.id in clan.coleaders) else False
             if not check_permissions:
                 return await interaction.followup.send("You don't have permission to do this.",ephemeral=True)

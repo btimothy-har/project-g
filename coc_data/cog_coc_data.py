@@ -246,9 +246,6 @@ class ClashOfClansData(commands.Cog):
             await unload_meteor_tasks()
         
         bot_client.coc_main_log.info(f"Stopped Clash Data Loop.")
-
-        aMember._global = {}
-        aMember._local = {}
     
     ############################################################
     #####
@@ -258,10 +255,7 @@ class ClashOfClansData(commands.Cog):
     @commands.Cog.listener("on_member_join")
     async def new_discord_member(self,member:discord.Member):
         linked_accounts = await bot_client.get_linked_players(member.id)
-        accounts = await self.client.fetch_many_players(*linked_accounts)
-
-        a_iter = AsyncIter(accounts)
-        async for player in a_iter:
+        async for player in bot_client.coc.get_players(linked_accounts):
             if player.discord_user == 0:
                 await BasicPlayer.set_discord_link(player.tag,member.id)
     
@@ -335,12 +329,15 @@ class ClashOfClansData(commands.Cog):
         limit = 1000
         
         async with self._lock_clan_loop:
+            if bot_client.api_maintenance:
+                return
+            
             current = list(bot_client.coc._clan_updates)
 
             tags = []
-            tags.extend([clan.tag for clan in await self.client.get_registered_clans()])
-            tags.extend([clan.tag for clan in await self.client.get_alliance_clans()])
-            tags.extend([clan.tag for clan in await self.client.get_war_league_clans()])
+            tags.extend([clan.tag for clan in await bot_client.coc.get_registered_clans()])
+            tags.extend([clan.tag for clan in await bot_client.coc.get_alliance_clans()])
+            tags.extend([clan.tag for clan in await bot_client.coc.get_war_league_clans()])
 
             guild_iter = AsyncIter(bot_client.bot.guilds)
             async for guild in guild_iter:
@@ -379,7 +376,7 @@ class ClashOfClansData(commands.Cog):
                         continue
 
                     try:
-                        clan = await self.client.fetch_clan(n_tag)
+                        clan = await bot_client.coc.get_clan(n_tag)
                     except:
                         continue
                     await clan._sync_cache()
@@ -409,7 +406,7 @@ class ClashOfClansData(commands.Cog):
                         continue
 
                     try:
-                        player = await self.client.fetch_player(n_tag)
+                        player = await bot_client.coc.get_player(n_tag)
                     except:
                         continue
                     await player._sync_cache()

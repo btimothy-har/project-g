@@ -349,7 +349,7 @@ class PlayerProfileMenu(DefaultView):
             )
         raid_count = 0
         async for raid in AsyncIter(self.current_raidstats.raid_log):
-            r_clan = await self.client.fetch_clan(raid.clan_tag)
+            r_clan = await bot_client.coc.get_clan(raid.clan_tag)
             if raid_count >= 5:
                 break
 

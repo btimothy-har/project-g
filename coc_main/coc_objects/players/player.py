@@ -17,7 +17,7 @@ from .base_player import BasicPlayer
 from .player_season import aPlayerSeason
 
 from ..season.season import aClashSeason
-from ..clans.player_clan import aPlayerClan
+from ..clans.clan import _PlayerClan
 from ..events.clan_war_leagues import WarLeaguePlayer
 
 from ...api_client import BotClashClient as client
@@ -38,7 +38,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         self._name = None
         self._exp_level = None
         self._town_hall_level = None
-        self._clan = None
+        self.clan_cls = _PlayerClan
         
         coc.Player.__init__(self,**kwargs)
         BasicPlayer.__init__(self,self.tag)
@@ -92,7 +92,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             }
 
     async def load(self):
-        if self.clan:
+        if self.clan and isinstance(self.clan,AwaitLoader):
             await self.clan
         await BasicPlayer.load(self)
     
@@ -124,20 +124,6 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     @town_hall.setter
     def town_hall(self,value:int):
         self._town_hall_level = value
-
-    @property
-    def clan(self) -> Optional[aPlayerClan]:
-        if not self._clan:
-            return None
-        return aPlayerClan(
-            tag=getattr(self._clan,'tag',None),
-            name=self._clan.name,
-            badge=self._clan.badge,
-            level=self._clan.level
-            )    
-    @clan.setter
-    def clan(self,value:coc.Clan):
-        self._clan = value
     
     @property
     def clan_tag(self) -> str:

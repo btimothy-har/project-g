@@ -63,6 +63,7 @@ class AddLinkMenu(DefaultView):
     ################################################## 
     async def _start_add_link(self):
         self.is_active = True
+        await self.member.load()
         embed = await clash_embed(
             context=self.ctx,
             message=f"To link a new Clash Account, you will need:"
@@ -107,7 +108,7 @@ class AddLinkMenu(DefaultView):
             except (coc.Maintenance,coc.GatewayError) as exc:
                 raise ClashAPIError(exc) from exc
 
-        self.add_link_account = await self.client.fetch_player(tag)
+        self.add_link_account = await bot_client.coc.get_player(tag)
 
         if self.add_link_account.is_member:
             verify = False
@@ -172,7 +173,7 @@ class DeleteLinkMenu(DefaultView):
     ################################################## 
     async def _start_delete_link(self):
         await self.member.load()
-        m_accounts = await self.client.fetch_many_players(*self.member.account_tags)
+        m_accounts = [p async for p in bot_client.coc.get_players(self.member.account_tags)]
         m_accounts.sort(key=lambda x:(x.town_hall_level,x.exp_level,x.clean_name),reverse=True)
 
         select_options = [discord.SelectOption(
@@ -209,7 +210,7 @@ class DeleteLinkMenu(DefaultView):
         
     async def _callback_remove_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
-        remove_accounts = await self.client.fetch_many_players(*menu.values)
+        remove_accounts = [p async for p in bot_client.coc.get_players(menu.values)]
 
         for account in remove_accounts:
             await BasicPlayer.set_discord_link(account.tag,0)

@@ -131,23 +131,19 @@ class EventReminder():
                 return
             
             if self.next_reminder and (time_remaining.total_seconds() / 3600) < self.next_reminder: 
-                a_iter = AsyncIter(players)
-                async for rem_player in a_iter:
+                get_players = bot_client.coc.get_players([p.tag for p in players])
+                async for player in get_players:
                     try:
-                        player = await self.coc_client.fetch_player(rem_player.tag)
-                        try:
-                            member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
-                        except (discord.Forbidden,discord.NotFound):
-                            member = None
-                        if not member:
-                            continue                    
-                        try:
-                            r = self.active_reminders[member.id]
-                        except KeyError:
-                            r = self.active_reminders[member.id] = MemberReminder(member)
-                        r.add_account(player)
-                    except:
-                        bot_client.coc_main_log.exception(f"Error adding account {rem_player.tag} to reminder in {getattr(self.channel,'id','Unknown Channel')}.")
+                        member = await bot_client.bot.get_or_fetch_member(self.guild,player.discord_user)
+                    except (discord.Forbidden,discord.NotFound):
+                        member = None
+                    if not member:
+                        continue                    
+                    try:
+                        r = self.active_reminders[member.id]
+                    except KeyError:
+                        r = self.active_reminders[member.id] = MemberReminder(member)
+                    r.add_account(player)
             
             if len(self.active_reminders) > 0:
                 if self._type == 1:
@@ -158,7 +154,7 @@ class EventReminder():
             await self.refresh_intervals(time_remaining)
     
     async def send_war_reminders(self,clan_war:aClanWar):
-        clan = await self.coc_client.fetch_clan(self.tag)
+        clan = await bot_client.coc.get_clan(self.tag)
                 
         reminder_text = f"You have **NOT** used all of your War Attacks. " 
         reminder_text += f"Clan War ends in **{EventReminder.remaining_time_str(clan_war.end_time)}** "
@@ -185,7 +181,7 @@ class EventReminder():
         self.active_reminders = {}
     
     async def send_raid_reminders(self,raid_weekend:aRaidWeekend):
-        clan = await self.coc_client.fetch_clan(self.tag)
+        clan = await bot_client.coc.get_clan(self.tag)
 
         reminder_text = f"You started your Raid Weekend but **HAVE NOT** used all your Raid Attacks. "
         reminder_text += f"Raid Weekend ends in **{EventReminder.remaining_time_str(raid_weekend.end_time)}** "

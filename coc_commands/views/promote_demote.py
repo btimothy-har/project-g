@@ -7,7 +7,7 @@ from redbot.core import commands
 
 from coc_main.api_client import BotClashClient
 from coc_main.cog_coc_client import ClashOfClansClient
-from coc_main.coc_objects.clans.player_clan import aPlayerClan
+from coc_main.coc_objects.clans.clan import BasicClan
 
 from coc_main.discord.member import aMember
 
@@ -231,7 +231,7 @@ class MemberRankMenu():
     async def _apply_rank_changes(self,target_clan:str):
         report_output = ""
 
-        clan = await self.client.fetch_clan(target_clan)
+        clan = await bot_client.coc.get_clan(target_clan)
         current_rank_int = ClanRanks.get_number(self.get_current_rank(clan))
         new_rank = ClanRanks.get_rank(current_rank_int + self.rank_action)
 
@@ -248,8 +248,7 @@ class MemberRankMenu():
 
             report_output += f"{EmojisUI.TASK_CHECK} {self.member.mention} is now a **{new_rank}** in {clan.title}.\n"
 
-            m = aMember(self.member.user_id,self.member.guild_id)
-            await m.load()
+            m = await aMember(self.member.user_id,self.member.guild_id)
             roles_added, roles_removed = await m.sync_clan_roles(self.ctx,force=True)
             
             for role in roles_added:
@@ -275,7 +274,7 @@ class MemberRankMenu():
     ##################################################
     ### HELPERS
     ##################################################
-    def _predicate_is_eligible_clan(self,clan:aPlayerClan):
+    def _predicate_is_eligible_clan(self,clan:BasicClan):
         if self.member.user_id == clan.leader:
             return False
         elif self.member.user_id in clan.coleaders:
@@ -308,7 +307,7 @@ class MemberRankMenu():
             else:
                 return False
     
-    def get_current_rank(self,clan:aPlayerClan):
+    def get_current_rank(self,clan:BasicClan):
         if self.member.user_id in clan.coleaders:
             current_rank = "Co-Leader"
         elif self.member.user_id in clan.elders:

@@ -96,7 +96,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = await self.client.fetch_many_players(*self.member.member_tags)
+        member_accounts = [p async for p in bot_client.coc.get_players(self.member.member_tags)]
         
         if len(member_accounts) == 0:
             embed = await clash_embed(
@@ -150,8 +150,7 @@ class RemoveMemberMenu(DefaultView):
             )
         await interaction.edit_original_response(embed=embed,view=self)
 
-        get_accounts = await self.client.fetch_many_players(*menu.values)
-        self.remove_accounts.extend(get_accounts)  
+        self.remove_accounts.extend([p async for p in bot_client.coc.get_players(menu.values)])  
         await self._remove_accounts_process()
     
     ####################################################################################################
@@ -204,15 +203,12 @@ class RemoveMemberMenu(DefaultView):
         accounts_removed_list = []
         discord_users = []
 
-        a_iter = AsyncIter(self.remove_accounts)
+        async for player in bot_client.coc.get_players(self.remove_accounts):
+            await player.remove_member()
+            accounts_removed_list.append(f"**{player.title}**")
 
-        async for a in a_iter:
-            account = await self.client.fetch_player(a.tag)
-            await account.remove_member()
-            accounts_removed_list.append(f"**{account.title}**")
-
-            if account.discord_user not in discord_users:
-                discord_users.append(account.discord_user)
+            if player.discord_user not in discord_users:
+                discord_users.append(player.discord_user)
         
         report_output += f"{EmojisUI.TASK_CHECK} Accounts Removed: {chat.humanize_list(accounts_removed_list)}.\n"
     
