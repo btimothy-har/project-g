@@ -525,6 +525,11 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
         application_accounts = [p async for p in bot_client.coc.get_players(tags)]
     else:
         application_accounts = []
+    
+    accounts = sorted(
+        [a for a in application_accounts if isinstance(a,aPlayer)],
+        key=lambda x:(x.town_hall.level,x.exp_level),reverse=True
+        )
 
     clan_tags = application.get('clans',[])
     if len(clan_tags) == 0:
@@ -578,11 +583,7 @@ async def listener_user_application(channel:discord.TextChannel,application_id:s
             value=f"{application.get('answer_q4',[])[1]}\n\u200b",
             inline=False
             )
-        
-    accounts = sorted(
-        [a for a in application_accounts if isinstance(a,aPlayer)],
-        key=lambda x:(x.town_hall.level,x.exp_level),reverse=True
-        )
+    
     accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
 
     tags_query = bot_client.coc_db.db__player.find({'discord_user':member.id},{'_id':1})
