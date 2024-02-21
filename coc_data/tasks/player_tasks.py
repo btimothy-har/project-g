@@ -68,7 +68,6 @@ class PlayerTasks():
         bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Labels changed to {new_player.label_ids}.")
     
     @coc.PlayerEvents.town_hall_level()
-    @coc.PlayerEvents.town_hall_weapon()
     async def on_player_upgrade_townhall(old_player:aPlayer,new_player:aPlayer):
         await aPlayerActivity.create_new(
             player=new_player,
@@ -78,6 +77,17 @@ class PlayerTasks():
             new_value=new_player.town_hall.level
             )        
         bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Townhall upgraded to {new_player.town_hall.description}.")
+    
+    @coc.PlayerEvents.town_hall_weapon()
+    async def on_player_upgrade_townhall_weapon(old_player:aPlayer,new_player:aPlayer):
+        await aPlayerActivity.create_new(
+            player=new_player,
+            timestamp=new_player.timestamp,
+            activity="upgrade_townhall_weapon",
+            change=max(0,new_player.town_hall.weapon - old_player.town_hall.weapon),
+            new_value=new_player.town_hall.weapon
+            )        
+        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Townhall Weapon upgraded to {new_player.town_hall.description}.")
     
     @coc.PlayerEvents.hero_strength()
     async def on_player_upgrade_hero(old_player:aPlayer,new_player:aPlayer):        

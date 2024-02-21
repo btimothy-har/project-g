@@ -15,7 +15,7 @@ from .clan_link import ClanGuildLink
 from ..api_client import BotClashClient as client
 
 from ..coc_objects.players.player import BasicPlayer
-from ..coc_objects.clans.player_clan import aPlayerClan
+from ..coc_objects.clans.clan import BasicClan
 
 from ..exceptions import InvalidUser, InvalidGuild, InvalidTag, CacheNotReady
 from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
@@ -87,8 +87,7 @@ class aMember(AwaitLoader):
         if self.guild:
             return [link.tag for link in await ClanGuildLink.get_for_guild(self.guild.id)]
         else:
-            client_cog = bot_client.bot.get_cog('ClashOfClansClient')
-            return [clan.tag for clan in await client_cog.get_alliance_clans()]
+            return [clan.tag for clan in await bot_client.coc.get_alliance_clans()]
         
     async def load(self):
         self._scope_clans = await self._get_scope_clans()
@@ -182,7 +181,7 @@ class aMember(AwaitLoader):
     def member_tags(self) -> List[str]:
         return [a.tag for a in self.member_accounts]
     @property
-    def home_clans(self) -> List[aPlayerClan]:
+    def home_clans(self) -> List[BasicClan]:
         accounts = self.member_accounts
         mem = []
         for a in accounts:
@@ -194,13 +193,13 @@ class aMember(AwaitLoader):
             )
         return mem
     @property
-    def leader_clans(self) -> List[aPlayerClan]:
+    def leader_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id == hc.leader]    
     @property
-    def coleader_clans(self) -> List[aPlayerClan]:
+    def coleader_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id in hc.coleaders or self.user_id == hc.leader]    
     @property
-    def elder_clans(self) -> List[aPlayerClan]:
+    def elder_clans(self) -> List[BasicClan]:
         return [hc for hc in self.home_clans if self.user_id in hc.elders or self.user_id in hc.coleaders or self.user_id == hc.leader]
     @property
     def is_member(self) -> bool:
@@ -457,8 +456,7 @@ class aMember(AwaitLoader):
             raise InvalidUser(self.user_id)
         
         default_tag = await self._get_default_account_tag()
-        client = bot_client.bot.get_cog('ClashOfClansClient')
-        default_account = await client.fetch_player(default_tag) if default_tag else None
+        default_account = await bot_client.coc.get_player(default_tag) if default_tag else None
 
         if not default_account:
             new_nickname = self.discord_member.name

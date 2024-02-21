@@ -57,8 +57,7 @@ class ClanTasks():
     
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_role(member:coc.ClanMember,clan:aClan):
-        client = ClanTasks._get_client()
-        n_player = await client.fetch_player(member.tag)
+        n_player = await bot_client.coc.get_player(member.tag)
 
         if n_player.discord_user:
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
@@ -86,14 +85,13 @@ class ClanTasks():
     
     @coc.ClanEvents.member_leave()
     async def on_clan_member_leave_role(member:coc.ClanMember,clan:aClan):
-        client = ClanTasks._get_client()
-        n_player = await client.fetch_player(member.tag)
+        n_player = await bot_client.coc.get_player(member.tag)
 
         if n_player.discord_user:
             member = await aMember(n_player.discord_user)
             await member.load()
 
-            member_accounts = await client.fetch_many_players(member.account_tags)            
+            member_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
             
             if clan_links and len(clan_links) > 0:

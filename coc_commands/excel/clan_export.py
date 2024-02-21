@@ -105,7 +105,7 @@ class ClanExcelExport():
             members_worksheet.write(row,col,header,bold)
             col += 1
         
-        members = await self.client.fetch_members_by_season(self.clan,self.season)
+        members = await bot_client.coc.get_members_by_season(self.clan,self.season)
         async for m in AsyncIter(members):
             col = 0
             row += 1

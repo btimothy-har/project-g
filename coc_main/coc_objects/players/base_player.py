@@ -9,7 +9,7 @@ from pymongo import ReturnDocument
 from collections import defaultdict
 from async_property import AwaitLoader
 
-from ..clans.player_clan import *
+from ..clans.clan import BasicClan, aClan, _PlayerClan
 
 from ...api_client import BotClashClient as client
 from ...exceptions import CacheNotReady
@@ -52,7 +52,7 @@ class BasicPlayer(AwaitLoader):
     
     async def load(self):
         await self._attributes.load()
-        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
+        self.home_clan = await BasicClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
         await bot_client.clan_queue.put(self.tag)
     
     ##################################################
@@ -205,7 +205,7 @@ class BasicPlayer(AwaitLoader):
 
             self._attributes.is_member = True
             self._attributes.home_clan_tag = home_clan.tag
-            self.home_clan = await aPlayerClan(tag=home_clan.tag)                
+            self.home_clan = await BasicClan(tag=home_clan.tag)                
             await self.home_clan.new_member(self.tag)
 
             await bot_client.coc_db.db__player.update_one(
@@ -225,7 +225,7 @@ class BasicPlayer(AwaitLoader):
                     )
             
     async def remove_member(self):
-        self.home_clan = await aPlayerClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
+        self.home_clan = await BasicClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
         if self.home_clan:
             await self.home_clan.remove_member(self.tag)
 

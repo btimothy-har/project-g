@@ -1,13 +1,14 @@
+import coc
+
 from typing import *
 
-from ...api_client import coc as coc
 from ...api_client import BotClashClient as client
-
 from ...utils.constants.coc_emojis import EmojisHeroes
 
 bot_client = client()
 
 class aHero():
+
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int):
         i = bot_client.coc.get_hero(name,level=1)

@@ -137,7 +137,6 @@ class GuildUtility(commands.Cog):
             reason=reason
             )
         await thread.send(f"{user.mention}, please note that to chat with me here, you will need to either reply or mention me in your message.")
-
         return f"Created a thread with {user.display_name}. Let the user know to continue the conversation there."
 
     async def _assistant_wikipedia_search(self,bot:Red,query:str,*args,**kwargs) -> str:

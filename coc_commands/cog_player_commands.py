@@ -1,3 +1,4 @@
+import coc
 import discord
 import pendulum
 import asyncio
@@ -52,10 +53,9 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
     menu = None
     try:
         await interaction.response.defer()
-        coc = bot_client.bot.get_cog("ClashOfClansClient")
 
         member = aMember(member.id,member.guild.id)
-        accounts = await coc.fetch_many_players(*member.account_tags)
+        accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
         menu = PlayerProfileMenu(interaction,accounts)
         await menu.start()
 
@@ -208,10 +208,19 @@ class Players(commands.Cog):
             bot_client.coc_main_log.exception("Error in Player Cog member_role_sync.")
     
     async def cog_command_error(self,ctx,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
+        if isinstance(error,coc.NotFound):
             embed = await clash_embed(
                 context=ctx,
-                message=f"{error.original.message}",
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        elif isinstance(error,coc.GatewayError) or isinstance(error,coc.Maintenance):
+            embed = await clash_embed(
+                context=ctx,
+                message="The Clash of Clans API is currently unavailable.",
                 success=False,
                 timestamp=pendulum.now()
                 )
@@ -220,10 +229,22 @@ class Players(commands.Cog):
         await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
 
     async def cog_app_command_error(self,interaction,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
+        if isinstance(error,coc.NotFound):
             embed = await clash_embed(
                 context=interaction,
-                message=f"{error.original.message}",
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed,view=None)
+            else:
+                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
+            return
+        elif isinstance(error,coc.GatewayError) or isinstance(error,coc.Maintenance):
+            embed = await clash_embed(
+                context=interaction,
+                message="The Clash of Clans API is currently unavailable.",
                 success=False,
                 timestamp=pendulum.now()
                 )
@@ -307,12 +328,11 @@ class Players(commands.Cog):
                 ]
             query = bot_client.coc_db.db__player.aggregate(pipeline)
 
-            try:
-                player_tags = [c['_id'] async for c in query]
-            except:
+            player_tags = [c['_id'] async for c in query]
+            if len(player_tags) == 0:
                 return f"No matches for {player_name} found."
-            players = await self.client.fetch_many_players(*player_tags)
-
+            
+            players = [p async for p in bot_client.coc.get_players(player_tags)]
             ret_players = [p.name_json() for p in players]
             return f"Found {len(ret_players)} Players matching `{player_name}`. Players: {ret_players}"
         except:
@@ -322,27 +342,31 @@ class Players(commands.Cog):
         if not user:
             return "No user found."        
         member = await aMember(user.id,guild.id)
-        accounts = await self.client.fetch_many_players(*member.account_tags)
+        accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
         return f"{user.name} has the following accounts linked: {[a.name_json() for a in accounts]}"
     
     async def _assistant_get_player_clan_status(self,player_tag:str,*args,**kwargs) -> str:
         try:
-            account = await self.client.fetch_player(player_tag)
-        except ClashAPIError as exc:
-            return f"Error: {exc.message}"
-        except InvalidTag:
-            return "Invalid Tag."
+            account = await bot_client.coc.get_player(player_tag)
+        except coc.NotFound:
+            return "The player tag provided does not exist."
+        except (coc.Maintenance,coc.GatewayError):
+            return "Clash of Clans API is currently not available."
+        except:
+            return "An exception occurred while fetching the player."
         if not account:
             return "No account found."
         return f"{account.profile_json()}"
     
     async def _assistant_get_account_heroes(self,player_tag:str,*args,**kwargs) -> str:
         try:
-            account = await self.client.fetch_player(player_tag)
-        except ClashAPIError as exc:
-            return f"Error: {exc.message}"
-        except InvalidTag:
-            return "Invalid Tag."
+            account = await bot_client.coc.get_player(player_tag)
+        except coc.NotFound:
+            return "The player tag provided does not exist."
+        except (coc.Maintenance,coc.GatewayError):
+            return "Clash of Clans API is currently not available."
+        except:
+            return "An exception occurred while fetching the player."
         if not account:
             return "No account found."
         return f"Hero Levels for account {account.name} (Tag: {account.tag}): {account.hero_json()}"
@@ -512,11 +536,11 @@ class Players(commands.Cog):
         await interaction.response.defer()
 
         selected_account = None
-        selected_member = None        
+        selected_member = None
         discord_id = int(discord_id) if discord_id else None
 
         if player:
-            selected_account = await self.client.fetch_player(player)
+            selected_account = await bot_client.coc.get_player(player)
         selected_member = member if member else discord_id if discord_id else None
 
         menu = RemoveMemberMenu(interaction,member=selected_member,account=selected_account)
@@ -666,13 +690,12 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player_tag:
-            player = await self.client.fetch_player(player_tag)
+            player = await bot_client.coc.get_player(player_tag)
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         else:
             member = await aMember(ctx.author.id,ctx.guild.id)
-            accounts = await self.client.fetch_many_players(*member.account_tags)
-            view_accounts.extend(accounts)
+            view_accounts.extend([p async for p in bot_client.coc.get_players(member.account_tags)])
         
         menu = PlayerProfileMenu(ctx,view_accounts)
         await menu.start()
@@ -695,24 +718,21 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player:
-            get_player = await self.client.fetch_player(player)
+            get_player = await bot_client.coc.get_player(player)
             if isinstance(get_player,aPlayer):
                 view_accounts.append(get_player)
 
         if member:
             get_member = await aMember(member.id,interaction.guild.id)
-            accounts = await self.client.fetch_many_players(*get_member.account_tags)
-            view_accounts.extend(accounts)
+            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
 
         if user_id:
             get_member = await aMember(user_id,interaction.guild.id)
-            accounts = await self.client.fetch_many_players(*get_member.account_tags)
-            view_accounts.extend(accounts)
+            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
 
         if not (player or member or user_id):
             get_member = await aMember(interaction.user.id,interaction.guild.id)
-            accounts = await self.client.fetch_many_players(*get_member.account_tags)
-            view_accounts.extend(accounts)
+            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
         
         if len(view_accounts) == 0:
             return await interaction.followup.send(content=f"Did not find any accounts for the provided input.")

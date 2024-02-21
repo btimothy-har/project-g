@@ -41,8 +41,7 @@ class ClanMemberFeed(ClanDataFeed):
             clan_feeds = await cls.feeds_for_clan(clan,type=type)
 
             if len(clan_feeds) > 0:
-                client = cls.get_coc_client()
-                p = await client.fetch_player(player.tag)
+                p = await bot_client.coc.get_player(player.tag)
 
                 embed = await cls.join_embed(clan,p)
                 a_iter = AsyncIter(clan_feeds)
@@ -78,8 +77,7 @@ class ClanMemberFeed(ClanDataFeed):
             clan_feeds = await cls.feeds_for_clan(clan,type=type)
 
             if len(clan_feeds) > 0:
-                client = cls.get_coc_client() 
-                p = await client.fetch_player(player.tag)
+                p = await bot_client.coc.get_player(player.tag)
 
                 embed = await cls.leave_embed(clan,p)
                 a_iter = AsyncIter(clan_feeds)

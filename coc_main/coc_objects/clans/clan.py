@@ -177,3 +177,43 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
                 tasks.append(basic_clan.set_war_league(self.war_league_name))            
             if tasks:
                 await asyncio.gather(*tasks)
+
+class _PlayerClan(coc.PlayerClan,BasicClan):
+    def __init__(self,**kwargs):
+
+        self._name = None
+        self._badge = None
+        self._level = None
+
+        coc.PlayerClan.__init__(self,**kwargs)
+        BasicClan.__init__(self,self.tag)
+    
+    def to_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'level': self.level,
+            }
+    
+    @property
+    def name(self) -> str:
+        return self._name
+    @name.setter
+    def name(self,value:str):
+        self._name = value
+
+    @property
+    def badge(self) -> Optional[str]:
+        if self._badge:
+            return self._badge.url
+        return None
+    @badge.setter
+    def badge(self,badge:coc.Badge):
+        self._badge = badge
+    
+    @property
+    def level(self) -> int:
+        return self._level
+    @level.setter
+    def level(self,value:int):
+        self._level = value

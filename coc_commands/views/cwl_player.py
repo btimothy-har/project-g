@@ -1,3 +1,4 @@
+import coc
 import discord
 import asyncio
 import pendulum
@@ -108,7 +109,7 @@ class CWLPlayerMenu(DefaultView):
                     self.message = await self.ctx.send(embed=embed, view=self)
             return            
 
-        self.accounts = await self.client.fetch_many_players(*[p.tag for p in self.member.accounts])
+        self.accounts = [p async for p in bot_client.coc.get_players([p.tag for p in self.member.accounts])]
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
@@ -524,7 +525,10 @@ class CWLPlayerMenu(DefaultView):
         
         a_iter = AsyncIter(self.current_signups)
         async for cwl_account in a_iter:
-            player = await self.client.fetch_player(cwl_account.tag)
+            try:
+                player = await bot_client.coc.get_player(cwl_account.tag)
+            except coc.NotFound:
+                continue
 
             if cwl_account.tag not in self.user_registration:
                 if embed_1_ct < 10:
@@ -591,7 +595,10 @@ class CWLPlayerMenu(DefaultView):
             )
         r_iter = AsyncIter(list(self.user_registration.values()))
         async for m_account in r_iter:
-            player = await self.client.fetch_player(m_account.account.tag)
+            try:
+                player = await bot_client.coc.get_player(m_account.account.tag)
+            except coc.NotFound:
+                continue
             change_embed.add_field(
                 name=f"**{player.title}**",
                 value=f"{CWLLeagueGroups.get_description(m_account.league) if m_account.league else 'Registration Removed'}"
@@ -826,7 +833,10 @@ class CWLPlayerMenu(DefaultView):
         ct = 0
         a_iter = AsyncIter(self.live_cwl_accounts)
         async for cwl_player in a_iter:
-            player = await self.client.fetch_player(cwl_player.tag)
+            try:
+                player = await bot_client.coc.get_player(cwl_player.tag)
+            except coc.NotFound:
+                continue
 
             ct += 1
             e = embed

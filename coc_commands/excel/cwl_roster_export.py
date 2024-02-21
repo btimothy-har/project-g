@@ -60,7 +60,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
         col += 1
     
     all_signups = await WarLeaguePlayer.signups_by_season(season=season)
-    participant_players = await client.fetch_many_players(*[m.tag for m in all_signups])
+    participant_players = [p async for p in bot_client.coc.get_players([m.tag for m in all_signups])]
     
     a_iter = AsyncIter(all_signups)
     async for league_player in a_iter:

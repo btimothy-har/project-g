@@ -165,13 +165,12 @@ class ClanWarLeagues(commands.Cog):
             raise ValueError("Could not create Clan Channel.")
         
         cwl_participants = await league_clan.get_participants()
-        fetch_players = await self.client.fetch_many_players(*[p.tag for p in cwl_participants])
-
         p_iter = AsyncIter(cwl_participants)
         tasks = [m.finalize(role=league_clan.league_role) async for m in p_iter]
         await bounded_gather(*tasks,limit=1)
 
-        fetch_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level),reverse=True)
+        fetch_players = [p async for p in bot_client.coc.get_players([p.tag for p in cwl_participants])]
+        fetch_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level),reverse=True)        
         participants_20 = fetch_players[:20]
         participants_40 = fetch_players[20:40]
 
@@ -352,7 +351,7 @@ class ClanWarLeagues(commands.Cog):
         return f"The next upcoming Clan War Leagues is for the {self.active_war_league_season.description} season."
     
     async def _assistant_get_cwl_clans(self,*args,**kwargs) -> str:
-        clans = await self.client.get_war_league_clans()
+        clans = await bot_client.coc.get_war_league_clans()
         return_info = [c.assistant_name_json() for c in clans]
         return f"The following Clans are registered as official Clan War League clans: {return_info}"
     
@@ -616,7 +615,7 @@ class ClanWarLeagues(commands.Cog):
             message=f"Roles will not appear if they are from a different Server."
                 + f"\nIf using Thread Channels, archived threads will not be visible."
             )
-        clans = await self.client.get_war_league_clans()
+        clans = await bot_client.coc.get_war_league_clans()
         c_iter = AsyncIter(clans)
         async for clan in c_iter:
             embed.add_field(
@@ -655,9 +654,10 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / CLAN / ADD
     ##################################################
-    async def add_war_league_clan_helper(self,context:Union[discord.Interaction,commands.Context],clan:aClan):
-        await clan.add_to_war_league()
+    async def add_war_league_clan_helper(self,context:Union[discord.Interaction,commands.Context],clan_tag:str):
+        clan = await bot_client.coc.get_clan(clan_tag)
 
+        await clan.add_to_war_league()
         embed = await clash_embed(
             context=context,
             message=f"**{clan.title}** is now added as a CWL Clan.",
@@ -675,8 +675,7 @@ class ClanWarLeagues(commands.Cog):
         This adds the Clan to the master list. It does not add the Clan to the current CWL Season. To enable a Clan for a specific season, use `/cwl setup`.
         """
         
-        clan = await self.client.fetch_clan(clan_tag)
-        embed = await self.add_war_league_clan_helper(ctx,clan)
+        embed = await self.add_war_league_clan_helper(ctx,clan_tag)
         await ctx.reply(embed=embed)
     
     @app_subcommand_group_cwl_clan.command(name="add",
@@ -688,8 +687,7 @@ class ClanWarLeagues(commands.Cog):
     async def sub_appcommand_cwl_clan_add(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
-        get_clan = await self.client.fetch_clan(clan)
-        embed = await self.add_war_league_clan_helper(interaction,get_clan)
+        embed = await self.add_war_league_clan_helper(interaction,clan)
         await interaction.edit_original_response(embed=embed)
     
     ##################################################
@@ -698,14 +696,14 @@ class ClanWarLeagues(commands.Cog):
     @subcommand_group_cwl_clan.command(name="remove")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_cwl_clan_remove(self,ctx,clan_tag:str):
+    async def subcommand_cwl_clan_remove(self,ctx:commands.Context,clan_tag:str):
         """
         Remove a Clan from the available CWL Clans list.
 
         Owner-only to prevent strange things from happening.
         """
         
-        clan = await self.client.fetch_clan(clan_tag)
+        clan = await bot_client.coc.get_clan(clan_tag)
         await clan.remove_from_war_league()
 
         embed = await clash_embed(
@@ -909,6 +907,21 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / ROSTER / ADD
     ##################################################
+    @subcommand_group_cwl_roster.command(name="open")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcommand_cwl_roster_open(self,ctx:commands.Context,clan_tag:str):
+        """
+        Force open a CWL Clan's Roster.
+        """
+        season = self.active_war_league_season
+
+        clan = await bot_client.coc.get_clan(clan_tag)
+        cwl_clan = await WarLeagueClan(clan.tag,season)
+
+        await cwl_clan.open_roster()
+        await ctx.tick()
+
     async def admin_add_player_helper(self,
         context:Union[discord.Interaction,commands.Context],
         clan_tag:str,
@@ -916,7 +929,8 @@ class ClanWarLeagues(commands.Cog):
 
         reopen = False
         season = self.active_war_league_season
-        league_clan = await WarLeagueClan(clan_tag,season)
+        clan = await bot_client.coc.get_clan(clan_tag)
+        league_clan = await WarLeagueClan(clan.tag,season)
 
         if not league_clan.is_participating:
             embed = await clash_embed(
@@ -933,8 +947,9 @@ class ClanWarLeagues(commands.Cog):
                 success=False
                 )
             return embed
-
-        league_player = await WarLeaguePlayer(player_tag,season)
+        
+        player = await bot_client.coc.get_player(player_tag)
+        league_player = await WarLeaguePlayer(player.tag,season)
         original_roster = league_player.roster_clan
 
         await league_player.admin_add(league_clan)
@@ -954,21 +969,6 @@ class ClanWarLeagues(commands.Cog):
             success=True
             )
         return embed
-
-    @subcommand_group_cwl_roster.command(name="open")
-    @commands.is_owner()
-    @commands.guild_only()
-    async def subcommand_cwl_roster_open(self,ctx,clan_tag:str):
-        """
-        Force open a CWL Clan's Roster.
-        """
-        season = self.active_war_league_season
-
-        clan = await self.client.fetch_clan(clan_tag)
-        cwl_clan = clan.war_league_season(season)
-
-        await cwl_clan.open_roster()
-        await ctx.tick()
     
     @subcommand_group_cwl_roster.command(name="add")
     @commands.check(is_cwl_leader)
@@ -1011,8 +1011,9 @@ class ClanWarLeagues(commands.Cog):
 
         reopen = False
         season = self.active_war_league_season
-        
-        league_player = await WarLeaguePlayer(player_tag,season)
+
+        player = await bot_client.coc.get_player(player_tag)        
+        league_player = await WarLeaguePlayer(player.tag,season)
         
         if getattr(league_player,'league_clan',None):
             embed = await clash_embed(
@@ -1042,7 +1043,7 @@ class ClanWarLeagues(commands.Cog):
     @subcommand_group_cwl_roster.command(name="remove")
     @commands.check(is_cwl_leader)
     @commands.guild_only()
-    async def subcommand_cwl_roster_remove(self,ctx,player_tag:str):
+    async def subcommand_cwl_roster_remove(self,ctx:commands.Context,player_tag:str):
         """
         Admin remove a Player from CWL.
 
@@ -1074,7 +1075,7 @@ class ClanWarLeagues(commands.Cog):
     @subcommand_group_cwl_roster.command(name="export")
     @commands.check(is_cwl_leader)
     @commands.guild_only()
-    async def subcommand_cwl_roster_export(self,ctx):
+    async def subcommand_cwl_roster_export(self,ctx:commands.Context):
         """
         Exports all Signups (and Roster information) to Excel.
 

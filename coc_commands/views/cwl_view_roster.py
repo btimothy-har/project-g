@@ -80,11 +80,11 @@ class CWLRosterDisplayMenu(MenuPaginator):
         self.stop()
 
     async def start(self):
-        self.clan = await self.client.fetch_clan(self.league_clan.tag)
+        self.clan = await bot_client.coc.get_clan(self.league_clan.tag)
 
         if self.league_clan.status == 'CWL Started':
             await asyncio.gather(*(self.league_clan.compute_lineup_stats(),self.league_clan.get_participants()))
-            self.reference_list = await self.client.fetch_many_players(*self.league_clan.master_roster_tags)
+            self.reference_list = [p async for p in bot_client.coc.get_players(self.league_clan.master_roster_tags)]
             self.reference_list.sort(
                 key=lambda x:(x.town_hall.level,x.hero_strength),
                 reverse=True)
@@ -105,13 +105,12 @@ class CWLRosterDisplayMenu(MenuPaginator):
                 return
             
             await self.league_clan.get_participants()
-            self.reference_list = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
+            self.reference_list = [p async for p in bot_client.coc.get_players([p.tag for p in self.league_clan.participants])]
             self.reference_list.sort(
                 key=lambda x:(x.town_hall.level,x.hero_strength),
                 reverse=True)
             
-            mem_in_clan = await self.client.fetch_many_players(*[p.tag for p in self.clan.members])
-            async for mem in AsyncIter(mem_in_clan):
+            async for mem in bot_client.coc.get_players([p.tag for p in self.clan.members]):
                 if mem.tag not in [p.tag for p in self.reference_list]:
                     self.reference_list.append(mem)
         self.is_active = True
@@ -191,12 +190,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-                header_text += f"\n**Participants:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
+                header_text += f"\n**Participants:** {len([p async for p in bot_client.coc.get_players([p.tag for p in self.league_clan.master_roster]) if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-                header_text += f"\n**Rostered:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
+                header_text += f"\n**Rostered:** {len([p async for p in bot_client.coc.get_players([p.tag for p in self.league_clan.participants]) if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += (f"{EmojisUI.YES}: a Rostered CWL Player\n" if self.league_clan.status in ["Roster Finalized","Roster Pending"] else "")
@@ -247,12 +244,10 @@ class CWLRosterDisplayMenu(MenuPaginator):
             header_text += f"\n**Status:** {self.league_clan.status}"
             header_text += f"\n**League:** {EmojisLeagues.get(self.league_clan.league)}{self.league_clan.league}"
             if self.league_clan.status in ["CWL Started"]:
-                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.master_roster])
-                header_text += f"\n**Participants:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
+                header_text += f"\n**Participants:** {len([p async for p in bot_client.coc.get_players([p.tag for p in self.league_clan.master_roster]) if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.master_roster)} in CWL"
                 header_text += f"\n*Only showing players in the in-game master roster.*"
             else:
-                roster_players = await self.client.fetch_many_players(*[p.tag for p in self.league_clan.participants])
-                header_text += f"\n**Rostered:** {len([p for p in roster_players if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
+                header_text += f"\n**Rostered:** {len([p async for p in bot_client.coc.get_players([p.tag for p in self.league_clan.participants]) if getattr(p.clan,'tag',None) == self.league_clan.tag])} In Clan / {len(self.league_clan.participants)} Rostered"
 
             header_text += f"\n\n"
             header_text += f"{EmojisUI.YES}: This player is rostered to play in CWL."

@@ -104,7 +104,7 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = await self.client.fetch_many_players(*self.member.account_tags)
+        player_accounts = [p async for p in bot_client.coc.get_players(self.member.account_tags)]
         player_accounts.sort(
             key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),
             reverse=True)
@@ -220,7 +220,7 @@ class NewMemberMenu(DefaultView):
     ### COLLATE ACCOUNTS
     ##################################################    
     async def _collate_player_accounts(self,tags:List[str]):
-        self.accounts = await self.client.fetch_many_players(*tags)
+        self.accounts = [p async for p in bot_client.coc.get_players(tags)]
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         await self._get_home_clans()
     

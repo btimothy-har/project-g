@@ -129,9 +129,8 @@ class DefaultWarTasks():
 
             await asyncio.sleep(120)
             await war.save_to_database()
-            client = DefaultWarTasks._get_client()
 
-            new_clan = await client.fetch_clan(clan.tag)
+            new_clan = await bot_client.coc.get_clan(clan.tag)
             if new_clan.is_registered_clan and len(new_clan.abbreviation) > 0:
                 if war.get_clan(new_clan.tag).result in ['winning','won']:                
                     if war.type == ClanWarType.RANDOM:
