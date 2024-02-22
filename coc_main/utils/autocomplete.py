@@ -7,7 +7,7 @@ from redbot.core import app_commands
 from redbot.core.utils import AsyncIter
 
 from ..api_client import BotClashClient
-from ..discord.guild import ClanGuildLink
+from ..discord.clan_link import ClanGuildLink
 from ..discord.member import aMember
 
 bot_client = BotClashClient()

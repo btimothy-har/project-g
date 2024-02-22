@@ -11,10 +11,9 @@ from numerize import numerize
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
-from coc_data.cog_coc_data import ClashOfClansData
+from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_main.discord.guild import ClanGuildLink
+from coc_main.discord.clan_link import ClanGuildLink
 
 from coc_main.utils.components import clash_embed, DiscordButton
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
