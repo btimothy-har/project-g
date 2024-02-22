@@ -148,8 +148,6 @@ class ClashOfClansData(commands.Cog):
             await asyncio.sleep(1)
 
         await bot_client.bot.wait_until_ready()
-        bot_client.coc.player_cls = aPlayer
-        bot_client.coc.clan_cls = aClan
 
         #NEBULA Bot
         if self.bot.user.id == 1031240380487831664:
