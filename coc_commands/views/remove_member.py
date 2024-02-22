@@ -203,7 +203,8 @@ class RemoveMemberMenu(DefaultView):
         accounts_removed_list = []
         discord_users = []
 
-        async for player in bot_client.coc.get_players(self.remove_accounts):
+        rem_accounts = AsyncIter(self.remove_accounts)
+        async for player in rem_accounts:
             await player.remove_member()
             accounts_removed_list.append(f"**{player.title}**")
 
