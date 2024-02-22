@@ -423,7 +423,7 @@ class DiscordPanels(commands.Cog):
     @commands.admin()
     async def command_group_clan_application_reset(self,ctx:commands.Context):
         """
-        Resets all Application Panel.
+        Resets all Application Panels.
         """
 
         lock = DiscordPanels._guild_locks[ctx.guild.id]
@@ -436,14 +436,11 @@ class DiscordPanels(commands.Cog):
             
             await ctx.reply(f"Application Panels have been reset.")
 
-    @app_command_subgroup_application_panels.command(name="delete",
-        description="Delete an Application Panel.")
+    @app_command_subgroup_application_panels.command(name="reset",
+        description="Resets all Application Panels.")
     @app_commands.check(is_admin)
     @app_commands.guild_only()
-    @app_commands.autocomplete(panel=autocomplete_guild_apply_panels)
-    @app_commands.describe(
-        panel="The Application Panel to delete.")
-    async def app_command_subgroup_application_panels_reset(self,interaction:discord.Interaction,panel:str):
+    async def app_command_subgroup_application_panels_reset(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 
