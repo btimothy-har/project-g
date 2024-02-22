@@ -14,38 +14,6 @@ from ..utils.components import clash_embed
 
 bot_client = client()
 
-async def guild_clan_panel_embed(clan:aClan,guild:Optional[discord.Guild]=None) -> discord.Embed:
-    if guild:
-        if guild.vanity_url:
-            invite = await guild.vanity_invite()                        
-        else:
-            normal_invites = await guild.invites()
-            if len(normal_invites) > 0:
-                invite = normal_invites[0]
-            else:
-                invite = await guild.channels[0].create_invite()
-
-    embed = await clash_embed(
-        context=bot_client.bot,
-        title=f"**{clan.title}**",
-        message=f"{EmojisClash.CLAN} Level {clan.level}\u3000"
-            + f"{EmojisUI.MEMBERS}" + (f" {clan.alliance_member_count}" if clan.is_alliance_clan else f" {clan.member_count}") + "\u3000"
-            + f"{EmojisUI.GLOBE} {clan.location.name}\n"
-            + (f"{EmojisClash.CLANWAR} W{clan.war_wins}/D{clan.war_ties}/L{clan.war_losses} (Streak: {clan.war_win_streak})\n" if clan.public_war_log else "")
-            + f"{EmojisClash.WARLEAGUES}" + (f"{EmojisLeagues.get(clan.war_league.name)} {clan.war_league.name}\n" if clan.war_league else "Unranked\n")
-            + f"{EmojisCapitalHall.get(clan.capital_hall)} CH {clan.capital_hall}\u3000"
-            + f"{EmojisClash.CAPITALTROPHY} {clan.capital_points}\u3000"
-            + (f"{EmojisLeagues.get(clan.capital_league.name)} {clan.capital_league}" if clan.capital_league else f"{EmojisLeagues.UNRANKED} Unranked") #+ "\n"
-            + (f"\n\n**Join this Clan at: [{guild.name}]({str(invite)})**" if guild and invite else "")
-            + f"\n\n{clan.description}"
-            + f"\n\n**Recruiting**"
-            + f"\nTownhalls: {clan.recruitment_level_emojis}"
-            + (f"\n\n{clan.recruitment_info}" if len(clan.recruitment_info) > 0 else ""),
-        thumbnail=clan.badge,
-        show_author=False
-        )
-    return embed
-
 def account_recruiting_summary(account:aPlayer):
     text = ""
     text += f"### __**{account.name}**__"

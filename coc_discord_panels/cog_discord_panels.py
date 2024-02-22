@@ -1,15 +1,12 @@
-import coc
-import random
 import discord
 import asyncio
-import hashlib
 import pendulum
 
 from typing import *
 
 from discord.ext import tasks
 
-from redbot.core import Config, commands, app_commands
+from redbot.core import commands, app_commands
 from redbot.core.commands import Context
 from redbot.core.utils import AsyncIter, bounded_gather
 from redbot.core.bot import Red
@@ -17,18 +14,22 @@ from redbot.core.bot import Red
 from coc_main.api_client import BotClashClient as client
 from coc_main.coc_objects.clans.clan import aClan
 from coc_main.discord.clan_link import ClanGuildLink
+from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisCapitalHall, EmojisLeagues
+from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin
 
 from .components.application_panel import GuildApplicationPanel, ClanApplyMenu, ClanApplyMenuUser
 from .components.create_application_panel import CreateApplicationMenu
-from .components.exceptions import InvalidApplicationChannel
-from .components.autocomplete import autocomplete_guild_apply_panels
+from .components.clan_panel import GuildClanPanel
+
+from .exceptions import InvalidApplicationChannel
+from .autocomplete import autocomplete_guild_apply_panels, autocomplete_guild_clan_panels
 
 bot_client = client()
 
-class ClanApplications(commands.Cog):
-    """Commands & Components to handle Clan Applications."""
+class DiscordPanels(commands.Cog):
+    """Commands & Components to handle Discord Clan Panels."""
 
     __author__ = bot_client.author
     __version__ = bot_client.version
@@ -406,21 +407,218 @@ class ClanApplications(commands.Cog):
     
     ############################################################
     #####
-    ##### BACKGROUND PANEL UPDATES
+    ##### COMMAND GROUP: CLAN PANELS
+    #####
+    ############################################################
+    @commands.group(name="clanpanel")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_group_clan_panels(self,ctx):
+        """
+        Command group for Clan Panels.
+
+        Clan Panels are a set of auto-updating embeds that display information about Clans linked to this Server.
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    app_command_group_panels = app_commands.Group(
+        name="clan-panel",
+        description="Command group for Clan Panels.",
+        guild_only=True
+        )
+    
+    ##################################################
+    ### CLANPANEL / LIST
+    ##################################################
+    @command_group_clan_panels.command(name="list")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_group_clan_panels_list(self,ctx):
+        """
+        List all Clan Panels in this Server.
+        """
+
+        embed = await clash_embed(
+            context=ctx,
+            title="**Clan Panels**"
+            )
+        clan_panels = await GuildClanPanel.get_for_guild(ctx.guild.id)
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
+            embed.add_field(
+                name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
+                value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
+                    + f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}",
+                inline=False
+                )
+        await ctx.reply(embed=embed)
+    
+    @app_command_group_panels.command(name="list",
+        description="List all Clan Panels in this Server.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    async def app_command_group_panels_list(self,interaction:discord.Interaction):
+        
+        await interaction.response.defer()
+        
+        embed = await clash_embed(
+            context=interaction,
+            title="**Clan Panels**"
+            )
+        clan_panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
+        a_iter = AsyncIter(clan_panels)
+        async for panel in a_iter:
+            embed.add_field(
+                name=f"**{getattr(panel.channel,'name','Unknown Channel')}**",
+                value=f"Channel: {getattr(panel.channel,'mention','Unknown Channel')}"
+                    + f"\nMessage: {getattr(await panel.fetch_message(),'jump_url','')}",
+                inline=False
+                )
+        await interaction.edit_original_response(embed=embed,view=None)
+    
+    ##################################################
+    ### SERVERSETUP / PANEL / CREATE
+    ##################################################    
+    @command_group_clan_panels.command(name="create")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_group_clan_panels_create(self,ctx,channel_id:int):
+        """
+        Create a Clan Panel.
+        """
+        channel = ctx.guild.get_channel(channel_id)
+
+        if not isinstance(channel,discord.TextChannel):
+            embed = await clash_embed(
+                context=ctx,
+                message=f"Please specify a valid channel.",
+                success=False
+                )
+            return await ctx.reply(embed=embed)
+        
+        panel = await GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel_id)
+        if panel:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"A Clan Panel already exists for this channel.",
+                success=False
+                )
+            return await ctx.reply(embed=embed)
+        
+        await GuildClanPanel.create(guild_id=channel.guild.id,channel_id=channel.id)
+        embed = await clash_embed(
+            context=ctx,
+            message=f"Clan Panel created.",
+            success=True
+            )
+        await ctx.reply(embed=embed)
+        await DiscordPanels.update_guild_clan_panels(ctx.guild)
+    
+    @app_command_group_panels.command(name="create",
+        description="Create a Clan Panel.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    @app_commands.describe(
+        channel="The Channel to create the Panel in.")
+    async def app_command_group_panels_create(self,interaction:discord.Interaction,channel:discord.TextChannel):
+
+        await interaction.response.defer()
+        
+        panel = await GuildClanPanel.get_panel(guild_id=interaction.guild.id,channel_id=channel.id)
+        if panel:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"A Clan Panel already exists for this channel.",
+                success=False
+                )
+            return await interaction.edit_original_response(embed=embed,view=None)
+        
+        await GuildClanPanel.create(guild_id=channel.guild.id,channel_id=channel.id)
+        embed = await clash_embed(
+            context=interaction,
+            message=f"Clan Panel created.",
+            success=True
+            )
+        await interaction.edit_original_response(embed=embed,view=None)
+        await DiscordPanels.update_guild_clan_panels(interaction.guild)
+    
+    ##################################################
+    ### SERVERSETUP / PANEL / DELETE
+    ##################################################    
+    @command_group_clan_panels.command(name="delete")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_group_clan_panels_delete(self,ctx:commands.Context,channel_id:int):
+        """
+        Deletes a Clan Panel.
+        """
+        channel = ctx.guild.get_channel(channel_id)
+
+        if not isinstance(channel,discord.TextChannel):
+            embed = await clash_embed(
+                context=ctx,
+                message=f"Please specify a valid channel.",
+                success=False
+                )
+            return await ctx.reply(embed=embed)
+        
+        panel = await GuildClanPanel.get_panel(guild_id=ctx.guild.id,channel_id=channel.id)
+        if not panel:
+            embed = await clash_embed(
+                context=ctx,
+                message=f"A Guild Panel does not exist for this channel.",
+                success=False
+                )
+            return await ctx.reply(embed=embed)
+                
+        await panel.delete()
+        embed = await clash_embed(
+            context=ctx,
+            message=f"Clan Panel deleted.",
+            success=True
+            )
+        await ctx.reply(embed=embed)
+        await DiscordPanels.update_guild_clan_panels(ctx.guild)
+
+    @app_command_group_panels.command(name="delete",
+        description="Delete a Clan Panel.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    @app_commands.autocomplete(panel=autocomplete_guild_clan_panels)
+    @app_commands.describe(
+        panel="The Clan Panel to delete.")
+    async def app_command_group_panels_delete(self,interaction:discord.Interaction,panel:str):
+
+        await interaction.response.defer()
+        
+        channel = interaction.guild.get_channel(int(panel))
+
+        get_panel = await GuildClanPanel.get_panel(guild_id=channel.guild.id,channel_id=channel.id)
+
+        await get_panel.delete()
+        embed = await clash_embed(
+            context=interaction,
+            message=f"Clan Panel deleted.",
+            success=True
+            )
+        await interaction.edit_original_response(embed=embed,view=None)
+        await DiscordPanels.update_guild_clan_panels(interaction.guild)
+    
+    ############################################################
+    #####
+    ##### BACKGROUND UPDATES: APPLICATION PANELS
     #####
     ############################################################
     @tasks.loop(minutes=30)
     async def update_application_panels(self):
-        if self._update_lock.locked():
-            return
-        
         async with self._update_lock:
             guild_iter = AsyncIter(self.bot.guilds)
-            tasks = [ClanApplications.update_for_guild(guild) async for guild in guild_iter]
+            tasks = [DiscordPanels.update_guild_application_panels(guild) async for guild in guild_iter]
             await bounded_gather(*tasks)
 
     @staticmethod
-    async def update_for_guild(guild:discord.Guild):
+    async def update_guild_application_panels(guild:discord.Guild):
         guild_panels = await GuildApplicationPanel.get_for_guild(guild.id)
         linked_clans = await ClanGuildLink.get_for_guild(guild.id)
 
@@ -450,7 +648,7 @@ class ClanApplications(commands.Cog):
                 reverse=True
                 )
 
-        embed = await ClanApplications.guild_application_panel_embed(guild,clans)
+        embed = await DiscordPanels.guild_application_panel_embed(guild,clans)
 
         async for panel in AsyncIter(guild_panels):
             panel_view = ClanApplyMenu(
@@ -495,4 +693,109 @@ class ClanApplications(commands.Cog):
                     + f"\n\u200b",
                 inline=False
                 )
+        return embed
+    
+    ############################################################
+    #####
+    ##### BACKGROUND UPDATES: CLAN PANELS
+    #####
+    ############################################################
+    @tasks.loop(minutes=30)
+    async def update_clan_panels(self):        
+        async with self._update_lock:
+            guild_iter = AsyncIter(self.bot.guilds)
+            tasks = [DiscordPanels.update_guild_clan_panels(guild) async for guild in guild_iter]
+            await bounded_gather(*tasks)
+    
+    @staticmethod
+    async def update_guild_clan_panels(guild:discord.Guild):
+        guild_panels = await GuildClanPanel.get_for_guild(guild.id)
+        linked_clans = await ClanGuildLink.get_for_guild(guild.id)
+
+        if len(guild_panels) == 0 or len(linked_clans) == 0:
+            return
+        linked_clans = [c async for c in bot_client.coc.get_clans([c.tag for c in linked_clans]) if c.is_alliance_clan]
+
+        if len(linked_clans) == 0:
+            return
+        
+        embeds = []
+        if guild.id == 688449973553201335:
+            arix_rank = {
+                '#20YLR2LUJ':1,
+                '#28VUPJRPU':2,
+                '#2YL99GC9L':3,
+                '#92G9J8CG':4
+                }
+            clans = sorted(
+                linked_clans,
+                key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
+        else:
+            clans = sorted(
+                linked_clans,
+                key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),
+                reverse=True
+                )
+        
+        async for clan in AsyncIter(clans):
+            embed = await DiscordPanels.guild_clan_panel_embed(clan=clan)
+            embeds.append({
+                'clan':clan,
+                'embed':embed
+                }
+            )
+        # Overwrite for Alliance Home Server
+        if guild.id in [1132581106571550831,680798075685699691]:
+            family_clans = await bot_client.coc.get_alliance_clans()
+            async for clan in AsyncIter(family_clans):
+                if clan.tag not in [c.tag for c in clans]:
+                    linked_servers = await ClanGuildLink.get_links_for_clan(clan.tag)
+                    if len(linked_servers) == 0:
+                        continue
+                    embed = await DiscordPanels.guild_clan_panel_embed(
+                        clan=clan,
+                        guild=linked_servers[0].guild
+                        )
+                    embeds.append({
+                        'clan':clan,
+                        'embed':embed
+                        }
+                    )                
+        async for panel in AsyncIter(guild_panels):
+            await panel.send_to_discord(embeds)
+        bot_client.coc_main_log.info(f"Clan Panels for {guild.name} ({guild.id}) updated.")
+    
+    @staticmethod
+    async def guild_clan_panel_embed(clan:aClan,guild:Optional[discord.Guild]=None) -> discord.Embed:
+        if guild:
+            if guild.vanity_url:
+                invite = await guild.vanity_invite()                        
+            else:
+                normal_invites = await guild.invites()
+                if len(normal_invites) > 0:
+                    invite = normal_invites[0]
+                else:
+                    invite = await guild.channels[0].create_invite()
+
+        embed = await clash_embed(
+            context=bot_client.bot,
+            title=f"**{clan.title}**",
+            message=f"{EmojisClash.CLAN} Level {clan.level}\u3000"
+                + f"{EmojisUI.MEMBERS}" + (f" {clan.alliance_member_count}" if clan.is_alliance_clan else f" {clan.member_count}") + "\u3000"
+                + f"{EmojisUI.GLOBE} {clan.location.name}\n"
+                + (f"{EmojisClash.CLANWAR} W{clan.war_wins}/D{clan.war_ties}/L{clan.war_losses} (Streak: {clan.war_win_streak})\n" if clan.public_war_log else "")
+                + f"{EmojisClash.WARLEAGUES}" + (f"{EmojisLeagues.get(clan.war_league.name)} {clan.war_league.name}\n" if clan.war_league else "Unranked\n")
+                + f"{EmojisCapitalHall.get(clan.capital_hall)} CH {clan.capital_hall}\u3000"
+                + f"{EmojisClash.CAPITALTROPHY} {clan.capital_points}\u3000"
+                + (f"{EmojisLeagues.get(clan.capital_league.name)} {clan.capital_league}" if clan.capital_league else f"{EmojisLeagues.UNRANKED} Unranked") #+ "\n"
+                + (f"\n\n**Join this Clan at: [{guild.name}]({str(invite)})**" if guild and invite else "")
+                + f"\n\n{clan.description}"
+                + f"\n\n**Recruiting**"
+                + f"\nTownhalls: {clan.recruitment_level_emojis}"
+                + (f"\n\n{clan.recruitment_info}" if len(clan.recruitment_info) > 0 else ""),
+            thumbnail=clan.badge,
+            show_author=False
+            )
         return embed
