@@ -676,15 +676,11 @@ class DiscordPanels(commands.Cog):
 
             await ctx.reply(f"Clan Panels have been reset.")
 
-    @app_command_group_panels.command(name="delete",
-        description="Delete a Clan Panel.")
+    @app_command_group_panels.command(name="reset",
+        description="Resets all Clan Panels.")
     @app_commands.check(is_admin)
     @app_commands.guild_only()
-    @app_commands.autocomplete(panel=autocomplete_guild_clan_panels)
-    @app_commands.describe(
-        panel="The Clan Panel to delete.")
     async def app_command_group_panels_reset(self,interaction:discord.Interaction):
-
         await interaction.response.defer()
 
         lock = DiscordPanels._guild_locks[interaction.guild.id]
