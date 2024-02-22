@@ -2,8 +2,8 @@ import discord
 
 from typing import *
 from redbot.core.utils import AsyncIter
-from ...coc_main.api_client import BotClashClient as client
-from ...coc_main.utils.components import ClanLinkMenu
+from coc_main.api_client import BotClashClient as client
+from coc_main.utils.components import ClanLinkMenu
 
 bot_client = client()
 
