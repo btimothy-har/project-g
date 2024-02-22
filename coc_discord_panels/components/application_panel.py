@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from redbot.core.utils import AsyncIter
 
+from coc_main.discord.member import aMember
 from coc_main.discord.clan_link import ClanGuildLink
 from coc_main.discord.add_delete_link import AddLinkMenu
 from coc_main.discord.helpers import account_recruiting_summary
@@ -249,8 +250,9 @@ class ClanApplyMenu(discord.ui.View):
 
         self.reload_items()
         await interaction.followup.edit_message(interaction.message.id,view=self)
-        
-        add_link_view = AddLinkMenu(interaction,interaction.user)
+
+        member = await aMember(interaction.user.id,interaction.guild.id)
+        add_link_view = AddLinkMenu(interaction,member)
         await add_link_view._start_add_link()
 
 ##################################################
