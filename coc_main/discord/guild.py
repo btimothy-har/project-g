@@ -6,6 +6,7 @@ from typing import *
 from redbot.core.utils import bounded_gather
 
 from .clocks import aGuildClocks
+from .clan_link import ClanGuildLink
 
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client

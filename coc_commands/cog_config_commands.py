@@ -10,7 +10,8 @@ from redbot.core.utils import AsyncIter
 from coc_main.api_client import BotClashClient, ClashOfClansError
 from coc_main.cog_coc_client import ClashOfClansClient
 
-from coc_main.discord.guild import aGuild, ClanGuildLink, aGuildClocks
+from coc_main.discord.guild import aGuild, aGuildClocks
+from coc_main.discord.clan_link import ClanGuildLink
 from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin, has_manage_server, has_manage_threads
 
