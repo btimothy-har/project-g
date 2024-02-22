@@ -355,7 +355,7 @@ class Leaderboards(commands.Cog):
         embed = await self.helper_delete_guild_leaderboard(interaction,leaderboard)
         await interaction.edit_original_response(embed=embed,view=None)
     
-    @tasks.loop(minutes=20.0)
+    @tasks.loop(minutes=15.0)
     async def update_leaderboards(self):
         if self.leaderboard_lock.locked():
             return

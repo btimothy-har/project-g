@@ -18,11 +18,11 @@ from coc_main.api_client import BotClashClient as client
 from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
 from coc_main.coc_objects.clans.clan import aClan
 
-from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed, handle_command_error
+from coc_main.utils.components import DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed, handle_command_error
 from coc_main.utils.constants.coc_emojis import EmojisClash
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from .exceptions import InvalidApplicationChannel
+from ..exceptions import InvalidApplicationChannel
 
 bot_client = client()
 
