@@ -69,7 +69,7 @@ class DiscordPanels(commands.Cog):
                     },
                 }
             ]
-        await cog.register_functions(cog_name="ClanApplications", schemas=schema)
+        await cog.register_functions(cog_name="DiscordPanels", schemas=schema)
     
     async def _assistant_clan_application(self,user:discord.User,channel:discord.TextChannel,guild:discord.Guild,*args,**kwargs) -> str:
         if not guild:
