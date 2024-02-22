@@ -112,8 +112,6 @@ class CreateApplicationMenu(DefaultView):
         text_q4 = q4[0][:45]
         placeholder_q4 = q4[1] if len(q4) > 1 else None
 
-
-        guild = aGuild(interaction.guild.id)
         await GuildApplicationPanel.create(
             guild_id=interaction.guild.id,
             channel_id=self.target_channel.id,
@@ -130,11 +128,4 @@ class CreateApplicationMenu(DefaultView):
             placeholder_q4=placeholder_q4
             )
         
-        while True:
-            try:
-                await guild.update_apply_panels()
-            except CacheNotReady:
-                await asyncio.sleep(10)
-            else:
-                break
         await interaction.followup.send(f"Your Application Menu has been created.",ephemeral=True)
