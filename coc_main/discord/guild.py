@@ -8,7 +8,7 @@ from redbot.core.utils import AsyncIter, bounded_gather
 from .clan_link import ClanGuildLink
 from .clan_panel import GuildClanPanel
 from .clocks import aGuildClocks
-from .helpers import guild_clan_panel_embed, guild_application_panel_embed
+from .helpers import guild_clan_panel_embed
 
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client
