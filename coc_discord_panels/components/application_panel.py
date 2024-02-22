@@ -223,7 +223,7 @@ class ClanApplyMenu(discord.ui.View):
     def apply_button(self):
         apply_button = DiscordButton(
             function=self._callback_apply,
-            label="Click here to apply to any of our Clans!",
+            label="Click here to start your application!",
             style=discord.ButtonStyle.blurple
             )
         return apply_button
@@ -240,7 +240,7 @@ class ClanApplyMenu(discord.ui.View):
             function=self._callback_add_link,
             emoji=EmojisUI.ADD,
             label="Link a Clash Account",
-            style=discord.ButtonStyle.blurple
+            style=discord.ButtonStyle.gray
             )
         return add_button
     
