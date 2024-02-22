@@ -46,40 +46,6 @@ async def guild_clan_panel_embed(clan:aClan,guild:Optional[discord.Guild]=None) 
         )
     return embed
 
-async def guild_application_panel_embed(guild:discord.Guild,clans:List[aClan]) -> discord.Embed:
-
-    if guild.id == 688449973553201335:
-        embed = await clash_embed(
-            context=bot_client.bot,
-            title=f"**Welcome to the AriX Alliance!**",
-            message=f"Our clans prioritize a social environment for members that are always ready to try new strategies and constantly improve themselves, "
-                + f"to have good banter, win wars and get the support of a very active community. "
-                + f"Our Clans try to mix the competitiveness of wars with a fun and enjoyable server to keep the game fun overall."
-                + f"\n\nWe hope you'll enjoy your stay! <a:zzzpikachuhello:965872920725426176>"
-                + f"\n\n**Server Link: https://discord.gg/arix **",
-            thumbnail=str(guild.icon),
-            show_author=False
-            )
-    else:
-        embed = await clash_embed(
-            context=bot_client.bot,
-            title=f"**Apply to Join!**",
-            message=f"Thinking of joining {guild.name}? Get started by picking one or more Clans to apply to."
-                + f"\n\n**Tip:** For a smoother experience, link your Clash accounts with `$profile` before applying."
-                + f"\n\u200b",
-            thumbnail=str(guild.icon),
-            show_author=False
-            )
-    async for c in AsyncIter(clans):
-        embed.add_field(
-            name=f"**{c.title}**",
-            value=f"{c.summary_description}"
-                + f"\nRecruiting: {c.recruitment_level_emojis}"
-                + f"\n\u200b",
-            inline=False
-            )
-    return embed
-
 def account_recruiting_summary(account:aPlayer):
     text = ""
     text += f"### __**{account.name}**__"

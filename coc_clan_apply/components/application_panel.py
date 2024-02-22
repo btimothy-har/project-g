@@ -9,21 +9,20 @@ from typing import *
 
 from redbot.core.utils import AsyncIter
 
-from .clan_link import ClanGuildLink
-from .add_delete_link import AddLinkMenu
-from .helpers import account_recruiting_summary
+from coc_main.discord.clan_link import ClanGuildLink
+from coc_main.discord.add_delete_link import AddLinkMenu
+from coc_main.discord.helpers import account_recruiting_summary
 
-from ..cog_coc_client import ClashOfClansClient
-from ..api_client import BotClashClient as client
+from coc_main.api_client import BotClashClient as client
 
-from ..coc_objects.players.player import BasicPlayer, aPlayer
-from ..coc_objects.clans.clan import aClan
+from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
+from coc_main.coc_objects.clans.clan import aClan
 
-from ..utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed, handle_command_error
-from ..utils.constants.coc_emojis import EmojisClash
-from ..utils.constants.ui_emojis import EmojisUI
+from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal, clash_embed, handle_command_error
+from coc_main.utils.constants.coc_emojis import EmojisClash
+from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from ..exceptions import ClashAPIError
+from .exceptions import InvalidApplicationChannel
 
 bot_client = client()
 
@@ -161,10 +160,6 @@ class ClanApplyMenu(discord.ui.View):
         super().__init__(timeout=None)
 
         self.reload_items()
-
-    @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
 
     async def on_timeout(self):
         pass
@@ -337,10 +332,6 @@ class ClanApplyMenuUser(discord.ui.View):
             return
         self.stop()
     
-    @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
     ##################################################
     #####
     ##### STANDARD APPLICATION FUNCTIONS
@@ -507,157 +498,173 @@ class ClanApplyMenuUser(discord.ui.View):
                 )
         modal.view.application_id = application_id
         modal.view.stop()
-
-async def listener_user_application(channel:discord.TextChannel,application_id:str):
-    newline = "\n"
-
-    application = await bot_client.coc_db.db__clan_application.find_one({'_id':bson.ObjectId(application_id)})
-    if not application:
-        embed = await clash_embed(
-            context=bot_client.bot,
-            message=f"**Could not find application.**",
-            success=False
-            )
-        return await channel.send(embed=embed)
     
-    tags = application.get('tags',[])
-    if len(tags) > 0:
-        application_accounts = [p async for p in bot_client.coc.get_players(tags)]
-    else:
-        application_accounts = []
-    
-    accounts = sorted(
-        [a for a in application_accounts if isinstance(a,aPlayer)],
-        key=lambda x:(x.town_hall.level,x.exp_level),reverse=True
-        )
-
-    clan_tags = application.get('clans',[])
-    if len(clan_tags) == 0:
-        application_clans = []
-        eligible_townhalls = set([a.town_hall.level for a in accounts])
-        linked_clans = await ClanGuildLink.get_for_guild(channel.guild.id)
-
-        async for clan in bot_client.coc.get_clans([c.tag for c in linked_clans]):
-            recruiting_ths = set(clan.recruitment_level)
-            if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
-                application_clans.append(clan)
-    else:
-        application_clans = [c async for c in bot_client.coc.get_clans(clan_tags)]
-
-    member = channel.guild.get_member(application.get('applicant_id',0))
-
-    application_embed = await clash_embed(
-        context=bot_client.bot,
-        title=f"{member.display_name}",
-        message=f"`{member.id}`"
-            + f"\n**Joined Discord**"
-            + f"\n<t:{int(member.created_at.timestamp())}:f>"
-            + f"\n\n**Joined {member.guild.name}**"
-            + f"\n<t:{int(member.joined_at.timestamp())}:f>"
-            + (f"\n\n**Applied to Clans**" if len(application_clans) > 0 else "")
-            + (f"\n{newline.join([c.title for c in application_clans])}" if len(application_clans) > 0 else "")
-            + f"\n\u200b",
-        thumbnail=member.display_avatar)
-    
-    if application.get('answer_q1',[])[1]:
-        application_embed.add_field(
-            name=f"**{application.get('answer_q1',[])[0]}**",
-            value=f"{application.get('answer_q1',[])[1]}\n\u200b",
-            inline=False
-            )
-    if application.get('answer_q2',[])[1]:
-        application_embed.add_field(
-            name=f"**{application.get('answer_q2',[])[0]}**",
-            value=f"{application.get('answer_q2',[])[1]}\n\u200b",
-            inline=False
-            )
-    if application.get('answer_q3',[])[1]:
-        application_embed.add_field(
-            name=f"**{application.get('answer_q3',[])[0]}**",
-            value=f"{application.get('answer_q3',[])[1]}\n\u200b",
-            inline=False
-            )
-    if application.get('answer_q4',[])[1]:
-        application_embed.add_field(
-            name=f"**{application.get('answer_q4',[])[0]}**",
-            value=f"{application.get('answer_q4',[])[1]}\n\u200b",
-            inline=False
-            )
-    
-    accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
-
-    tags_query = bot_client.coc_db.db__player.find({'discord_user':member.id},{'_id':1})
-    member_account_tags = [db['_id'] async for db in tags_query]
-    other_accounts = [tag for tag in member_account_tags if tag not in application.get('tags')]
-
-    if len(accounts) == 0:
-        accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.get('tags'))
-    else:
-        accounts_embed_text = ""
-        async for a in AsyncIter(accounts):
-            if a.discord_user == 0:
-                await BasicPlayer.set_discord_link(a.tag,member.id)
-            accounts_embed_text += account_recruiting_summary(a)
-    
-    accounts_embed = await clash_embed(
-        context=bot_client.bot,
-        title=f"{member.name}",
-        message=accounts_embed_text + "\u200b",
-        thumbnail=member.display_avatar
-        )
-    if len(other_accounts) > 0:
-        other_accounts_embed_text = ""
-        list_oa = [p async for p in bot_client.coc.get_players(other_accounts[:5])]                
-        list_oa.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
-
-        async for a in AsyncIter(list_oa):
-            other_accounts_embed_text += f"{a.title}\n\u200b\u3000{EmojisClash.CLAN} {a.clan_description}\n\n"
-
-        accounts_embed.add_field(
-            name=f"**Other Accounts (max. 5)**",
-            value="\n" + other_accounts_embed_text,
-            inline=False
-            )
-    
-    await bot_client.coc_db.db__clan_application.update_one(
-        {'_id':bson.ObjectId(application_id)},
-        {'$set':{
-            'ticket_channel':channel.id
-            }
-        })
-                
-    await channel.send(embed=application_embed)
-    await channel.send(embed=accounts_embed)
-
-    channel_name = ""
-    if channel.name.startswith('ticket-'):
-        channel_name += f"{re.split('-', channel.name)[1]}-"
-    else:
-        if channel.guild.id == 1132581106571550831: #guild
-            channel_name += f"{re.split('-', channel.name)[0]}-"
-        elif channel.guild.id == 688449973553201335: #arix
-            channel_name += f"{re.split('📝', channel.name)[0]}-"
-    
-    for c in application_clans:
-        if c.unicode_emoji:
-            channel_name += f"{c.unicode_emoji}"
-        else:
-            channel_name += f"-{c.abbreviation}"
-    
-    for th in accounts_townhalls:
-        channel_name += f"-th{th}"
-    
-    await channel.edit(name=channel_name.lower())
-
-    c_iter = AsyncIter(application_clans)
-    async for c in c_iter:
-        link = await ClanGuildLink.get_link(c.tag,channel.guild.id)
+    @staticmethod
+    async def _add_clan_leaders(channel:discord.TextChannel,clan:aClan,prefix:str,townhalls:List[int]):
+        link = await ClanGuildLink.get_link(clan.tag,channel.guild.id)
         if getattr(link,'coleader_role',None):
-            await channel.send(f"{application.get('bot_prefix','.')}add {link.coleader_role.mention}")
+            await channel.send(f"{prefix}add {link.coleader_role.mention}")
             if len(channel.threads) > 0:   
                 await asyncio.sleep(3)
                 thread = channel.threads[0]
                 await thread.send(
-                    f"{link.coleader_role.mention} {c.emoji} {c.name} has a new applicant: {', '.join(f'TH{num}' for num in accounts_townhalls)}.",
+                    f"{link.coleader_role.mention} {clan.emoji} {clan.name} has a new applicant: {', '.join(f'TH{num}' for num in townhalls)}.",
                     allowed_mentions=discord.AllowedMentions(roles=True)
                     )
+    
+    @staticmethod
+    async def _listener_user_application(channel:discord.TextChannel):
+        newline = "\n"
+
+        application_id = None
+        async for message in channel.history(limit=1,oldest_first=True):
+            for embed in message.embeds:
+                if embed.footer.text == "Application ID":                    
+                    application_id = embed.description
+                    break
+        
+        if not application_id:
+            raise InvalidApplicationChannel
+
+        application = await bot_client.coc_db.db__clan_application.find_one({'_id':bson.ObjectId(application_id)})
+        if not application:
+            raise InvalidApplicationChannel
+        
+        tags = application.get('tags',[])
+        if len(tags) > 0:
+            application_accounts = [p async for p in bot_client.coc.get_players(tags)]
+        else:
+            application_accounts = []
+        
+        accounts = sorted(
+            [a for a in application_accounts if isinstance(a,aPlayer)],
+            key=lambda x:(x.town_hall.level,x.exp_level),reverse=True
+            )
+
+        clan_tags = application.get('clans',[])
+        if len(clan_tags) == 0:
+            application_clans = []
+            eligible_townhalls = set([a.town_hall.level for a in accounts])
+            linked_clans = await ClanGuildLink.get_for_guild(channel.guild.id)
+
+            async for clan in bot_client.coc.get_clans([c.tag for c in linked_clans]):
+                recruiting_ths = set(clan.recruitment_level)
+                if len(recruiting_ths.intersection(eligible_townhalls)) > 0:
+                    application_clans.append(clan)
+        else:
+            application_clans = [c async for c in bot_client.coc.get_clans(clan_tags)]
+
+        member = channel.guild.get_member(application.get('applicant_id',0))
+
+        application_embed = await clash_embed(
+            context=bot_client.bot,
+            title=f"{member.display_name}",
+            message=f"`{member.id}`"
+                + f"\n**Joined Discord**"
+                + f"\n<t:{int(member.created_at.timestamp())}:f>"
+                + f"\n\n**Joined {member.guild.name}**"
+                + f"\n<t:{int(member.joined_at.timestamp())}:f>"
+                + (f"\n\n**Applied to Clans**" if len(application_clans) > 0 else "")
+                + (f"\n{newline.join([c.title for c in application_clans])}" if len(application_clans) > 0 else "")
+                + f"\n\u200b",
+            thumbnail=member.display_avatar)
+        
+        if application.get('answer_q1',[])[1]:
+            application_embed.add_field(
+                name=f"**{application.get('answer_q1',[])[0]}**",
+                value=f"{application.get('answer_q1',[])[1]}\n\u200b",
+                inline=False
+                )
+        if application.get('answer_q2',[])[1]:
+            application_embed.add_field(
+                name=f"**{application.get('answer_q2',[])[0]}**",
+                value=f"{application.get('answer_q2',[])[1]}\n\u200b",
+                inline=False
+                )
+        if application.get('answer_q3',[])[1]:
+            application_embed.add_field(
+                name=f"**{application.get('answer_q3',[])[0]}**",
+                value=f"{application.get('answer_q3',[])[1]}\n\u200b",
+                inline=False
+                )
+        if application.get('answer_q4',[])[1]:
+            application_embed.add_field(
+                name=f"**{application.get('answer_q4',[])[0]}**",
+                value=f"{application.get('answer_q4',[])[1]}\n\u200b",
+                inline=False
+                )
+        
+        accounts_townhalls = sorted(list(set([a.town_hall.level for a in accounts])),reverse=True)
+
+        tags_query = bot_client.coc_db.db__player.find({'discord_user':member.id},{'_id':1})
+        member_account_tags = [db['_id'] async for db in tags_query]
+        other_accounts = [tag for tag in member_account_tags if tag not in application.get('tags')]
+
+        if len(accounts) == 0:
+            accounts_embed_text = "Did not find any valid accounts. Received Tags: " + ", ".join(application.get('tags'))
+        else:
+            accounts_embed_text = ""
+            async for a in AsyncIter(accounts):
+                if a.discord_user == 0:
+                    await BasicPlayer.set_discord_link(a.tag,member.id)
+                accounts_embed_text += account_recruiting_summary(a)
+        
+        accounts_embed = await clash_embed(
+            context=bot_client.bot,
+            title=f"{member.name}",
+            message=accounts_embed_text + "\u200b",
+            thumbnail=member.display_avatar
+            )
+        if len(other_accounts) > 0:
+            other_accounts_embed_text = ""
+            list_oa = [p async for p in bot_client.coc.get_players(other_accounts[:5])]                
+            list_oa.sort(key=lambda x:(x.town_hall.level,x.exp_level),reverse=True)
+
+            async for a in AsyncIter(list_oa):
+                other_accounts_embed_text += f"{a.title}\n\u200b\u3000{EmojisClash.CLAN} {a.clan_description}\n\n"
+
+            accounts_embed.add_field(
+                name=f"**Other Accounts (max. 5)**",
+                value="\n" + other_accounts_embed_text,
+                inline=False
+                )
+        
+        await bot_client.coc_db.db__clan_application.update_one(
+            {'_id':bson.ObjectId(application_id)},
+            {'$set':{
+                'ticket_channel':channel.id
+                }
+            })
+                    
+        await channel.send(embed=application_embed)
+        await channel.send(embed=accounts_embed)
+
+        channel_name = ""
+        if channel.name.startswith('ticket-'):
+            channel_name += f"{re.split('-', channel.name)[1]}-"
+        else:
+            if channel.guild.id == 1132581106571550831: #guild
+                channel_name += f"{re.split('-', channel.name)[0]}-"
+            elif channel.guild.id == 688449973553201335: #arix
+                channel_name += f"{re.split('📝', channel.name)[0]}-"
+        
+        for c in application_clans:
+            if c.unicode_emoji:
+                channel_name += f"{c.unicode_emoji}"
+            else:
+                channel_name += f"-{c.abbreviation}"
+        
+        for th in accounts_townhalls:
+            channel_name += f"-th{th}"
+        
+        await channel.edit(name=channel_name.lower())
+
+        add_leaders = [ClanApplyMenuUser._add_clan_leaders(
+            channel=channel,
+            clan=clan,
+            prefix=application.get('bot_prefix','.'),
+            townhalls=accounts_townhalls
+            ) for clan in application_clans]
+
+        await asyncio.gather(*add_leaders)
+        return application

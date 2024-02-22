@@ -7,12 +7,13 @@ from redbot.core import commands
 
 from coc_main.api_client import CacheNotReady
 from coc_main.discord.guild import aGuild
-from coc_main.discord.application_panel import GuildApplicationPanel
 from coc_main.utils.components import DiscordButton, DiscordModal, DefaultView
+
+from .application_panel import GuildApplicationPanel
 
 class CreateApplicationMenu(DefaultView):
     def __init__(self,
-        context:[Union[commands.Context,discord.Interaction]],
+        context:Union[commands.Context,discord.Interaction],
         channel:discord.TextChannel,
         listener:discord.TextChannel,
         choose_clans:bool=True,):
