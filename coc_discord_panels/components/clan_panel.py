@@ -1,6 +1,9 @@
+import asyncio
 import discord
 
 from typing import *
+from collections import defaultdict
+
 from redbot.core.utils import AsyncIter
 from coc_main.api_client import BotClashClient as client
 from coc_main.utils.components import ClanLinkMenu
@@ -8,6 +11,7 @@ from coc_main.utils.components import ClanLinkMenu
 bot_client = client()
 
 class GuildClanPanel():
+    _locks = defaultdict(asyncio.Lock)
 
     @classmethod
     async def get_for_guild(cls,guild_id:int) -> List['GuildClanPanel']:
@@ -52,11 +56,12 @@ class GuildClanPanel():
                 pass
             else:
                 await message.delete()
-    
+    @property
+    def lock(self) -> asyncio.Lock:
+        return self._locks[self.id]    
     @property
     def guild(self):
-        return bot_client.bot.get_guild(self.guild_id)
-    
+        return bot_client.bot.get_guild(self.guild_id)    
     @property
     def channel(self):
         return bot_client.bot.get_channel(self.channel_id)
@@ -69,58 +74,78 @@ class GuildClanPanel():
                 pass
         return None
     
-    async def send_to_discord(self,embeds:list[discord.Embed]):            
-        try:
-            if not self.channel:
-                self.delete()
-                return
-
-            message_ids_master = []
-            existing_messages = len(self.long_message_ids)
-
-            #iterate through embeds up to len existing messages
-            for i,send_message in enumerate(embeds[:existing_messages]):
-                link_button = ClanLinkMenu([send_message['clan']])
+    async def reset(self):
+        async with self.lock:
+            msg_iter = AsyncIter(self.long_message_ids)
+            async for message_id in msg_iter:
                 try:
-                    message = await self.channel.fetch_message(self.long_message_ids[i])
+                    message = await self.channel.fetch_message(message_id)
                 except discord.NotFound:
+                    continue
+                else:
+                    await message.delete()
+
+            await bot_client.coc_db.db__guild_clan_panel.update_one(
+                {'_id':self.id},
+                {'$set':{
+                    'message_id':0,
+                    'long_message_ids':[]
+                    }
+                })
+    
+    async def send_to_discord(self,embeds:list[discord.Embed]):
+        try:
+            async with self.lock:
+                if not self.channel:
+                    self.delete()
+                    return
+
+                message_ids_master = []
+                existing_messages = len(self.long_message_ids)
+
+                #iterate through embeds up to len existing messages
+                for i,send_message in enumerate(embeds[:existing_messages]):
+                    link_button = ClanLinkMenu([send_message['clan']])
+                    try:
+                        message = await self.channel.fetch_message(self.long_message_ids[i])
+                    except discord.NotFound:
+                        message = await self.channel.send(
+                            embed=send_message['embed'],
+                            view=link_button
+                            )
+                        message_ids_master.append(message.id)
+                    else:
+                        message = await message.edit(
+                            embed=send_message['embed'],
+                            view=link_button
+                            )
+                        message_ids_master.append(message.id)
+                
+                #iterate through remaining embeds
+                for send_message in embeds[existing_messages:]:
+                    link_button = ClanLinkMenu([send_message['clan']])
                     message = await self.channel.send(
                         embed=send_message['embed'],
                         view=link_button
                         )
                     message_ids_master.append(message.id)
-                else:
-                    message = await message.edit(
-                        embed=send_message['embed'],
-                        view=link_button
-                        )
-                    message_ids_master.append(message.id)
-            
-            #iterate through remaining embeds
-            for send_message in embeds[existing_messages:]:
-                link_button = ClanLinkMenu([send_message['clan']])
-                message = await self.channel.send(
-                    embed=send_message['embed'],
-                    view=link_button
-                    )
-                message_ids_master.append(message.id)
-            
-            #delete any remaining messages
-            for message_id in self.long_message_ids[len(embeds):]:
-                try:
-                    message = await self.channel.fetch_message(message_id)
-                except discord.NotFound:
-                    pass
-                else:
-                    await message.delete()
-            
-            await bot_client.coc_db.db__guild_clan_panel.update_one(
-                {'_id':self.id},
-                {'$set':{
-                    'message_id':message_ids_master[0],
-                    'long_message_ids':message_ids_master
-                    }
-                })
+                
+                #delete any remaining messages
+                for message_id in self.long_message_ids[len(embeds):]:
+                    try:
+                        message = await self.channel.fetch_message(message_id)
+                    except discord.NotFound:
+                        pass
+                    else:
+                        await message.delete()
+                
+                await bot_client.coc_db.db__guild_clan_panel.update_one(
+                    {'_id':self.id},
+                    {'$set':{
+                        'message_id':message_ids_master[0],
+                        'long_message_ids':message_ids_master
+                        }
+                    })
 
         except Exception as exc:
             bot_client.coc_main_log.exception(

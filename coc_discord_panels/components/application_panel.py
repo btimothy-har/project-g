@@ -6,6 +6,7 @@ import bson
 import coc 
 
 from typing import *
+from collections import defaultdict
 
 from redbot.core.utils import AsyncIter
 
@@ -32,6 +33,7 @@ bot_client = client()
 #####
 ##################################################
 class GuildApplicationPanel():
+    _locks = defaultdict(asyncio.Lock)
 
     @classmethod
     async def get_for_guild(cls,guild_id:int):
@@ -96,15 +98,16 @@ class GuildApplicationPanel():
         if message:
             await message.delete()        
         await bot_client.coc_db.db__guild_apply_panel.delete_one({'_id':self.id})
-
+    
+    @property
+    def lock(self) -> asyncio.Lock:
+        return self._locks[self.id]
     @property
     def guild(self) -> Optional[discord.Guild]:
-        return bot_client.bot.get_guild(self.guild_id)
-    
+        return bot_client.bot.get_guild(self.guild_id)    
     @property
     def channel(self) -> Optional[discord.TextChannel]:
         return bot_client.bot.get_channel(self.channel_id)
-
     @property
     def listener_channel(self) -> Optional[discord.TextChannel]:
         return bot_client.bot.get_channel(self._tickettool_channel)
@@ -116,31 +119,49 @@ class GuildApplicationPanel():
             except discord.NotFound:
                 pass
         return None
+
+    async def reset(self):
+        async with self.lock:
+            try:
+                message = await self.fetch_message()
+            except discord.NotFound:
+                pass
+            else:                
+                await message.delete()
+            await bot_client.coc_db.db__guild_apply_panel.update_one(
+                {'_id':self.id},
+                {'$set':{
+                    'message_id':0
+                    }
+                    }
+                )
+            self.message_id = 0
     
     async def send_to_discord(self,embed:discord.Embed,view:discord.ui.View):
         try:
-            if not self.channel:
-                await self.delete()
-                return
-            
-            message = await self.fetch_message()
-            if not message:
-                message = await self.channel.send(
-                    embed=embed,
-                    view=view
-                    )
-                await bot_client.coc_db.db__guild_apply_panel.update_one(
-                    {'_id':self.id},
-                    {'$set':{
-                        'message_id':message.id
-                        }
-                        }
-                    )
-            else:
-                message = await message.edit(
-                    embed=embed,
-                    view=view
-                    )
+            async with self.lock:
+                if not self.channel:
+                    await self.delete()
+                    return
+                
+                message = await self.fetch_message()
+                if not message:
+                    message = await self.channel.send(
+                        embed=embed,
+                        view=view
+                        )
+                    await bot_client.coc_db.db__guild_apply_panel.update_one(
+                        {'_id':self.id},
+                        {'$set':{
+                            'message_id':message.id
+                            }
+                            }
+                        )
+                else:
+                    message = await message.edit(
+                        embed=embed,
+                        view=view
+                        )
         
         except Exception as exc:
             bot_client.coc_main_log.exception(

@@ -5,6 +5,7 @@ import pendulum
 from typing import *
 
 from discord.ext import tasks
+from collections import defaultdict
 
 from redbot.core import commands, app_commands
 from redbot.core.commands import Context
@@ -31,16 +32,25 @@ bot_client = client()
 class DiscordPanels(commands.Cog):
     """Commands & Components to handle Discord Clan Panels."""
 
+    _guild_locks = defaultdict(asyncio.Lock)
+
     __author__ = bot_client.author
     __version__ = bot_client.version
 
     def __init__(self,bot:Red):
-        self.bot: Red = bot
-        self._update_lock = asyncio.Lock()
+        self.bot: Red = bot        
     
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+    
+    async def cog_load(self):
+        self.update_application_panels.start()
+        self.update_clan_panels.start()
+
+    async def cog_unload(self):
+        self.update_application_panels.stop()
+        self.update_clan_panels.stop()
     
     ############################################################
     #####
@@ -404,6 +414,48 @@ class DiscordPanels(commands.Cog):
             success=True
             )
         await interaction.edit_original_response(embed=embed,view=None)
+
+    ##################################################
+    ### CLANAPPLY / PANELS / RESET
+    ##################################################
+    @command_group_clan_application.command(name="reset")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_group_clan_application_reset(self,ctx:commands.Context):
+        """
+        Resets all Application Panel.
+        """
+
+        lock = DiscordPanels._guild_locks[ctx.guild.id]
+
+        async with lock:
+            panels = await GuildApplicationPanel.get_for_guild(ctx.guild.id)
+            reset_tasks = [panel.reset() for panel in panels]
+            await bounded_gather(*reset_tasks)
+            await DiscordPanels.update_guild_application_panels(ctx.guild)
+            
+            await ctx.reply(f"Application Panels have been reset.")
+
+    @app_command_subgroup_application_panels.command(name="delete",
+        description="Delete an Application Panel.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    @app_commands.autocomplete(panel=autocomplete_guild_apply_panels)
+    @app_commands.describe(
+        panel="The Application Panel to delete.")
+    async def app_command_subgroup_application_panels_reset(self,interaction:discord.Interaction,panel:str):
+        
+        await interaction.response.defer()
+
+        lock = DiscordPanels._guild_locks[interaction.guild.id]
+
+        async with lock:
+            panels = await GuildApplicationPanel.get_for_guild(interaction.guild.id)
+            reset_tasks = [panel.reset() for panel in panels]
+            await bounded_gather(*reset_tasks)
+            await DiscordPanels.update_guild_application_panels(interaction.guild)
+
+            await interaction.followup.send(f"Application Panels have been reset.")
     
     ############################################################
     #####
@@ -478,8 +530,8 @@ class DiscordPanels(commands.Cog):
         await interaction.edit_original_response(embed=embed,view=None)
     
     ##################################################
-    ### SERVERSETUP / PANEL / CREATE
-    ##################################################    
+    ### CLANPANEL / CREATE
+    ##################################################
     @command_group_clan_panels.command(name="create")
     @commands.guild_only()
     @commands.admin()
@@ -544,11 +596,11 @@ class DiscordPanels(commands.Cog):
         await DiscordPanels.update_guild_clan_panels(interaction.guild)
     
     ##################################################
-    ### SERVERSETUP / PANEL / DELETE
-    ##################################################    
+    ### CLANPANEL / DELETE
+    ##################################################
     @command_group_clan_panels.command(name="delete")
     @commands.guild_only()
-    @commands.is_owner()
+    @commands.admin()
     async def command_group_clan_panels_delete(self,ctx:commands.Context,channel_id:int):
         """
         Deletes a Clan Panel.
@@ -605,6 +657,50 @@ class DiscordPanels(commands.Cog):
         await interaction.edit_original_response(embed=embed,view=None)
         await DiscordPanels.update_guild_clan_panels(interaction.guild)
     
+    ##################################################
+    ### CLANPANEL / RESET
+    ##################################################
+    @command_group_clan_panels.command(name="reset")
+    @commands.guild_only()
+    @commands.admin()
+    async def command_group_clan_panels_reset(self,ctx:commands.Context):
+        """
+        Resets all Clan Panels.
+        """
+
+        lock = DiscordPanels._guild_locks[ctx.guild.id]
+        
+        async with lock:
+            panels = await GuildClanPanel.get_for_guild(ctx.guild.id)
+
+            reset_tasks = [panel.reset() for panel in panels]
+            await bounded_gather(*reset_tasks)
+            await DiscordPanels.update_guild_clan_panels(ctx.guild)
+
+            await ctx.reply(f"Clan Panels have been reset.")
+
+    @app_command_group_panels.command(name="delete",
+        description="Delete a Clan Panel.")
+    @app_commands.check(is_admin)
+    @app_commands.guild_only()
+    @app_commands.autocomplete(panel=autocomplete_guild_clan_panels)
+    @app_commands.describe(
+        panel="The Clan Panel to delete.")
+    async def app_command_group_panels_reset(self,interaction:discord.Interaction):
+
+        await interaction.response.defer()
+
+        lock = DiscordPanels._guild_locks[interaction.guild.id]
+
+        async with lock:        
+            panels = await GuildClanPanel.get_for_guild(interaction.guild.id)
+
+            reset_tasks = [panel.reset() for panel in panels]
+            await bounded_gather(*reset_tasks)
+            await DiscordPanels.update_guild_clan_panels(interaction.guild)
+
+            await interaction.followup.send(f"Clan Panels have been reset.")
+    
     ############################################################
     #####
     ##### BACKGROUND UPDATES: APPLICATION PANELS
@@ -612,13 +708,19 @@ class DiscordPanels(commands.Cog):
     ############################################################
     @tasks.loop(minutes=30)
     async def update_application_panels(self):
-        async with self._update_lock:
-            guild_iter = AsyncIter(self.bot.guilds)
-            tasks = [DiscordPanels.update_guild_application_panels(guild) async for guild in guild_iter]
-            await bounded_gather(*tasks)
+
+        async def _start_update(guild:discord.Guild):
+            lock = DiscordPanels._guild_locks[guild.id]
+            async with lock:
+                await DiscordPanels.update_guild_application_panels(guild)
+
+        guild_iter = AsyncIter(self.bot.guilds)
+        tasks = [_start_update(guild) async for guild in guild_iter]
+        await bounded_gather(*tasks)
 
     @staticmethod
     async def update_guild_application_panels(guild:discord.Guild):
+        
         guild_panels = await GuildApplicationPanel.get_for_guild(guild.id)
         linked_clans = await ClanGuildLink.get_for_guild(guild.id)
 
@@ -701,11 +803,17 @@ class DiscordPanels(commands.Cog):
     #####
     ############################################################
     @tasks.loop(minutes=30)
-    async def update_clan_panels(self):        
-        async with self._update_lock:
-            guild_iter = AsyncIter(self.bot.guilds)
-            tasks = [DiscordPanels.update_guild_clan_panels(guild) async for guild in guild_iter]
-            await bounded_gather(*tasks)
+    async def update_clan_panels(self):
+
+        async def _start_update(guild:discord.Guild):
+            lock = DiscordPanels._guild_locks[guild.id]
+            async with lock:
+                await DiscordPanels.update_guild_clan_panels(guild)
+
+        guild_iter = AsyncIter(self.bot.guilds)
+        
+        tasks = [_start_update(guild) async for guild in guild_iter]
+        await bounded_gather(*tasks)
     
     @staticmethod
     async def update_guild_clan_panels(guild:discord.Guild):
