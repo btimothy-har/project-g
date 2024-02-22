@@ -335,7 +335,9 @@ class DiscordPanels(commands.Cog):
         view = CreateApplicationMenu(ctx,channel,listener,can_user_select_clans)
         await view.start()
 
-        await DiscordPanels.update_guild_application_panels(ctx.guild)
+        await view.wait()
+        if view.completed:
+            await DiscordPanels.update_guild_application_panels(ctx.guild)
     
     @app_command_subgroup_application_panels.command(name="create",
         description="Create an Application Panel.")
@@ -356,7 +358,9 @@ class DiscordPanels(commands.Cog):
         view = CreateApplicationMenu(interaction,channel,listener,can_user_select_clans)    
         await view.start()
 
-        await DiscordPanels.update_guild_application_panels(ctx.guild)
+        await view.wait()
+        if view.completed:
+            await DiscordPanels.update_guild_application_panels(interaction.guild)
     
     ##################################################
     ### CLANAPPLY / PANELS / DELETE

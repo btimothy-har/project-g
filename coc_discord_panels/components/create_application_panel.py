@@ -22,6 +22,8 @@ class CreateApplicationMenu(DefaultView):
         self.listener_channel = listener
         self.choose_clans = choose_clans
 
+        self.completed = False
+
         self.open_modal_button = DiscordButton(
             function=self._send_post_modal,
             label="Click to Create Application Menu",
@@ -129,3 +131,6 @@ class CreateApplicationMenu(DefaultView):
             )
         
         await interaction.followup.send(f"Your Application Menu has been created.",ephemeral=True)
+        self.completed = True
+
+        self.stop_menu()
