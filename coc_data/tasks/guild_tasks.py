@@ -85,8 +85,6 @@ class DiscordGuildLoop(TaskLoop):
         tasks = [
             asyncio.create_task(self._save_member_roles(guild,locks)),
             asyncio.create_task(self._update_clocks(guild,locks)),
-            asyncio.create_task(self._update_clan_panels(guild,locks)),
-            asyncio.create_task(self._update_application_panels(guild,locks)),
             asyncio.create_task(self._update_recruiting_reminder(guild,locks))
             ]
         await asyncio.gather(*tasks)
@@ -133,52 +131,6 @@ class DiscordGuildLoop(TaskLoop):
         except Exception:
             bot_client.coc_main_log.exception(
                 f"{guild.id} {guild.name}: Error updating Guild Clocks."
-                )
-    
-    async def _update_clan_panels(self,guild:discord.Guild,locks:dict):
-        try:
-            lock = locks['clan_panels']
-        except KeyError:
-            self._locks[guild.id]['clan_panels'] = lock = asyncio.Lock()
-        
-        if lock.locked():
-            return
-        await lock.acquire()
-        self.loop.call_later(1800,self.unlock,lock)
-
-        try:
-            m_guild = aGuild(guild.id)
-            await m_guild.update_clan_panels()
-        
-        except ClashAPIError:
-            return
-
-        except Exception:
-            bot_client.coc_main_log.exception(
-                f"{guild.id} {guild.name}: Error updating Guild Clan Panels."
-                )
-    
-    async def _update_application_panels(self,guild:discord.Guild,locks:dict):
-        try:
-            lock = locks['application_panels']
-        except KeyError:
-            self._locks[guild.id]['application_panels'] = lock = asyncio.Lock()
-
-        if lock.locked():
-            return
-        await lock.acquire()
-        self.loop.call_later(1800,self.unlock,lock)
-
-        try:
-            m_guild = aGuild(guild.id)
-            await m_guild.update_apply_panels()
-        
-        except ClashAPIError:
-            return
-
-        except Exception:
-            bot_client.coc_main_log.exception(
-                f"{guild.id} {guild.name}: Error updating Guild Application Panels."
                 )
     
     async def _update_recruiting_reminder(self,guild:discord.Guild,locks:dict):

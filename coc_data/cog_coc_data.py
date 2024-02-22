@@ -18,11 +18,9 @@ from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
 from coc_main.coc_objects.clans.clan import aClan
 
-from coc_main.discord.member import aMember
 from coc_main.discord.clan_link import ClanGuildLink
 from coc_main.discord.feeds.donations import ClanDataFeed
 from coc_main.discord.feeds.reminders import EventReminder
-from coc_main.discord.application_panel import GuildApplicationPanel, listener_user_application
 
 from coc_main.utils.components import DefaultView, DiscordButton, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
@@ -150,8 +148,6 @@ class ClashOfClansData(commands.Cog):
             await asyncio.sleep(1)
 
         await bot_client.bot.wait_until_ready()
-        bot_client.coc.player_cls = aPlayer
-        bot_client.coc.clan_cls = aClan
 
         #NEBULA Bot
         if self.bot.user.id == 1031240380487831664:
@@ -258,24 +254,6 @@ class ClashOfClansData(commands.Cog):
         async for player in bot_client.coc.get_players(linked_accounts):
             if player.discord_user == 0:
                 await BasicPlayer.set_discord_link(player.tag,member.id)
-    
-    @commands.Cog.listener("on_guild_channel_create")
-    async def recruiting_ticket_listener(self,channel):
-        application_id = None
-        await asyncio.sleep(2)        
-        
-        panels = await GuildApplicationPanel.get_for_guild(channel.guild.id)
-        if len(panels) == 0:
-            return
-        
-        async for message in channel.history(limit=1,oldest_first=True):
-            for embed in message.embeds:
-                if embed.footer.text == "Application ID":                    
-                    application_id = embed.description
-                    break
-        if not application_id:
-            return        
-        await listener_user_application(channel, application_id)
 
     @tasks.loop(minutes=1)    
     async def update_player_loop(self):

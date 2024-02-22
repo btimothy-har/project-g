@@ -3,13 +3,10 @@ import discord
 
 from typing import *
 
-from redbot.core.utils import AsyncIter, bounded_gather
+from redbot.core.utils import bounded_gather
 
-from .clan_link import ClanGuildLink
-from .clan_panel import GuildClanPanel
-from .application_panel import GuildApplicationPanel, ClanApplyMenu
 from .clocks import aGuildClocks
-from .helpers import guild_clan_panel_embed, guild_application_panel_embed
+from .clan_link import ClanGuildLink
 
 from ..cog_coc_client import ClashOfClansClient
 from ..api_client import BotClashClient as client
@@ -51,108 +48,6 @@ class aGuild():
     @property
     def name(self) -> str:
         return self.guild.name
-    
-    ##################################################
-    ### CLAN PANELS
-    ##################################################
-    async def update_clan_panels(self):
-        guild_panels = await GuildClanPanel.get_for_guild(self.id)
-        linked_clans = await ClanGuildLink.get_for_guild(self.id)
-
-        if len(guild_panels) == 0 or len(linked_clans) == 0:
-            return
-        linked_clans = [c async for c in bot_client.coc.get_clans([c.tag for c in linked_clans]) if c.is_alliance_clan]
-        
-        embeds = []
-        if self.id == 688449973553201335:
-            arix_rank = {
-                '#20YLR2LUJ':1,
-                '#28VUPJRPU':2,
-                '#2YL99GC9L':3,
-                '#92G9J8CG':4
-                }
-            clans = sorted(
-                linked_clans,
-                key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),
-                reverse=True
-                )
-        else:
-            clans = sorted(
-                linked_clans,
-                key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),
-                reverse=True
-                )
-        
-        async for clan in AsyncIter(clans):
-            embed = await guild_clan_panel_embed(clan=clan)
-            embeds.append({
-                'clan':clan,
-                'embed':embed
-                }
-            )
-        # Overwrite for Alliance Home Server
-        if self.id in [1132581106571550831,680798075685699691]:
-            family_clans = await bot_client.coc.get_alliance_clans()
-            async for clan in AsyncIter(family_clans):
-                if clan.tag not in [c.tag for c in clans]:
-                    linked_servers = await ClanGuildLink.get_links_for_clan(clan.tag)
-                    if len(linked_servers) == 0:
-                        continue
-                    embed = await guild_clan_panel_embed(
-                        clan=clan,
-                        guild=linked_servers[0].guild
-                        )
-                    embeds.append({
-                        'clan':clan,
-                        'embed':embed
-                        }
-                    )                
-        async for panel in AsyncIter(guild_panels):
-            await panel.send_to_discord(embeds)
-        bot_client.coc_main_log.info(f"Clan Panels for {self.guild.name} ({self.id}) updated.")
-
-    ##################################################
-    ### APPLICATION PANELS
-    ##################################################
-    async def update_apply_panels(self):
-        guild_panels = await GuildApplicationPanel.get_for_guild(self.id)
-        linked_clans = await ClanGuildLink.get_for_guild(self.id)
-
-        if len(guild_panels) == 0 or len(linked_clans) == 0:
-            return
-        all_clans = [c async for c in bot_client.coc.get_clans([c.tag for c in linked_clans]) if c.is_alliance_clan]
-        
-        if self.id == 688449973553201335:
-            arix_rank = {
-                '#20YLR2LUJ':1,
-                '#28VUPJRPU':2,
-                '#2YL99GC9L':3,
-                '#92G9J8CG':4
-                }
-            clans = sorted(
-                all_clans,
-                key=lambda c:((arix_rank.get(c.tag,999)*-1),c.level,c.max_recruitment_level,c.capital_points),
-                reverse=True
-                )
-        else:
-            clans = sorted(
-                all_clans,
-                key=lambda c:(c.level,c.max_recruitment_level,c.capital_points),
-                reverse=True
-                )
-
-        embed = await guild_application_panel_embed(guild=self.guild,clans=clans)
-
-        async for panel in AsyncIter(guild_panels):
-            panel_view = ClanApplyMenu(
-                panel=panel,
-                list_of_clans=clans
-                )
-            await panel.send_to_discord(
-                embed=embed,
-                view=panel_view
-                )
-        bot_client.coc_main_log.info(f"Application Panels for {self.guild.name} ({self.id}) updated.")
 
     ##################################################
     ### CLOCKS

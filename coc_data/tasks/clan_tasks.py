@@ -75,7 +75,6 @@ class ClanTasks():
                         continue
 
                     member = await aMember(discord_user.id,link.guild.id)
-                    await member.load()
 
                     if clan.tag not in [c.tag for c in member.home_clans]:
                         await discord_user.add_roles(
@@ -89,7 +88,6 @@ class ClanTasks():
 
         if n_player.discord_user:
             member = await aMember(n_player.discord_user)
-            await member.load()
 
             member_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
             clan_links = await ClanGuildLink.get_links_for_clan(clan.tag)
