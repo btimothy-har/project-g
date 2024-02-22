@@ -2314,7 +2314,7 @@ class Bank(commands.Cog):
                     user_id=interaction.user.id,
                     comment=f"Reward transfer to {user.name} {user.id}. Reason: {reason}"
                     )
-                await bank.deposit_credits(user,amount)
+                await bank.deposit_credits(user,a)
                 await self._send_log(
                     user=user,
                     done_by=interaction.user,
