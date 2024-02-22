@@ -3,7 +3,8 @@ import discord
 import re
 import pendulum
 import bson
-import coc 
+import coc
+import hashlib
 
 from typing import *
 from collections import defaultdict
@@ -101,7 +102,9 @@ class GuildApplicationPanel():
     
     @property
     def lock(self) -> asyncio.Lock:
-        return self._locks[self.id]
+        _id = f"{self.guild_id}-{self.channel_id}"
+        h = hashlib.sha256(_id.encode()).hexdigest()
+        return self._locks[h]
     @property
     def guild(self) -> Optional[discord.Guild]:
         return bot_client.bot.get_guild(self.guild_id)    

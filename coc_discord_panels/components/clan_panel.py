@@ -1,5 +1,6 @@
 import asyncio
 import discord
+import hashlib
 
 from typing import *
 from collections import defaultdict
@@ -58,7 +59,9 @@ class GuildClanPanel():
                 await message.delete()
     @property
     def lock(self) -> asyncio.Lock:
-        return self._locks[self.id]    
+        _id = f"{self.guild_id}-{self.channel_id}"
+        h = hashlib.sha256(_id.encode()).hexdigest()
+        return self._locks[h]
     @property
     def guild(self):
         return bot_client.bot.get_guild(self.guild_id)    
