@@ -551,11 +551,11 @@ class ClanApplyMenuUser(discord.ui.View):
                     break
         
         if not application_id:
-            raise InvalidApplicationChannel
+            raise InvalidApplicationChannel(channel)
 
         application = await bot_client.coc_db.db__clan_application.find_one({'_id':bson.ObjectId(application_id)})
         if not application:
-            raise InvalidApplicationChannel
+            raise InvalidApplicationChannel(channel)
         
         tags = application.get('tags',[])
         if len(tags) > 0:
