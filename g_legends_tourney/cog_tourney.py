@@ -133,12 +133,13 @@ class LegendsTourney(commands.Cog):
             message=f"1. The Tournament will be held during the in-game March 2024 Legend League Season."
                 + f"\n2. This Tournament is open to the Clash of Clans Community."
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
-                + f"\n4. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
-                + f"\n5. You must join and stay in The Guild's Discord Server throughout the Tournament to participate."
-                + f"\n6. For TH16 participants, your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
-                + f"\n7. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
-                + f"\n8. TH13 - TH15 participants do not need to meet the time spent requirement."
-                + f"\n9. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
+                + f"\n4. Registrations close on <t:{tourn_season.trophy_season_start.subtract(days=20).int_timestamp}:f>."
+                + f"\n5. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
+                + f"\n6. You must join and stay in The Guild's Discord Server throughout the Tournament to participate."
+                + f"\n7. For TH16 participants, your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
+                + f"\n8. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
+                + f"\n9. TH13 - TH15 participants do not need to meet the time spent requirement."
+                + f"\n10. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n### Designated Clans"
                 + f"\n- [1LegioN #2LVJ98RR0](https://link.clashofclans.com/en?action=OpenClanProfile&tag=%232LVJ98RR0)",
             show_author=False)
@@ -471,6 +472,16 @@ class RegistrationMenu(AddLinkMenu):
     ##################################################
     async def _start_add_link(self):
         self.is_active = True
+
+        tourn_season = await aClashSeason(self.tournament_cog._tourney_season)
+
+        if pendulum.now() > tourn_season.trophy_season_end.subtract(days=20):
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"Registration for the Tournament has closed.",
+                success=False
+                )
+            return await self.ctx.followup.send(embed=embed,ephemeral=True)
 
         chk_participant = await self.tournament_cog.fetch_participant_for_user(self.member.id)
         if chk_participant:
