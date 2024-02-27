@@ -134,7 +134,7 @@ class LegendsTourney(commands.Cog):
                 + f"\n2. This Tournament is open to the Clash of Clans Community."
                 + f"\n3. Players may register with only **one** account of {EmojisTownHall.TH13} TH13 or higher."
                 + f"\n4. Registrations close on <t:{tourn_season.trophy_season_end.subtract(days=20).int_timestamp}:f>."
-                + f"\n5. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
+                + f"\n5. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_end.subtract(days=20).int_timestamp}:f>."
                 + f"\n6. You must join and stay in The Guild's Discord Server throughout the Tournament to participate."
                 + f"\n7. For TH16 participants, your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
                 + f"\n8. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
@@ -587,7 +587,7 @@ class CancelRegistrationMenu(DefaultView):
 
         if chk_registration:
             if pendulum.now() > tourn_season.trophy_season_start:
-                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
+                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_end.subtract(days=20) else tourn_season.trophy_season_end.subtract(days=20)
                 check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
                 time_spent = 0
@@ -611,7 +611,7 @@ class CancelRegistrationMenu(DefaultView):
             else:
                 time_spent_str = ""
 
-            if pendulum.now() < tourn_season.trophy_season_start.add(days=3):
+            if pendulum.now() < tourn_season.trophy_season_end.subtract(days=20):
                 embed = await clash_embed(
                     context=interaction,
                     message=f"You are currently registered with the account **{chk_registration.town_hall.emoji} {chk_registration.tag} {chk_registration.clean_name}**.\n\n"
