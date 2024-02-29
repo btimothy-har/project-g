@@ -653,38 +653,43 @@ class Bank(commands.Cog):
             )
     
     async def apply_bank_taxes(self):
+        tax_brackets = [
+            (0,10000,0),
+            (10001,25000,0.01),
+            (25001,50000,0.03),
+            (50001,100000,0.08),
+            (100001,200000,0.15),
+            (200001,500000,0.25),
+            (500001,float('inf'),0.25)
+            ]
+
         async def _user_tax(user_id:int):
             user = self.bot.get_user(user_id)
             if user.bot:
-                current_balance = await bank.get_balance(user)
+                balance = await bank.get_balance(user)
                 await self.reserve_account.deposit(
-                    amount=current_balance,
+                    amount=balance,
                     user_id=self.bot.user.id,
                     comment=f"Reset bot account."
                     )
-                return await bank.set_balance(user,0)                
+                return await bank.set_balance(user,0)
 
-            current_balance = await bank.get_balance(user)
-            additional_tax = 0
-            if current_balance <= 10000:
-                tax_pct = 0
-            elif current_balance <= 25000:
-                tax_pct = 0.01
-            elif current_balance <= 50000:
-                tax_pct = 0.03
-            elif current_balance <= 100000:
-                tax_pct = 0.08
-            elif current_balance <= 200000:
-                tax_pct = 0.15
-            else:
-                tax_pct = 0.25
-                additional_tax = (current_balance - 200000) // 10000 * 0.01 * 10000
+            balance = await bank.get_balance(user)
+            estimated_tax = 0
+
+            rate_iter = AsyncIter(tax_brackets)
+            async for low,high,rate in rate_iter:
+                if balance > high:
+                    estimated_tax += (high - low) * rate
+                else:
+                    estimated_tax += (balance - low) * rate
+                    break
             
             guild_user = self.bank_guild.get_member(user_id)
             if guild_user and self.bank_penalty_role in guild_user.roles:
-                total_tax = max(round(0.1 * current_balance),round((current_balance * tax_pct) + additional_tax) * 2)
+                total_tax = max(round(0.1 * balance),round(estimated_tax * 2))
             else:
-                total_tax = round((current_balance * tax_pct) + additional_tax)
+                total_tax = round(estimated_tax)
 
             if total_tax > 0:
                 await bank.withdraw_credits(user,total_tax)
