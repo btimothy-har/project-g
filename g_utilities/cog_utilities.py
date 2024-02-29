@@ -259,7 +259,7 @@ class GuildUtility(commands.Cog):
         await context.invoke(
             self.bot.get_command("timestamp"),
             dti=await DateConverter().convert(context,datetime)
-            )    
+            )
 
     @app_commands.command(name="dadjoke",
         description="Gets a random dad joke.")
