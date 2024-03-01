@@ -155,7 +155,10 @@ class LegendsTourney(commands.Cog):
             await message.edit(embeds=embeds,view=view)
         
     async def fetch_participant(self,tag:str) -> aPlayer:
-        player = await bot_client.coc.get_player(tag)
+        try:
+            player = await bot_client.coc.get_player(tag)
+        except coc.NotFound as exc:
+            raise exc            
 
         db_query = {'event_id':self.event_id,'tag':player.tag}
         tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)

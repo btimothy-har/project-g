@@ -281,12 +281,18 @@ class ClanWarLoop(TaskLoop):
                 await self.start()
     
     async def fetch_current_war(self,clan_tag:str):
-        current_war = await bot_client.coc.get_current_war(clan_tag)
+        try:
+            current_war = await bot_client.coc.get_current_war(clan_tag)
+        except coc.NotFound:
+            current_war = None
         if not current_war and pendulum.now().day in range(1,7):
-            current_war = await bot_client.coc.get_current_war(
-                clan_tag=clan_tag,
-                cwl_round=coc.WarRound.current_preparation
-                )
+            try:
+                current_war = await bot_client.coc.get_current_war(
+                    clan_tag=clan_tag,
+                    cwl_round=coc.WarRound.current_preparation
+                    )
+            except coc.NotFound:
+                current_war = None
         return current_war
     
     async def _run_single_loop(self,tag:str):
@@ -309,9 +315,9 @@ class ClanWarLoop(TaskLoop):
                 return self.loop.call_later(60,self.unlock,lock)
             
             current_war = None
-            try:
-                current_war = await self.fetch_current_war(tag)
-            except coc.NotFound:
+            current_war = await self.fetch_current_war(tag)
+
+            if not current_war:
                 return self.loop.call_later(60,self.unlock,lock)
             
             wait = getattr(current_war,'_response_retry',default_sleep)
