@@ -923,7 +923,7 @@ class Events(commands.Cog):
             return await interaction.followup.send(embed=embed)
 
         try:
-            participant = await get_event.register_participant(account,user.id)
+            participant = await get_event.register_participant(account.tag,user.id)
         except EventClosed:
             embed = await clash_embed(
                 context=interaction,
@@ -1114,7 +1114,7 @@ class Events(commands.Cog):
             message=f"{get_event.description}"
                 + f"\n\n`{'Start Time:':<15}` <t:{get_event.start_time.int_timestamp}:F>"
                 + f"\n`{'End Time:':<15}` <t:{get_event.end_time.int_timestamp}:F>"
-                + f"\n\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
+                + f"\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
                 + f"\n## Registration"
                 + f"\n`{'Status:':<15}` {get_event.status}"
                 + f"\n`{'Available:':<15}` {get_event.max_participants - count}/{get_event.max_participants}"
