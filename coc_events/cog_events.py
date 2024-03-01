@@ -229,10 +229,30 @@ class Events(commands.Cog):
     
     ############################################################
     #####
+    ##### COMMAND GROUP: EVENT
+    ##### 
+    ############################################################
+    @commands.group(name="event")
+    @commands.guild_only()
+    async def command_group_event(self,ctx:commands.Context):
+        """
+        Commands for all Guild Events.
+        """
+        if not ctx.invoked_subcommand:
+            pass        
+
+    appcommand_group_event = app_commands.Group(
+        name="event",
+        description="Commands for all Guild Events.",
+        guild_only=True
+        )
+    
+    ############################################################
+    #####
     ##### COMMAND GROUP: EVENT ADMIN
     ##### 
     ############################################################
-    @commands.group(name="eventadmin")
+    @command_group_event.group(name="admin")
     @commands.check(is_events_admin)
     @commands.guild_only()
     async def command_group_event_admin(self,ctx:commands.Context):
@@ -243,8 +263,9 @@ class Events(commands.Cog):
             pass        
 
     appcommand_group_event_admin = app_commands.Group(
-        name="event-admin",
+        name="admin",
         description="Commands for setting up/managing Events.",
+        parent=appcommand_group_event,
         guild_only=True
         )
     
@@ -335,7 +356,7 @@ class Events(commands.Cog):
         """
         Create a new Event.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin create` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin create` for this.")
     
     @appcommand_group_event_admin.command(name="create",
         description="Create a new Event.")
@@ -444,7 +465,7 @@ class Events(commands.Cog):
         """
         Edits an Event.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin edit` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin edit` for this.")
     
     @appcommand_group_event_admin.command(name="edit",
         description="Edit an existing Event.")
@@ -607,7 +628,7 @@ class Events(commands.Cog):
 
         This action is irreversible.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin delete` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin delete` for this.")
     
     @appcommand_group_event_admin.command(name="delete",
         description="Deletes an Event. This action is irreversible.")
@@ -674,7 +695,7 @@ class Events(commands.Cog):
         """
         Opens an Event for registration.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin open` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin open` for this.")
     
     @appcommand_group_event_admin.command(name="open",
         description="Opens an Event for registration.")
@@ -713,7 +734,7 @@ class Events(commands.Cog):
         """
         Closes an Event and stops new registrations.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin close` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin close` for this.")
     
     @appcommand_group_event_admin.command(name="close",
         description="Closes an Event and stops new registrations.")
@@ -752,7 +773,7 @@ class Events(commands.Cog):
         """
         Links an Event to Discord, with optional parameters.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin link` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin link` for this.")
     
     @appcommand_group_event_admin.command(name="link",
         description="Links an Event to Discord, with optional parameters.")
@@ -813,7 +834,7 @@ class Events(commands.Cog):
         """
         Syncs the Event Role with the Event Participants.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin syncrole` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin syncrole` for this.")
     
     @appcommand_group_event_admin.command(name="sync-role",
         description="Syncs the Event Role with the Event Participants.")
@@ -861,7 +882,7 @@ class Events(commands.Cog):
         """
         Exports the Event Participants to Excel.
         """
-        return await ctx.reply(f"Please use the Slash Command `/event-admin export` for this.")
+        return await ctx.reply(f"Please use the Slash Command `/event admin export` for this.")
     
     @appcommand_group_event_admin.command(name="export",
         description="Exports the Event Participants to Excel.")
@@ -892,26 +913,6 @@ class Events(commands.Cog):
             content="Event Participants for {get_event.name} exported.",
             file=discord.File(rp_file)
             )
-    
-    ############################################################
-    #####
-    ##### COMMAND GROUP: EVENT
-    ##### 
-    ############################################################
-    @commands.group(name="event")
-    @commands.guild_only()
-    async def command_group_event(self,ctx:commands.Context):
-        """
-        Register/Withdraw from Events.
-        """
-        if not ctx.invoked_subcommand:
-            pass        
-
-    appcommand_group_event = app_commands.Group(
-        name="event",
-        description="Register/Withdraw from Events.",
-        guild_only=True
-        )
     
     ##################################################
     ### EVENT / REGISTER
