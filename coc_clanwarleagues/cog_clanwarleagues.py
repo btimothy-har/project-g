@@ -1199,7 +1199,7 @@ class ClanWarLeagues(commands.Cog):
             )
         return embed
     
-    @subcmd_cwl_cwlrostersetup.command(name="remove")
+    @subcmdgroup_cwl_cwlroster.command(name="remove")
     @commands.check(is_cwl_admin)
     @commands.guild_only()
     async def subcmd_cwl_cwlrosterremove(self,ctx:commands.Context,player_tag:str):
