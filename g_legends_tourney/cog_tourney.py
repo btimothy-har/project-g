@@ -155,10 +155,7 @@ class LegendsTourney(commands.Cog):
             await message.edit(embeds=embeds,view=view)
         
     async def fetch_participant(self,tag:str) -> aPlayer:
-        try:
-            player = await bot_client.coc.get_player(tag)
-        except coc.NotFound as exc:
-            raise exc            
+        player = await bot_client.coc.get_player(tag)        
 
         db_query = {'event_id':self.event_id,'tag':player.tag}
         tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)
@@ -179,7 +176,9 @@ class LegendsTourney(commands.Cog):
         async for participant in tournament_db:
             try:
                 player = await self.fetch_participant(participant['tag'])
-            except coc.NotFound:
+            except (coc.Maintenance,coc.GatewayError):
+                raise
+            except:
                 continue
             participants.append(player)
         

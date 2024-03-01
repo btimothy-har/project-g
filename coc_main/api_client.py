@@ -795,10 +795,8 @@ class BotClashClient():
 
 @coc.ClientEvents.event_error()
 async def clash_event_error(exception:Exception):
-    if isinstance(exception,coc.NotFound):
-        return
-    
-    if str(exception) == "No active exception to reraise":
+    original = getattr(exception,"original",None)
+    if isinstance(original,coc.NotFound):
         return
     
     try:
