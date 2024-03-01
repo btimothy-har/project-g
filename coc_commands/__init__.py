@@ -5,7 +5,6 @@ from redbot.core.bot import Red
 from .cog_clan_commands import Clans as clan_commands
 from .cog_player_commands import Players as player_commands 
 from .cog_player_commands import context_menu_user_profile, context_menu_clash_accounts, context_menu_change_nickname, context_menu_restore_roles, context_menu_sync_roles
-from .cog_cwl_commands import ClanWarLeagues as cwl_commands
 from .cog_config_commands import ClashServerConfig as config_commands
 
 try_limit = 60
@@ -32,9 +31,6 @@ async def setup(bot:Red):
 
     commands_player = player_commands(bot,version)    
     await bot.add_cog(commands_player)
-  
-    commands_cwl = cwl_commands(bot,version)
-    await bot.add_cog(commands_cwl)
      
     commands_config = config_commands(bot,version)
     await bot.add_cog(commands_config)

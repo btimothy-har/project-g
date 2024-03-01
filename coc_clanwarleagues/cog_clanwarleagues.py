@@ -12,7 +12,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar
+from coc_main.cog_coc_client import aClan, aClanWar
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 

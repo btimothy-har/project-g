@@ -299,9 +299,6 @@ class Event():
                 if member:
                     await member.add_roles(self.event_role)
 
-
-
-
     
     ##################################################
     ##### PARTICIPANT FUNCTIONS

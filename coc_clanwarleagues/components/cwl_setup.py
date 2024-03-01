@@ -53,10 +53,6 @@ class CWLSeasonSetup(DefaultView):
     @property
     def bot_client(self) -> BotClashClient:
         return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### START / STOP CALL
