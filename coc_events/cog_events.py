@@ -949,14 +949,14 @@ class Events(commands.Cog):
         if interaction.user.id == user.id:
             embed = await clash_embed(
                 context=interaction,
-                message=f"You have registered for {get_event.name} with the account {participant.title}.",
+                message=f"You have registered for **{get_event.name}** with the account **{participant.title}**.",
                 success=True
                 )
             return await interaction.followup.send(embed=embed)
         else:
             embed = await clash_embed(
                 context=interaction,
-                message=f"{user.display_name} has been registered for {get_event.name} with the account {participant.title}.",
+                message=f"{user.display_name} has been registered for **{get_event.name}** with the account **{participant.title}**.",
                 success=True
                 )
             return await interaction.followup.send(embed=embed)
