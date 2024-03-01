@@ -538,6 +538,7 @@ class Bank(commands.Cog):
         
         if message.content.startswith("Fulfillment reversed by"):
             await ticket.reverse_redemption()
+            await message.channel.send("--automation stop")
 
     ############################################################
     #####
