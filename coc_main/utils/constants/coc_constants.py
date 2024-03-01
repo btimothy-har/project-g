@@ -183,7 +183,7 @@ class SpellAvailability:
         9: ['Jump Spell', 'Freeze Spell', 'Haste Spell', 'Skeleton Spell'],
         10: ['Clone Spell', 'Bat Spell'],
         11: ['Invisibility Spell'],
-        12: [],
+        12: ['Overgrowth Spell'],
         13: ['Recall Spell'],
         14: [],
         15: [],
