@@ -68,29 +68,6 @@ async def autocomplete_clans(interaction:discord.Interaction,current:str):
     except Exception:
         bot_client.coc_main_log.exception("Error in autocomplete_clans")
 
-async def autocomplete_war_league_clans(interaction:discord.Interaction,current:str):
-    try:
-        league_clans = await bot_client.coc.get_war_league_clans()
-
-        if current:
-            clans = [c for c in league_clans 
-                if current.lower() in c.name.lower() 
-                or current.lower() in c.tag.lower() 
-                or current.lower() in c.abbreviation.lower()
-                ]
-        else:
-            clans = league_clans
-
-        a_iter = AsyncIter(random.sample(clans,min(len(clans),8)))
-        return [
-            app_commands.Choice(
-                name=f"{c.clean_name} | {c.tag}",
-                value=c.tag)
-            async for c in a_iter
-            ]
-    except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_war_league_clans")
-
 async def autocomplete_clans_coleader(interaction:discord.Interaction,current:str):
     try:
         member = await aMember(interaction.user.id,interaction.guild.id)

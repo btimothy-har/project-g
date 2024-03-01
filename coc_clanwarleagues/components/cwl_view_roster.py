@@ -8,7 +8,6 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
 
 from coc_main.utils.components import DiscordButton, MenuPaginator, handle_command_error, clash_embed
@@ -35,10 +34,6 @@ class CWLRosterDisplayMenu(MenuPaginator):
     @property
     def bot_client(self) -> BotClashClient:
         return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS

@@ -5,7 +5,6 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu

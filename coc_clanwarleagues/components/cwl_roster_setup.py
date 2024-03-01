@@ -16,9 +16,7 @@ from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, D
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
 from coc_main.utils.utils import chunks
-from coc_main.exceptions import ClashAPIError
 
 bot_client = BotClashClient()
 

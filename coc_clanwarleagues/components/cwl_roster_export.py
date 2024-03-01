@@ -7,7 +7,6 @@ from typing import *
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
@@ -32,9 +31,6 @@ cwl_roster_headers = [
 
 bot_client = BotClashClient()
 
-def get_client() -> ClashOfClansClient:
-    return bot_client.bot.get_cog('ClashOfClansClient')
-
 async def generate_cwl_roster_export(season:aClashSeason):    
     report_file = bot_client.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
 
@@ -47,7 +43,6 @@ async def generate_cwl_roster_export(season:aClashSeason):
     if os.path.exists(report_file):
         os.remove(report_file)
 
-    client = get_client()
     workbook = xlsxwriter.Workbook(report_file)
     
     bold = workbook.add_format({'bold':True})

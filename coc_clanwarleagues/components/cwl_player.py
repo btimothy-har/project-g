@@ -9,18 +9,16 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
+from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
 from coc_main.discord.member import aMember
 
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
-from coc_main.utils.constants.coc_constants import WarState, WarResult, CWLLeagueGroups, MultiplayerLeagues
+from coc_main.utils.constants.coc_constants import WarResult, CWLLeagueGroups, MultiplayerLeagues
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-from coc_main.exceptions import ClashAPIError
 
 bot_client = BotClashClient()
 
