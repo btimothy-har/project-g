@@ -372,7 +372,7 @@ class ClanWarLoop(TaskLoop):
                 if len(war_league_reminder) == 0:
                     await EventReminder.create_war_reminder(
                         clan=clan,
-                        channel=clan.league_clan_channel,
+                        channel=league_clan.league_clan_channel,
                         war_types=['cwl'],
                         interval=[12,8,6,4,3,2,1],
                         )
