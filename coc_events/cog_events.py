@@ -375,12 +375,12 @@ class Events(commands.Cog):
         embed = await clash_embed(
             context=interaction,
             title=f"Create Event: {name}",
-            message=f"Start Time: <t:{st_time.int_timestamp}:F>"
-                + f"\nDuration: {duration} hours"
-                + f"\nMax Participants: {max_participants}"
-                + f"\nMembers Only: {members_only}"
-                + f"\nTags per Participant: {tags_per_participant}"                
-                + f"\nPrize Pool: {prize_pool}"
+            message=f"`{'Start Time:':<25}` <t:{st_time.int_timestamp}:F>"
+                + f"\n`{'Duration:':<25}` {duration} hours"
+                + f"\n`{'Max Participants:':<25}` {max_participants}"
+                + f"\n`{'Members Only:':<25}` {members_only}"
+                + f"\n`{'Tags per Participant:':<25}` {tags_per_participant}"                
+                + f"\n`{'Prize Pool:':<25}` {prize_pool:,} {await bank.get_currency_name()}"
                 + f"\n\u200b"
             )
         embed.add_field(
@@ -422,13 +422,13 @@ class Events(commands.Cog):
             embed = await clash_embed(
                 context=interaction,
                 title=f"Event Created: {event.name}",
-                message=f"Event ID: {event.id}"
-                    + f"\nStart Time: <t:{event.start_time.int_timestamp}:F>"
-                    + f"\nDuration: {event.duration} hours"
-                    + f"\nMax Participants: {event.max_participants}"
-                    + f"\nMembers Only: {event.members_only}"
-                    + f"\nTags per Participant: {event.tags_per_participant}"
-                    + f"\nPrize Pool: {event.prize_pool}",
+                message=f"`{'Start Time:':<25}` <t:{st_time.int_timestamp}:F>"
+                    + f"\n`{'Duration:':<25}` {duration} hours"
+                    + f"\n`{'Max Participants:':<25}` {max_participants}"
+                    + f"\n`{'Members Only:':<25}` {members_only}"
+                    + f"\n`{'Tags per Participant:':<25}` {tags_per_participant}"                
+                    + f"\n`{'Prize Pool:':<25}` {prize_pool:,} {await bank.get_currency_name()}"
+                    + f"\n\u200b",
                 success=True
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -583,13 +583,13 @@ class Events(commands.Cog):
             embed = await clash_embed(
                 context=interaction,
                 title=f"Event Edited: {new_event.name}",
-                message=f"Event ID: {new_event.id}"
-                    + f"\nStart Time: <t:{new_event.start_time.int_timestamp}:F>"
-                    + f"\nDuration: {new_event.duration} hours"
-                    + f"\nMax Participants: {new_event.max_participants}"
-                    + f"\nMembers Only: {new_event.members_only}"
-                    + f"\nTags per Participant: {new_event.tags_per_participant}"
-                    + f"\nPrize Pool: {new_event.prize_pool}",
+                message=f"`{'Event ID:':<25}` {new_event.id}"
+                    + f"\n`{'Start Time:':<25}` <t:{new_event.start_time.int_timestamp}:F>"
+                    + f"\n`{'Duration:':<25}` {new_event.duration} hours"
+                    + f"\n`{'Max Participants:':<25}` {new_event.max_participants}"
+                    + f"\n`{'Members Only:':<25}` {new_event.members_only}"
+                    + f"\n`{'Tags per Participant:':<25}` {new_event.tags_per_participant}"
+                    + f"\n`{'Prize Pool:':<25}` {new_event.prize_pool}",
                 success=True
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -1112,13 +1112,13 @@ class Events(commands.Cog):
             context=interaction,
             title=f"{get_event.name}",
             message=f"{get_event.description}"
-                + f"\n\nStart Time: <t:{get_event.start_time.int_timestamp}:F>"
-                + f"\nEnd Time: <t:{get_event.end_time.int_timestamp}:F>"
-                + f"\n\nPrize Pool: {get_event.prize_pool} {currency}"
+                + f"\n\n`{'Start Time:':<15}` <t:{get_event.start_time.int_timestamp}:F>"
+                + f"\n`{'End Time:':<15}` <t:{get_event.end_time.int_timestamp}:F>"
+                + f"\n\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
                 + f"\n## Registration"
-                + f"\nStatus: {get_event.status}"
-                + f"\nAvailable: {get_event.max_participants - count}/{get_event.max_participants}"
-                + f"\nMax per User: {get_event.tags_per_participant}"
-                + f"\nMembers Only: {get_event.members_only}"
+                + f"\n`{'Status:':<15}` {get_event.status}"
+                + f"\n`{'Available:':<15}` {get_event.max_participants - count}/{get_event.max_participants}"
+                + f"\n`{'Max per User:':<15}` {get_event.tags_per_participant}"
+                + f"\n`{'Members Only:':<15}` {get_event.members_only}"
             )
         return await interaction.followup.send(embed=embed,view=None)
