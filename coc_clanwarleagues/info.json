@@ -1,0 +1,12 @@
+{
+    "author": ["bakkutteh"],
+    "description": "Events management module for The Assassins Guild",
+    "install_msg": "Hello!",
+    "short": "g_utility",
+    "end_user_data_statement": "This cog does not collect or store any data.",
+    "min_bot_version": "3.5.2",
+    "min_python_version": [3,11,3],
+    "hidden": false,
+    "disabled": false,
+    "required_cogs": {}
+}

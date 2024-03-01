@@ -8,8 +8,8 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClanWar, aPlayer
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup,WarLeagueClan
+from coc_main.cog_coc_client import ClashOfClansClient, aClanWar
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.helpers import clan_war_embed
 
@@ -17,8 +17,6 @@ from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, D
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, WarResult
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-from coc_main.exceptions import ClashAPIError
 
 bot_client = BotClashClient()
 

@@ -12,7 +12,7 @@ from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter, bounded_gather
 
 from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar
+from coc_main.cog_coc_client import aClan, aClanWar
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup, WarLeaguePlayer, WarLeagueClan
 from coc_main.coc_objects.events.clan_war import aWarPlayer
 
@@ -21,18 +21,20 @@ from coc_main.discord.member import aMember
 from coc_main.utils.components import clash_embed, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
-from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_war_league_clans, autocomplete_players
-from coc_main.utils.checks import is_admin, is_coleader, is_cwl_leader
+from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_players
+
+from .checks import is_cwl_admin
+from .autocomplete import autocomplete_all_league_clans, autocomplete_season_league_participants, autocomplete_season_league_clans
 
 from coc_data.tasks.war_tasks import ClanWarLoop
 
-from .views.cwl_player import CWLPlayerMenu
-from .views.cwl_setup import CWLSeasonSetup
-from .views.cwl_view_roster import CWLRosterDisplayMenu
-from .views.cwl_league_group import CWLClanGroupMenu
-from .views.cwl_roster_setup import CWLRosterMenu
+from .components.cwl_player import CWLPlayerMenu
+from .components.cwl_setup import CWLSeasonSetup
+from .components.cwl_view_roster import CWLRosterDisplayMenu
+from .components.cwl_league_group import CWLClanGroupMenu
+from .components.cwl_roster_setup import CWLRosterMenu
 
-from .excel.cwl_roster_export import generate_cwl_roster_export
+from .components.cwl_roster_export import generate_cwl_roster_export
 
 bot_client = BotClashClient()
 
@@ -51,23 +53,37 @@ class ClanWarLeagues(commands.Cog):
     __author__ = bot_client.author
     __version__ = bot_client.version
 
-    def __init__(self,bot:Red,version:int):
+    def __init__(self,bot:Red):
         self.bot = bot
-        self.sub_v = version
         
         self.banned_users = set()
+
+        self.ticket_prefix = "--"
+        self._ticket_listener = 0        
+        self._cwl_guild = 0
+        self._cwl_top_role = 0
+        self._admin_role = 0
+
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
-            "banned_users":[]
+            "banned_users":[],
+            "ticket_prefix": "--",
+            "ticket_listener": 0,            
+            "master_guild": 0,
+            "master_role": 0,
+            "admin_role": 0
             }
         self.config.register_global(**default_global)
 
-        self._cwl_channel_listener = 1194618178760876042 if bot_client.bot.user.id == 1031240380487831664 else 1194618586610802688
-
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
-    
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+
+    ############################################################
+    #####
+    ##### COG LOAD / UNLOAD
+    #####
+    ############################################################    
     async def cog_load(self):
         async def load_events():
             while True:
@@ -77,8 +93,12 @@ class ClanWarLeagues(commands.Cog):
             ClanWarLoop.add_war_end_event(self.cwl_elo_adjustment)
             ClanWarLoop.add_war_end_event(self.war_elo_adjustment)
 
-        a = await self.config.banned_users()
-        self.banned_users = set(a)
+        self.banned_users = set(await self.config.banned_users())
+        self.ticket_prefix = await self.config.ticket_prefix()
+        self._ticket_listener = await self.config.ticket_listener()
+        self._cwl_guild = await self.config.master_guild()
+        self._cwl_top_role = await self.config.master_role()
+        self._admin_role = await self.config.admin_role()
 
         asyncio.create_task(load_events())
     
@@ -86,97 +106,33 @@ class ClanWarLeagues(commands.Cog):
         ClanWarLoop.remove_war_end_event(self.cwl_elo_adjustment)
         ClanWarLoop.remove_war_end_event(self.war_elo_adjustment)
     
-    @property
-    def bot_client(self) -> BotClashClient:
-        return BotClashClient()
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
-    @property
-    def cwl_channel_listener(self) -> Optional[discord.TextChannel]:
-        return self.bot.get_channel(self._cwl_channel_listener)
-    
-    @property
-    def cwl_channel_category(self) -> Optional[discord.CategoryChannel]:
-        if self.cwl_channel_listener:
-            return self.cwl_channel_listener.category
-        return None
-    
+    ############################################################
+    #####
+    ##### COG PROPERTIES
+    #####
+    ############################################################    
     @property
     def cwl_guild(self) -> Optional[discord.Guild]:
-        if self.cwl_channel_listener:
-            return self.cwl_channel_listener.guild
+        return self.bot.get_guild(self._cwl_guild)
+    @property
+    def cwl_top_role(self) -> Optional[discord.Role]:
+        if self.cwl_guild:
+            return self.cwl_guild.get_role(self._cwl_top_role)
         return None
+    @property
+    def admin_role(self) -> Optional[discord.Role]:
+        if self.cwl_guild:
+            return self.cwl_guild.get_role(self._admin_role)
+        return None
+    @property
+    def ticket_listener(self) -> Optional[discord.TextChannel]:
+        return self.bot.get_channel(self._ticket_listener)
     
     @property
     def active_war_league_season(self) -> aClashSeason:
-        if pendulum.now() > self.bot_client.current_season.cwl_end.add(days=4):
-            return self.bot_client.current_season.next_season()
-        return self.bot_client.current_season
-    
-    async def cog_command_error(self,ctx,error):
-        original = getattr(error,'original',None)
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=ctx,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
-
-    async def cog_app_command_error(self,interaction,error):
-        original = getattr(error,'original',None)
-        embed = None
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-        if embed:
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed,view=None)
-            else:
-                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
-            return
+        if pendulum.now() > bot_client.current_season.cwl_end.add(days=4):
+            return bot_client.current_season.next_season()
+        return bot_client.current_season
     
     async def create_clan_channel(self,clan:WarLeagueClan):
         if not self.cwl_channel_listener:
@@ -323,9 +279,11 @@ class ClanWarLeagues(commands.Cog):
         tasks = [player_elo_adjustment(p) async for p in p_iter]
         await bounded_gather(*tasks)
     
-    ##################################################
-    ### ASSISTANT COG FUNCTIONS
-    ##################################################
+    ############################################################
+    #####
+    ##### COG ASSISTANT FUNCTIONS
+    #####
+    ############################################################
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
@@ -438,66 +396,78 @@ class ClanWarLeagues(commands.Cog):
         return f"{user.display_name}'s registered accounts for {self.active_war_league_season.description} are: {return_info}"
     
     ############################################################
-    ############################################################
     #####
-    ##### COG DIRECTORY
-    ##### - mycwl
-    ##### - cwl
-    #####   - info
-    #####   - setup
-    #####   - clan
-    #####     - list
-    #####     - add
-    #####     - remove
-    #####     - roster
-    #####     - group
-    #####   - roster
-    #####     - setup
-    #####     - add
-    #####     - remove
-    #####     - export
+    ##### COMMAND HELPERS
     #####
     ############################################################
-    ############################################################
-    @commands.command(name="finalize")
-    @commands.is_owner()
-    @commands.guild_only()
-    async def command_finalize(self,ctx):
-        """
-        Finalize CWL Rosters for the current season.
-        """
+    async def cog_command_error(self,ctx,error):
+        original = getattr(error,'original',None)
+        if isinstance(original,coc.NotFound):
+            embed = await clash_embed(
+                context=ctx,
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
+            embed = await clash_embed(
+                context=ctx,
+                message="The Clash of Clans API is currently unavailable.",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        elif isinstance(original,ClashOfClansError):
+            embed = await clash_embed(
+                context=ctx,
+                message=f"{original.message}",
+                success=False,
+                timestamp=pendulum.now()
+                )
+            await ctx.send(embed=embed)
+            return
+        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
 
-        clan = await WarLeagueClan("#URGQUR82",self.active_war_league_season)
-        clan.roster_open = True
-        i = await clan.finalize_roster()
-        await ctx.reply(f"Finalized: {i}.")
-
-    ##################################################
-    ### PARENT COMMAND GROUPS
-    ##################################################
-    @commands.group(name="cwl")
-    @commands.guild_only()
-    async def command_group_cwl(self,ctx):
-        """
-        Group for CWL-related Commands.
-
-        **This is a command group. To use the sub-commands below, follow the syntax: `$cwl [sub-command]`.**
-        """
-        if not ctx.invoked_subcommand:
-            pass
-
-    app_command_group_cwl = app_commands.Group(
-        name="cwl",
-        description="Group for CWL commands. Equivalent to [p]cwl.",
-        guild_only=True
-        )
-
+    async def cog_app_command_error(self,interaction,error):
+        original = getattr(error,'original',None)
+        embed = None
+        if isinstance(original,coc.NotFound):
+            embed = await clash_embed(
+                context=interaction,
+                message="The Tag you provided doesn't seem to exist.",
+                success=False,
+                timestamp=pendulum.now()
+                )            
+        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
+            embed = await clash_embed(
+                context=interaction,
+                message="The Clash of Clans API is currently unavailable.",
+                success=False,
+                timestamp=pendulum.now()
+                )            
+        elif isinstance(original,ClashOfClansError):
+            embed = await clash_embed(
+                context=interaction,
+                message=f"{original.message}",
+                success=False,
+                timestamp=pendulum.now()
+                )
+        if embed:
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed,view=None)
+            else:
+                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
+            return
+    
     ##################################################
     ### MYCWL
     ##################################################
     @commands.command(name="mycwl")
     @commands.guild_only()
-    async def command_mycwl(self,ctx):
+    async def cmdgroup_cwl_mycwl(self,ctx:commands.Context):
         """
         Manage your CWL Signup/Rosters/Stats.
 
@@ -505,11 +475,10 @@ class ClanWarLeagues(commands.Cog):
         Defaults to the currently running CWL Season.
         """
         
-        season = self.active_war_league_season
         member = await aMember(ctx.author.id)
-        cwlmenu = CWLPlayerMenu(ctx,season,member)
+        cwlmenu = CWLPlayerMenu(ctx,self.active_war_league_season,member)
 
-        if pendulum.now() < season.cwl_start:
+        if pendulum.now() < self.active_war_league_season.cwl_start:
             if ctx.author.id in self.banned_users:
                 await ctx.reply("You have been banned from participating in CWL.")
                 return
@@ -520,44 +489,184 @@ class ClanWarLeagues(commands.Cog):
     @app_commands.command(name="mycwl",
         description="Manage your CWL Signups, Rosters, Stats.")
     @app_commands.guild_only()
-    async def appcommand_mycwl(self,interaction:discord.Interaction):
+    async def appgroup_cwl_mycwl(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 
-        season = self.active_war_league_season
         member = await aMember(interaction.user.id)
-        cwlmenu = CWLPlayerMenu(interaction,season,member)
+        cwlmenu = CWLPlayerMenu(interaction,self.active_war_league_season,member)
 
-        if pendulum.now() < season.cwl_start.subtract(days=1): 
+        if pendulum.now() < self.active_war_league_season.cwl_start.subtract(days=1): 
             if interaction.user.id in self.banned_users:
                 await interaction.edit_original_response(content="You have been banned from participating in CWL.")
                 return
             await cwlmenu.start_signup()
         else:
             await cwlmenu.show_live_cwl()
+
+    ############################################################
+    #####
+    ##### COMMAND GROUP: CWLSET
+    ##### Only available as text command
+    ############################################################
+    @commands.group(name="cwlset")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def cmdgroup_cwl_cwlset(self,ctx:commands.Context):
+        """
+        Command group for setting up the CWL Module.
+        """
+        if not ctx.invoked_subcommand:
+            pass
+    
+    ##################################################
+    ### CWLSET / GUILD
+    ##################################################    
+    @cmdgroup_cwl_cwlset.command(name="guild")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcmd_cwl_cwlset_guild(self,ctx:commands.Context,guild_id:int):
+        """
+        Set the Master Guild for the CWL Module.
+        """
+
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return await ctx.reply(f"Guild not found.")
+        
+        await self.config.master_guild.set(guild_id)
+        self._cwl_guild = guild_id
+        await ctx.reply(f"CWL Master Guild set to {guild.name}.")
+    
+    ##################################################
+    ### CWLSET / ROLE
+    ##################################################    
+    @cmdgroup_cwl_cwlset.command(name="role")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcmd_cwl_cwlset_role(self,ctx:commands.Context,role_id:int):
+        """
+        Set the Master Role for the CWL Module.
+
+        All roles created for CWL will be created under this role.
+        """
+
+        if not self.cwl_guild:
+            return await ctx.reply(f"Master Guild not set.")
+        
+        role = self.cwl_guild.get_role(role_id)
+        if not role:
+            return await ctx.reply(f"Role not found.")
+        
+        await self.config.master_role.set(role_id)
+        self._cwl_top_role = role_id
+        await ctx.reply(f"Master Role set to {role.name}.")
+    
+    ##################################################
+    ### CWLSET / ADMIN
+    ##################################################    
+    @cmdgroup_cwl_cwlset.command(name="admin")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcmd_cwl_cwlset_admin(self,ctx:commands.Context,role_id:int):
+        """
+        Set the Admin Role for the CWL Module.
+        """
+
+        if not self.cwl_guild:
+            return await ctx.reply(f"Master Guild not set.")
+
+        role = self.cwl_guild.get_role(role_id)
+        if not role:
+            return await ctx.reply(f"Role not found.")
+        
+        await self.config.admin_role.set(role_id)
+        self._admin_role = role_id
+        await ctx.reply(f"CWL Admin Role set to {role.name}.")
+    
+    ##################################################
+    ### CWLSET / LISTENER
+    ##################################################    
+    @cmdgroup_cwl_cwlset.command(name="listener")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcmd_cwl_cwlset_listener(self,ctx:commands.Context,channel_id:int):
+        """
+        Set the Listener Channel for the CWL Module.
+        """
+
+        if not self.cwl_guild:
+            return await ctx.reply(f"Master Guild not set.")
+
+        channel = self.cwl_guild.get_channel(channel_id)
+        if not channel:
+            return await ctx.reply(f"Channel not found.")
+        
+        await self.config.ticket_listener.set(channel_id)
+        self._ticket_listener = channel_id
+        await ctx.reply(f"Ticket Listener set to {channel.name}.")
+
+    ##################################################
+    ### CWLSET / PREFIX
+    ##################################################    
+    @cmdgroup_cwl_cwlset.command(name="prefix")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def subcmd_cwl_cwlset_prefix(self,ctx:commands.Context,prefix:str):
+        """
+        Set the Listener Prefix for the CWL Module.
+        """
+
+        if not self.cwl_guild:
+            return await ctx.reply(f"Master Guild not set.")
+        
+        await self.config.ticket_prefix.set(prefix)
+        self.ticket_prefix = prefix
+        await ctx.reply(f"Ticket Prefix set to {prefix}.")
+    
+    ############################################################
+    #####
+    ##### GROUP: CWL MASTER COMMANDS
+    #####
+    ############################################################
+    @commands.group(name="cwl")
+    @commands.guild_only()
+    async def cmdgroup_cwl_cwl(self,ctx):
+        """
+        Group for CWL-related Commands.
+
+        **This is a command group. To use the sub-commands below, follow the syntax: `$cwl [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    appgroup_cwl_cwl = app_commands.Group(
+        name="cwl",
+        description="Group for CWL commands. Equivalent to [p]cwl.",
+        guild_only=True
+        )
     
     ##################################################
     ### CWL / SETUP
     ##################################################
-    @command_group_cwl.command(name="setup")
-    @commands.check(is_cwl_leader)
+    @cmdgroup_cwl_cwl.command(name="setup")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_setup(self,ctx):
+    async def subcmd_cwl_setup(self,ctx):
         """
         Admin home for the CWL Season.
 
         Provides an overview to Admins of the current CWL Season, and provides toggles to control various options.
         """
 
-        season = self.active_war_league_season
-        menu = CWLSeasonSetup(ctx,season)
+        menu = CWLSeasonSetup(ctx,self.active_war_league_season)
         await menu.start()
     
-    @app_command_group_cwl.command(name="setup",
+    @appgroup_cwl_cwl.command(name="setup",
         description="Setup CWL for a season.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_cwl_setup(self,interaction:discord.Interaction):
+    async def subappcmd_cwl_setup(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 
@@ -566,12 +675,12 @@ class ClanWarLeagues(commands.Cog):
         await menu.start()
     
     ##################################################
-    ### CWL / ban-user
+    ### CWL / BAN
     ##################################################
-    @command_group_cwl.command(name="ban", aliases=["banuser","ban-user"])
-    @commands.check(is_cwl_leader)
+    @cmdgroup_cwl_cwl.command(name="ban", aliases=["banuser","ban-user"])
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_ban_user(self,ctx:commands.Context,user:discord.Member):
+    async def subcmd_cwl_banuser(self,ctx:commands.Context,user:discord.Member):
         """
         Bans a user from participating in future CWL.
         """
@@ -580,67 +689,76 @@ class ClanWarLeagues(commands.Cog):
         await self.config.banned_users.set(list(self.banned_users))
         await ctx.reply(f"{user.display_name} `{user.id}` is now banned from participating in future CWL.")
     
-    @app_command_group_cwl.command(name="ban",
+    @appgroup_cwl_cwl.command(name="ban",
         description="Ban a user from participating in future CWL.")
     @app_commands.describe(user="The user to ban.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_cwl_ban_user(self,interaction:discord.Interaction,user:discord.Member):
+    async def subappcmd_cwl_banuser(self,interaction:discord.Interaction,user:discord.Member):
         
         await interaction.response.defer()
 
         self.banned_users.add(user.id)
         await self.config.banned_users.set(list(self.banned_users))
-        await interaction.edit_original_response(content=f"{user.display_name} `{user.id}`is now banned from participating in future CWL.")
+        await interaction.followup.send(
+            content=f"{user.display_name} `{user.id}`is now banned from participating in future CWL."
+            )
     
     ##################################################
-    ### CWL / unban-user
+    ### CWL / UNBAN
     ##################################################
-    @command_group_cwl.command(name="unban", aliases=["unbanuser","unban-user"])
-    @commands.check(is_cwl_leader)
+    @cmdgroup_cwl_cwl.command(name="unban", aliases=["unbanuser","unban-user"])
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_unban_user(self,ctx:commands.Context,user:discord.Member):
+    async def subcmd_cwl_unbanuser(self,ctx:commands.Context,user:discord.Member):
         """
-        Unbans a user from participating in future CWL.
+        Unbans a user from CWL participation.
         """
         if user.id not in self.banned_users:
-            return await ctx.reply(f"{user.display_name} `{user.id}` is not banned from participating in future CWL.")
+            return await ctx.reply(f"{user.display_name} `{user.id}` is currently not banned from participating in future CWL.")
 
         self.banned_users.remove(user.id)
         await self.config.banned_users.set(list(self.banned_users))
         await ctx.reply(f"{user.display_name} `{user.id}` is now unbanned from participating in future CWL.")
     
-    @app_command_group_cwl.command(name="unban",
+    @appgroup_cwl_cwl.command(name="unban",
         description="Unban a user from participating in future CWL.")
-    @app_commands.describe(user="The user to ban.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.describe(user="The user to unban.")
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_unban_user(self,interaction:discord.Interaction,user:discord.Member):
+    async def subappcmd_cwl_unbanuser(self,interaction:discord.Interaction,user:discord.Member):
         
         await interaction.response.defer()
         if user.id not in self.banned_users:
-            return await interaction.edit_original_response(content=f"{user.display_name} `{user.id}` is not banned from participating in future CWL.")
+            await interaction.followup.send(
+                content=f"{user.display_name} `{user.id}` is currently not banned from participating in future CWL."
+                )
+            return
 
         self.banned_users.remove(user.id)
         await self.config.banned_users.set(list(self.banned_users))
-        await interaction.edit_original_response(content=f"{user.display_name} `{user.id}` is now unbanned from participating in future CWL.")
+        await interaction.followup.send(
+            content=f"{user.display_name} `{user.id}` is now unbanned from future CWL."
+            )
     
-    ##################################################
-    ### CWL / CLAN
-    ##################################################
-    @command_group_cwl.group(name="clan")
+    ############################################################
+    #####
+    ##### GROUP: CWL CLAN COMMANDS
+    #####
+    ############################################################
+    @cmdgroup_cwl_cwl.group(name="clan")
     @commands.guild_only()
-    async def subcommand_group_cwl_clan(self,ctx):
+    async def subcmdgroup_cwl_cwlclan(self,ctx:commands.Context):
         """
-        Manage Clans available for CWL.
+        Manage Clans for CWL.
         """
         if not ctx.invoked_subcommand:
             pass
 
-    app_subcommand_group_cwl_clan = app_commands.Group(
+    subappgroup_cwl_cwlclan = app_commands.Group(
         name="clan",
-        description="Manage Clans available for CWL.",
-        parent=app_command_group_cwl,
+        description="Manage Clans for CWL.",
+        parent=appgroup_cwl_cwl,
         guild_only=True
         )
 
@@ -665,10 +783,10 @@ class ClanWarLeagues(commands.Cog):
                 )            
         return embed
     
-    @subcommand_group_cwl_clan.command(name="list")
-    @commands.admin()
+    @subcmdgroup_cwl_cwlclan.command(name="list")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_clans_show(self,ctx):
+    async def subcmd_cwl_cwlclanlist(self,ctx:commands.Context):
         """
         [Admin-only] List all Clans available for CWL.
 
@@ -680,15 +798,15 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.war_league_clan_list_embed(ctx)
         await ctx.reply(embed=embed)
     
-    @app_subcommand_group_cwl_clan.command(name="list",
+    @subappgroup_cwl_cwlclan.command(name="list",
         description="List all Clans available for CWL.",)
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_cwl_clans_show(self,interaction:discord.Interaction):
+    async def subappcmd_cwl_cwlclanlist(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
         embed = await self.war_league_clan_list_embed(interaction)
-        await interaction.edit_original_response(embed=embed)
+        await interaction.followup.send(embed=embed)
     
     ##################################################
     ### CWL / CLAN / ADD
@@ -704,26 +822,25 @@ class ClanWarLeagues(commands.Cog):
             )
         return embed
 
-    @subcommand_group_cwl_clan.command(name="add")
-    @commands.admin()
+    @subcmdgroup_cwl_cwlclan.command(name="add")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_clan_add(self,ctx,clan_tag:str):
+    async def subcmd_cwl_cwlclanadd(self,ctx:commands.Context,clan_tag:str):
         """
         Add a Clan as a CWL Clan.
 
         This adds the Clan to the master list. It does not add the Clan to the current CWL Season. To enable a Clan for a specific season, use `/cwl setup`.
-        """
-        
+        """        
         embed = await self.add_war_league_clan_helper(ctx,clan_tag)
         await ctx.reply(embed=embed)
     
-    @app_subcommand_group_cwl_clan.command(name="add",
+    @subappgroup_cwl_cwlclan.command(name="add",
         description="Add a Clan to the available CWL Clans list.")
-    @app_commands.check(is_admin)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="The Clan to add as a CWL Clan.")
-    async def sub_appcommand_cwl_clan_add(self,interaction:discord.Interaction,clan:str):
+    async def subappcmd_cwl_cwlclanadd(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
         embed = await self.add_war_league_clan_helper(interaction,clan)
@@ -732,10 +849,10 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / CLAN / REMOVE
     ##################################################
-    @subcommand_group_cwl_clan.command(name="remove")
+    @subcmdgroup_cwl_cwlclan.command(name="remove")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_cwl_clan_remove(self,ctx:commands.Context,clan_tag:str):
+    async def subcmd_cwl_cwlclanremove(self,ctx:commands.Context,clan_tag:str):
         """
         Remove a Clan from the available CWL Clans list.
 
@@ -744,7 +861,6 @@ class ClanWarLeagues(commands.Cog):
         
         clan = await bot_client.coc.get_clan(clan_tag)
         await clan.remove_from_war_league()
-
         embed = await clash_embed(
             context=ctx,
             message=f"**{clan.title}** is now removed from the CWL Clan List.",
@@ -753,22 +869,21 @@ class ClanWarLeagues(commands.Cog):
         await ctx.reply(embed=embed)
     
     ##################################################
-    ### CWL / CLAN / VIEW-ROSTER
+    ### CWL / CLAN / ROSTER
     ##################################################
-    @subcommand_group_cwl_clan.command(name="roster")
+    @subcmdgroup_cwl_cwlclan.command(name="roster")
     @commands.guild_only()
-    async def subcommand_cwl_clan_viewroster_member(self,ctx,clan_tag:str):
+    async def subcmd_cwl_cwlclanroster(self,ctx,clan_tag:str):
         """
         View the Roster for a CWL Clan.
         """
 
-        season = self.active_war_league_season        
-        league_clan = await WarLeagueClan(clan_tag,season)
+        league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
 
         if not league_clan.is_participating:
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{league_clan.title}** is not participating in Guild CWL for {season.description}.",
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {self.active_war_league_season.description}.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
@@ -776,22 +891,22 @@ class ClanWarLeagues(commands.Cog):
         menu = CWLRosterDisplayMenu(ctx,league_clan)
         await menu.start()
     
-    @app_subcommand_group_cwl_clan.command(name="roster",
+    @subappgroup_cwl_cwlclan.command(name="roster",
         description="View a CWL Clan's current Roster.")
+    @app_commands.describe(
+        clan="The Clan to view. Only registered CWL Clans are eligible.")
     @app_commands.guild_only()
-    @app_commands.autocomplete(clan=autocomplete_war_league_clans)
-    @app_commands.describe(clan="The Clan to view. Only registered CWL Clans are eligible.")
-    async def sub_appcommand_cwl_clan_viewroster_member(self,interaction:discord.Interaction,clan:str):
+    @app_commands.autocomplete(clan=autocomplete_season_league_clans)    
+    async def subappcmd_cwl_cwlclanroster(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
 
-        season = self.active_war_league_season        
-        league_clan = await WarLeagueClan(clan,season)
+        league_clan = await WarLeagueClan(clan,self.active_war_league_season)
 
         if not league_clan.is_participating:
             embed = await clash_embed(
                 context=interaction,
-                message=f"**{league_clan.title}** is not participating in Guild CWL for {season.description}.",
+                message=f"**{league_clan.title}** is not participating in Guild CWL for {self.active_war_league_season.description}.",
                 success=False
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -802,9 +917,9 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / CLAN / LEAGUE GROUP
     ##################################################
-    @subcommand_group_cwl_clan.command(name="group")
+    @subcmdgroup_cwl_cwlclan.command(name="group")
     @commands.guild_only()
-    async def subcommand_cwl_clan_viewgroup(self,ctx:commands.Context,clan_tag:str):
+    async def subcmd_cwl_cwlclangroup(self,ctx:commands.Context,clan_tag:str):
         """
         View the League Group for a CWL Clan.
         """
@@ -823,7 +938,7 @@ class ClanWarLeagues(commands.Cog):
             embed = await clash_embed(
                 context=ctx,
                 message=f"**{league_clan.title}** has not started CWL for {self.bot_client.current_season.description}."
-                    + "\n\nIf you're looking for the Clan Roster, use [p]`cwl clan roster` instead.",
+                    + "\n\nIf you're looking for the Clan Roster, use `/cwl clan roster` instead.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
@@ -832,12 +947,13 @@ class ClanWarLeagues(commands.Cog):
         menu = CWLClanGroupMenu(ctx,league_group)
         await menu.start()
     
-    @app_subcommand_group_cwl_clan.command(name="group",
+    @subappgroup_cwl_cwlclan.command(name="group",
         description="View a CWL Clan's current League Group.")
+    @app_commands.describe(
+        clan="The Clan to view. Only registered CWL Clans are tracked.")
     @app_commands.guild_only()
-    @app_commands.autocomplete(clan=autocomplete_war_league_clans)
-    @app_commands.describe(clan="The Clan to view. Only registered CWL Clans are tracked.")
-    async def sub_appcommand_cwl_clan_viewgroup(self,interaction:discord.Interaction,clan:str):
+    @app_commands.autocomplete(clan=autocomplete_season_league_clans)    
+    async def subappcmd_cwl_cwlclangroup(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
 
@@ -863,12 +979,15 @@ class ClanWarLeagues(commands.Cog):
         menu = CWLClanGroupMenu(interaction,league_group)
         await menu.start()
     
-    ##################################################
-    ### CWL / ROSTERS
-    ##################################################
-    @command_group_cwl.group(name="roster")
+    ############################################################
+    #####
+    ##### GROUP: CWL ROSTER COMMANDS
+    #####
+    ############################################################
+    @cmdgroup_cwl_cwl.group(name="roster")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_group_cwl_roster(self,ctx):
+    async def subcmdgroup_cwl_cwlroster(self,ctx):
         """
         Manage CWL Rosters.
 
@@ -883,20 +1002,20 @@ class ClanWarLeagues(commands.Cog):
         if not ctx.invoked_subcommand:
             pass
 
-    app_subcommand_group_cwl_roster = app_commands.Group(
+    subappgroup_cwl_cwlroster = app_commands.Group(
         name="roster",
         description="Manage CWL Rosters",
-        parent=app_command_group_cwl,
+        parent=appgroup_cwl_cwl,
         guild_only=True
         )
     
     ##################################################
     ### CWL / ROSTER / SETUP
     ##################################################
-    @subcommand_group_cwl_roster.command(name="setup")
-    @commands.check(is_cwl_leader)
+    @subcmdgroup_cwl_cwlroster.command(name="setup")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_roster_setup(self,ctx,clan_tag:str):
+    async def subcmd_cwl_cwlrostersetup(self,ctx:commands.Context,clan_tag:str):
         """
         Setup a Roster for a Clan.
 
@@ -905,27 +1024,26 @@ class ClanWarLeagues(commands.Cog):
         Always defaults to the next open CWL Season.
         """
             
-        season = self.active_war_league_season
-        league_clan = await WarLeagueClan(clan_tag,season)
+        league_clan = await WarLeagueClan(clan_tag,self.active_war_league_season)
 
         if not league_clan.is_participating:
             embed = await clash_embed(
                 context=ctx,
-                message=f"**{league_clan.title}** is not participating in CWL for {season.description}.",
+                message=f"**{league_clan.title}** is not participating in CWL for {self.active_war_league_season.description}.",
                 success=False
                 )
             return await ctx.reply(embed=embed,view=None)
         
-        menu = CWLRosterMenu(ctx,season,league_clan)
+        menu = CWLRosterMenu(ctx,self.active_war_league_season,league_clan)
         await menu.start()
     
-    @app_subcommand_group_cwl_roster.command(name="setup",
+    @subappgroup_cwl_cwlroster.command(name="setup",
         description="Setup a CWL Roster for a Clan. Defaults to the next open CWL Season.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    @app_commands.autocomplete(clan=autocomplete_war_league_clans)
+    @app_commands.autocomplete(clan=autocomplete_season_league_clans)
     @app_commands.describe(clan="The Clan to setup for.")
-    async def sub_appcommand_cwl_roster_setup(self,interaction:discord.Interaction,clan:str):
+    async def subappcmd_cwl_cwlrostersetup(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
 
@@ -944,23 +1062,25 @@ class ClanWarLeagues(commands.Cog):
         await menu.start()
     
     ##################################################
-    ### CWL / ROSTER / ADD
+    ### CWL / ROSTER / OPEN
     ##################################################
-    @subcommand_group_cwl_roster.command(name="open")
+    @subcmdgroup_cwl_cwlroster.command(name="open")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_cwl_roster_open(self,ctx:commands.Context,clan_tag:str):
+    async def subcmd_cwl_cwlrosteropen(self,ctx:commands.Context,clan_tag:str):
         """
         Force open a CWL Clan's Roster.
         """
         season = self.active_war_league_season
-
         clan = await bot_client.coc.get_clan(clan_tag)
         cwl_clan = await WarLeagueClan(clan.tag,season)
 
         await cwl_clan.open_roster()
         await ctx.tick()
-
+    
+    ##################################################
+    ### CWL / ROSTER / ADD
+    ##################################################
     async def admin_add_player_helper(self,
         context:Union[discord.Interaction,commands.Context],
         clan_tag:str,
@@ -1009,10 +1129,10 @@ class ClanWarLeagues(commands.Cog):
             )
         return embed
     
-    @subcommand_group_cwl_roster.command(name="add")
-    @commands.check(is_cwl_leader)
+    @subcmdgroup_cwl_cwlroster.command(name="add")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_roster_add(self,ctx,clan_tag:str,player_tag:str):
+    async def subcmd_cwl_cwlrosteradd(self,ctx:commands.Context,clan_tag:str,player_tag:str):
         """
         Admin add a Player to a Roster.
 
@@ -1026,16 +1146,16 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.admin_add_player_helper(ctx,clan_tag,player_tag)
         await ctx.reply(embed=embed)
     
-    @app_subcommand_group_cwl_roster.command(name="add",
+    @subappgroup_cwl_cwlroster.command(name="add",
         description="Add a Player to a CWL Roster. Automatically registers the Player, if not registered.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    @app_commands.autocomplete(clan=autocomplete_war_league_clans)
+    @app_commands.autocomplete(clan=autocomplete_season_league_clans)
     @app_commands.autocomplete(player=autocomplete_players)
     @app_commands.describe(
         clan="The Clan to add the player to. Must be an active CWL Clan.",
         player="The Player to add to the Roster.")
-    async def sub_appcommand_cwl_roster_add(self,interaction:discord.Interaction,clan:str,player:str):
+    async def subcmd_cwl_cwlrosteradd(self,interaction:discord.Interaction,clan:str,player:str):
         
         await interaction.response.defer()
         embed = await self.admin_add_player_helper(interaction,clan,player)
@@ -1079,10 +1199,10 @@ class ClanWarLeagues(commands.Cog):
             )
         return embed
     
-    @subcommand_group_cwl_roster.command(name="remove")
-    @commands.check(is_cwl_leader)
+    @subcmdgroup_cwl_cwlroster.command(name="remove")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_roster_remove(self,ctx:commands.Context,player_tag:str):
+    async def subcmd_cwl_cwlrosterremove(self,ctx:commands.Context,player_tag:str):
         """
         Admin remove a Player from CWL.
 
@@ -1095,13 +1215,13 @@ class ClanWarLeagues(commands.Cog):
         embed = await self.admin_remove_player_helper(ctx,player_tag)
         await ctx.reply(embed=embed)
     
-    @app_subcommand_group_cwl_roster.command(name="remove",
+    @subappgroup_cwl_cwlroster.command(name="remove",
         description="Removes a Player from a CWL Roster. Automatically unregisters the Player, if registered.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
     @app_commands.autocomplete(player=autocomplete_players)
     @app_commands.describe(player="The Player to remove from CWL.")
-    async def sub_appcommand_cwl_roster_add(self,interaction:discord.Interaction,player:str):
+    async def subappcmd_cwl_cwlrosterremove(self,interaction:discord.Interaction,player:str):
         
         await interaction.response.defer()
 
@@ -1111,10 +1231,10 @@ class ClanWarLeagues(commands.Cog):
     ##################################################
     ### CWL / ROSTER / EXPORT
     ##################################################
-    @subcommand_group_cwl_roster.command(name="export")
-    @commands.check(is_cwl_leader)
+    @subcmdgroup_cwl_cwlroster.command(name="export")
+    @commands.check(is_cwl_admin)
     @commands.guild_only()
-    async def subcommand_cwl_roster_export(self,ctx:commands.Context):
+    async def subcmd_cwl_cwlrosterexport(self,ctx:commands.Context):
         """
         Exports all Signups (and Roster information) to Excel.
 
@@ -1134,11 +1254,11 @@ class ClanWarLeagues(commands.Cog):
             content=f"Here is the CWL Roster for {season.description}.",
             file=discord.File(rp_file))
     
-    @app_subcommand_group_cwl_roster.command(name="export",
+    @subappgroup_cwl_cwlroster.command(name="export",
         description="Exports all Signups (and Roster information) to Excel. Uses the currently open CWL Season.")
-    @app_commands.check(is_cwl_leader)
+    @app_commands.check(is_cwl_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_cwl_roster_export(self,interaction:discord.Interaction):
+    async def subappcmd_cwl_cwlrosterexport(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 

@@ -231,15 +231,14 @@ class aMember(AwaitLoader):
     ### BANK ATTRIBUTES
     ##################################################
     async def get_last_payday(self) -> Optional[pendulum.DateTime]:
-        async with self.payday_lock:
-            query = await bot_client.coc_db.db__discord_member.find(
-                {'_id':self.db_id},
-                {'_id':1,'guild_id':1,'last_payday':1}
-                ).to_list(length=None)        
-            db_lastpayday = [db.get('last_payday',0) for db in query]
+        query = await bot_client.coc_db.db__discord_member.find(
+            {'_id':self.db_id},
+            {'_id':1,'guild_id':1,'last_payday':1}
+            ).to_list(length=None)        
+        db_lastpayday = [db.get('last_payday',0) for db in query]
 
-            last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
-            return last_payday
+        last_payday = pendulum.from_timestamp(max(db_lastpayday)) if len(db_lastpayday) > 0 else None
+        return last_payday
         
     async def set_last_payday(self,timestamp:pendulum.DateTime):
         last_payday = timestamp

@@ -109,7 +109,7 @@ class Event():
             }
         },
         {
-            "$match": {"end_time": {"$lte": pendulum.now().int_timestamp},
+            "$match": {"end_time": {"$gte": pendulum.now().int_timestamp},
             }
         }
         ]
@@ -298,9 +298,6 @@ class Event():
                 member = self.guild.get_member(member_id)
                 if member:
                     await member.add_roles(self.event_role)
-
-
-
 
     
     ##################################################

@@ -303,7 +303,7 @@ class Events(commands.Cog):
                 message=f"No active Events found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         all_events.sort(key=lambda x: x.start_time.int_timestamp)
 
@@ -322,7 +322,7 @@ class Events(commands.Cog):
                     + f"\nPrize Pool: {event.prize_pool}"
                     + f"\n\u200b"
                 )        
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
     
     ##################################################
     ### EVENTADMIN / CREATE
@@ -370,17 +370,17 @@ class Events(commands.Cog):
                 message=f"Invalid Start Time format. Please use `YYYY-MM-DD HH:MM:SS`.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         embed = await clash_embed(
             context=interaction,
             title=f"Create Event: {name}",
-            message=f"Start Time: <t:{st_time.int_timestamp}:F>"
-                + f"\nDuration: {duration} hours"
-                + f"\nMax Participants: {max_participants}"
-                + f"\nMembers Only: {members_only}"
-                + f"\nTags per Participant: {tags_per_participant}"                
-                + f"\nPrize Pool: {prize_pool}"
+            message=f"`{'Start Time:':<25}` <t:{st_time.int_timestamp}:F>"
+                + f"\n`{'Duration:':<25}` {duration} hours"
+                + f"\n`{'Max Participants:':<25}` {max_participants}"
+                + f"\n`{'Members Only:':<25}` {members_only}"
+                + f"\n`{'Tags per Participant:':<25}` {tags_per_participant}"                
+                + f"\n`{'Prize Pool:':<25}` {prize_pool:,} {await bank.get_currency_name()}"
                 + f"\n\u200b"
             )
         embed.add_field(
@@ -422,13 +422,13 @@ class Events(commands.Cog):
             embed = await clash_embed(
                 context=interaction,
                 title=f"Event Created: {event.name}",
-                message=f"Event ID: {event.id}"
-                    + f"\nStart Time: <t:{event.start_time.int_timestamp}:F>"
-                    + f"\nDuration: {event.duration} hours"
-                    + f"\nMax Participants: {event.max_participants}"
-                    + f"\nMembers Only: {event.members_only}"
-                    + f"\nTags per Participant: {event.tags_per_participant}"
-                    + f"\nPrize Pool: {event.prize_pool}",
+                message=f"`{'Start Time:':<25}` <t:{st_time.int_timestamp}:F>"
+                    + f"\n`{'Duration:':<25}` {duration} hours"
+                    + f"\n`{'Max Participants:':<25}` {max_participants}"
+                    + f"\n`{'Members Only:':<25}` {members_only}"
+                    + f"\n`{'Tags per Participant:':<25}` {tags_per_participant}"                
+                    + f"\n`{'Prize Pool:':<25}` {prize_pool:,} {await bank.get_currency_name()}"
+                    + f"\n\u200b",
                 success=True
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -481,7 +481,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         embed = await clash_embed(
             context=interaction,
@@ -534,7 +534,7 @@ class Events(commands.Cog):
                     message=f"Invalid Start Time format. Please use `YYYY-MM-DD HH:MM:SS`.",
                     success=False
                     )
-                return await interaction.followup.send(embed=embed,view=None)
+                return await interaction.followup.send(embed=embed)
             new_values['start_time'] = st_time.int_timestamp
             embed.add_field(
                 name="Start Time",
@@ -583,13 +583,13 @@ class Events(commands.Cog):
             embed = await clash_embed(
                 context=interaction,
                 title=f"Event Edited: {new_event.name}",
-                message=f"Event ID: {new_event.id}"
-                    + f"\nStart Time: <t:{new_event.start_time.int_timestamp}:F>"
-                    + f"\nDuration: {new_event.duration} hours"
-                    + f"\nMax Participants: {new_event.max_participants}"
-                    + f"\nMembers Only: {new_event.members_only}"
-                    + f"\nTags per Participant: {new_event.tags_per_participant}"
-                    + f"\nPrize Pool: {new_event.prize_pool}",
+                message=f"`{'Event ID:':<25}` {new_event.id}"
+                    + f"\n`{'Start Time:':<25}` <t:{new_event.start_time.int_timestamp}:F>"
+                    + f"\n`{'Duration:':<25}` {new_event.duration} hours"
+                    + f"\n`{'Max Participants:':<25}` {new_event.max_participants}"
+                    + f"\n`{'Members Only:':<25}` {new_event.members_only}"
+                    + f"\n`{'Tags per Participant:':<25}` {new_event.tags_per_participant}"
+                    + f"\n`{'Prize Pool:':<25}` {new_event.prize_pool}",
                 success=True
                 )
             return await interaction.edit_original_response(embed=embed,view=None)
@@ -626,7 +626,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         embed = await clash_embed(
             context=interaction,
@@ -692,7 +692,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         await get_event.open_event()
         embed = await clash_embed(
@@ -700,7 +700,7 @@ class Events(commands.Cog):
             message=f"Event {get_event.name} opened for registration.",
             success=True
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
 
     ##################################################
     ### EVENTADMIN / CLOSE
@@ -739,7 +739,7 @@ class Events(commands.Cog):
             message=f"Event {get_event.name} closed for registration.",
             success=True
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
 
     ##################################################
     ### EVENTADMIN / LINK
@@ -777,7 +777,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         put_discord_event = None
         if discord_event:
@@ -800,7 +800,7 @@ class Events(commands.Cog):
                 + f"\nDiscord Channel: {getattr(get_event.event_channel,'mention','Not Linked')}",
             success=True
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
 
     ##################################################
     ### EVENTADMIN / SYNC-ROLE
@@ -831,7 +831,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         if not get_event.event_role:
             embed = await clash_embed(
@@ -839,7 +839,7 @@ class Events(commands.Cog):
                 message=f"Event Role not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         await get_event.sync_role()
 
@@ -848,7 +848,7 @@ class Events(commands.Cog):
             message=f"Event Role synced with Participants.",
             success=True
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
     
     ############################################################
     #####
@@ -906,7 +906,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         if is_events_admin(interaction) and discord_user:
             user = discord_user
@@ -920,46 +920,46 @@ class Events(commands.Cog):
                 message=f"Invalid account. You can only register with your own linked accounts.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
 
         try:
-            participant = await get_event.register_participant(account,user.id)
+            participant = await get_event.register_participant(account.tag,user.id)
         except EventClosed:
             embed = await clash_embed(
                 context=interaction,
                 message=f"The Event you are registering for is not open for registration.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         except NotEligible:
             embed = await clash_embed(
                 context=interaction,
                 message=f"This is a Members-only Event. You are not eligible to register.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         except AlreadyRegistered:
             embed = await clash_embed(
                 context=interaction,
                 message=f"You have already reached the maximum registrations allowed for this event.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
 
         if interaction.user.id == user.id:
             embed = await clash_embed(
                 context=interaction,
-                message=f"You have registered for {get_event.name} with the account {participant.title}.",
+                message=f"You have registered for **{get_event.name}** with the account **{participant.title}**.",
                 success=True
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         else:
             embed = await clash_embed(
                 context=interaction,
-                message=f"{user.display_name} has been registered for {get_event.name} with the account {participant.title}.",
+                message=f"{user.display_name} has been registered for **{get_event.name}** with the account **{participant.title}**.",
                 success=True
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
     
     ##################################################
     ### EVENT / WITHDRAW
@@ -995,7 +995,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         participant = await get_event.get_participant(account)
         if not participant:
@@ -1004,7 +1004,7 @@ class Events(commands.Cog):
                 message=f"This account is not registered for the Event.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         if participant.participant_id != interaction.user.id and not is_events_admin(interaction):
             embed = await clash_embed(
@@ -1012,7 +1012,7 @@ class Events(commands.Cog):
                 message=f"You can only withdraw your own registrations.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         try:
             await get_event.withdraw_participant(participant.tag)
@@ -1022,14 +1022,14 @@ class Events(commands.Cog):
                 message=f"The Event you are withdrawing from is not open for registration.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         embed = await clash_embed(
             context=interaction,
             message=f"The account {participant.title} is withdrawn from {get_event.name}.",
             success=True
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
     
     ##################################################
     ### EVENT / MYSIGNUPS
@@ -1057,7 +1057,7 @@ class Events(commands.Cog):
                 message=f"You are currently not registered for any Events.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
 
         embed = await clash_embed(
             context=interaction,
@@ -1074,7 +1074,7 @@ class Events(commands.Cog):
                     + f"\n\u200b",
                 inline=False
                 )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
 
     ##################################################
     ### EVENT / INFO
@@ -1103,7 +1103,7 @@ class Events(commands.Cog):
                 message=f"Event not found.",
                 success=False
                 )
-            return await interaction.followup.send(embed=embed,view=None)
+            return await interaction.followup.send(embed=embed)
         
         count = await get_event.get_participant_count()
         currency = await bank.get_currency_name()
@@ -1112,13 +1112,13 @@ class Events(commands.Cog):
             context=interaction,
             title=f"{get_event.name}",
             message=f"{get_event.description}"
-                + f"\n\nStart Time: <t:{get_event.start_time.int_timestamp}:F>"
-                + f"\nEnd Time: <t:{get_event.end_time.int_timestamp}:F>"
-                + f"\n\nPrize Pool: {get_event.prize_pool} {currency}"
+                + f"\n\n`{'Start Time:':<15}` <t:{get_event.start_time.int_timestamp}:F>"
+                + f"\n`{'End Time:':<15}` <t:{get_event.end_time.int_timestamp}:F>"
+                + f"\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
                 + f"\n## Registration"
-                + f"\nStatus: {get_event.status}"
-                + f"\nAvailable: {get_event.max_participants - count}/{get_event.max_participants}"
-                + f"\nMax per User: {get_event.tags_per_participant}"
-                + f"\nMembers Only: {get_event.members_only}"
+                + f"\n`{'Status:':<15}` {get_event.status}"
+                + f"\n`{'Available:':<15}` {get_event.max_participants - count}/{get_event.max_participants}"
+                + f"\n`{'Max per User:':<15}` {get_event.tags_per_participant}"
+                + f"\n`{'Members Only:':<15}` {get_event.members_only}"
             )
-        return await interaction.followup.send(embed=embed,view=None)
+        return await interaction.followup.send(embed=embed)
