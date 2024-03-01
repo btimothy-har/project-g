@@ -308,8 +308,11 @@ class ClanWarLoop(TaskLoop):
             if not getattr(clan,'public_war_log',False):
                 return self.loop.call_later(60,self.unlock,lock)
             
-            current_war = None            
-            current_war = await self.fetch_current_war(tag)
+            current_war = None
+            try:
+                current_war = await self.fetch_current_war(tag)
+            except coc.NotFound:
+                return self.loop.call_later(60,self.unlock,lock)
             
             wait = getattr(current_war,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)

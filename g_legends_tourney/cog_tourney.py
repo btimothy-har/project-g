@@ -137,7 +137,7 @@ class LegendsTourney(commands.Cog):
                 + f"\n5. Withdrawing from the Tournament is allowed any time before <t:{tourn_season.trophy_season_start.add(days=3).int_timestamp}:f>."
                 + f"\n6. You must join and stay in The Guild's Discord Server throughout the Tournament to participate."
                 + f"\n7. For TH16 participants, your account must be a member in any of the designated Tournament Clans for at least 70% of the time during the Tournament Period. You may check your current time spent with the `Cancel/Check` button below."
-                + f"\n8. For purposes of determining time spent, the Tournament Period shall: (1) start from 5 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
+                + f"\n8. For purposes of determining time spent, the Tournament Period shall: (1) start from 3 days after the start of the in-game Legend League Season or when a participant registers, whichever is later; (2) end at the current moment or the last day of the in-game Legend League Season, whichever is earlier."
                 + f"\n9. TH13 - TH15 participants do not need to meet the time spent requirement."
                 + f"\n10. The Townhall Level used for determining prizes shall be your Townhall Level at the end of the Legends Season."
                 + f"\n### Designated Clans"
@@ -174,7 +174,10 @@ class LegendsTourney(commands.Cog):
 
         participants = []
         async for participant in tournament_db:
-            player = await self.fetch_participant(participant['tag'])
+            try:
+                player = await self.fetch_participant(participant['tag'])
+            except coc.NotFound:
+                continue
             participants.append(player)
         
         if self.guild:
@@ -587,7 +590,7 @@ class CancelRegistrationMenu(DefaultView):
 
         if chk_registration:
             if pendulum.now() > tourn_season.trophy_season_start:
-                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=5) else tourn_season.trophy_season_end.add(days=5)
+                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
                 check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
                 time_spent = 0
