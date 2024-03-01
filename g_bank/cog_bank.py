@@ -1430,44 +1430,46 @@ class Bank(commands.Cog):
             return embed       
 
         member = await aMember(user.id,context.guild.id)
-        next_change = await member.get_reward_timer()
-        reward_tag = await member._get_reward_account_tag()
-        if reward_tag:
-            try:
-                reward_account = await bot_client.coc.get_player(reward_tag)
-            except coc.NotFound:
-                reward_account = None
-        else:
-            reward_account = None        
-        
-        primary_multiplier = (await self._compute_multiplier(reward_account) * 100) if reward_account else 0
 
-        guild_member = self.bank_guild.get_member(user.id)
-        pass_active = True if self.bank_pass_role and self.bank_pass_role in getattr(guild_member,'roles',[]) else False
+        async with member.payday_lock:
+            next_change = await member.get_reward_timer()
+            reward_tag = await member._get_reward_account_tag()
+            if reward_tag:
+                try:
+                    reward_account = await bot_client.coc.get_player(reward_tag)
+                except coc.NotFound:
+                    reward_account = None
+            else:
+                reward_account = None        
+            
+            primary_multiplier = (await self._compute_multiplier(reward_account) * 100) if reward_account else 0
 
-        embed = await clash_embed(
-            context=context,
-            message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
-            timestamp=pendulum.now()
-            )
-        
-        if context.guild.id == self.bank_guild.id:
-            last_payday = await member.get_last_payday()
-            embed.description += "\nNext payday: "
-            embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if last_payday and last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
-        
-        embed.description += "\n\u200b"
-        
-        embed.add_field(
-            name="__Reward Multipliers__",
-            value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n" if pass_active else "*Boost your rewards with a Bank Pass! Get up to 50% more rewards.*\n")
-                + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
-                + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
-                + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
-                + (f"\nChange your main account with `/bank set-main`." if pendulum.now() > next_change else f"\nYou can change your main account in: <t:{next_change.int_timestamp}:R>."),
-            inline=True
-            )
-        return embed
+            guild_member = self.bank_guild.get_member(user.id)
+            pass_active = True if self.bank_pass_role and self.bank_pass_role in getattr(guild_member,'roles',[]) else False
+
+            embed = await clash_embed(
+                context=context,
+                message=f"You have **{await bank.get_balance(member.discord_member):,} {currency}** (Global Rank: #{await bank.get_leaderboard_position(member.discord_member)}).",
+                timestamp=pendulum.now()
+                )
+            
+            if context.guild.id == self.bank_guild.id:
+                last_payday = await member.get_last_payday()
+                embed.description += "\nNext payday: "
+                embed.description += (f"<t:{member.last_payday.add(days=1).int_timestamp}:R>" if last_payday and last_payday.add(days=1) > pendulum.now() else "Now! Use `payday` to claim your credits!")
+            
+            embed.description += "\n\u200b"
+            
+            embed.add_field(
+                name="__Reward Multipliers__",
+                value=(f"{EmojisUI.BOOST} Rewards Boosted with Bank Pass.\n" if pass_active else "*Boost your rewards with a Bank Pass! Get up to 50% more rewards.*\n")
+                    + (f"- **{reward_account.town_hall.emoji} {reward_account.name}**: " + (f"{int(primary_multiplier)}%\n" if pass_active else f"{int(primary_multiplier)}%\n") if reward_account else "")
+                    + f"- **Member Accounts**: " + ("100%\n" if pass_active else "40%\n")
+                    + f"- **Non-Member Accounts**: " + ("40%\n" if pass_active else "20%\n")
+                    + (f"\nChange your main account with `/bank set-main`." if pendulum.now() > next_change else f"\nYou can change your main account in: <t:{next_change.int_timestamp}:R>."),
+                inline=True
+                )
+            return embed
     
     @commands.command(name="balance",aliases=['bal'])
     @commands.guild_only()
@@ -1527,17 +1529,17 @@ class Bank(commands.Cog):
         is_staff = True if self.guild_staff and set(self.guild_staff).intersection(set([r.id for r in getattr(member.discord_member,'roles',[])])) else False
         is_booster = True if getattr(member.discord_member,'premium_since',None) else False
 
-        last_payday = await member.get_last_payday()
-        if last_payday and last_payday.add(days=1) > pendulum.now():
-            embed = await clash_embed(
-                context=context,
-                message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
-                success=False,
-                timestamp=pendulum.now()
-                )        
-            return embed
-                
         async with member.payday_lock:
+            last_payday = await member.get_last_payday()
+            if last_payday and last_payday.add(days=1) > pendulum.now():
+                embed = await clash_embed(
+                    context=context,
+                    message=f"You can claim your next payday <t:{last_payday.add(days=1).int_timestamp}:R>.",
+                    success=False,
+                    timestamp=pendulum.now()
+                    )        
+                return embed
+            
             try:
                 mee6user = await Mee6Rank._get_player(
                     bot_client.bot.get_cog("Mee6Rank"),
