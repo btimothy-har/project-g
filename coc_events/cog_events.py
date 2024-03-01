@@ -14,6 +14,7 @@ from coc_main.utils.components import clash_embed, MenuConfirmation
 from .checks import is_events_admin
 from .autocomplete import autocomplete_active_events, autocomplete_user_players
 from .components.event import Event
+from .components.export import generate_event_export
 
 from .exceptions import EventClosed, AlreadyRegistered, NotEligible
 
@@ -849,6 +850,48 @@ class Events(commands.Cog):
             success=True
             )
         return await interaction.followup.send(embed=embed)
+
+    ##################################################
+    ### EVENTADMIN / EXPORT
+    ##################################################    
+    @command_group_event_admin.command(name="export")
+    @commands.check(is_events_admin)
+    @commands.guild_only()
+    async def subcommand_event_admin_export(self,ctx:commands.Context):
+        """
+        Exports the Event Participants to Excel.
+        """
+        return await ctx.reply(f"Please use the Slash Command `/event-admin export` for this.")
+    
+    @appcommand_group_event_admin.command(name="export",
+        description="Exports the Event Participants to Excel.")
+    @app_commands.check(is_events_admin)
+    @app_commands.guild_only()
+    @app_commands.describe(event="The Event to export.")
+    @app_commands.autocomplete(event=autocomplete_active_events)    
+    async def appsubcommand_event_admin_export(self,interaction:discord.Interaction,event:str):
+
+        await interaction.response.defer()
+
+        get_event = await Event.get_event(event)
+        if not get_event:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Event not found.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        await interaction.edit_original_response("Exporting Event Participants... please wait.")
+        rp_file = await generate_event_export(get_event)
+
+        if not rp_file:
+            await interaction.edit_original_response("Error exporting Event Participants.")
+        
+        await interaction.edit_original_response(
+            content="Event Participants for {get_event.name} exported.",
+            file=discord.File(rp_file)
+            )
     
     ############################################################
     #####
