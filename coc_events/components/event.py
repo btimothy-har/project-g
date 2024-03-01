@@ -109,7 +109,7 @@ class Event():
             }
         },
         {
-            "$match": {"end_time": {"$lte": pendulum.now().int_timestamp},
+            "$match": {"end_time": {"$gte": pendulum.now().int_timestamp},
             }
         }
         ]
