@@ -795,17 +795,16 @@ class BotClashClient():
 
 @coc.ClientEvents.event_error()
 async def clash_event_error(exception:Exception):
-    original = getattr(exception,"original",None)
-    if isinstance(original,coc.NotFound):
-        return
+    if isinstance(exception,coc.HTTPException):
+        # suppress 404 (notFound) and 503 (Maintenance) errors
+        if exception.status in [404,503]:
+            return
     
     try:
         client = BotClashClient()
     except:
-        pass
+        return
     else:
-        if client.api_maintenance:
-            return
         client.coc_main_log.exception(f"Clash Event Error: {exception}")
 
 @coc.ClientEvents.player_loop_start()

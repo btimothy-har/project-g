@@ -283,7 +283,7 @@ class ClanWarLoop(TaskLoop):
     async def fetch_current_war(self,clan_tag:str):
         try:
             current_war = await bot_client.coc.get_current_war(clan_tag)
-        except coc.NotFound:
+        except:
             current_war = None
         if not current_war and pendulum.now().day in range(1,7):
             try:
@@ -291,7 +291,7 @@ class ClanWarLoop(TaskLoop):
                     clan_tag=clan_tag,
                     cwl_round=coc.WarRound.current_preparation
                     )
-            except coc.NotFound:
+            except:
                 current_war = None
         return current_war
     
