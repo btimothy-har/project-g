@@ -193,6 +193,9 @@ class EmojisEquipment:
     INVISIBILITY_VIAL = "<:invisibility_vial:1187485821557821450>"
     SEEKING_SHIELD = "<:seeking_shield:1187485811088818277>"
     VAMPSTACHE = "<:vampstache:1187485806437347378>"
+    FROZEN_ARROW = "<:frozen_arrow:1213055717594890250>"
+    HOG_RIDER_PUPPET = "<:HogRiderPuppet:1213056475765809164>"
+    HASTE_VIAL = "<:HasteVial:1213056469587599360>"
 
     @classmethod
     def get(cls, equipment:str):
@@ -288,6 +291,7 @@ class EmojisSpells:
     BAT_SPELL = "<:BatSpell:1036999371008516237>"
     INVISIBILITY_SPELL = "<:InvisibilitySpell:1036999371985784885>"
     RECALL_SPELL = "<:recall:1036999373529296976>"
+    OVERGROWTH_SPELL = "<:Overgrowth_Spell:1213055211308847105>"
     
     @classmethod
     def get(cls, spell:str):
