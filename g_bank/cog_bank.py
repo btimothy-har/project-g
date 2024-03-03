@@ -777,13 +777,10 @@ class Bank(commands.Cog):
     async def progress_reward_townhall(self):
         async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
             try:
-                await player_activity_log.mark_as_read()
-                if not player_activity_log.is_member:
-                    return
-                
+                await player_activity_log.mark_as_read()                
                 member = self.bot.get_user(player_activity_log.discord_user)
                 if not member:
-                    return            
+                    return
                 if player_activity_log.change <= 0:
                     return
                 
@@ -793,7 +790,9 @@ class Bank(commands.Cog):
                     await player_activity_log.mark_as_unread()
                     return
                 
-                if player.hero_rushed_pct > 0:
+                if not player_activity_log.is_member:
+                    reward = 0
+                elif player.hero_rushed_pct > 0:
                     reward = 0
                 elif player_activity_log.new_value <= 9:
                     reward = 10000
@@ -840,21 +839,22 @@ class Bank(commands.Cog):
     async def progress_reward_hero_upgrade(self):
         async def distribute_reward_hero_upgrade(player_activity_log:aPlayerActivity):
             try:
-                await player_activity_log.mark_as_read()                
-                if not player_activity_log.is_member:
-                    return
+                await player_activity_log.mark_as_read()
                 
                 member = self.bot.get_user(player_activity_log.discord_user)
                 if not member:
-                    return            
+                    return
                 if player_activity_log.change <= 0:
                     return
                 
                 hero = aHero.get_hero(player_activity_log.stat,player_activity_log.town_hall.level)
                 upgrades = range(player_activity_log.new_value - player_activity_log.change + 1,player_activity_log.new_value + 1)
 
-                async for u in AsyncIter(upgrades):                
-                    reward = 0 if u <= hero.min_level else 1000
+                async for u in AsyncIter(upgrades):            
+                    if not player_activity_log.is_member:
+                        reward = 0
+                    else:   
+                        reward = 0 if u <= hero.min_level else 1000
 
                     multi = await self._compute_multiplier(player_activity_log)
                     new_rew = round(reward * multi)
