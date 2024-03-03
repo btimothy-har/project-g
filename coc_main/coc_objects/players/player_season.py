@@ -222,7 +222,10 @@ class aPlayerSeason(AwaitLoader):
         return self.clan_games
     
     async def create_member_snapshot(self):
-        snapshot_id = (self.season.id,self.tag)        
+        snapshot_id = {
+            'season':self.season.id,
+            'tag':self.tag
+            }
         await bot_client.coc_db.db_player_member_snapshot.update_one(
             {'_id':snapshot_id},
             {'$set':{
