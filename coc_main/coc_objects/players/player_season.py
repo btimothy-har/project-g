@@ -49,15 +49,59 @@ class aPlayerSeason(AwaitLoader):
         self.home_clan = None
         self.time_in_home_clan = 0
         self.last_seen = []
-        self.attack_wins = None
-        self.defense_wins = None
-        self.donations_sent = None
-        self.donations_rcvd = None
-        self.loot_gold = None
-        self.loot_elixir = None
-        self.loot_darkelixir = None
-        self.capital_contribution = None
-        self.clan_games = None
+        self.attack_wins = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='attack_wins',
+            activities=[]
+            )
+        self.defense_wins = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='defense_wins',
+            activities=[]
+            )
+        self.donations_sent = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='donations_sent',
+            activities=[]
+            )
+        self.donations_rcvd = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='donations_received',
+            activities=[]
+            )
+        self.loot_gold = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='loot_gold',
+            activities=[]
+            )
+        self.loot_elixir = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='loot_elixir',
+            activities=[]
+            )
+        self.loot_darkelixir = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='loot_darkelixir',
+            activities=[]
+            )
+        self.capital_contribution = aPlayerStat(
+            tag=self.tag,
+            season=self.season,
+            description='capital_contribution',
+            activities=[]
+            )
+        self.clan_games = aPlayerClanGames(
+            tag=self.tag,
+            season=self.season,
+            activities=[]
+            )
     
     def __str__(self):
         return f"Player Stats {self.season.id}: {self.name} ({self.tag})"
