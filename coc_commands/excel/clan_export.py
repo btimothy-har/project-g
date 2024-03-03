@@ -107,7 +107,7 @@ class ClanExcelExport():
         async for m in AsyncIter(members):
             col = 0
             row += 1
-            
+
             stats = await m.get_season_stats(self.season)
 
             war_log = await aClanWar.for_player(m.tag,season=self.season)
@@ -122,7 +122,7 @@ class ClanExcelExport():
 
             m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'name',''))
 
-            m_data.append(f"{stats.home_clan.name} ({stats.home_clan_tag})")
+            m_data.append(f"{getattr(stats.home_clan,'name','')} ({stats.home_clan_tag})")
             m_data.append(stats.time_in_home_clan / (24*60*60))
             m_data.append(stats.town_hall)        
 
