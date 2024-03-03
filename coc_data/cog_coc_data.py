@@ -64,6 +64,7 @@ class ClashOfClansData(commands.Cog):
         # DATA QUEUE
         self._lock_player_loop = asyncio.Lock()
         self._lock_clan_loop = asyncio.Lock()
+        self._lock_snapshot = asyncio.Lock()
         self._war_loop = ClanWarLoop()
         self._raid_loop = ClanRaidLoop()
         self._discord_loop = DiscordGuildLoop()
@@ -141,6 +142,10 @@ class ClashOfClansData(commands.Cog):
                 self.update_clan_loop.start()
             except:
                 pass
+            try:
+                self.create_member_snapshot.start()
+            except:
+                pass
             
         while True:
             if getattr(bot_client,'_is_initialized',False):
@@ -189,6 +194,10 @@ class ClashOfClansData(commands.Cog):
                 pass
             try:
                 self.update_clan_loop.cancel()
+            except:
+                pass
+            try:
+                self.create_member_snapshot.cancel()
             except:
                 pass
 
@@ -341,6 +350,24 @@ class ClashOfClansData(commands.Cog):
                 tags = [p['_id'] async for p in db_query]
                 bot_client.coc.add_clan_updates(*tags)
     
+    @tasks.loop(hours=6)    
+    async def create_member_snapshot(self):
+        if self._lock_snapshot.locked():
+            return
+        
+        async with self._lock_snapshot:
+            all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
+            async for player_tag in all_player_tags:
+                try:
+                    player = await bot_client.coc.get_player(player_tag['_id'])
+                except coc.NotFound:
+                    continue
+                except (coc.GatewayError,coc.Maintenance):
+                    return
+                
+                season = await player.get_season_stats(bot_client.current_season)
+                await season.create_member_snapshot()
+    
     async def clan_queue_loop(self):
         sleep = 0.1
         try:
@@ -484,6 +511,30 @@ class ClashOfClansData(commands.Cog):
         """Manage the Clash of Clans Data Client."""
         if not ctx.invoked_subcommand:
             pass
+    
+    @command_group_clash_data.command(name="createsnapshot")
+    @commands.is_owner()
+    async def create_member_snapshots(self):
+        if self._lock_snapshot.locked():
+            return
+        
+        async with self._lock_snapshot:            
+            all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
+            async for player_tag in all_player_tags:
+                try:
+                    player = await bot_client.coc.get_player(player_tag['_id'])
+                except coc.NotFound:
+                    continue
+                except (coc.GatewayError,coc.Maintenance):
+                    return
+                
+                current_season = await player.get_season_stats(bot_client.current_season)
+                await current_season.create_member_snapshot()
+
+                seasons = AsyncIter(bot_client.tracked_seasons)
+                async for season in seasons:
+                    player_season = await player.get_season_stats(season)
+                    await player_season.create_member_snapshot()                
 
     @command_group_clash_data.command(name="status")
     @commands.is_owner()
