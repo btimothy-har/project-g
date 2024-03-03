@@ -107,11 +107,8 @@ class ClanExcelExport():
         async for m in AsyncIter(members):
             col = 0
             row += 1
-
-            if self.season.is_current:
-                stats = await m.get_current_season()
-            else:
-                stats = await m.get_season_stats(self.season)
+            
+            stats = await m.get_season_stats(self.season)
 
             war_log = await aClanWar.for_player(m.tag,season=self.season)
             war_stats = aClanWarSummary.for_player(m.tag,war_log)
