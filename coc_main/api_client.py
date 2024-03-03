@@ -176,7 +176,7 @@ class ClashClient(coc.EventsClient):
 
             players = [p async for p in self.get_players(tags)]
             season_stats = await bounded_gather(*[p.get_season_stats(season) for p in players])
-            season_members = [s.tag for s in season_stats if s.is_member and s.home_clan_tag == clan.tag]
+            season_members = [s.tag for s in season_stats if s.is_member and getattr(s.home_clan,'tag') == clan.tag]
             ret_players = [p for p in players if p.tag in season_members]
             return sorted(
                 ret_players,
@@ -380,15 +380,15 @@ class BotClashClient():
         await instance.discordlinks_login()        
 
         bot.coc_client.add_events(
-            clash_event_error,
-            player_loop_start,
-            player_loop_end,
-            clan_loop_start,
-            clan_loop_end,
-            clash_maintenance_start,
-            clash_maintenance_complete,
-            end_of_trophy_season,
-            end_of_clan_games
+            instance.clash_event_error,
+            instance.player_loop_start,
+            instance.player_loop_end,
+            instance.clan_loop_start,
+            instance.clan_loop_end,
+            instance.clash_maintenance_start,
+            instance.clash_maintenance_complete,
+            instance.end_of_trophy_season,
+            instance.end_of_clan_games
             )
         await instance.load_seasons()
 
@@ -788,105 +788,102 @@ class BotClashClient():
         else:
             self.last_status_update = pendulum.now()
             self.coc_main_log.info(f"Bot Status Updated: {text}.")
-
-@coc.ClientEvents.event_error()
-async def clash_event_error(exception:Exception):
-    if isinstance(exception,coc.HTTPException):
-        # suppress 404 (notFound) and 503 (Maintenance) errors
-        if exception.status in [404,503]:
+    
+    ############################################################
+    #####
+    ##### CLIENT EVENTS
+    #####
+    ############################################################
+    @coc.ClientEvents.event_error()
+    async def clash_event_error(self,exception:Exception):
+        if isinstance(exception,coc.HTTPException):
+            # suppress 404 (notFound) and 503 (Maintenance) errors
+            if exception.status in [404,503]:
+                return
+        
+        try:
+            client = BotClashClient()
+        except:
             return
-    
-    try:
-        client = BotClashClient()
-    except:
-        return
-    else:
-        client.coc_main_log.exception(f"Clash Event Error: {exception}")
+        else:
+            client.coc_main_log.exception(f"Clash Event Error: {exception}")
 
-@coc.ClientEvents.player_loop_start()
-async def player_loop_start(iteration_number:int):
-    client = BotClashClient()
-    client._player_loop_tracker[iteration_number] = pendulum.now()
-    client.player_loop_status = True
+    @coc.ClientEvents.player_loop_start()
+    async def player_loop_start(self,iteration_number:int):
+        self._player_loop_tracker[iteration_number] = pendulum.now()
+        self.player_loop_status = True
 
-@coc.ClientEvents.player_loop_finish()
-async def player_loop_end(iteration_number:int):
-    client = BotClashClient()
-    start = client._player_loop_tracker.get(iteration_number,None)
-    if start:
-        end = pendulum.now()
-        client.last_loop['player'] = end
-        client.player_loop_status = False
-        client.player_loop_runtime.append(end.diff(start).in_seconds())
-        del client._player_loop_tracker[iteration_number]
+    @coc.ClientEvents.player_loop_finish()
+    async def player_loop_end(self,iteration_number:int):
+        start = self._player_loop_tracker.get(iteration_number,None)
+        if start:
+            end = pendulum.now()
+            self.last_loop['player'] = end
+            self.player_loop_status = False
+            self.player_loop_runtime.append(end.diff(start).in_seconds())
+            del self._player_loop_tracker[iteration_number]
 
-@coc.ClientEvents.clan_loop_start()
-async def clan_loop_start(iteration_number:int):
-    client = BotClashClient()
-    client._clan_loop_tracker[iteration_number] = pendulum.now()
-    client.clan_loop_status = True
+    @coc.ClientEvents.clan_loop_start()
+    async def clan_loop_start(self,iteration_number:int):
+        self._clan_loop_tracker[iteration_number] = pendulum.now()
+        self.clan_loop_status = True
 
-@coc.ClientEvents.clan_loop_finish()
-async def clan_loop_end(iteration_number:int):
-    client = BotClashClient()
-    start = client._clan_loop_tracker.get(iteration_number,None)
-    if start:
-        end = pendulum.now()
-        client.last_loop['clan'] = end
-        client.clan_loop_status = False
-        client.clan_loop_runtime.append(end.diff(start).in_seconds())
-        del client._clan_loop_tracker[iteration_number]
+    @coc.ClientEvents.clan_loop_finish()
+    async def clan_loop_end(self,iteration_number:int):
+        start = self._clan_loop_tracker.get(iteration_number,None)
+        if start:
+            end = pendulum.now()
+            self.last_loop['clan'] = end
+            self.clan_loop_status = False
+            self.clan_loop_runtime.append(end.diff(start).in_seconds())
+            del self._clan_loop_tracker[iteration_number]
 
-@coc.ClientEvents.maintenance_start()
-async def clash_maintenance_start():
-    client = BotClashClient()
-    client.api_maintenance = True
+    @coc.ClientEvents.maintenance_start()
+    async def clash_maintenance_start(self):
+        self.api_maintenance = True
 
-    client.coc_main_log.warning(f"Clash Maintenance Started.\n"
-        + text2art("Clash Maintenance Started",font="small")
-        )
-    await client.update_bot_status(
-        cooldown=0,
-        text="Clash Maintenance!"
-        )
+        self.coc_main_log.warning(f"Clash Maintenance Started.\n"
+            + text2art("Clash Maintenance Started",font="small")
+            )
+        await self.update_bot_status(
+            cooldown=0,
+            text="Clash Maintenance!"
+            )
 
-@coc.ClientEvents.maintenance_completion()
-async def clash_maintenance_complete(time_started):
-    client = BotClashClient()
-    await client.api_counter.reset_counter()
-    client.api_maintenance = False
+    @coc.ClientEvents.maintenance_completion()
+    async def clash_maintenance_complete(self,time_started):
+        await self.api_counter.reset_counter()
+        self.api_maintenance = False
 
-    maint_start = pendulum.instance(time_started)
-    maint_end = pendulum.now()
+        maint_start = pendulum.instance(time_started)
+        maint_end = pendulum.now()
 
-    client.coc_main_log.warning(f"Clash Maintenance Completed. Maintenance took: {maint_end.diff(maint_start).in_minutes()} minutes. Sync loops unlocked.\n"
-        + text2art("Clash Maintenance Completed",font="small")
-        )
-    await client.update_bot_status(
-        cooldown=0,
-        text="Clash of Clans!"
-        )
+        self.coc_main_log.warning(f"Clash Maintenance Completed. Maintenance took: {maint_end.diff(maint_start).in_minutes()} minutes. Sync loops unlocked.\n"
+            + text2art("Clash Maintenance Completed",font="small")
+            )
+        await self.update_bot_status(
+            cooldown=0,
+            text="Clash of Clans!"
+            )
 
-@coc.ClientEvents.new_season_start()
-async def end_of_trophy_season():
-    client = BotClashClient()
-    client.coc_main_log.info(f"Running End of Trophy Season Rewards.")
-    await asyncio.sleep(1800)
+    @coc.ClientEvents.new_season_start()
+    async def end_of_trophy_season(self):
+        self.coc_main_log.info(f"Running End of Trophy Season Rewards.")
+        await asyncio.sleep(1800)
 
-    cog = client.bot.get_cog("Bank")
-    if cog:
-        await cog.member_legend_rewards()
-    
-    client.coc_main_log.info(f"Completed End of Trophy Season Rewards.")
+        cog = self.bot.get_cog("Bank")
+        if cog:
+            await cog.member_legend_rewards()
+        
+        self.coc_main_log.info(f"Completed End of Trophy Season Rewards.")
 
-@coc.ClientEvents.clan_games_end()
-async def end_of_clan_games():
-    client = BotClashClient()
-    client.coc_main_log.info(f"Running End of Clan Games Rewards.")
-    await asyncio.sleep(900)
+    @coc.ClientEvents.clan_games_end()
+    async def end_of_clan_games(self):
+        self.coc_main_log.info(f"Running End of Clan Games Rewards.")
+        await asyncio.sleep(900)
 
-    cog = client.bot.get_cog("Bank")
-    if cog:
-        await cog.member_clan_games_rewards()
-    
-    client.coc_main_log.info(f"Completed End of Clan Games Rewards.")
+        cog = self.bot.get_cog("Bank")
+        if cog:
+            await cog.member_clan_games_rewards()
+        
+        self.coc_main_log.info(f"Completed End of Clan Games Rewards.")
