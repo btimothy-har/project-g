@@ -378,55 +378,55 @@ class Clans(commands.Cog):
         message = f"Here is your Data for **{clan}**.\n\nSeason: {season.description}."
         return message,discord_file
 
-    @command_group_clan.command(name="export")
-    @commands.guild_only()
-    @commands.check(is_coleader)
-    async def command_export_clan_data(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-        """
-        Exports a Clan's data to Excel.
+    # @command_group_clan.command(name="export")
+    # @commands.guild_only()
+    # @commands.check(is_coleader)
+    # async def command_export_clan_data(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    #     """
+    #     Exports a Clan's data to Excel.
 
-        Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
-        """
+    #     Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
+    #     """
 
-        embed = await clash_embed(
-            context=ctx,
-            message=f"{EmojisUI.LOADING} Exporting data... please wait.",
-            timestamp=pendulum.now(),
-            )
-        message = await ctx.reply(embed=embed)
+    #     embed = await clash_embed(
+    #         context=ctx,
+    #         message=f"{EmojisUI.LOADING} Exporting data... please wait.",
+    #         timestamp=pendulum.now(),
+    #         )
+    #     message = await ctx.reply(embed=embed)
 
-        embed, discord_file = await self._clan_export_helper(ctx,clan_tag_or_abbreviation)
-        attachments = [discord_file] if discord_file else []
+    #     embed, discord_file = await self._clan_export_helper(ctx,clan_tag_or_abbreviation)
+    #     attachments = [discord_file] if discord_file else []
 
-        await message.edit(
-            content=f'{ctx.author.mention} {embed}',
-            embed=None,
-            attachments=attachments
-            )
+    #     await message.edit(
+    #         content=f'{ctx.author.mention} {embed}',
+    #         embed=None,
+    #         attachments=attachments
+    #         )
 
-    @app_command_group_clan.command(name="export",
-        description="Export seasonal Clan Data to an Excel file.")
-    @app_commands.check(is_coleader)
-    @app_commands.autocomplete(
-        clan=autocomplete_clans_coleader,
-        season=autocomplete_seasons)
-    @app_commands.describe(
-        clan="Select a Clan. Only Alliance Clans can be selected.",
-        season="Select a Season to export.")
-    async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
+    # @app_command_group_clan.command(name="export",
+    #     description="Export seasonal Clan Data to an Excel file.")
+    # @app_commands.check(is_coleader)
+    # @app_commands.autocomplete(
+    #     clan=autocomplete_clans_coleader,
+    #     season=autocomplete_seasons)
+    # @app_commands.describe(
+    #     clan="Select a Clan. Only Alliance Clans can be selected.",
+    #     season="Select a Season to export.")
+    # async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
         
-        await interaction.response.defer()
+    #     await interaction.response.defer()
 
-        get_season = await aClashSeason(season)
+    #     get_season = await aClashSeason(season)
 
-        embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
-        attachments = [discord_file] if discord_file else []
+    #     embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
+    #     attachments = [discord_file] if discord_file else []
 
-        await interaction.edit_original_response(
-            content=f'{interaction.user.mention} {embed}',
-            embed=None,
-            attachments=attachments
-            )
+    #     await interaction.edit_original_response(
+    #         content=f'{interaction.user.mention} {embed}',
+    #         embed=None,
+    #         attachments=attachments
+    #         )
     
     ##################################################
     ### CLANDATA / COMPO
