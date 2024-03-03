@@ -463,7 +463,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         if season.is_current_season:
             stats.name = self.name
             stats.town_hall = self.town_hall.level      
-            stats.home_clan_tag = self.home_clan_tag
+            stats.home_clan_tag = getattr(self.home_clan,'tag',None)
             stats.home_clan = self.home_clan
             stats.is_member = self.is_member      
         return stats
