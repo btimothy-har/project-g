@@ -13,11 +13,11 @@ from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
 
 from coc_main.discord.member import aMember
 
-from coc_main.utils.components import handle_command_error, clash_embed, DiscordSelectMenu
+from coc_main.utils.components import handle_command_error, handle_exception, clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
 
-from coc_main.exceptions import ClashAPIError, InvalidTag, InvalidUser
+from coc_main.exceptions import InvalidUser
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -205,67 +205,13 @@ class Players(commands.Cog):
         except Exception:
             bot_client.coc_main_log.exception("Error in Player Cog member_role_sync.")
     
-    async def cog_command_error(self,ctx,error):
-        original = getattr(error,'original',None)
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=ctx,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
 
-    async def cog_app_command_error(self,interaction,error):
-        original = getattr(error,'original',None)
-        embed = None
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-        if embed:
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed,view=None)
-            else:
-                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
-            return
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,interaction)
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):

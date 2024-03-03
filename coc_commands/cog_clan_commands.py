@@ -10,10 +10,10 @@ from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason, ClashOfClansError, InvalidAbbreviation, InvalidRole
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
+from coc_main.api_client import BotClashClient, aClashSeason, InvalidRole
+from coc_main.cog_coc_client import aClan
 
-from coc_main.utils.components import clash_embed, MenuConfirmation, ClanLinkMenu
+from coc_main.utils.components import clash_embed, handle_command_error, handle_exception, MenuConfirmation, ClanLinkMenu
 from coc_main.utils.utils import chunks
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_clans_coleader, autocomplete_seasons
 from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_admin_or_coleader
@@ -21,16 +21,12 @@ from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_
 from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
-from coc_main.exceptions import ClashAPIError, InvalidTag
-
 from coc_main.discord.clan_link import ClanGuildLink
 
 from .views.clan_settings import ClanSettingsMenu
 from .views.clan_members import ClanMembersMenu
 from .views.clan_warlog import ClanWarLog
 from .excel.clan_export import ClanExcelExport
-
-from coc_main.discord.feeds.raid_results import RaidResultsFeed
 
 bot_client = BotClashClient()
 
@@ -42,8 +38,8 @@ async def autocomplete_clan_settings(interaction:discord.Interaction,current:str
         else:
             return await autocomplete_clans_coleader(interaction,current)
         
-    except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_clan_settings")
+    except Exception as exc:
+        await handle_exception(exc)        
 
 ############################################################
 ############################################################
@@ -71,72 +67,14 @@ class Clans(commands.Cog):
     @property
     def bot_client(self) -> BotClashClient:
         return BotClashClient()
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
-    async def cog_command_error(self,ctx,error):
-        original = getattr(error,'original',None)
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=ctx,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=ctx,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
 
-    async def cog_app_command_error(self,interaction,error):
-        original = getattr(error,'original',None)
-        embed = None
-        if isinstance(original,coc.NotFound):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Tag you provided doesn't seem to exist.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,coc.GatewayError) or isinstance(original,coc.Maintenance):
-            embed = await clash_embed(
-                context=interaction,
-                message="The Clash of Clans API is currently unavailable.",
-                success=False,
-                timestamp=pendulum.now()
-                )            
-        elif isinstance(original,ClashOfClansError):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-        if embed:
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed,view=None)
-            else:
-                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
-            return
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,interaction)
     
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
@@ -193,10 +131,8 @@ class Clans(commands.Cog):
     async def _assistant_get_clan_information(self,clan_tag:str,*args,**kwargs) -> str:
         try:
             clan = await bot_client.coc.get_clan(clan_tag)
-        except coc.NotFound:
-            return f"The tag {clan_tag} appears to be invalid."
-        except (coc.Maintenance,coc.GatewayError):
-            return "The API Service isn't available right now."            
+        except Exception as exc:
+            return await handle_exception(exc)
         
         ret_clan = clan.assistant_clan_information()
         return f"Found Clan: {ret_clan}"

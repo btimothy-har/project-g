@@ -24,7 +24,7 @@ from coc_main.coc_objects.events.raid_weekend import aRaidMember
 
 from coc_main.discord.member import aMember
 
-from coc_main.utils.components import clash_embed, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
+from coc_main.utils.components import clash_embed, handle_command_error, MenuPaginator, DiscordSelectMenu, DiscordModal, DiscordButton
 from coc_main.exceptions import InvalidTag, ClashAPIError
 from coc_main.utils.constants.coc_constants import WarResult, ClanWarType
 from coc_main.utils.constants.ui_emojis import EmojisUI
@@ -75,7 +75,7 @@ def _staff_check(interaction:discord.Interaction):
 ############################################################
 ############################################################
 #####
-##### CLIENT COG
+##### BANK COG
 #####
 ############################################################
 ############################################################
@@ -128,8 +128,52 @@ class Bank(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
+
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
+
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,interaction)
     
+    ############################################################
+    #####
+    ##### COG LOAD / UNLOAD
+    #####
+    ############################################################
     async def cog_load(self):
+        async def start_cog():
+            while True:
+                if getattr(bot_client,'_is_initialized',False):
+                    break
+                await asyncio.sleep(1)
+
+            self.current_account = await MasterAccount('current')
+            self.sweep_account = await MasterAccount('sweep')
+            self.reserve_account = await MasterAccount('reserve')
+        
+            self.progress_reward_townhall.start()
+            self.progress_reward_hero_upgrade.start()
+            self.clan_capital_contribution_reward.start()
+
+            ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
+            ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
+
+            await self.bot.wait_until_red_ready()
+            u_iter = AsyncIter(self.bank_admins)
+            async for user_id in u_iter:
+                guild_user = self.bank_guild.get_member(user_id)
+                if not guild_user:
+                    continue
+                admin_role = self.bank_guild.get_role(self._bank_admin_role)
+                if admin_role and admin_role not in guild_user.roles:
+                    await guild_user.add_roles(admin_role)
+            
+            self.subscription_item_expiry.start()
+            self.staff_item_grant.start()
+
+            self._log_task = asyncio.create_task(self._log_task_loop())
         try:
             self.use_rewards = await self.config.use_rewards()
         except:
@@ -148,39 +192,7 @@ class Bank(commands.Cog):
             self._bank_penalty_role = 0
 
         self.bank_admins = await self.config.admins()
-        asyncio.create_task(self.start_cog())
-    
-    async def start_cog(self):
-        while True:
-            if getattr(bot_client,'_is_initialized',False):
-                break
-            await asyncio.sleep(1)
-
-        self.current_account = await MasterAccount('current')
-        self.sweep_account = await MasterAccount('sweep')
-        self.reserve_account = await MasterAccount('reserve')
-    
-        self.progress_reward_townhall.start()
-        self.progress_reward_hero_upgrade.start()
-        self.clan_capital_contribution_reward.start()
-
-        ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
-        ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
-
-        await self.bot.wait_until_red_ready()
-        u_iter = AsyncIter(self.bank_admins)
-        async for user_id in u_iter:
-            guild_user = self.bank_guild.get_member(user_id)
-            if not guild_user:
-                continue
-            admin_role = self.bank_guild.get_role(self._bank_admin_role)
-            if admin_role and admin_role not in guild_user.roles:
-                await guild_user.add_roles(admin_role)
-        
-        self.subscription_item_expiry.start()
-        self.staff_item_grant.start()
-
-        self._log_task = asyncio.create_task(self._log_task_loop())
+        asyncio.create_task(start_cog())    
     
     async def cog_unload(self):
         self.subscription_item_expiry.cancel()
@@ -413,7 +425,7 @@ class Bank(commands.Cog):
         if len(eligible_accounts) == 0:
             return f"The user {user.name} (ID: {user.id}) does not have any eligible linked accounts."        
         if len(eligible_accounts) == 1:
-            return f"The user selected the account: {eligible_accounts[0].overview_json()}."
+            return f"The user selected the account: {eligible_accounts[0].name_json()}."
         
         else:
             view = ClashAccountSelector(user,eligible_accounts)

@@ -18,7 +18,7 @@ from coc_main.coc_objects.events.clan_war import aWarPlayer
 
 from coc_main.discord.member import aMember
 
-from coc_main.utils.components import clash_embed, ClanLinkMenu
+from coc_main.utils.components import clash_embed, handle_command_error, ClanLinkMenu
 from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, ClanWarType
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_players
@@ -78,6 +78,14 @@ class ClanWarLeagues(commands.Cog):
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+    
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
+
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await handle_command_error(original_exc,interaction)
 
     ############################################################
     #####

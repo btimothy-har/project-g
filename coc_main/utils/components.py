@@ -12,9 +12,23 @@ from .constants.coc_emojis import *
 from .constants.ui_emojis import *
 
 from .utils import *
-from ..exceptions import ClashOfClansError
 
 _ACCEPTABLE_PAGE_TYPES = Union[Dict[str, Union[str, discord.Embed]], discord.Embed, str]
+
+async def handle_exception(exception:Exception) -> str:
+    bot_client = client()
+
+    if isinstance(exception,coc.HTTPException):
+        if exception.status == 404:
+            return "The requested Tag doesn't seem to be valid."
+        elif exception.status in [502,503,504]:
+            return "The Clash of Clans API is currently unavailable."
+        else:
+            bot_client.coc_main_log.exception(f"Clash of Clans API HTTP Error: {exception}")
+            return "The Clash of Clans API is currently unavailable."
+    else:
+        bot_client.coc_main_log.exception(f"{exception}")
+        return "An unexpected error occurred and has been logged. Please try again later."
 
 async def handle_command_error(
     exception:Exception,
@@ -23,33 +37,13 @@ async def handle_command_error(
 
     bot_client = client()
 
-    if isinstance(exception,coc.NotFound):
-        error_embed = await clash_embed(
-            context=bot_client.bot,
-            message="The Tag you provided doesn't seem to exist.",
-            success=False,
-            timestamp=pendulum.now()
-            )            
-    elif isinstance(exception,coc.GatewayError) or isinstance(exception,coc.Maintenance):
-        error_embed = await clash_embed(
-            context=bot_client.bot,
-            message="The Clash of Clans API is currently unavailable.",
-            success=False,
-            timestamp=pendulum.now()
-            )    
-    elif isinstance(exception,ClashOfClansError):
-        error_embed = await clash_embed(
-            context=bot_client.bot,
-            message=f"**Error**: {exception.message}",
-            success=False,
-            timestamp=pendulum.now())
-    else:
-        error_embed = await clash_embed(
-            context=bot_client.bot,
-            message=f"An unexpected error occurred. I've forwarded this error to my owners. You may also report this error with `/report`."
-                + f"\n\nI apologise for the inconvenience.",
-            success=False,
-            timestamp=pendulum.now())
+    response = await handle_exception(exception)
+    error_embed = await clash_embed(
+        context=bot_client.bot,
+        message=response,
+        success=False,
+        timestamp=pendulum.now()
+        )
     
     if isinstance(context,discord.Interaction):
         try:
@@ -60,16 +54,17 @@ async def handle_command_error(
                     await context.response.send_message(embed=error_embed,ephemeral=True)
                 else:
                     await context.response.edit_message(embed=error_embed)
-        except discord.NotFound:
+        except:
             return True
+        
     elif isinstance(context,commands.Context):
-        if message:
-            await message.edit(embed=error_embed,view=None)
-        else:
-            await context.reply(embed=error_embed,view=None)
-    
-    if not isinstance(exception,ClashOfClansError):
-        raise
+        try:
+            if message:
+                await message.edit(embed=error_embed,view=None)
+            else:
+                await context.reply(embed=error_embed,view=None)
+        except:
+            return True
 
 ####################################################################################################
 #####
