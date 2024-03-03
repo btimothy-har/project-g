@@ -17,7 +17,6 @@ from ...utils.utils import check_rtl
 bot_client = client()
 
 class aPlayerSeason(AwaitLoader):
-    _cache = {}
     __slots__ = [
         'tag',
         'season',

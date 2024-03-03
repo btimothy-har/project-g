@@ -458,7 +458,9 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         return await self.get_season_stats(bot_client.current_season)
     
     async def get_season_stats(self,season:aClashSeason) -> aPlayerSeason:
-        return await aPlayerSeason(self.tag,season)
+        stats = aPlayerSeason(self.tag,season)
+        await stats.load()
+        return stats
             
     async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
         return await WarLeaguePlayer(self.tag,season)
