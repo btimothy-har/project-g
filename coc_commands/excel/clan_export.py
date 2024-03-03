@@ -110,6 +110,9 @@ class ClanExcelExport():
 
             stats = await m.get_season_stats(self.season)
 
+            if stats.is_member and getattr(stats.home_clan,'tag','') != self.clan.tag:
+                continue
+
             war_log = await aClanWar.for_player(m.tag,season=self.season)
             war_stats = aClanWarSummary.for_player(m.tag,war_log)
 
