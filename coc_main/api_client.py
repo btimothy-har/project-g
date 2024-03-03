@@ -150,13 +150,11 @@ class ClashClient(coc.EventsClient):
             season = self.bot_client.current_season
         
         if season.is_current:
-            query = self.bot_client.coc_db.db__player.find(
-                {
-                    'home_clan':clan.tag,
-                    'is_member':True
-                    },
-                {'_id':1}
-                )
+            filter_criteria = {
+                'home_clan':clan.tag,
+                'is_member':True
+                }
+            query = self.bot_client.coc_db.db__player.find(filter_criteria,{'_id':1})
             tags = [p['_id'] async for p in query]
             ret_players = [p async for p in self.get_players(tags)]
             return sorted(
@@ -166,7 +164,6 @@ class ClashClient(coc.EventsClient):
                 )
         else:
             filter_criteria = {
-                {
                 'is_member':True,
                 'home_clan':clan.tag,
                 'timestamp': {
@@ -174,7 +171,6 @@ class ClashClient(coc.EventsClient):
                     '$lte':season.season_end.int_timestamp
                     }
                 }
-            }
             query = self.bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
             tags = [p['tag'] async for p in query]
 
