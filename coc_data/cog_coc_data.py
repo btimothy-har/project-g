@@ -3,6 +3,7 @@ import discord
 import pendulum
 import logging
 import coc
+import random
 
 from typing import *
 
@@ -514,9 +515,11 @@ class ClashOfClansData(commands.Cog):
     
     @command_group_clash_data.command(name="createsnapshot")
     @commands.is_owner()
-    async def create_member_snapshots(self):
+    async def command_create_member_snapshot(self,ctx:commands.Context):
         if self._lock_snapshot.locked():
             return
+        
+        await ctx.reply("Creating Member Snapshot...")
         
         async with self._lock_snapshot:            
             all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
@@ -534,7 +537,12 @@ class ClashOfClansData(commands.Cog):
                 seasons = AsyncIter(bot_client.tracked_seasons)
                 async for season in seasons:
                     player_season = await player.get_season_stats(season)
-                    await player_season.create_member_snapshot()                
+                    await player_season.create_member_snapshot()
+                
+                if random.randint(1,100) == 100:
+                    await ctx.reply(f"Player Snapshot: {player.name} ({player.tag})")
+
+        await ctx.reply("Member Snapshot Created.")            
 
     @command_group_clash_data.command(name="status")
     @commands.is_owner()
