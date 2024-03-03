@@ -7,7 +7,6 @@ from typing import *
 from collections import deque, defaultdict
 
 from coc_main.api_client import BotClashClient as client
-from coc_main.api_client import clash_event_error
 from coc_main.cog_coc_client import ClashOfClansClient
 
 bot_client = client()
@@ -23,7 +22,7 @@ class TaskLoop():
     
     @staticmethod
     async def report_fatal_error(message,error):
-        await clash_event_error(error)
+        await bot_client.clash_event_error(error)
 
     def __init__(self):
         self._active = False
