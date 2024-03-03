@@ -143,10 +143,10 @@ class ClashOfClansData(commands.Cog):
                 self.update_clan_loop.start()
             except:
                 pass
-            try:
-                self.create_member_snapshot.start()
-            except:
-                pass
+            # try:
+            #     self.create_member_snapshot.start()
+            # except:
+            #     pass
             
         while True:
             if getattr(bot_client,'_is_initialized',False):
