@@ -5,7 +5,7 @@ import random
 import asyncio
 import motor.motor_asyncio
 
-import coc
+import coc as cocpy
 
 from typing import *
 from coc.ext import discordlinks
@@ -68,7 +68,7 @@ class DataQueue(asyncio.Queue):
 #####
 ############################################################
 ############################################################
-class CustomThrottler(coc.BasicThrottler):
+class CustomThrottler(cocpy.BasicThrottler):
     def __init__(self,sleep_time):
         self.limiter = AsyncLimiter(1,sleep_time)
         super().__init__(sleep_time)
@@ -134,7 +134,7 @@ class RequestCounter():
                 self.rcvd_time = nt
             self.current_rcvd += 1
 
-class ClashClient(coc.EventsClient):
+class ClashClient(cocpy.EventsClient):
     def __init__(self,**options):
         super().__init__(**options)
     
@@ -142,9 +142,9 @@ class ClashClient(coc.EventsClient):
     def bot_client(self) -> 'BotClashClient':
         return BotClashClient()
     
-    async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[coc.Player]:
+    async def get_members_by_season(self,clan:cocpy.Clan,season:Optional[aClashSeason]=None) -> List[cocpy.Player]:
         if self.bot_client.api_maintenance:
-            raise coc.Maintenance()
+            raise cocpy.Maintenance()
         
         if not season or season.id not in [s.id for s in self.bot_client.tracked_seasons]:
             season = self.bot_client.current_season
@@ -189,7 +189,7 @@ class ClashClient(coc.EventsClient):
     ##### COMMON CLAN HELPERS
     #####
     ############################################################
-    async def from_clan_abbreviation(self,abbreviation:str) -> coc.Clan:
+    async def from_clan_abbreviation(self,abbreviation:str) -> cocpy.Clan:
         query = await self.bot_client.coc_db.db__clan.find_one(
             {
                 'abbreviation':abbreviation.upper()
@@ -202,9 +202,9 @@ class ClashClient(coc.EventsClient):
         clan = await self.get_clan(abbreviation)
         return clan
     
-    async def get_registered_clans(self) -> List[coc.Clan]:
+    async def get_registered_clans(self) -> List[cocpy.Clan]:
         if getattr(self.bot_client,'api_maintenance',False):
-            raise coc.Maintenance()
+            raise cocpy.Maintenance()
         
         filter = {
             "emoji": {
@@ -221,9 +221,9 @@ class ClashClient(coc.EventsClient):
             reverse=True
             )
 
-    async def get_alliance_clans(self) -> List[coc.Clan]:
+    async def get_alliance_clans(self) -> List[cocpy.Clan]:
         if getattr(self.bot_client,'api_maintenance',False):
-            raise coc.Maintenance()
+            raise cocpy.Maintenance()
         
         query = self.bot_client.coc_db.db__alliance_clan.find({},{'_id':1})
         tags = [c['_id'] async for c in query]
@@ -234,9 +234,9 @@ class ClashClient(coc.EventsClient):
             reverse=True
             )
 
-    async def get_war_league_clans(self) -> List[coc.Clan]:
+    async def get_war_league_clans(self) -> List[cocpy.Clan]:
         if self.bot_client.api_maintenance:
-            raise coc.Maintenance()
+            raise cocpy.Maintenance()
         
         filter = {
             'is_active':True
@@ -492,7 +492,7 @@ class BotClashClient():
                 
         if not getattr(self.bot,"coc_client",None):
             self.bot.coc_client = ClashClient(
-                load_game_data=coc.LoadGameData(always=True),
+                load_game_data=cocpy.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit,
                 )
@@ -520,7 +520,7 @@ class BotClashClient():
             self.bot.coc_client = ClashClient(
                 key_count=int(clashapi_login.get("keys",1)),
                 key_names='project-g',
-                load_game_data=coc.LoadGameData(always=True),
+                load_game_data=cocpy.LoadGameData(always=True),
                 throttler=CustomThrottler,
                 throttle_limit=rate_limit
                 )
@@ -794,9 +794,9 @@ class BotClashClient():
     ##### CLIENT EVENTS
     #####
     ############################################################
-    @coc.ClientEvents.event_error()
+    @cocpy.ClientEvents.event_error()
     async def clash_event_error(self,exception:Exception):
-        if isinstance(exception,coc.HTTPException):
+        if isinstance(exception,cocpy.HTTPException):
             # suppress 404 (notFound) and 503 (Maintenance) errors
             if exception.status in [404,503]:
                 return
@@ -808,12 +808,12 @@ class BotClashClient():
         else:
             client.coc_main_log.exception(f"Clash Event Error: {exception}")
 
-    @coc.ClientEvents.player_loop_start()
+    @cocpy.ClientEvents.player_loop_start()
     async def player_loop_start(self,iteration_number:int):
         self._player_loop_tracker[iteration_number] = pendulum.now()
         self.player_loop_status = True
 
-    @coc.ClientEvents.player_loop_finish()
+    @cocpy.ClientEvents.player_loop_finish()
     async def player_loop_end(self,iteration_number:int):
         start = self._player_loop_tracker.get(iteration_number,None)
         if start:
@@ -823,12 +823,12 @@ class BotClashClient():
             self.player_loop_runtime.append(end.diff(start).in_seconds())
             del self._player_loop_tracker[iteration_number]
 
-    @coc.ClientEvents.clan_loop_start()
+    @cocpy.ClientEvents.clan_loop_start()
     async def clan_loop_start(self,iteration_number:int):
         self._clan_loop_tracker[iteration_number] = pendulum.now()
         self.clan_loop_status = True
 
-    @coc.ClientEvents.clan_loop_finish()
+    @cocpy.ClientEvents.clan_loop_finish()
     async def clan_loop_end(self,iteration_number:int):
         start = self._clan_loop_tracker.get(iteration_number,None)
         if start:
@@ -838,7 +838,7 @@ class BotClashClient():
             self.clan_loop_runtime.append(end.diff(start).in_seconds())
             del self._clan_loop_tracker[iteration_number]
 
-    @coc.ClientEvents.maintenance_start()
+    @cocpy.ClientEvents.maintenance_start()
     async def clash_maintenance_start(self):
         self.api_maintenance = True
 
@@ -850,7 +850,7 @@ class BotClashClient():
             text="Clash Maintenance!"
             )
 
-    @coc.ClientEvents.maintenance_completion()
+    @cocpy.ClientEvents.maintenance_completion()
     async def clash_maintenance_complete(self,time_started):
         await self.api_counter.reset_counter()
         self.api_maintenance = False
@@ -866,7 +866,7 @@ class BotClashClient():
             text="Clash of Clans!"
             )
 
-    @coc.ClientEvents.new_season_start()
+    @cocpy.ClientEvents.new_season_start()
     async def end_of_trophy_season(self):
         self.coc_main_log.info(f"Running End of Trophy Season Rewards.")
         await asyncio.sleep(1800)
@@ -877,7 +877,7 @@ class BotClashClient():
         
         self.coc_main_log.info(f"Completed End of Trophy Season Rewards.")
 
-    @coc.ClientEvents.clan_games_end()
+    @cocpy.ClientEvents.clan_games_end()
     async def end_of_clan_games(self):
         self.coc_main_log.info(f"Running End of Clan Games Rewards.")
         await asyncio.sleep(900)
