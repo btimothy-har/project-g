@@ -539,7 +539,8 @@ class ClashOfClansData(commands.Cog):
                 except Exception as e:
                     bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
 
-                tasks = [create_snapshot(player,bot_client.current_season)].extend([create_snapshot(player,season) for season in bot_client.tracked_seasons])
+                tasks = [create_snapshot(player,bot_client.current_season)]
+                tasks.extend([create_snapshot(player,season) for season in bot_client.tracked_seasons])
                 await asyncio.gather(*tasks)
                 
                 if random.randint(1,100) == 100:
