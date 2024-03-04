@@ -149,40 +149,19 @@ class ClashClient(cocpy.EventsClient):
         if not season or season.id not in [s.id for s in self.bot_client.tracked_seasons]:
             season = self.bot_client.current_season
         
-        if season.is_current:
-            filter_criteria = {
-                'home_clan':clan.tag,
-                'is_member':True
-                }
-            query = self.bot_client.coc_db.db__player.find(filter_criteria,{'_id':1})
-            tags = [p['_id'] async for p in query]
-            ret_players = [p async for p in self.get_players(tags)]
-            return sorted(
-                ret_players,
-                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
-                reverse=True
-                )
-        else:
-            filter_criteria = {
-                'is_member':True,
-                'home_clan':clan.tag,
-                'timestamp': {
-                    '$gt':season.season_start.int_timestamp,
-                    '$lte':season.season_end.int_timestamp
-                    }
-                }
-            query = self.bot_client.coc_db.db__player_activity.find(filter_criteria,{'tag':1})
-            tags = [p['tag'] async for p in query]
-
-            players = [p async for p in self.get_players(tags)]
-            season_stats = await bounded_gather(*[p.get_season_stats(season) for p in players])
-            season_members = [s.tag for s in season_stats if s.is_member and getattr(s.home_clan,'tag') == clan.tag]
-            ret_players = [p for p in players if p.tag in season_members]
-            return sorted(
-                ret_players,
-                key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
-                reverse=True
-                )
+        filter_criteria = {
+            'season':season.id,
+            'home_clan_tag':clan.tag,
+            'is_member':True
+            }
+        query = self.bot_client.coc_db.db_player_member_snapshot.find(filter_criteria,{'tag':1})
+        tags = [p['tag'] async for p in query]
+        ret_players = [p async for p in self.get_players(tags)]
+        return sorted(
+            ret_players,
+            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+            reverse=True
+            )
     
     ############################################################
     #####

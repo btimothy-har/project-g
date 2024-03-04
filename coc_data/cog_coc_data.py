@@ -532,10 +532,11 @@ class ClashOfClansData(commands.Cog):
             async for player_tag in all_player_tags:
                 try:
                     player = await bot_client.coc.get_player(player_tag['_id'])
-                except coc.NotFound:
-                    continue
-                except (coc.GatewayError,coc.Maintenance):
-                    return
+                except coc.HTTPException as exc:
+                    if exc.status == 404:
+                        continue
+                    else:
+                        raise exc                    
                 except Exception as e:
                     bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
 
