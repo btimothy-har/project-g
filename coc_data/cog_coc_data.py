@@ -3,6 +3,7 @@ import discord
 import pendulum
 import logging
 import coc
+import random
 
 from typing import *
 
@@ -64,6 +65,7 @@ class ClashOfClansData(commands.Cog):
         # DATA QUEUE
         self._lock_player_loop = asyncio.Lock()
         self._lock_clan_loop = asyncio.Lock()
+        self._lock_snapshot = asyncio.Lock()
         self._war_loop = ClanWarLoop()
         self._raid_loop = ClanRaidLoop()
         self._discord_loop = DiscordGuildLoop()
@@ -141,6 +143,10 @@ class ClashOfClansData(commands.Cog):
                 self.update_clan_loop.start()
             except:
                 pass
+            # try:
+            #     self.create_member_snapshot.start()
+            # except:
+            #     pass
             
         while True:
             if getattr(bot_client,'_is_initialized',False):
@@ -189,6 +195,10 @@ class ClashOfClansData(commands.Cog):
                 pass
             try:
                 self.update_clan_loop.cancel()
+            except:
+                pass
+            try:
+                self.create_member_snapshot.cancel()
             except:
                 pass
 
@@ -341,6 +351,26 @@ class ClashOfClansData(commands.Cog):
                 tags = [p['_id'] async for p in db_query]
                 bot_client.coc.add_clan_updates(*tags)
     
+    @tasks.loop(hours=6)    
+    async def create_member_snapshot(self):
+        if self._lock_snapshot.locked():
+            return
+        
+        async with self._lock_snapshot:
+            all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
+            async for player_tag in all_player_tags:
+                try:
+                    player = await bot_client.coc.get_player(player_tag['_id'])
+                except coc.NotFound:
+                    continue
+                except (coc.GatewayError,coc.Maintenance):
+                    return
+                except Exception as e:
+                    bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
+                
+                season = await player.get_season_stats(bot_client.current_season)
+                await season.create_member_snapshot()
+    
     async def clan_queue_loop(self):
         sleep = 0.1
         try:
@@ -484,6 +514,40 @@ class ClashOfClansData(commands.Cog):
         """Manage the Clash of Clans Data Client."""
         if not ctx.invoked_subcommand:
             pass
+    
+    @command_group_clash_data.command(name="createsnapshot")
+    @commands.is_owner()
+    async def command_create_member_snapshot(self,ctx:commands.Context):
+        if self._lock_snapshot.locked():
+            return
+        
+        await ctx.reply("Creating Member Snapshot...")
+
+        async def create_snapshot(player:aPlayer,season):
+            season_stats = await player.get_season_stats(season)
+            await season_stats.create_member_snapshot()
+        
+        async with self._lock_snapshot:            
+            all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
+            async for player_tag in all_player_tags:
+                try:
+                    player = await bot_client.coc.get_player(player_tag['_id'])
+                except coc.HTTPException as exc:
+                    if exc.status == 404:
+                        continue
+                    else:
+                        raise exc                    
+                except Exception as e:
+                    bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
+
+                tasks = [create_snapshot(player,bot_client.current_season)]
+                tasks.extend([create_snapshot(player,season) for season in bot_client.tracked_seasons])
+                await asyncio.gather(*tasks)
+                
+                if random.randint(1,100) == 100:
+                    await ctx.reply(f"Player Snapshot: {player.name} ({player.tag})")
+
+        await ctx.reply("Member Snapshot Created.")            
 
     @command_group_clash_data.command(name="status")
     @commands.is_owner()

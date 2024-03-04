@@ -460,6 +460,12 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     async def get_season_stats(self,season:aClashSeason) -> aPlayerSeason:
         stats = aPlayerSeason(self.tag,season)
         await stats.load()
+        if season.is_current_season:
+            stats.name = self.name
+            stats.town_hall = self.town_hall.level      
+            stats.home_clan_tag = getattr(self.home_clan,'tag',None)
+            stats.home_clan = self.home_clan
+            stats.is_member = self.is_member      
         return stats
             
     async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:

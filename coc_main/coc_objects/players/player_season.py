@@ -220,3 +220,23 @@ class aPlayerSeason(AwaitLoader):
     @property
     def clangames(self) -> aPlayerClanGames:
         return self.clan_games
+    
+    async def create_member_snapshot(self):
+        snapshot_id = {
+            'season':self.season.id,
+            'tag':self.tag
+            }
+        await bot_client.coc_db.db_player_member_snapshot.update_one(
+            {'_id':snapshot_id},
+            {'$set':{
+                'tag':self.tag,
+                'season':self.season.id,
+                'name':self.name,
+                'town_hall':self.town_hall,
+                'is_member':self.is_member,
+                'home_clan_tag':self.home_clan_tag,
+                }
+            },
+            upsert=True
+            )
+        
