@@ -365,6 +365,8 @@ class ClashOfClansData(commands.Cog):
                     continue
                 except (coc.GatewayError,coc.Maintenance):
                     return
+                except Exception as e:
+                    bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
                 
                 season = await player.get_season_stats(bot_client.current_season)
                 await season.create_member_snapshot()
@@ -520,6 +522,10 @@ class ClashOfClansData(commands.Cog):
             return
         
         await ctx.reply("Creating Member Snapshot...")
+
+        async def create_snapshot(player:aPlayer,season):
+            season_stats = await player.get_season_stats(season)
+            await season_stats.create_member_snapshot()
         
         async with self._lock_snapshot:            
             all_player_tags = bot_client.coc_db.db__player.find({},{'_id':1})
@@ -530,14 +536,11 @@ class ClashOfClansData(commands.Cog):
                     continue
                 except (coc.GatewayError,coc.Maintenance):
                     return
-                
-                current_season = await player.get_season_stats(bot_client.current_season)
-                await current_season.create_member_snapshot()
+                except Exception as e:
+                    bot_client.coc_main_log.exception(f"Error in Member Snapshot {player_tag['_id']}: {e}")
 
-                seasons = AsyncIter(bot_client.tracked_seasons)
-                async for season in seasons:
-                    player_season = await player.get_season_stats(season)
-                    await player_season.create_member_snapshot()
+                tasks = [create_snapshot(player,bot_client.current_season)].extend([create_snapshot(player,season) for season in bot_client.tracked_seasons])
+                await asyncio.gather(*tasks)
                 
                 if random.randint(1,100) == 100:
                     await ctx.reply(f"Player Snapshot: {player.name} ({player.tag})")
