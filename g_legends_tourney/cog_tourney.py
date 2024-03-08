@@ -252,8 +252,8 @@ class LegendsTourney(commands.Cog,GlobalClient):
 
     async def leaderboard_current_season_embed(self):
         participants = await self.fetch_all_participants()
-        elig_participants = [p for p in participants if getattr(getattr(p,'legend_statistics',None),'current_season',None)]
-        elig_participants.sort(key=lambda x: (x.town_hall.level,x.legend_statistics.current_season.trophies),reverse=True)
+        elig_participants = [p for p in participants if p.league.name == 'Legend League']
+        elig_participants.sort(key=lambda x: (x.town_hall.level,x.trophies),reverse=True)
 
         #chunk the list into 30s
         chunks = [elig_participants[i:i + 30] for i in range(0, len(elig_participants), 30)]

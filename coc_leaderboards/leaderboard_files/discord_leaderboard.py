@@ -259,15 +259,16 @@ class DiscordLeaderboard(GlobalClient):
                     if not archived_data:
                         calculate = True
                         archive = True
-                elif self._type == 5 and is_current and pendulum.now() >= season.clangames_end:
-                    archived_data = await self._retrieve_archived(season)
-                    if not archived_data:
-                        calculate = True
-                        archive = True               
                 else:
-                    calculate = True
+                    if self._type == 5 and pendulum.now() >= season.clangames_end:
+                        archived_data = await self._retrieve_archived(season)
+                        if not archived_data:
+                            calculate = True
+                            archive = True
+                    else:
+                        calculate = True
 
-                if calculate:
+                if calculate or not archived_data:
                     if self._type == 1:
                         data = await ClanWarLeaderboard.calculate(self,season)
                     elif self._type == 3:
