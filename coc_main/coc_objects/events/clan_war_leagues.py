@@ -47,9 +47,8 @@ class WarLeagueGroup(GlobalClient,AwaitLoader):
     
     async def load(self):
         
-        query = await self.database.db.db__war_league_group.find_one({'_id':self.id})
+        query = await self.database.db__war_league_group.find_one({'_id':self.id})
 
-        LOG.info(f"Loading War League Group {self.id} {query}")
         self._is_loaded = True
         if not query:
             return
