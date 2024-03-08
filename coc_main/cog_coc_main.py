@@ -281,6 +281,7 @@ class ClashOfClansMain(commands.Cog):
                 + f"\n{'[API Keys]':<15}" + f"{self.coc_client.http.key_count:,}"
                 + f"\n{'[API Requests]':<15}" + f"{self.coc_client.http.key_count - self.coc_client.http._HTTPClient__lock._value:,} / {self.coc_client.http.key_count:,}" + f" (Waiting: {waiters:,})"
                 + f"\n{'[Discovery]':<15}" + f"{self.coc_client._use_discovery}"
+                + f"\n{'[Q Tasks]':<15}" + f"{GlobalClient.task_queue.qsize()}"
                 + "```",
             inline=False
             )
