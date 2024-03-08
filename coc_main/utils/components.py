@@ -37,19 +37,19 @@ async def clash_embed(
     
     bot = None
     user = None
-    channel = None    
+    channel = None
+
+    bot = GlobalClient.bot
+
     if isinstance(context, Red):
-        bot = context
         user = None
         channel = await bot.get_or_fetch_user(list(bot.owner_ids)[0])
 
     elif isinstance(context, commands.Context):
-        bot = context.bot
         user = context.author
         channel = context.channel
 
     elif isinstance(context, discord.Interaction):
-        bot = context.client
         user = context.user
         channel = context.channel
 
