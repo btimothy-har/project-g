@@ -241,7 +241,6 @@ class ClashOfClansMain(commands.Cog):
             while True:
                 try:
                     await asyncio.sleep(sleep)
-
                     task = await GlobalClient.task_queue.get()
                     if task:
                         await task
@@ -279,7 +278,7 @@ class ClashOfClansMain(commands.Cog):
             value="```ini"
                 + f"\n{'[Maintenance]':<15}{self.coc_client.maintenance}"
                 + f"\n{'[API Keys]':<15}" + f"{self.coc_client.http.key_count:,}"
-                + f"\n{'[API Requests]':<15}" + f"{self.coc_client.http.key_count - self.coc_client.http._HTTPClient__lock._value:,} / {self.coc_client.http.key_count:,}" + f" (Waiting: {waiters:,})"
+                + f"\n{'[API Requests]':<15}" + f"{(self.coc_client.http.key_count * 10) - self.coc_client.http._HTTPClient__lock._value:,} / {self.coc_client.http.key_count * 10:,}" + f" (Waiting: {waiters:,})"
                 + f"\n{'[Discovery]':<15}" + f"{self.coc_client._use_discovery}"
                 + f"\n{'[Q Tasks]':<15}" + f"{GlobalClient.task_queue.qsize()}"
                 + "```",
