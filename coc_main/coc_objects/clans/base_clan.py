@@ -591,8 +591,11 @@ class _ClanAttributes(MotorClient):
         self.coleaders = alliance_db.get('coleaders',[]) if alliance_db else []
         self.elders = alliance_db.get('elders',[]) if alliance_db else []
 
-        mem_query = self.database.db__player.find({'is_member':True,'home_clan':self.tag},{'_id':1})
-        self.alliance_members = [p['_id'] async for p in mem_query]
+        if self.is_alliance_clan:
+            mem_query = self.database.db__player.find({'is_member':True,'home_clan':self.tag},{'_id':1})
+            self.alliance_members = [p['_id'] async for p in mem_query]
+        else:
+            self.alliance_members = []
 
         league_db = await self.database.db__war_league_clan_setup.find_one({'_id':self.tag})
         self.is_active_league_clan = league_db.get('is_active',False) if league_db else False
