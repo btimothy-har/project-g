@@ -98,12 +98,27 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
         ClanRaidLoop.add_raid_ongoing_event(FeedTasks._setup_raid_reminder)
         ClanRaidLoop.add_raid_end_event(FeedTasks._raid_ended_feed)
 
-        self.update_clan_loop.start()
-        self.save_member_roles.start()
-        self.update_guild_clocks.start()
+        asyncio.create_task(self.start_cog())
+    
+    async def start_cog(self):
+        await self.bot.wait_until_red_ready()
+
+        async def _update_app_panels_start(guild:discord.Guild):
+            lock = ClashOfClansDiscord._guild_locks[guild.id]
+            async with lock:
+                await ClashOfClansDiscord.update_guild_application_panels(guild)
+
+        guild_iter = AsyncIter(self.bot.guilds)
+        tasks = [_update_app_panels_start(guild) async for guild in guild_iter]
+        await bounded_gather(*tasks)
+
+
         self.update_application_panels.start()
         self.update_clan_panels.start()
-
+        self.update_guild_clocks.start()
+        self.update_clan_loop.start()
+        self.save_member_roles.start()        
+      
     async def cog_unload(self):
         self.update_application_panels.stop()
         self.update_clan_panels.stop()        
@@ -140,7 +155,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
                     },
                 }
             ]
-        await cog.register_functions(cog_name="DiscordPanels", schemas=schema)
+        await cog.register_functions(cog_name="ClashOfClansDiscord", schemas=schema)
     
     async def _assistant_clan_application(self,user:discord.User,channel:discord.TextChannel,guild:discord.Guild,*args,**kwargs) -> str:
         if not guild:
