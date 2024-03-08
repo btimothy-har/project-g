@@ -204,7 +204,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 pass
             asyncio.create_task(self._war_loop.start())
             asyncio.create_task(self._raid_loop.start())
-            asyncio.create_task(self._discord_loop.start())
         
         elif self.cycle_id >= 0:
             self.coc_client.add_events(
