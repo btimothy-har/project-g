@@ -271,7 +271,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ##### LOOPS
     #####
     ############################################################
-    @tasks.loop(seconds=10)    
+    @tasks.loop(minutes=10)    
     async def update_player_loop(self):
         async with self._player_loop_lock:
             if self.coc_client.maintenance:
@@ -316,7 +316,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             db_query = self.database.db__player.find(query,{'_id':1})
             self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
     
-    @tasks.loop(seconds=10)
+    @tasks.loop(minutes=10)
     async def update_clan_loop(self):        
         async with self._clan_loop_lock:
             if self.coc_client.maintenance:
