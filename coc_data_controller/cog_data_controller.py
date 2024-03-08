@@ -132,7 +132,7 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
         
         async with self.control_lock:
             await self.clean_unused_cycles()
-            
+
             available_cycles = [k for k,v in self.cycle_availability.items() if v > 0]
 
             if len(available_cycles) == 0:
@@ -260,7 +260,6 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                 {"$unset": {"_cycle_id": 1}}
                 )
             count += 1
-            available_slots += 1
         if count > 0:
             LOG.info(f"Removed {count} Players from unused cycle.")
         
@@ -272,7 +271,6 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                 {"$unset": {"_cycle_id": 1}}
                 )
             count += 1
-            available_slots += 1
         if count > 0:
             LOG.info(f"Removed {count} Clans from unused cycle.")
 
