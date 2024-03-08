@@ -110,10 +110,12 @@ class ClashOfClansMain(commands.Cog):
 
         self.bot_status_update_loop.start() 
         self.clash_season_check.start()
+        self._task_queue = asyncio.create_task(self._task_queue_loop())
             
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
         self.clash_season_check.cancel()
+        self._task_queue.cancel()
 
         await self.client_logout()
         await self.database_logout()
@@ -244,12 +246,20 @@ class ClashOfClansMain(commands.Cog):
                     if task:
                         await task
                 except asyncio.CancelledError:
-                    return
+                    raise
                 except Exception:
                     COC_LOG.exception("Error in Task Queue Loop")
 
         except asyncio.CancelledError:
-            return
+            while True:
+                try:
+                    task = await GlobalClient.task_queue.get()
+                    if task:
+                        await task
+                    if self._log_queue.qsize() == 0:
+                        break
+                except Exception:
+                    pass
     
     ############################################################
     #####
