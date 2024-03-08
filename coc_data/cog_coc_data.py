@@ -277,6 +277,26 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             if self.coc_client.maintenance:
                 return
             
+            if self.cycle_id >= 1:
+                current = list(self.coc_client._player_updates)            
+                query = {
+                    "$and": [
+                        {"_id": {"$in": current}},
+                        {"$or": [
+                            {"discord_user": {"$exists":True,"$gt":0}},
+                            {"is_member": True}
+                            ]}
+                        ]
+                    }
+                db_query = self.database.db__player.find(query,{'_id':1})
+                async for p in db_query:
+                    if p['_id'] in current:
+                        self.coc_client.remove_player_updates(p['_id'])
+                    await self.database.db__player.update_one(
+                        {"_id": p['_id']},
+                        {"$unset": {"_cycle_id": 1}}
+                        )
+            
             current = list(self.coc_client._player_updates)
             if self.cycle_id >= 1:
                 query = {
@@ -538,11 +558,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     async def player_loop_start(self,iteration_number:int):        
         self._player_loop_tracker[iteration_number] = pendulum.now()
         self.player_loop_status = True
-        await self._player_loop_lock.acquire()
 
     @coc.ClientEvents.player_loop_finish()
     async def player_loop_end(self,iteration_number:int):
-        self._player_loop_lock.release()
         start = self._player_loop_tracker.get(iteration_number,None)
         if start:
             self.player_loop_last = end = pendulum.now()
@@ -558,7 +576,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
     @coc.ClientEvents.clan_loop_finish()
     async def clan_loop_end(self,iteration_number:int):
-        self._clan_loop_lock.release()
         start = self._clan_loop_tracker.get(iteration_number,None)
         if start:
             self.clan_loop_last = end = pendulum.now()

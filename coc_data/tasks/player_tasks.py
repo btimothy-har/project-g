@@ -72,8 +72,6 @@ class PlayerTasks():
     
     @coc.PlayerEvents.label_ids()
     async def on_player_update_labels(old_player:aPlayer,new_player:aPlayer):
-        
-        await GlobalClient.task_queue.put((aPlayerActivity.create_new,args))
         task = aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
