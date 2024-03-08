@@ -231,8 +231,6 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         self._activity_count = len(season_entries)        
         if self._activity_count <= 0:
             return
-        
-        LOG.info(f"Computing {self.tag} {season_entries}.")
             
         self.name = season_entries[-1].name
         self.town_hall = season_entries[-1].town_hall.level
