@@ -131,6 +131,8 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             return
         
         async with self.control_lock:
+            await self.clean_unused_cycles()
+            
             available_cycles = [k for k,v in self.cycle_availability.items() if v > 0]
 
             if len(available_cycles) == 0:
@@ -246,6 +248,33 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             LOG.info(f"Removed {count} Clans from Cycle {cycle_num}.")
 
         self.cycle_availability[cycle_num] = available_slots
+    
+    async def clean_unused_cycles(self):        
+        query = {"_cycle_id": {'$gte':self.max_cycle}}
+        find_unused = self.database.db__player.find(query).limit(1000)
+
+        count = 0
+        async for player in find_unused:
+            await self.database.db__player.update_one(
+                {"_id": player['_id']},
+                {"$unset": {"_cycle_id": 1}}
+                )
+            count += 1
+            available_slots += 1
+        if count > 0:
+            LOG.info(f"Removed {count} Players from unused cycle.")
+        
+        count = 0
+        find_unused = self.database.db__clan.find(query).limit(1000)
+        async for clan in find_unused:
+            await self.database.db__clan.update_one(
+                {"_id": clan['_id']},
+                {"$unset": {"_cycle_id": 1}}
+                )
+            count += 1
+            available_slots += 1
+        if count > 0:
+            LOG.info(f"Removed {count} Clans from unused cycle.")
 
     @tasks.loop(minutes=10)
     async def refresh_cycle_availability(self):
