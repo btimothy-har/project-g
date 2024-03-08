@@ -202,7 +202,7 @@ class aGuildClocks(GlobalClient):
     
     async def update_raidweekend_channel(self):
         now = pendulum.now('UTC')
-        raid_start, raid_end = await aClashSeason.get_raid_weekend_dates(now)
+        raid_start, raid_end = aClashSeason.get_raid_weekend_dates(now)
         
         if not self.raids_channel:
             new_channel = await self.create_clock_channel()
@@ -243,7 +243,7 @@ class aGuildClocks(GlobalClient):
 
     async def update_raidweekend_event(self):
         now = pendulum.now('UTC')
-        raid_start, raid_end = await aClashSeason.get_raid_weekend_dates(now)
+        raid_start, raid_end = aClashSeason.get_raid_weekend_dates(now)
         
         if raid_start.subtract(days=5) < now < raid_start:
             event = await self.create_scheduled_event(

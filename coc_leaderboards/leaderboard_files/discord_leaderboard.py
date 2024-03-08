@@ -203,7 +203,7 @@ class DiscordLeaderboard(GlobalClient):
     
     async def is_season_current(self,season) -> bool: 
         if self._type == 5:
-            last_games = await aClashSeason.last_completed_clangames()
+            last_games = aClashSeason.last_completed_clangames()
             if season.id == last_games.id:
                 return True
         else:

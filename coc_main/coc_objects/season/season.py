@@ -250,7 +250,7 @@ class aClashSeason(MotorClient):
     ### STATIC METHODS
     ##################################################    
     @staticmethod
-    async def get_raid_weekend_dates(datetime:pendulum.datetime=None):
+    def get_raid_weekend_dates(datetime:pendulum.datetime=None):
         if not datetime:
             datetime = pendulum.now('UTC')
         
@@ -269,6 +269,6 @@ class aClashSeason(MotorClient):
         return raid_start, raid_end
     
     @staticmethod
-    async def last_completed_clangames():
+    def last_completed_clangames():
         current_season = aClashSeason.current()
         return current_season if pendulum.now() >= current_season.clangames_start else current_season.previous_season()

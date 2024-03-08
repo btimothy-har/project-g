@@ -96,8 +96,7 @@ class ClashClient(coc.EventsClient):
                 load_game_data=coc.LoadGameData(always=True),
                 throttler=CounterThrottler,
                 throttle_limit=rate_limit
-                )
-            
+                )            
             await client.login(
                 clashapi_login.get("username"),
                 clashapi_login.get("password")                

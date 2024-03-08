@@ -368,7 +368,7 @@ class Clans(commands.Cog,GlobalClient):
         
         await interaction.response.defer()
 
-        get_season = await aClashSeason(season)
+        get_season = aClashSeason(season)
 
         embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
         attachments = [discord_file] if discord_file else []

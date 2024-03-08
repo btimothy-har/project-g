@@ -264,7 +264,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
             player_text = "\n".join([
                 f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {p.legend_statistics.current_season.trophies:<6,}` <@{p.discord_user}>" for p in chunk if p.legend_statistics.current_season.trophies >= 5000])
             if i == 1:
-                season = await aClashSeason(self._tourney_season)
+                season = aClashSeason(self._tourney_season)
                 days_difference = pendulum.now().diff(season.trophy_season_start).in_days() + 1
                 season_length = season.trophy_season_end.diff(season.trophy_season_start).in_days()
 
@@ -331,7 +331,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
             player_text = "\n".join([
                 f"\u200E{p.town_hall.emoji} `{p.clean_name[:15]:<20}` <@{p.discord_user}>\u200F" for p in chunk])
             if i == 1:
-                season = await aClashSeason(self._tourney_season)
+                season = aClashSeason(self._tourney_season)
                 days_difference = pendulum.now().diff(season.trophy_season_start,abs=False).in_days()
 
                 embed = await clash_embed(
@@ -496,7 +496,7 @@ class RegistrationMenu(AddLinkMenu):
     async def _start_add_link(self):
         self.is_active = True
 
-        tourn_season = await aClashSeason(self.tournament_cog._tourney_season)
+        tourn_season = aClashSeason(self.tournament_cog._tourney_season)
 
         if pendulum.now() > tourn_season.trophy_season_end.subtract(days=20):
             embed = await clash_embed(
@@ -601,7 +601,7 @@ class CancelRegistrationMenu(DefaultView):
         menu = cls(interaction,interaction.user)
         chk_registration = await menu.tournament_cog.fetch_participant_for_user(interaction.user.id)
 
-        tourn_season = await aClashSeason(menu.tournament_cog._tourney_season)
+        tourn_season = aClashSeason(menu.tournament_cog._tourney_season)
 
         if chk_registration:
             if pendulum.now() > tourn_season.trophy_season_start:

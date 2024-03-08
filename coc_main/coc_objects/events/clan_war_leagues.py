@@ -50,7 +50,7 @@ class WarLeagueGroup(GlobalClient,AwaitLoader):
         self._is_loaded = True
         if not query:
             return
-        self.season = await aClashSeason(query['season'])
+        self.season = aClashSeason(query['season'])
         self.league = query['league']
         self.number_of_rounds = query['number_of_rounds']
         self.rounds = query['rounds']
@@ -118,7 +118,7 @@ class WarLeagueGroup(GlobalClient,AwaitLoader):
     
     @classmethod
     async def from_api(cls,clan:BasicClan,api_data:coc.ClanWarLeagueGroup):
-        season = await aClashSeason(pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY'))
+        season = aClashSeason(pendulum.from_format(api_data.season, 'YYYY-MM').format('M-YYYY'))
 
         combined = f"{season.id}-{''.join(sorted([clan.tag for clan in api_data.clans]))}"
         group_id = hashlib.sha256(combined.encode()).hexdigest()
