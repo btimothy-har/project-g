@@ -71,6 +71,8 @@ class ClashOfClansMain(commands.Cog):
             }
         self.config.register_global(**default_global)
 
+        self._task_queue = None
+
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
@@ -230,6 +232,24 @@ class ClashOfClansMain(commands.Cog):
             await self.bot.send_to_owners(f"An error occured during Season Refresh. Check logs for details."
                 + f"```{exc}```")
             COC_LOG.exception(f"Error in Season Refresh")
+    
+    async def _task_queue_loop(self):
+        sleep = 0.1
+        try:
+            while True:
+                try:
+                    await asyncio.sleep(sleep)
+
+                    task = await GlobalClient.task_queue.get()
+                    if task:
+                        await task
+                except asyncio.CancelledError:
+                    return
+                except Exception:
+                    COC_LOG.exception("Error in Task Queue Loop")
+
+        except asyncio.CancelledError:
+            return
     
     ############################################################
     #####
