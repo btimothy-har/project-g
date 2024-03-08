@@ -165,6 +165,9 @@ class aPlayerActivity(MotorClient):
         self._read_by_bank = database.get('read_by_bank',False)
         self._legacy_conversion = database.get('legacy_conversion',False)
     
+    def __str__(self) -> str:
+        return f"{self.name} - {self.activity} - {self.new_value} ({self.change})"
+    
     async def mark_as_read(self) -> None:
         await self.database.db__player_activity.update_one(
             {'_id':bson.ObjectId(self._id)},

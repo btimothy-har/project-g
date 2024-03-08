@@ -51,8 +51,6 @@ class aPlayerStat():
         if len(activities) == 0:
             return 0
         
-        LOG.info(f"Computing {self.description} for {self.tag} in {self.season.id} {activities}.")
-        
         self.season_total = sum([activity.change for activity in activities])
         self.last_capture = activities[-1].new_value
 
@@ -233,6 +231,8 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         self._activity_count = len(season_entries)        
         if self._activity_count <= 0:
             return
+        
+        LOG.info(f"Computing {self.tag} {season_entries}.")
             
         self.name = season_entries[-1].name
         self.town_hall = season_entries[-1].town_hall.level
