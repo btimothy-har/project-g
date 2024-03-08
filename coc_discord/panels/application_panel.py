@@ -269,7 +269,7 @@ class ClanApplyMenu(GlobalClient,discord.ui.View):
         await interaction.followup.edit_message(interaction.message.id,view=self)
 
         member = await aMember(interaction.user.id,interaction.guild.id)
-        add_link_view = AddLinkMenu(interaction,member)
+        add_link_view = AddLinkMenu(interaction,member.discord_member)
         await add_link_view._start_add_link()
 
 ##################################################
