@@ -188,13 +188,15 @@ class aPlayerActivity(MotorClient):
     
     @property
     def is_online_activity(self) -> bool:
+        change_only_events = [
+            'attack_wins',
+            'donations_sent',
+            ]
         online_events = [        
             'change_name',
             'change_war_option',
-            'change_label',
-            'attack_wins',
-            'war_stars',
-            'donations_sent',
+            'change_label',            
+            'war_stars',            
             'loot_gold',
             'loot_elixir',
             'loot_darkelixir',
@@ -202,5 +204,5 @@ class aPlayerActivity(MotorClient):
             'loot_capital_gold',
             'clan_games'
             ]        
-        return self.activity in online_events
+        return self.activity in online_events or (self.activity in change_only_events and self.change > 0)
 
