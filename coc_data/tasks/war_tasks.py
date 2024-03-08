@@ -282,7 +282,7 @@ class ClanWarLoop(TaskLoop):
                 self._running = False
                 try:
                     runtime = et - st
-                    self.run_time.append(runtime)
+                    self.run_time.append(runtime.in_seconds())
                 except:
                     pass
 
