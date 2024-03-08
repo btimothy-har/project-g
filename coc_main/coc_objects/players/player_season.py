@@ -1,4 +1,5 @@
 import pendulum
+import logging
 
 from typing import *
 from numerize import numerize
@@ -13,6 +14,8 @@ from ..clans.clan import BasicClan
 
 from ...client.db_client import MotorClient
 from ...utils.utils import check_rtl
+
+LOG = logging.getLogger("coc.main")
 
 ##################################################
 #####
@@ -44,9 +47,12 @@ class aPlayerStat():
         else:
             return f"{self.season_total:,}"
     
-    def compute_stat(self,activities:List[aPlayerActivity]) -> int:
+    def compute_stat(self,activities:List[aPlayerActivity]):
         if len(activities) == 0:
             return 0
+        
+        LOG.info(f"Computing {self.description} for {self.tag} in {self.season.id} {activities}.")
+        
         self.season_total = sum([activity.change for activity in activities])
         self.last_capture = activities[-1].new_value
 
