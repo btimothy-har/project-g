@@ -492,7 +492,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     
     @command_group_clash_data.command(name="cycle")
     @commands.is_owner()
-    async def subcommand_clash_data_stream(self,ctx:commands.Context,cycle:int):
+    async def subcommand_clash_data_setcycle(self,ctx:commands.Context,cycle:int):
         """Set the current cycle ID."""
 
         chk_state = await self.database.db_data_controller.find_one({"_id":cycle})
