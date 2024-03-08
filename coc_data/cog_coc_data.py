@@ -286,7 +286,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     ]
                 }
             db_query = self.database.db__player.find(query,{'_id':1})
-            #self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
+            self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
     
     @tasks.loop(seconds=10)
     async def update_clan_loop(self):        
@@ -302,7 +302,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     ]
                 }
             db_query = self.database.db__clan.find(query,{'_id':1})
-            #self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
+            self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
     
     async def _player_discovery_loop(self):
         sleep = 0.1

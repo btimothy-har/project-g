@@ -108,6 +108,16 @@ class ClanRaidLoop(TaskLoop):
             pass
         await super().stop()
     
+    async def refresh_tags(self):
+        tags = []
+        tags.extend([clan.tag for clan in await self.coc_client.get_registered_clans()])
+        tags.extend([clan.tag for clan in await self.coc_client.get_alliance_clans()])
+        tags.extend([clan.tag for clan in await self.coc_client.get_war_league_clans()])
+
+        self.add_to_loop(*tags)
+        self._last_refresh = pendulum.now()
+
+    
     ##################################################
     ### PRIMARY TASK LOOP
     ##################################################
@@ -117,6 +127,9 @@ class ClanRaidLoop(TaskLoop):
                 if self.api_maintenance:
                     await asyncio.sleep(10)
                     continue
+
+                if pendulum.now().diff(self._last_refresh).in_minutes() > 10:
+                    await self.refresh_tags()
 
                 c_tags = list(self._tags)
                 if len(c_tags) <= 0:
