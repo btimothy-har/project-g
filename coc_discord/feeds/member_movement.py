@@ -6,6 +6,7 @@ import logging
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
 
+from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.clans.clan import aClan
 
@@ -45,7 +46,7 @@ class ClanMemberFeed(ClanDataFeed):
     @classmethod
     async def join_embed(cls,clan:aClan,player:aPlayer):
         embed = await clash_embed(
-            context=cls.bot,
+            context=GlobalClient.bot,
             title=f"**{player.name}** ({player.tag})",
             message=(f"{player.discord_user_str}\n" if player.discord_user else "")
                 + (f"{player.member_description}\n" if player.is_member else "")
@@ -58,7 +59,7 @@ class ClanMemberFeed(ClanDataFeed):
             timestamp=pendulum.now())
         embed.set_footer(
             text=f"Joined {clan.name} [{clan.member_count}/50]",
-            icon_url=cls.bot.user.display_avatar.url
+            icon_url=GlobalClient.bot.user.display_avatar.url
             )
         return embed
     
@@ -81,7 +82,7 @@ class ClanMemberFeed(ClanDataFeed):
     @classmethod
     async def leave_embed(cls,clan:aClan,player:aPlayer):
         embed = await clash_embed(
-            context=cls.bot,
+            context=GlobalClient.bot,
             title=f"**{player.name}** ({player.tag})",
             message=(f"{player.discord_user_str}\n" if player.discord_user else "")
                 + (f"{player.member_description}\n" if player.is_member else "")
@@ -93,7 +94,7 @@ class ClanMemberFeed(ClanDataFeed):
             timestamp=pendulum.now())
         embed.set_footer(
             text=f"Left {clan.name} [{clan.member_count}/50] " + (f"and joined {player.clan.name}" if player.clan and getattr(player.clan,'tag',None) != clan.tag else ""),
-            icon_url=cls.bot.user.display_avatar.url
+            icon_url=GlobalClient.bot.user.display_avatar.url
             )
         return embed
 
