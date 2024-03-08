@@ -107,7 +107,7 @@ class Bank(commands.Cog,GlobalClient):
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
             "use_rewards":False,
-            "guild":1132581106571550831 if bot.user.id == 1031240380487831664 else 0,
+            "bank_guild":1132581106571550831 if bot.user.id == 1031240380487831664 else 0,
             "admin_role":1189481989984751756 if bot.user.id == 1031240380487831664 else 0,
             "log_channel":0,
             "bank_pass_role":0,
@@ -157,7 +157,7 @@ class Bank(commands.Cog,GlobalClient):
         except:
             pass
         try:
-            self._bank_guild = await self.config.guild()
+            self._bank_guild = await self.config.bank_guild()
         except:
             pass
         try:
@@ -1060,7 +1060,7 @@ class Bank(commands.Cog,GlobalClient):
         if not guild:
             return await ctx.reply("Guild not found.")
         self._bank_guild = guild.id
-        await self.config.guild.set(self._bank_guild)
+        await self.config.bank_guild.set(self._bank_guild)
         await ctx.reply(f"Bank Guild has been set to {guild.name}.")
     
     ############################################################
