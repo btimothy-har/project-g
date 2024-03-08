@@ -259,9 +259,11 @@ class ClanWarLeagues(commands.Cog,GlobalClient):
         if war._league_group == '':
             return
         
-        league_group = await WarLeagueGroup(war._league_group)
+        league_group = WarLeagueGroup(war._league_group)
         if not league_group:
             return
+        
+        await league_group.load()
         
         calculated_elo = {}
         

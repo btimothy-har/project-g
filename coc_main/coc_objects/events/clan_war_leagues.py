@@ -270,7 +270,8 @@ class WarLeagueClan(BasicClan):
     ##################################################
     async def get_league_group(self) -> Optional[WarLeagueGroup]:
         if self.league_group_id:
-            self.league_group = await WarLeagueGroup(self.league_group_id)
+            self.league_group = WarLeagueGroup(self.league_group_id)
+            await self.league_group.load()
             return self.league_group
         return None
     

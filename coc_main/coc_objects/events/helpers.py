@@ -17,7 +17,8 @@ async def clan_war_embed(
     clan_war:aClanWar):
         
     if clan_war.league_group_id:
-        league_group = await WarLeagueGroup(group_id=clan_war.league_group_id)
+        league_group = WarLeagueGroup(group_id=clan_war.league_group_id)
+        await league_group.load()
     
     embed = await clash_embed(
         context=context,
