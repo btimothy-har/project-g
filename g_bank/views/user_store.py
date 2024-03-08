@@ -6,14 +6,11 @@ from typing import *
 from functools import cached_property
 
 from redbot.core import commands, bank
-from coc_main.api_client import BotClashClient
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from ..objects.item import ShopItem
 from ..objects.inventory import UserInventory, InventoryItem
-
-bot_client = BotClashClient()
 
 class UserStore(DefaultView):
     def __init__(self,

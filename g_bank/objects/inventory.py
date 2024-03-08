@@ -2,21 +2,23 @@ import asyncio
 import bson
 import discord
 import pendulum
+import logging
 
 from typing import *
 from async_property import AwaitLoader
 from collections import defaultdict
 
+from redbot.core.bot import Red
 from redbot.core import bank, commands
 from redbot.core.utils import AsyncIter, bounded_gather
 
-from coc_main.api_client import BotClashClient
+from coc_main.client.global_client import GlobalClient
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from .item import ShopItem
 
-bot_client = BotClashClient()
+LOG = logging.getLogger('coc.main')
 
 # db__user_inventory = {
 #   '_id': user_id,    
@@ -30,11 +32,11 @@ bot_client = BotClashClient()
 #  'item': {}
 #   }
 
-class InventoryItem(ShopItem):
+class InventoryItem(ShopItem,GlobalClient):
 
     @classmethod
     async def get_by_id(cls,item_id:str) -> Optional['InventoryItem']:
-        query = await bot_client.coc_db.db__user_item.find_one({'_id':bson.ObjectId(item_id)})
+        query = await GlobalClient.database.db__user_item.find_one({'_id':bson.ObjectId(item_id)})
         if query:
             return cls(query)
         return None
@@ -47,7 +49,7 @@ class InventoryItem(ShopItem):
             'in_inventory':False
             }
         
-        db_query = bot_client.coc_db.db__user_item.find(filter_document).sort('timestamp',-1).limit(1)
+        db_query = GlobalClient.database.db__user_item.find(filter_document).sort('timestamp',-1).limit(1)
         query = await db_query.to_list(length=None)
         if len(query) > 0:
             return cls(query[0])
@@ -66,7 +68,7 @@ class InventoryItem(ShopItem):
                 'in_inventory':True,
                 'item.guild_id':user.guild.id
                 }
-        query = bot_client.coc_db.db__user_item.find(filter_criteria)
+        query = GlobalClient.database.db__user_item.find(filter_criteria)
         items = [cls(item) async for item in query]
         return items
 
@@ -76,7 +78,7 @@ class InventoryItem(ShopItem):
             'in_inventory':True,
             'item.subscription_duration':{'$gt':0},
             }
-        query = bot_client.coc_db.db__user_item.find(filter_criteria)
+        query = GlobalClient.database.db__user_item.find(filter_criteria)
         items = [cls(item) async for item in query]
         return items
     
@@ -91,6 +93,10 @@ class InventoryItem(ShopItem):
 
         super().__init__(item_dict['item'])
 
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+    
     def to_json(self) -> dict:
         return {
             '_id': str(self._inv_id),
@@ -104,7 +110,7 @@ class InventoryItem(ShopItem):
         if not self.subscription:
             return None
     
-        if bot_client.bot.user.id == 828838353977868368:
+        if self.bot.user.id == 828838353977868368:
             expiry_time = self.timestamp.add(minutes=self.subscription_duration)
         else:
             expiry_time = self.timestamp.add(days=self.subscription_duration)
@@ -118,7 +124,7 @@ class InventoryItem(ShopItem):
             return True
     
     async def _update_timestamp(self,timestamp:pendulum.DateTime):
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'timestamp':timestamp.int_timestamp}}
             )
@@ -126,7 +132,7 @@ class InventoryItem(ShopItem):
     
     async def reinstate(self):
         self.in_inventory = True
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'in_inventory':True}}
             )
@@ -141,22 +147,22 @@ class InventoryItem(ShopItem):
                 except:
                     pass
         user = self.guild.get_member(self.user)
-        bot_client.coc_main_log.info(f"{self.id} {self.name} reinstated to {self.user} {getattr(user,'name','Invalid User')}.")
+        LOG.info(f"{self.id} {self.name} reinstated to {self.user} {getattr(user,'name','Invalid User')}.")
     
     async def extend(self,days:int):
         if self.subscription_duration == 0:
             return
 
         self.subscription_duration += days
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'item.subscription_duration':self.subscription_duration}}
             )
-        bot_client.coc_main_log.info(f"{self.id} {self.name} extended by {days} days for {self.user} {getattr(bot_client.bot.get_user(self.user),'name','Invalid User')}.")
+        LOG.info(f"{self.id} {self.name} extended by {days} days for {self.user} {getattr(self.bot.get_user(self.user),'name','Invalid User')}.")
 
     async def remove_from_inventory(self):
         self.in_inventory = False
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'in_inventory':False}}
             )
@@ -171,11 +177,11 @@ class InventoryItem(ShopItem):
                 except:
                     pass
         user = self.guild.get_member(self.user)
-        bot_client.coc_main_log.info(f"{self.id} {self.name} removed from {self.user} {getattr(user,'name','Invalid User')}.")
+        LOG.info(f"{self.id} {self.name} removed from {self.user} {getattr(user,'name','Invalid User')}.")
     
     async def lock_item(self):
         self._is_locked = True
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'is_locked':True}}
             )
@@ -194,7 +200,7 @@ class InventoryItem(ShopItem):
 
         self.user = user.id
         self._is_locked = True
-        await bot_client.coc_db.db__user_item.update_one(
+        await self.database.db__user_item.update_one(
             {'_id':self._inv_id},
             {'$set':{'user': user.id, 'is_locked': True}}
             )
@@ -211,11 +217,11 @@ class InventoryItem(ShopItem):
                     pass
         
         await self.extend(7)        
-        bot_client.coc_main_log.info(f"{self.id} {self.name} gifted to {self.user} {getattr(user,'name','Invalid User')}.")
+        LOG.info(f"{self.id} {self.name} gifted to {self.user} {getattr(user,'name','Invalid User')}.")
 
     @classmethod
     async def add_for_user(cls,user:Union[int,discord.Member],item:ShopItem,is_migration:bool=False) -> 'InventoryItem':
-        new_item = await bot_client.coc_db.db__user_item.insert_one(
+        new_item = await GlobalClient.database.db__user_item.insert_one(
             {
                 'user':getattr(user,'id',user),
                 'timestamp':pendulum.now().int_timestamp,
@@ -224,10 +230,10 @@ class InventoryItem(ShopItem):
                 'legacy_migration':is_migration
                 }
             )        
-        bot_client.coc_main_log.info(f"{item.id} {item.name} added to {getattr(user,'id',user)} {getattr(user,'name','')}.")
+        LOG.info(f"{item.id} {item.name} added to {getattr(user,'id',user)} {getattr(user,'name','')}.")
         return await cls.get_by_id(str(new_item.inserted_id))
     
-class UserInventory(AwaitLoader):
+class UserInventory(AwaitLoader,GlobalClient):
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         'user',
@@ -331,7 +337,7 @@ class UserInventory(AwaitLoader):
                     if item.type in ['basic']:
                         inventory_text += f"\nPurchased from: {item.guild.name}"
                     if item.type in ['cash']:
-                        inventory_text += f"\nRedeem this by talking to <@{bot_client.bot.user.id}>."
+                        inventory_text += f"\nRedeem this by talking to <@{self.bot.user.id}>."
                 if item.type in ['role']:
                     inventory_text += f"\nGrants: {getattr(item.assigns_role,'mention','Unknown')}"
                 if item.subscription and item.expiration:

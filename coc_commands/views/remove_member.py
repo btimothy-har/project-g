@@ -1,21 +1,15 @@
 import discord
-import asyncio
 
 from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
-from coc_main.api_client import BotClashClient, InvalidTag, InvalidUser
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
-
+from coc_main.coc_objects.players.player import aPlayer
 from coc_main.discord.member import aMember
 
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, MenuConfirmation, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-
-bot_client = BotClashClient()
 
 class RemoveMemberMenu(DefaultView):
     def __init__(self,
@@ -40,10 +34,6 @@ class RemoveMemberMenu(DefaultView):
             self.member = aMember(member)
         if account:
             self.remove_accounts.append(account)
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -96,7 +86,7 @@ class RemoveMemberMenu(DefaultView):
     ### IF DISCORD USER PROVIDED, USE SELECT MENU
     ##################################################
     async def _remove_accounts_by_select(self):
-        member_accounts = [p async for p in bot_client.coc.get_players(self.member.member_tags)]
+        member_accounts = [p async for p in self.coc_client.get_players(self.member.member_tags)]
         
         if len(member_accounts) == 0:
             embed = await clash_embed(
@@ -150,7 +140,7 @@ class RemoveMemberMenu(DefaultView):
             )
         await interaction.edit_original_response(embed=embed,view=self)
 
-        self.remove_accounts.extend([p async for p in bot_client.coc.get_players(menu.values)])  
+        self.remove_accounts.extend([p async for p in self.coc_client.get_players(menu.values)])  
         await self._remove_accounts_process()
     
     ####################################################################################################
@@ -215,13 +205,16 @@ class RemoveMemberMenu(DefaultView):
     
         u_iter = AsyncIter(discord_users)
         async for user_id in u_iter:
-            try:
-                roles_added_output = f""
-                roles_removed_output = f""
+            
+            roles_added_output = f""
+            roles_removed_output = f""
 
+            try:
                 member = await aMember(user_id,self.guild.id)
                 roles_added, roles_removed = await member.sync_clan_roles(self.ctx,force=True)
-
+            except:
+                report_output += f"\nCould not change {member.mention}'s Roles.\n"
+            else:
                 for role in roles_added:
                     roles_added_output += f"{role.mention}, "
                 for role in roles_removed:
@@ -230,16 +223,13 @@ class RemoveMemberMenu(DefaultView):
                 report_output += f"\nRoles Added for {member.mention}: {roles_added_output}"
                 report_output += f"\nRoles Removed for {member.mention}: {roles_removed_output}"
 
+            try:
                 new_nickname = await member.get_nickname()
-
-                try:
-                    await member.discord_member.edit(nick=new_nickname)
-                except discord.Forbidden:
-                    report_output += f"\nCould not change {member.mention}'s Nickname.\n"
-                else:
-                    report_output += f"\nChanged {member.mention}'s Nickname to {new_nickname}.\n"
-            except InvalidUser:
-                continue
+                await member.discord_member.edit(nick=new_nickname)
+            except:
+                report_output += f"\nCould not change {member.mention}'s Nickname.\n"
+            else:
+                report_output += f"\nChanged {member.mention}'s Nickname to {new_nickname}.\n"
         
         embed = await clash_embed(
             context=self.ctx,

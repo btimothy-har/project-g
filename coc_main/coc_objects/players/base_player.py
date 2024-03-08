@@ -2,32 +2,27 @@ import coc
 import pendulum
 import asyncio
 import random
+import logging
+import motor.motor_asyncio
 
 from typing import *
 
 from pymongo import ReturnDocument
 from collections import defaultdict
 from async_property import AwaitLoader
+from redbot.core.bot import Red
 
 from ..clans.clan import BasicClan, aClan, _PlayerClan
 
-from ...api_client import BotClashClient as client
-from ...exceptions import CacheNotReady
+from ...client.db_client import MotorClient
 
 from ...utils.constants.coc_emojis import EmojisTownHall
 from ...utils.constants.ui_emojis import EmojisUI
 from ...utils.utils import check_rtl
 
-bot_client = client()
+DATA_LOG = logging.getLogger("coc.main")
 
 class BasicPlayer(AwaitLoader):
-
-    @classmethod
-    async def load_all(cls) -> List['BasicPlayer']:
-        query = bot_client.coc_db.db__player.find({},{'_id':1}).limit(50000)
-        async for p in query:
-            await bot_client.player_queue.put(p['_id'])
-            await asyncio.sleep(0.1)
     
     @classmethod
     def clear_cache(cls):
@@ -45,15 +40,19 @@ class BasicPlayer(AwaitLoader):
         self.home_clan = None
 
     def __str__(self):
-        return f"Player {self.tag}"
-    
+        return f"Player {self.tag}"    
     def __hash__(self):
         return hash(self.tag)
+    @property
+    def database(self) -> motor.motor_asyncio.AsyncIOMotorDatabase:
+        return self._attributes.database
+    @property
+    def bot(self) -> Red:
+        return self._attributes.bot
     
     async def load(self):
         await self._attributes.load()
         self.home_clan = await BasicClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
-        await bot_client.clan_queue.put(self.tag)
     
     ##################################################
     #####
@@ -176,13 +175,13 @@ class BasicPlayer(AwaitLoader):
 
         async with player._attributes._lock:
             player._attributes.first_seen = pendulum.now()
-
-            await bot_client.coc_db.db__player.update_one(
+            
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':player.tag},
                 {'$set':{'first_seen':getattr(player.first_seen,'int_timestamp',pendulum.now().int_timestamp)}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{player}: first_seen changed to {player.first_seen}. Is new: {player.is_new}")
+            DATA_LOG.debug(f"{player}: first_seen changed to {player.first_seen}. Is new: {player.is_new}")
     
     @classmethod
     async def set_discord_link(cls,tag:str,discord_user:int):
@@ -190,15 +189,16 @@ class BasicPlayer(AwaitLoader):
         async with player._attributes._lock:
             player._attributes.discord_user = discord_user
 
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':player.tag},
                 {'$set':{'discord_user':player.discord_user}},
                 upsert=True
                 )
-            bot_client.coc_data_log.info(f"{player}: discord_user changed to {player.discord_user}.")            
+            DATA_LOG.info(f"{player}: discord_user changed to {player.discord_user}.")            
 
     async def new_member(self,user_id:int,home_clan:BasicClan):
         await BasicPlayer.set_discord_link(self.tag,user_id)
+
         async with self._attributes._lock:
             if not self.is_member or not self.last_joined:
                 self._attributes.last_joined = pendulum.now()         
@@ -208,7 +208,7 @@ class BasicPlayer(AwaitLoader):
             self.home_clan = await BasicClan(tag=home_clan.tag)                
             await self.home_clan.new_member(self.tag)
 
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
                     'is_member':self.is_member,
@@ -218,7 +218,7 @@ class BasicPlayer(AwaitLoader):
                 },
                 upsert=True)
             
-            bot_client.coc_data_log.info(
+            DATA_LOG.info(
                 f"Player {self} is now an Alliance member!"
                     + f"\n\tHome Clan: {self.home_clan.tag} {self.home_clan.name}"
                     + f"\n\tLast Joined: {self.last_joined}"
@@ -237,7 +237,7 @@ class BasicPlayer(AwaitLoader):
 
             self.home_clan = None
 
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{
                     'is_member':False,
@@ -249,32 +249,32 @@ class BasicPlayer(AwaitLoader):
                 },
                 upsert=True
                 )
-            bot_client.coc_data_log.info(
+            DATA_LOG.info(
                 f"Player {self} has been removed as a member."
                 + f"\n\tLast Removed: {self._attributes.last_removed}"
                 )
     
     async def reset_war_elo(self):
         async with self._attributes._lock:
-            player = await bot_client.coc_db.db__player.find_one_and_update(
+            player = await _PlayerAttributes.database.db__player.find_one_and_update(
                 {'_id':self.tag},
                 {'$set':{'war_elo':0}},
                 return_document=ReturnDocument.AFTER,
                 upsert=True
                 )
             self._attributes.war_elo = player['war_elo']
-            bot_client.coc_data_log.debug(f"{self}: war_elo reset to 0. New: {self.war_elo}.")
+            DATA_LOG.debug(f"{self}: war_elo reset to 0. New: {self.war_elo}.")
     
     async def adjust_war_elo(self,amount:float):
         async with self._attributes._lock:
-            player = await bot_client.coc_db.db__player.find_one_and_update(
+            player = await _PlayerAttributes.database.db__player.find_one_and_update(
                 {'_id':self.tag},
                 {'$inc':{'war_elo':amount}},
                 return_document=ReturnDocument.AFTER,
                 upsert=True
                 )
             self._attributes.war_elo = player['war_elo']
-            bot_client.coc_data_log.debug(f"{self}: war_elo adjusted by {amount}. New: {self.war_elo}.")
+            DATA_LOG.debug(f"{self}: war_elo adjusted by {amount}. New: {self.war_elo}.")
 
     ##################################################
     #####
@@ -284,34 +284,48 @@ class BasicPlayer(AwaitLoader):
     async def set_name(self,new_name:str):
         async with self._attributes._lock:
             self._attributes.name = new_name
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{'name':self.name}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: name changed to {self.name}.")
+            DATA_LOG.debug(f"{self}: name changed to {self.name}.")
     
     async def set_exp_level(self,new_value:int):        
         async with self._attributes._lock:
             self._attributes.exp_level = new_value
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{'xp_level':self.exp_level}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: exp_level changed to {self.exp_level}.")
+            DATA_LOG.debug(f"{self}: exp_level changed to {self.exp_level}.")
         
     async def set_town_hall_level(self,new_value:int):        
         async with self._attributes._lock:
             self._attributes.town_hall_level = new_value
-            await bot_client.coc_db.db__player.update_one(
+            await _PlayerAttributes.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{'townhall':self.town_hall_level}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: town_hall_level changed to {self.town_hall_level}.")
+            DATA_LOG.debug(f"{self}: town_hall_level changed to {self.town_hall_level}.")
 
-class _PlayerAttributes():
+# db__player = {
+#   '_id': string, #player tag
+#   'discord_user': string,
+#   'is_member': bool,
+#   'home_clan': string,
+#   'war_elo': int,
+#   'first_seen': int,
+#   'last_joined': int,
+#   'last_removed': int,
+#   'name': string,
+#   'xp_level': int,
+#   'townhall': int
+#   }
+
+class _PlayerAttributes(MotorClient):
     """
     This class enforces a singleton pattern that caches database responses.
 
@@ -368,7 +382,6 @@ class _PlayerAttributes():
     @property
     def _lock(self) -> asyncio.Lock:
         return self._locks[self.tag]
-    
     @property
     def _sync_lock(self) -> asyncio.Lock:
         return self._sync_locks[self.tag]
@@ -378,7 +391,8 @@ class _PlayerAttributes():
             await self.load_data()
     
     async def load_data(self):
-        database = await bot_client.coc_db.db__player.find_one({'_id':self.tag})
+        database = await self.database.db__player.find_one({'_id':self.tag})
+
         self.name = database.get('name','') if database else ""
         self.exp_level = database.get('xp_level','') if database else 0
         self.town_hall_level = database.get('townhall','') if database else 0
@@ -408,16 +422,16 @@ class _PlayerAttributes():
             if not clan.is_alliance_clan:
                 player = BasicPlayer(tag=self.tag)
                 await player.remove_member()
-                bot_client.coc_data_log.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
+                DATA_LOG.info(f"{self}: Removing as Member as their previous Home Clan is no longer recognized as an Alliance clan.")
                 return False
         return database_entry
     
     async def update_last_sync(self,timestamp:pendulum.DateTime):
         async with self._attributes._lock:
             self._attributes._last_sync = timestamp
-            await bot_client.coc_db.db__player.update_one(
+            await self.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{'last_sync':timestamp.int_timestamp}},
                 upsert=True
                 )
-            bot_client.coc_data_log.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")
+            DATA_LOG.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")

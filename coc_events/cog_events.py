@@ -8,7 +8,8 @@ from redbot.core import Config, commands, app_commands, bank
 from redbot.core.utils import AsyncIter
 from redbot.core.bot import Red
 
-from coc_main.api_client import BotClashClient as client
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
+from coc_main.client.global_client import GlobalClient
 from coc_main.utils.components import clash_embed, MenuConfirmation
 
 from .checks import is_events_admin
@@ -18,17 +19,14 @@ from .components.export import generate_event_export
 
 from .exceptions import EventClosed, AlreadyRegistered, NotEligible
 
-bot_client = client()
 
-class Events(commands.Cog):
+class Events(commands.Cog,GlobalClient):
     """Events Management module for Guild Events."""
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
 
-    def __init__(self,bot:Red):
-        self.bot: Red = bot
-
+    def __init__(self):
         self.ticket_prefix = "--"
         self._ticket_listener = 0        
         self._events_guild = 0
@@ -49,6 +47,19 @@ class Events(commands.Cog):
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
     
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,ctx)
+
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,interaction)
+    
+    ############################################################
+    #####
+    ##### COG LOAD/UNLOAD
+    #####
+    ############################################################
     async def cog_load(self):
         self.ticket_prefix = await self.config.ticket_prefix()
         self._ticket_listener = await self.config.ticket_listener()
@@ -58,7 +69,16 @@ class Events(commands.Cog):
 
     async def cog_unload(self):
         return
-            
+    
+    ############################################################
+    #####
+    ##### COG PROPERTIES
+    #####
+    ############################################################
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+                
     @property
     def events_guild(self) -> Optional[discord.Guild]:
         return self.bot.get_guild(self._events_guild)    
@@ -75,7 +95,12 @@ class Events(commands.Cog):
         if self.events_guild:
             return self.events_guild.get_role(self._admin_role)
         return None
-    
+
+    ############################################################
+    #####
+    ##### LISTENERS
+    #####
+    ############################################################    
     @commands.Cog.listener("on_guild_channel_create")
     async def event_channel_ticket_create_listener(self,channel:discord.TextChannel):
         event_id = None
@@ -105,25 +130,6 @@ class Events(commands.Cog):
             if role:
                 await role.delete(reason="Event Channel Deleted.")
     
-    ############################################################
-    #####
-    ##### ASSISTANT FUNCTIONS
-    #####
-    ############################################################
-    @commands.Cog.listener()
-    async def on_assistant_cog_add(self,cog:commands.Cog):
-        return
-        # schema = [
-        #     {
-        #         "name": "_assistant_clan_application",
-        #         "description": "Starts the process for a user to apply to or join a Clan in the Alliance. When completed, returns the ticket channel that the application was created in.",
-        #         "parameters": {
-        #             "type": "object",
-        #             "properties": {},
-        #             },
-        #         }
-        #     ]
-        # await cog.register_functions(cog_name="DiscordPanels", schemas=schema)
     
     ############################################################
     #####
@@ -133,7 +139,7 @@ class Events(commands.Cog):
     @commands.group(name="eventset")
     @commands.is_owner()
     @commands.guild_only()
-    async def command_group_events_set(self,ctx:commands.Context):
+    async def cmdgroup_eventset(self,ctx:commands.Context):
         """
         Command group for setting up the Events Module.
         """
@@ -143,10 +149,10 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTSET / GUILD
     ##################################################    
-    @command_group_events_set.command(name="guild")
+    @cmdgroup_eventset.command(name="guild")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_events_set_guild(self,ctx:commands.Context,guild_id:int):
+    async def subcmd_eventset_guild(self,ctx:commands.Context,guild_id:int):
         """
         Set the Master Guild for the Events Module.
         """
@@ -162,10 +168,10 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTSET / ROLE
     ##################################################    
-    @command_group_events_set.command(name="role")
+    @cmdgroup_eventset.command(name="role")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_events_set_role(self,ctx:commands.Context,role_id:int):
+    async def subcmd_eventset_role(self,ctx:commands.Context,role_id:int):
         """
         Set the Master Role for the Events Module.
 
@@ -186,10 +192,10 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTSET / ROLE
     ##################################################    
-    @command_group_events_set.command(name="admin")
+    @cmdgroup_eventset.command(name="admin")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_events_set_admin(self,ctx:commands.Context,role_id:int):
+    async def subcmd_eventset_admin(self,ctx:commands.Context,role_id:int):
         """
         Set the Admin Role for the Events Module.
         """
@@ -208,10 +214,10 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTSET / LISTENER
     ##################################################    
-    @command_group_events_set.command(name="listener")
+    @cmdgroup_eventset.command(name="listener")
     @commands.is_owner()
     @commands.guild_only()
-    async def subcommand_events_set_listener(self,ctx:commands.Context,channel_id:int):
+    async def subcmd_eventset_listener(self,ctx:commands.Context,channel_id:int):
         """
         Set the Admin Role for the Events Module.
         """
@@ -234,48 +240,301 @@ class Events(commands.Cog):
     ############################################################
     @commands.group(name="event")
     @commands.guild_only()
-    async def command_group_event(self,ctx:commands.Context):
+    async def cmdgroup_event(self,ctx:commands.Context):
         """
         Commands for all Guild Events.
         """
         if not ctx.invoked_subcommand:
             pass        
 
-    appcommand_group_event = app_commands.Group(
+    appgroup_event = app_commands.Group(
         name="event",
         description="Commands for all Guild Events.",
         guild_only=True
         )
+    
+    ##################################################
+    ### EVENT / REGISTER
+    ##################################################    
+    @cmdgroup_event.command(name="register")
+    @commands.guild_only()
+    async def subcmd_event_register(self,ctx:commands.Context):
+        """
+        Register for an Event.
+        """
+        return await ctx.reply(f"Please use the Slash Command `/event register` for this.")
+    
+    @appgroup_event.command(name="register",
+        description="Register for an Event.")
+    @app_commands.guild_only()
+    @app_commands.describe(
+        event="The Event to register for.",
+        account="The account to register with for the Event.",
+        discord_user="For Events Admin use only. The Discord User to register for.")
+    @app_commands.autocomplete(
+        event=autocomplete_active_events,
+        account=autocomplete_user_players)
+    async def appcmd_event_register(self,
+        interaction:discord.Interaction,
+        event:str,
+        account:str,
+        discord_user:discord.Member=None):
+
+        await interaction.response.defer()
+
+        get_event = await Event.get_event(event)
+        if not get_event:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Event not found.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        if is_events_admin(interaction) and discord_user:
+            user = discord_user
+        else:
+            user = interaction.user
+        
+        account = await self.coc_client.get_player(account)
+        if account.discord_user != user.id and not is_events_admin(interaction):
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Invalid account. You can only register with your own linked accounts.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+
+        try:
+            participant = await get_event.register_participant(account.tag,user.id)
+        except EventClosed:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"The Event you are registering for is not open for registration.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        except NotEligible:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"This is a Members-only Event. You are not eligible to register.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        except AlreadyRegistered:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"You have already reached the maximum registrations allowed for this event.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+
+        if interaction.user.id == user.id:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"You have registered for **{get_event.name}** with the account **{participant.title}**.",
+                success=True
+                )
+            return await interaction.followup.send(embed=embed)
+        else:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"{user.display_name} has been registered for **{get_event.name}** with the account **{participant.title}**.",
+                success=True
+                )
+            return await interaction.followup.send(embed=embed)
+    
+    ##################################################
+    ### EVENT / WITHDRAW
+    ##################################################    
+    @cmdgroup_event.command(name="withdraw")
+    @commands.guild_only()
+    async def subcmd_event_withdraw(self,ctx:commands.Context):
+        """
+        Withdraw from an Event.
+        """
+        return await ctx.reply(f"Please use the Slash Command `/event withdraw` for this.")
+    
+    @appgroup_event.command(name="withdraw",
+        description="Withdraw from an Event.")
+    @app_commands.guild_only()
+    @app_commands.describe(
+        event="The Event to withdraw from.",
+        account="The account to withdraw from the Event.")
+    @app_commands.autocomplete(
+        event=autocomplete_active_events,
+        account=autocomplete_user_players)
+    async def appcmd_event_withdraw(self,
+        interaction:discord.Interaction,
+        event:str,
+        account:str):
+
+        await interaction.response.defer()
+
+        get_event = await Event.get_event(event)
+        if not get_event:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Event not found.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        participant = await get_event.get_participant(account)
+        if not participant:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"This account is not registered for the Event.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        if participant.participant_id != interaction.user.id and not is_events_admin(interaction):
+            embed = await clash_embed(
+                context=interaction,
+                message=f"You can only withdraw your own registrations.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        try:
+            await get_event.withdraw_participant(participant.tag)
+        except EventClosed:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"The Event you are withdrawing from is not open for registration.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        embed = await clash_embed(
+            context=interaction,
+            message=f"The account {participant.title} is withdrawn from {get_event.name}.",
+            success=True
+            )
+        return await interaction.followup.send(embed=embed)
+    
+    ##################################################
+    ### EVENT / MYSIGNUPS
+    ##################################################    
+    @cmdgroup_event.command(name="mysignups")
+    @commands.guild_only()
+    async def subcmd_event_mysignups(self,ctx:commands.Context):
+        """
+        Lists all your registrations for Events.
+        """
+        return await ctx.reply(f"Please use the Slash Command `/event my-signups` for this.")
+    
+    @appgroup_event.command(name="my-signups",
+        description="Lists all your registrations for Events.")
+    @app_commands.guild_only()
+    async def appcmd_event_mysignups(self,interaction:discord.Interaction):
+
+        await interaction.response.defer()
+
+        participating_events = await Event.get_participating_for_user(interaction.user.id)
+
+        if len(participating_events) == 0:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"You are currently not registered for any Events.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+
+        embed = await clash_embed(
+            context=interaction,
+            message=f"You are registered for the following Events:",
+            thumbnail=getattr(interaction.user.avatar,'url','')
+            )
+        e_iter = AsyncIter(participating_events)
+        async for event in e_iter:
+            accounts = await event.get_participants_for_user(interaction.user.id)
+            embed.add_field(
+                name=f"{event.name}",
+                value=f"Start Time: <t:{event.start_time.int_timestamp}:F>\n"
+                    + '\n'.join([f"- {p.title}" for p in accounts])
+                    + f"\n\u200b",
+                inline=False
+                )
+        return await interaction.followup.send(embed=embed)
+
+    ##################################################
+    ### EVENT / INFO
+    ##################################################    
+    @cmdgroup_event.command(name="info")
+    @commands.guild_only()
+    async def subcmd_event_info(self,ctx:commands.Context):
+        """
+        Displays information about an Event.
+        """
+        return await ctx.reply(f"Please use the Slash Command `/event info` for this.")
+    
+    @appgroup_event.command(name="info",
+        description="Displays information about an Event.")
+    @app_commands.guild_only()
+    @app_commands.describe(event="The Event to get information for.")
+    @app_commands.autocomplete(event=autocomplete_active_events)
+    async def appcmd_event_info(self,interaction:discord.Interaction,event:str):
+
+        await interaction.response.defer()
+
+        get_event = await Event.get_event(event)
+        if not get_event:
+            embed = await clash_embed(
+                context=interaction,
+                message=f"Event not found.",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
+        
+        count = await get_event.get_participant_count()
+        currency = await bank.get_currency_name()
+
+        embed = await clash_embed(
+            context=interaction,
+            title=f"{get_event.name}",
+            message=f"{get_event.description}"
+                + f"\n\n`{'Start Time:':<15}` <t:{get_event.start_time.int_timestamp}:F>"
+                + f"\n`{'End Time:':<15}` <t:{get_event.end_time.int_timestamp}:F>"
+                + f"\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
+                + f"\n## Registration"
+                + f"\n`{'Status:':<15}` {get_event.status}"
+                + f"\n`{'Available:':<15}` {get_event.max_participants - count}/{get_event.max_participants}"
+                + f"\n`{'Max per User:':<15}` {get_event.tags_per_participant}"
+                + f"\n`{'Members Only:':<15}` {get_event.members_only}"
+            )
+        return await interaction.followup.send(embed=embed)
     
     ############################################################
     #####
     ##### COMMAND GROUP: EVENT ADMIN
     ##### 
     ############################################################
-    @command_group_event.group(name="admin")
+    @cmdgroup_event.group(name="admin")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def command_group_event_admin(self,ctx:commands.Context):
+    async def subcmdgrp_event_admin(self,ctx:commands.Context):
         """
         Command group for setting up/managing Events.
         """
         if not ctx.invoked_subcommand:
             pass        
 
-    appcommand_group_event_admin = app_commands.Group(
+    appgroup_event_admin = app_commands.Group(
         name="admin",
         description="Commands for setting up/managing Events.",
-        parent=appcommand_group_event,
+        parent=appgroup_event,
         guild_only=True
         )
     
     ##################################################
     ### EVENTADMIN / LIST
     ##################################################    
-    @command_group_event_admin.command(name="list")
+    @subcmdgrp_event_admin.command(name="list")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_list(self,ctx:commands.Context):
+    async def subcmd_event_admin_list(self,ctx:commands.Context):
         """
         Lists all active Events.
         """
@@ -309,11 +568,11 @@ class Events(commands.Cog):
                 )        
         return await ctx.reply(embed=embed)
     
-    @appcommand_group_event_admin.command(name="list",
+    @appgroup_event_admin.command(name="list",
         description="Lists all active Events.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
-    async def appsubcommand_event_admin_list(self,interaction:discord.Interaction):
+    async def appcmd_event_admin_list(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 
@@ -349,16 +608,16 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / CREATE
     ##################################################    
-    @command_group_event_admin.command(name="create")
+    @subcmdgrp_event_admin.command(name="create")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_create(self,ctx:commands.Context):
+    async def subcmd_event_admin_create(self,ctx:commands.Context):
         """
         Create a new Event.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin create` for this.")
     
-    @appcommand_group_event_admin.command(name="create",
+    @appgroup_event_admin.command(name="create",
         description="Create a new Event.")
     @app_commands.describe(
         name="Name of the Event.",
@@ -371,7 +630,7 @@ class Events(commands.Cog):
         prize_pool="Prize Pool for the Event. 0 for no prize pool.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
-    async def appsubcommand_event_admin_create(self,
+    async def appcmd_event_admin_create(self,
         interaction:discord.Interaction,
         name:str,
         max_participants:int,
@@ -458,16 +717,16 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / EDIT
     ##################################################    
-    @command_group_event_admin.command(name="edit")
+    @subcmdgrp_event_admin.command(name="edit")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_edit(self,ctx:commands.Context):
+    async def subcmd_event_admin_edit(self,ctx:commands.Context):
         """
         Edits an Event.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin edit` for this.")
     
-    @appcommand_group_event_admin.command(name="edit",
+    @appgroup_event_admin.command(name="edit",
         description="Edit an existing Event.")
     @app_commands.describe(
         event="The Event to edit.",
@@ -482,7 +741,7 @@ class Events(commands.Cog):
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.autocomplete(event=autocomplete_active_events)
-    async def appsubcommand_event_admin_edit(self,
+    async def appcmd_event_admin_edit(self,
         interaction:discord.Interaction,
         event:str,
         name:str=None,
@@ -619,10 +878,10 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / DELETE
     ##################################################    
-    @command_group_event_admin.command(name="delete")
+    @subcmdgrp_event_admin.command(name="delete")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_delete(self,ctx:commands.Context):
+    async def subcmd_event_admin_delete(self,ctx:commands.Context):
         """
         Deletes an Event.
 
@@ -630,13 +889,13 @@ class Events(commands.Cog):
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin delete` for this.")
     
-    @appcommand_group_event_admin.command(name="delete",
+    @appgroup_event_admin.command(name="delete",
         description="Deletes an Event. This action is irreversible.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.describe(event="The Event to delete.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_delete(self,interaction:discord.Interaction,event:str):
+    async def appcmd_event_admin_delete(self,interaction:discord.Interaction,event:str):
 
         await interaction.response.defer()
 
@@ -688,22 +947,22 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / OPEN
     ##################################################    
-    @command_group_event_admin.command(name="open")
+    @subcmdgrp_event_admin.command(name="open")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_open(self,ctx:commands.Context):
+    async def subcmd_event_admin_open(self,ctx:commands.Context):
         """
         Opens an Event for registration.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin open` for this.")
     
-    @appcommand_group_event_admin.command(name="open",
+    @appgroup_event_admin.command(name="open",
         description="Opens an Event for registration.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.describe(event="The Event to open.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_open(self,interaction:discord.Interaction,event:str):
+    async def appcmd_event_admin_open(self,interaction:discord.Interaction,event:str):
 
         await interaction.response.defer()
 
@@ -727,22 +986,22 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / CLOSE
     ##################################################    
-    @command_group_event_admin.command(name="close")
+    @subcmdgrp_event_admin.command(name="close")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_close(self,ctx:commands.Context):
+    async def subcmd_event_admin_close(self,ctx:commands.Context):
         """
         Closes an Event and stops new registrations.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin close` for this.")
     
-    @appcommand_group_event_admin.command(name="close",
+    @appgroup_event_admin.command(name="close",
         description="Closes an Event and stops new registrations.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.describe(event="The Event to close.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_close(self,interaction:discord.Interaction,event:str):
+    async def appcmd_event_admin_close(self,interaction:discord.Interaction,event:str):
 
         await interaction.response.defer()
 
@@ -766,16 +1025,16 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / LINK
     ##################################################    
-    @command_group_event_admin.command(name="link")
+    @subcmdgrp_event_admin.command(name="link")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_link(self,ctx:commands.Context):
+    async def subcmd_event_admin_link(self,ctx:commands.Context):
         """
         Links an Event to Discord, with optional parameters.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin link` for this.")
     
-    @appcommand_group_event_admin.command(name="link",
+    @appgroup_event_admin.command(name="link",
         description="Links an Event to Discord, with optional parameters.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
@@ -784,7 +1043,7 @@ class Events(commands.Cog):
         discord_event="Create the Event as a Discord Event.",
         discord_channel="Create a Discord Channel for Event participants. Also creates a Discord Role.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_link(self,
+    async def appcmd_event_admin_link(self,
         interaction:discord.Interaction,
         event:str,
         discord_event:bool=False,
@@ -827,22 +1086,22 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / SYNC-ROLE
     ##################################################    
-    @command_group_event_admin.command(name="syncrole")
+    @subcmdgrp_event_admin.command(name="syncrole")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_syncrole(self,ctx:commands.Context):
+    async def subcmd_event_admin_syncrole(self,ctx:commands.Context):
         """
         Syncs the Event Role with the Event Participants.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin syncrole` for this.")
     
-    @appcommand_group_event_admin.command(name="sync-role",
+    @appgroup_event_admin.command(name="syncrole",
         description="Syncs the Event Role with the Event Participants.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.describe(event="The Event to sync.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_syncrole(self,interaction:discord.Interaction,event:str):
+    async def appcmd_event_admin_syncrole(self,interaction:discord.Interaction,event:str):
 
         await interaction.response.defer()
 
@@ -875,22 +1134,22 @@ class Events(commands.Cog):
     ##################################################
     ### EVENTADMIN / EXPORT
     ##################################################    
-    @command_group_event_admin.command(name="export")
+    @subcmdgrp_event_admin.command(name="export")
     @commands.check(is_events_admin)
     @commands.guild_only()
-    async def subcommand_event_admin_export(self,ctx:commands.Context):
+    async def subcmd_event_admin_export(self,ctx:commands.Context):
         """
         Exports the Event Participants to Excel.
         """
         return await ctx.reply(f"Please use the Slash Command `/event admin export` for this.")
     
-    @appcommand_group_event_admin.command(name="export",
+    @appgroup_event_admin.command(name="export",
         description="Exports the Event Participants to Excel.")
     @app_commands.check(is_events_admin)
     @app_commands.guild_only()
     @app_commands.describe(event="The Event to export.")
     @app_commands.autocomplete(event=autocomplete_active_events)    
-    async def appsubcommand_event_admin_export(self,interaction:discord.Interaction,event:str):
+    async def appcmd_event_admin_export(self,interaction:discord.Interaction,event:str):
 
         await interaction.response.defer()
 
@@ -913,256 +1172,3 @@ class Events(commands.Cog):
             content="Event Participants for {get_event.name} exported.",
             file=discord.File(rp_file)
             )
-    
-    ##################################################
-    ### EVENT / REGISTER
-    ##################################################    
-    @command_group_event.command(name="register")
-    @commands.guild_only()
-    async def subcommand_event_register(self,ctx:commands.Context):
-        """
-        Register for an Event.
-        """
-        return await ctx.reply(f"Please use the Slash Command `/event register` for this.")
-    
-    @appcommand_group_event.command(name="register",
-        description="Register for an Event.")
-    @app_commands.guild_only()
-    @app_commands.describe(
-        event="The Event to register for.",
-        account="The account to register with for the Event.",
-        discord_user="For Events Admin use only. The Discord User to register for.")
-    @app_commands.autocomplete(
-        event=autocomplete_active_events,
-        account=autocomplete_user_players)
-    async def appsubcommand_event_register(self,
-        interaction:discord.Interaction,
-        event:str,
-        account:str,
-        discord_user:discord.Member=None):
-
-        await interaction.response.defer()
-
-        get_event = await Event.get_event(event)
-        if not get_event:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Event not found.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        if is_events_admin(interaction) and discord_user:
-            user = discord_user
-        else:
-            user = interaction.user
-        
-        account = await bot_client.coc.get_player(account)
-        if account.discord_user != user.id and not is_events_admin(interaction):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Invalid account. You can only register with your own linked accounts.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-
-        try:
-            participant = await get_event.register_participant(account.tag,user.id)
-        except EventClosed:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"The Event you are registering for is not open for registration.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        except NotEligible:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"This is a Members-only Event. You are not eligible to register.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        except AlreadyRegistered:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You have already reached the maximum registrations allowed for this event.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-
-        if interaction.user.id == user.id:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You have registered for **{get_event.name}** with the account **{participant.title}**.",
-                success=True
-                )
-            return await interaction.followup.send(embed=embed)
-        else:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{user.display_name} has been registered for **{get_event.name}** with the account **{participant.title}**.",
-                success=True
-                )
-            return await interaction.followup.send(embed=embed)
-    
-    ##################################################
-    ### EVENT / WITHDRAW
-    ##################################################    
-    @command_group_event.command(name="withdraw")
-    @commands.guild_only()
-    async def subcommand_event_withdraw(self,ctx:commands.Context):
-        """
-        Withdraw from an Event.
-        """
-        return await ctx.reply(f"Please use the Slash Command `/event withdraw` for this.")
-    
-    @appcommand_group_event.command(name="withdraw",
-        description="Withdraw from an Event.")
-    @app_commands.guild_only()
-    @app_commands.describe(
-        event="The Event to withdraw from.",
-        account="The account to withdraw from the Event.")
-    @app_commands.autocomplete(
-        event=autocomplete_active_events,
-        account=autocomplete_user_players)
-    async def appsubcommand_event_withdraw(self,
-        interaction:discord.Interaction,
-        event:str,
-        account:str):
-
-        await interaction.response.defer()
-
-        get_event = await Event.get_event(event)
-        if not get_event:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Event not found.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        participant = await get_event.get_participant(account)
-        if not participant:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"This account is not registered for the Event.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        if participant.participant_id != interaction.user.id and not is_events_admin(interaction):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You can only withdraw your own registrations.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        try:
-            await get_event.withdraw_participant(participant.tag)
-        except EventClosed:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"The Event you are withdrawing from is not open for registration.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        embed = await clash_embed(
-            context=interaction,
-            message=f"The account {participant.title} is withdrawn from {get_event.name}.",
-            success=True
-            )
-        return await interaction.followup.send(embed=embed)
-    
-    ##################################################
-    ### EVENT / MYSIGNUPS
-    ##################################################    
-    @command_group_event.command(name="mysignups")
-    @commands.guild_only()
-    async def subcommand_event_mysignups(self,ctx:commands.Context):
-        """
-        Lists all your registrations for Events.
-        """
-        return await ctx.reply(f"Please use the Slash Command `/event my-signups` for this.")
-    
-    @appcommand_group_event.command(name="my-signups",
-        description="Lists all your registrations for Events.")
-    @app_commands.guild_only()
-    async def appsubcommand_event_mysignups(self,interaction:discord.Interaction):
-
-        await interaction.response.defer()
-
-        participating_events = await Event.get_participating_for_user(interaction.user.id)
-
-        if len(participating_events) == 0:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"You are currently not registered for any Events.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-
-        embed = await clash_embed(
-            context=interaction,
-            message=f"You are registered for the following Events:",
-            thumbnail=getattr(interaction.user.avatar,'url','')
-            )
-        e_iter = AsyncIter(participating_events)
-        async for event in e_iter:
-            accounts = await event.get_participants_for_user(interaction.user.id)
-            embed.add_field(
-                name=f"{event.name}",
-                value=f"Start Time: <t:{event.start_time.int_timestamp}:F>\n"
-                    + '\n'.join([f"- {p.title}" for p in accounts])
-                    + f"\n\u200b",
-                inline=False
-                )
-        return await interaction.followup.send(embed=embed)
-
-    ##################################################
-    ### EVENT / INFO
-    ##################################################    
-    @command_group_event.command(name="info")
-    @commands.guild_only()
-    async def subcommand_event_info(self,ctx:commands.Context):
-        """
-        Displays information about an Event.
-        """
-        return await ctx.reply(f"Please use the Slash Command `/event info` for this.")
-    
-    @appcommand_group_event.command(name="info",
-        description="Displays information about an Event.")
-    @app_commands.guild_only()
-    @app_commands.describe(event="The Event to get information for.")
-    @app_commands.autocomplete(event=autocomplete_active_events)
-    async def appsubcommand_event_info(self,interaction:discord.Interaction,event:str):
-
-        await interaction.response.defer()
-
-        get_event = await Event.get_event(event)
-        if not get_event:
-            embed = await clash_embed(
-                context=interaction,
-                message=f"Event not found.",
-                success=False
-                )
-            return await interaction.followup.send(embed=embed)
-        
-        count = await get_event.get_participant_count()
-        currency = await bank.get_currency_name()
-
-        embed = await clash_embed(
-            context=interaction,
-            title=f"{get_event.name}",
-            message=f"{get_event.description}"
-                + f"\n\n`{'Start Time:':<15}` <t:{get_event.start_time.int_timestamp}:F>"
-                + f"\n`{'End Time:':<15}` <t:{get_event.end_time.int_timestamp}:F>"
-                + f"\n`{'Prize Pool:':<15}` {get_event.prize_pool} {currency}"
-                + f"\n## Registration"
-                + f"\n`{'Status:':<15}` {get_event.status}"
-                + f"\n`{'Available:':<15}` {get_event.max_participants - count}/{get_event.max_participants}"
-                + f"\n`{'Max per User:':<15}` {get_event.tags_per_participant}"
-                + f"\n`{'Members Only:':<15}` {get_event.members_only}"
-            )
-        return await interaction.followup.send(embed=embed)

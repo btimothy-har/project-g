@@ -7,16 +7,17 @@ from numerize import numerize
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClanWar, aRaidWeekend
+from coc_main.coc_objects.season.season import aClashSeason
+
+from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed, s_convert_seconds_to_str
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_constants import EmojisClash, EmojisLeagues, EmojisTownHall, WarResult, EmojisEquipment
-
-bot_client = BotClashClient()
 
 class PlayerProfileMenu(DefaultView):
     def __init__(self,
@@ -25,7 +26,8 @@ class PlayerProfileMenu(DefaultView):
         
         self.accounts = accounts
         self.current_page = "summary"
-        self.current_account = self.accounts[0]
+        
+        self.current_account = self.accounts[0] if len(self.accounts) > 0 else None
 
         self.current_warstats = None
         self.current_raidstats = None
@@ -68,10 +70,6 @@ class PlayerProfileMenu(DefaultView):
         self.add_item(self.blacksmith_button)
         self._build_dynamic_menu()
     
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
     ##################################################
     ### OVERRIDE BUILT IN METHODS
     ##################################################
@@ -82,33 +80,18 @@ class PlayerProfileMenu(DefaultView):
     ##################################################
     ### START / STOP
     ##################################################
-    async def start(self):
-        if len(self.accounts) == 0:
-            embed = await clash_embed(
-                context=self.ctx,
-                message="I couldn't find any accounts to show. Check your input, maybe?",
-                success=False
-                )
-            if isinstance(self.ctx,discord.Interaction):
-                await self.ctx.edit_original_response(embed=embed,view=None)
-                self.message = await self.ctx.original_response()
-            else:
-                self.message = await self.ctx.reply(embed=embed,view=None)
-            return
-        
-        self.current_warstats = aClanWarSummary.for_player(
+    async def start(self):        
+        war_log = await aClanWar.for_player(
             player_tag=self.current_account.tag,
-            war_log=await aClanWar.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
-        
-        self.current_raidstats = aSummaryRaidStats.for_player(
+            season=aClashSeason.current()
+            )        
+        self.current_warstats = await self.run_in_thread(aClanWarSummary.for_player,self.current_account.tag,war_log)
+
+        raid_log = await aRaidWeekend.for_player(
             player_tag=self.current_account.tag,
-            raid_log=await aRaidWeekend.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
+            season=aClashSeason.current()
+            )        
+        self.current_raidstats = await self.run_in_thread(aSummaryRaidStats.for_player,self.current_account.tag,raid_log)
             
         self.is_active = True
         self.summary_button.disabled = True
@@ -191,19 +174,17 @@ class PlayerProfileMenu(DefaultView):
         await interaction.response.defer()
         self.current_account = [account for account in self.accounts if account.tag == menu.values[0]][0]
 
-        self.current_warstats = aClanWarSummary.for_player(
+        war_log = await aClanWar.for_player(
             player_tag=self.current_account.tag,
-            war_log=await aClanWar.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
-        
-        self.current_raidstats = aSummaryRaidStats.for_player(
+            season=aClashSeason.current()
+            )
+        self.current_warstats = await self.run_in_thread(aClanWarSummary.for_player,self.current_account.tag,war_log)
+
+        raid_log = await aRaidWeekend.for_player(
             player_tag=self.current_account.tag,
-            raid_log=await aRaidWeekend.for_player(
-                player_tag=self.current_account.tag,
-                season=bot_client.current_season
-                ))
+            season=aClashSeason.current()
+            )        
+        self.current_raidstats = await self.run_in_thread(aSummaryRaidStats.for_player,self.current_account.tag,raid_log)
 
         self._build_dynamic_menu()
             
@@ -301,7 +282,7 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**War Log: {player}**",
-            message=f"**Stats for: {bot_client.current_season.description} Season**\n"
+            message=f"**Stats for: {aClashSeason.current().description} Season**\n"
                 + f"{EmojisClash.CLANWAR} `{self.current_warstats.wars_participated:^3}`\u3000"
                 + f"{EmojisClash.THREESTARS} `{self.current_warstats.triples:^3}`\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} `{self.current_warstats.unused_attacks:^3}`\n"
@@ -339,7 +320,7 @@ class PlayerProfileMenu(DefaultView):
         embed = await clash_embed(
             context=self.ctx,
             title=f"**Raid Log: {player}**",
-            message=f"**Stats for: {bot_client.current_season.description} Season**\n"
+            message=f"**Stats for: {aClashSeason.current().description} Season**\n"
                 + f"{EmojisClash.CAPITALRAID} `{self.current_raidstats.raids_participated:^3}`\u3000"
                 + f"{EmojisClash.ATTACK} {self.current_raidstats.raid_attacks:^3}\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} {self.current_raidstats.unused_attacks:^3}\n"
@@ -349,7 +330,7 @@ class PlayerProfileMenu(DefaultView):
             )
         raid_count = 0
         async for raid in AsyncIter(self.current_raidstats.raid_log):
-            r_clan = await bot_client.coc.get_clan(raid.clan_tag)
+            r_clan = await self.coc_client.get_clan(raid.clan_tag)
             if raid_count >= 5:
                 break
 

@@ -1,19 +1,29 @@
+import asyncio
 import discord
 import pendulum
 import requests
+import logging
+import os
+import random
+import io
 
 from typing import *
+
+from pathlib import Path
+from PIL import Image
+
 from redbot.core.utils import AsyncIter
-from ..api_client import BotClashClient as client
+
+from ..client.global_client import GlobalClient
 from ..coc_objects.season.season import aClashSeason
 
-bot_client = client()
+LOG = logging.getLogger("coc.main")
 
-class aGuildClocks():
+class aGuildClocks(GlobalClient):
 
     @classmethod
     async def get_for_guild(cls,guild_id:int):        
-        database = await bot_client.coc_db.db__clock_config.find_one({'_id':guild_id})      
+        database = await cls.database.db__clock_config.find_one({'_id':guild_id})      
         if not database:
             return cls(guild_id,{})  
         return cls(guild_id,database)
@@ -28,8 +38,8 @@ class aGuildClocks():
         self._warleague_channel = config.get('warleague_channel',0) if config else 0
 
     @property
-    def guild(self):
-        return bot_client.bot.get_guild(self.id)
+    def guild(self) -> discord.Guild:
+        return self.bot.get_guild(self.id)
     
     async def create_clock_channel(self):
         default_permissions = {
@@ -45,19 +55,29 @@ class aGuildClocks():
             name='🕐',
             overwrites=default_permissions
             )
-        bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Clock Channel: {clock_channel.id}.")
+        LOG.info(f"Guild {self.guild.name} {self.guild.id}: Created Clock Channel: {clock_channel.id}.")
         return clock_channel
     
     async def create_scheduled_event(self,
         name:str,
         start_time:pendulum.DateTime,
-        end_time:pendulum.DateTime,
-        image:str):
+        end_time:pendulum.DateTime):
 
-        def convert_image_to_bytes(url):
-            response = requests.get(url,stream=True)
-            response.raise_for_status()
-            return response.content
+        def get_random_image(directory):
+            # List all files in the directory
+            files = os.listdir(directory)
+            # Filter image files
+            image_files = [f for f in files if f.endswith(('png', 'jpg', 'jpeg', 'gif', 'bmp'))]
+            if not image_files:
+                print("No image files found in the directory.")
+                return None
+            # Select a random image file
+            image_file = random.choice(image_files)
+            
+            image_path = os.path.join(directory, image_file)
+            with open(image_path, 'rb') as img_file:
+                img_bytes = img_file.read()
+            return img_bytes
         
         create_event = True
         
@@ -68,29 +88,39 @@ class aGuildClocks():
         if not create_event:
             return event
         
-        image_bytes = await bot_client.run_in_thread(convert_image_to_bytes,image)
+        base_path = str(Path(__file__).parent)
+        images_dir = base_path + '/clock_images'
         
-        event = await self.guild.create_scheduled_event(
-            name=name,
-            start_time=start_time,
-            end_time=end_time,
-            privacy_level=discord.PrivacyLevel.guild_only,
-            entity_type=discord.EntityType.external,
-            image=image_bytes,
-            location="In-Game"
-            )
-        bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Created Scheduled Event: {event.name} {event.id}.")
+        image_bytes = await GlobalClient.run_in_thread(get_random_image,images_dir)
+
+        if image_bytes:
+            event = await self.guild.create_scheduled_event(
+                name=name,
+                start_time=start_time,
+                end_time=end_time,
+                privacy_level=discord.PrivacyLevel.guild_only,
+                entity_type=discord.EntityType.external,
+                image=image_bytes,
+                location="In-Game"
+                )
+        else:
+            event = await self.guild.create_scheduled_event(
+                name=name,
+                start_time=start_time,
+                end_time=end_time,
+                privacy_level=discord.PrivacyLevel.guild_only,
+                entity_type=discord.EntityType.external,
+                location="In-Game"
+                )
+        LOG.info(f"Guild {self.guild.name} {self.guild.id}: Created Scheduled Event: {event.name} {event.id}.")
         return event    
 
     ##################################################
     ### CONFIGURATION
     ##################################################
-    async def toggle_channels(self):
-        if self.use_channels:
-            self.use_channels = False
-        else:
-            self.use_channels = True
-        await bot_client.coc_db.db__clock_config.update_one(
+    async def toggle_channels(self,bool:bool):
+        self.use_channels = bool        
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'use_channels':self.use_channels
@@ -98,12 +128,9 @@ class aGuildClocks():
             },
             upsert=True)
     
-    async def toggle_events(self):
-        if self.use_events:
-            self.use_events = False
-        else:
-            self.use_events = True
-        await bot_client.coc_db.db__clock_config.update_one(
+    async def toggle_events(self,bool:bool):
+        self.use_events = bool
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'use_events':self.use_events
@@ -123,7 +150,7 @@ class aGuildClocks():
     
     async def new_season_channel(self,channel_id:int):
         self._season_channel = channel_id        
-        await bot_client.coc_db.db__clock_config.update_one(
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'season_channel':self._season_channel
@@ -139,8 +166,8 @@ class aGuildClocks():
             await new_channel.edit(position=0)
             await self.new_season_channel(new_channel.id)
     
-        season_ch_name = f"📅 {bot_client.current_season.short_description} "
-        time_to_end = bot_client.current_season.time_to_end(now)
+        season_ch_name = f"📅 {aClashSeason.current().short_description} "
+        time_to_end = aClashSeason.current().time_to_end(now)
 
         if time_to_end.days > 0:
             season_ch_name += f"({time_to_end.days}D left)"
@@ -151,7 +178,7 @@ class aGuildClocks():
 
         if self.season_channel.name != season_ch_name:
             await self.season_channel.edit(name=season_ch_name)
-            bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Season Channel updated to {season_ch_name}.")
+            LOG.info(f"Guild {self.guild.name} {self.guild.id}: Season Channel updated to {season_ch_name}.")
 
     ##################################################
     ### RAID CLOCKS
@@ -165,7 +192,7 @@ class aGuildClocks():
     
     async def new_raids_channel(self,channel_id:int):
         self._raids_channel = channel_id
-        await bot_client.coc_db.db__clock_config.update_one(
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'raids_channel':self._raids_channel
@@ -212,7 +239,7 @@ class aGuildClocks():
         
         if raid_ch_name and self.raids_channel.name != raid_ch_name:
             await self.raids_channel.edit(name=raid_ch_name)
-            bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Raids Channel updated to {raid_ch_name}.")
+            LOG.info(f"Guild {self.guild.name} {self.guild.id}: Raids Channel updated to {raid_ch_name}.")
 
     async def update_raidweekend_event(self):
         now = pendulum.now('UTC')
@@ -222,8 +249,7 @@ class aGuildClocks():
             event = await self.create_scheduled_event(
                 name="Raid Weekend",
                 start_time=raid_start,
-                end_time=raid_end,
-                image="https://i.imgur.com/4n5xoLa.jpg"
+                end_time=raid_end
                 )                
             self.raids_event = event.id
     
@@ -239,7 +265,7 @@ class aGuildClocks():
 
     async def new_clangames_channel(self,channel_id:int):
         self._clangames_channel = channel_id
-        await bot_client.coc_db.db__clock_config.update_one(
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'clangames_channel':self._clangames_channel
@@ -249,7 +275,7 @@ class aGuildClocks():
     
     async def update_clangames_channel(self):
         now = pendulum.now('UTC')
-        season = await aClashSeason.get_current_season()
+        season = aClashSeason.current()
 
         if season.clangames_start < season.clangames_end.add(hours=24) < now:
             clangames_season = season.next_season()
@@ -291,11 +317,11 @@ class aGuildClocks():
         
         if cg_ch_name and self.clangames_channel.name != cg_ch_name:
             await self.clangames_channel.edit(name=cg_ch_name)
-            bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: Clan Games Channel updated to {cg_ch_name}.")           
+            LOG.info(f"Guild {self.guild.name} {self.guild.id}: Clan Games Channel updated to {cg_ch_name}.")           
     
     async def update_clangames_event(self):
         now = pendulum.now('UTC')
-        season = await aClashSeason.get_current_season()
+        season = aClashSeason.current()
 
         if season.clangames_start < season.clangames_end.add(hours=24) < now:
             clangames_season = season.next_season()
@@ -306,8 +332,7 @@ class aGuildClocks():
             await self.create_scheduled_event(
                 name=f"Clan Games - {clangames_season.short_description}",
                 start_time=clangames_season.clangames_start,
-                end_time=clangames_season.clangames_end,
-                image="https://i.imgur.com/PwRPVYP.jpg"
+                end_time=clangames_season.clangames_end
                 )
     
     ##################################################
@@ -322,7 +347,7 @@ class aGuildClocks():
     
     async def new_league_channel(self,channel_id:int):
         self._warleague_channel = channel_id
-        await bot_client.coc_db.db__clock_config.update_one(
+        await self.database.db__clock_config.update_one(
             {'_id':self.id},
             {'$set':{
                 'warleague_channel':self._warleague_channel
@@ -332,7 +357,7 @@ class aGuildClocks():
     
     async def update_warleagues_channel(self):
         now = pendulum.now('UTC')
-        season = await aClashSeason.get_current_season()
+        season = aClashSeason.current()
 
         if season.cwl_start < season.cwl_end.add(hours=24) < now:
             warleague_season = season.next_season()
@@ -373,11 +398,11 @@ class aGuildClocks():
         
         if cwl_ch_name and self.warleague_channel.name != cwl_ch_name:
             await self.warleague_channel.edit(name=cwl_ch_name)
-            bot_client.coc_main_log.info(f"Guild {self.guild.name} {self.guild.id}: CWL Channel updated to {cwl_ch_name}.")
+            LOG.info(f"Guild {self.guild.name} {self.guild.id}: CWL Channel updated to {cwl_ch_name}.")
     
     async def update_warleagues_event(self):
         now = pendulum.now('UTC')
-        season = await aClashSeason.get_current_season()
+        season = aClashSeason.current()
 
         if season.cwl_start < season.cwl_end.add(hours=24) < now:
             warleague_season = season.next_season()
@@ -388,6 +413,5 @@ class aGuildClocks():
            await self.create_scheduled_event(
                 name=f"Clan War Leagues - {warleague_season.short_description}",
                 start_time=warleague_season.cwl_start,
-                end_time=warleague_season.cwl_end,
-                image="https://i.imgur.com/NYmlLJz.jpg"
+                end_time=warleague_season.cwl_end
                 )

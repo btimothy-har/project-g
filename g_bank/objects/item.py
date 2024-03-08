@@ -3,23 +3,25 @@ import bson
 import discord
 import random
 import pendulum
+import logging
 
 from typing import *
 
-from redbot.core.utils import AsyncIter
-
 from pymongo import ReturnDocument
 from collections import defaultdict
-from coc_main.api_client import BotClashClient
+
+from redbot.core.bot import Red
+from coc_main.client.global_client import GlobalClient
+
 from ..exceptions import CannotPurchase
+
+LOG = logging.getLogger('coc.main')
 
 #Available Item Types
 #1 Basic
 #2 Role
 #3 Random
 #4 Cash
-
-bot_client = BotClashClient()
 
 # db__shop_item = {
 #   '_id': ObjectId(),
@@ -42,7 +44,7 @@ bot_client = BotClashClient()
 #   'subscription_log': { user_id: int }
 #   }
 
-class ShopItem():
+class ShopItem(GlobalClient):
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         '_id',
@@ -69,14 +71,14 @@ class ShopItem():
 
     @classmethod
     async def get_by_id(cls,item_id:str) -> Optional['ShopItem']:        
-        query = await bot_client.coc_db.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
+        query = await GlobalClient.database.db__shop_item.find_one({'_id':bson.ObjectId(item_id)})
         if query:
             return cls(query)
         return None
     
     @classmethod
     async def get_subscription_items(cls) -> List['ShopItem']:
-        query = bot_client.coc_db.db__shop_item.find(
+        query = GlobalClient.database.db__shop_item.find(
             {'subscription_duration':{'$gt':0}}
             )
         return [cls(item) async for item in query]
@@ -84,7 +86,7 @@ class ShopItem():
     @classmethod
     async def get_subscribed_roles_for_user(cls,user_id:int) -> List['ShopItem']:
         key_dict = f'subscription_log.{user_id}'
-        query = bot_client.coc_db.db__shop_item.find(
+        query = GlobalClient.database.db__shop_item.find(
             {
                 key_dict:{'$exists':True},
                 'type':'role'
@@ -94,7 +96,7 @@ class ShopItem():
 
     @classmethod
     async def get_by_guild(cls,guild_id:int):
-        query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'disabled':False})
+        query = GlobalClient.database.db__shop_item.find({'guild_id':guild_id,'disabled':False})
         return [cls(item) async for item in query]
     
     @classmethod
@@ -109,17 +111,17 @@ class ShopItem():
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__shop_item.aggregate(pipeline)
+        query = GlobalClient.database.db__shop_item.aggregate(pipeline)
         return [cls(item) async for item in query]
 
     @classmethod
     async def get_by_guild_category(cls,guild_id:int,category:str):        
-        query = bot_client.coc_db.db__shop_item.find({'guild_id':guild_id,'category':category,'disabled':False})
+        query = GlobalClient.database.db__shop_item.find({'guild_id':guild_id,'category':category,'disabled':False})
         return [cls(item) async for item in query]
 
     @classmethod
     async def get_by_role_assigned(cls,guild_id:int,role_id:int):
-        query = bot_client.coc_db.db__shop_item.find(
+        query = GlobalClient.database.db__shop_item.find(
             {
                 'guild_id':guild_id,
                 'role_id':role_id
@@ -165,6 +167,10 @@ class ShopItem():
             return self.id == other.id
         return False
 
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+
     def db_json(self) -> dict:
         return {
             '_id':self._id,
@@ -206,7 +212,7 @@ class ShopItem():
         return self._locks[self.id]
     @property
     def guild(self) -> Optional[discord.Guild]:
-        return bot_client.bot.get_guild(self.guild_id)    
+        return self.bot.get_guild(self.guild_id)    
     @property
     def stock(self) -> Union[int,str]:
         if self._stock < 0:
@@ -289,7 +295,7 @@ class ShopItem():
                 if self.id in self._random_stock:
                     self._random_stock[self.id]['stock'] = 0
                 else:
-                    item = await bot_client.coc_db.db__shop_item.find_one_and_update(
+                    item = await self.database.db__shop_item.find_one_and_update(
                         {'_id':self._id},
                         {'$inc': {'stock':-quantity}},
                         return_document=ReturnDocument.AFTER
@@ -299,7 +305,7 @@ class ShopItem():
     async def restock(self,quantity:int=1):
         async with self.lock:
             if self._stock >= 0:
-                item = await bot_client.coc_db.db__shop_item.find_one_and_update(
+                item = await self.database.db__shop_item.find_one_and_update(
                     {'_id':self._id},
                     {'$inc': {'stock':quantity}},
                     return_document=ReturnDocument.AFTER
@@ -309,7 +315,7 @@ class ShopItem():
     async def delete(self):        
         async with self.lock:
             self.disabled = True
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'disabled':True}}
                 )
@@ -317,7 +323,7 @@ class ShopItem():
     async def unhide(self):
         async with self.lock:
             self.show_in_store = True
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'show_in_store':True}}
                 )
@@ -325,7 +331,7 @@ class ShopItem():
     async def hide(self):
         async with self.lock:
             self.show_in_store = False
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'show_in_store':False}}
                 )
@@ -342,35 +348,35 @@ class ShopItem():
 
     async def edit(self,**kwargs):
         if kwargs.get('category'):
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'category':kwargs['category']}}
                 )
             self.category = kwargs['category']
         
         if kwargs.get('description'):
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'description':kwargs['description']}}
                 )
             self.description = kwargs['description']
         
         if kwargs.get('price'):
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'price':kwargs['price']}}
                 )
             self.price = kwargs['price']
         
         if kwargs.get('buy_message'):
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'buy_message':kwargs['buy_message']}}
                 )
             self.buy_message = kwargs['buy_message']
         
         if kwargs.get('required_role'):
-            await bot_client.coc_db.db__shop_item.update_one(
+            await self.database.db__shop_item.update_one(
                 {'_id':self._id},
                 {'$set': {'required_role':kwargs['required_role']}}
                 )
@@ -378,7 +384,7 @@ class ShopItem():
     
     @classmethod
     async def create(cls,**kwargs):        
-        new_item = await bot_client.coc_db.db__shop_item.insert_one(
+        new_item = await GlobalClient.database.db__shop_item.insert_one(
             {
                 'guild_id':kwargs['guild_id'],
                 'type':kwargs['type'],
@@ -399,7 +405,7 @@ class ShopItem():
                 }
             )
         item = await cls.get_by_id(str(new_item.inserted_id))
-        bot_client.coc_main_log.info(f"Created new shop item: {item} {item.guild_id} {item.id}")
+        LOG.info(f"Created new shop item: {item} {item.guild_id} {item.id}")
         return item
 
 class NewShopItem():

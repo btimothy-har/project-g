@@ -7,29 +7,24 @@ from typing import *
 from functools import cached_property
 from async_property import AwaitLoader
 
+from .base_player import BasicPlayer
+from .player_season import aPlayerSeason
+
 from .townhall import aTownHall
 from .hero import aHero
 from .troop import aTroop
 from .spell import aSpell
 from .pet import aPet
 
-from .base_player import BasicPlayer
-from .player_season import aPlayerSeason
-
 from ..season.season import aClashSeason
 from ..clans.clan import _PlayerClan
-from ..events.clan_war_leagues import WarLeaguePlayer
-
-from ...api_client import BotClashClient as client
 
 from ...utils.constants.coc_constants import HeroAvailability, TroopAvailability, SpellAvailability, PetAvailability
 from ...utils.constants.coc_constants import EmojisHeroes, EmojisLeagues
 
-bot_client = client()
-
 ##################################################
 #####
-##### DATABASE
+##### PLAYER
 #####
 ##################################################
 class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
@@ -455,7 +450,8 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
                 await asyncio.gather(*tasks)
 
     async def get_current_season(self) -> aPlayerSeason:
-        return await self.get_season_stats(bot_client.current_season)
+        season = aClashSeason.current()
+        return await self.get_season_stats(season)
     
     async def get_season_stats(self,season:aClashSeason) -> aPlayerSeason:
         stats = aPlayerSeason(self.tag,season)
@@ -467,25 +463,22 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
             stats.home_clan = self.home_clan
             stats.is_member = self.is_member      
         return stats
-            
-    async def war_league_season(self,season:aClashSeason) -> WarLeaguePlayer:
-        return await WarLeaguePlayer(self.tag,season)
 
-    def get_hero(self,hero_name:str):
+    def get_hero(self,hero_name:str) -> aHero:
         hero = next((hero for hero in self._heroes if hero.name == hero_name),None)
         return aHero(hero,self.town_hall.level) if hero else None
     
-    def get_troop(self,name:str,is_home_troop:bool=True):
+    def get_troop(self,name:str,is_home_troop:bool=True) -> aTroop:
         if is_home_troop:
             troop = next((troop for troop in self._troops if troop.name == name and troop.village == 'home'),None)
         else:
             troop = next((troop for troop in self._troops if troop.name == name),None)
         return aTroop(troop,self.town_hall.level) if troop else None
     
-    def get_spell(self,name:str):
+    def get_spell(self,name:str) -> aSpell:
         spell = next((spell for spell in self._spells if spell.name == name),None)
         return aSpell(spell,self.town_hall.level) if spell else None
     
-    def get_pet(self,name:str):
+    def get_pet(self,name:str) -> aPet:
         pet = next((pet for pet in self._pets if pet.name == name),None)
         return aPet(pet,self.town_hall.level) if pet else None

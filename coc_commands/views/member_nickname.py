@@ -4,17 +4,11 @@ import asyncio
 from typing import *
 
 from redbot.core import commands
-
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
-
 from coc_main.discord.member import aMember
 
 from coc_main.utils.components import DefaultView, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
-
-bot_client = BotClashClient()
 
 class MemberNicknameMenu(DefaultView):
     def __init__(self,
@@ -28,10 +22,6 @@ class MemberNicknameMenu(DefaultView):
 
         self.member = aMember(member.id,self.guild.id)
         self.for_self = self.user.id == member.id
-    
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -89,7 +79,7 @@ class MemberNicknameMenu(DefaultView):
     async def _select_accounts(self):
 
         if self.guild.id == 688449973553201335: #ARIX
-            player_accounts = [p async for p in bot_client.coc.get_players(self.member.member_tags)]
+            player_accounts = [p async for p in self.coc_client.get_players(self.member.member_tags)]
 
             dropdown_options = [discord.SelectOption(
                 label=f"{account.name} | {account.tag}",
@@ -108,7 +98,7 @@ class MemberNicknameMenu(DefaultView):
             self.add_item(dropdown_menu)
 
         else:
-            player_accounts = [p async for p in bot_client.coc.get_players(self.member.account_tags)]
+            player_accounts = [p async for p in self.coc_client.get_players(self.member.account_tags)]
 
             dropdown_options = [discord.SelectOption(
                 label=f"{account.name} | {account.tag}",

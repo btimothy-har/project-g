@@ -1,13 +1,14 @@
 import coc
 import hashlib
 import pendulum
+import logging
 
 from typing import *
 
 from collections import defaultdict
 from async_property import AwaitLoader
 
-from ...api_client import BotClashClient as client
+from ...client.db_client import MotorClient
 
 from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
@@ -17,9 +18,9 @@ from ...utils.constants.coc_constants import ClanWarType, WarResult, WarState
 from ...utils.constants.coc_emojis import EmojisClash
 from ...utils.constants.ui_emojis import EmojisUI
 
-bot_client = client()
+LOG = logging.getLogger("coc.main")
 
-class aClanWar(AwaitLoader):
+class aClanWar(MotorClient,AwaitLoader):
     _cache = {}
     __slots__ = [
         '_id',
@@ -59,7 +60,7 @@ class aClanWar(AwaitLoader):
                 'members.tag': player_tag,
                 'type': ClanWarType.RANDOM
                 }        
-        query = bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})   
+        query = cls.database.db__clan_war.find(query_doc,{'_id':1})   
         ret_wars = [await cls(war_id=d['_id']) async for d in query]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
@@ -79,7 +80,7 @@ class aClanWar(AwaitLoader):
                 'clans.tag': clan_tag,
                 'type': ClanWarType.RANDOM
                 }
-        query = bot_client.coc_db.db__clan_war.find(query_doc,{'_id':1})
+        query = cls.database.db__clan_war.find(query_doc,{'_id':1})
         ret_wars = [await cls(war_id=d['_id']) async for d in query]
         return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
 
@@ -120,7 +121,7 @@ class aClanWar(AwaitLoader):
         if self._loaded_from_db:
             return
         
-        query = await bot_client.coc_db.db__clan_war.find_one({'_id':self._id})
+        query = await self.database.db__clan_war.find_one({'_id':self._id})
         self._loaded_from_db = True
         if not query:
             return
@@ -211,7 +212,7 @@ class aClanWar(AwaitLoader):
     async def save_to_database(self):
         self._last_save = pendulum.now()
         self._found_in_db = True
-        await bot_client.coc_db.db__clan_war.update_one(
+        await self.database.db__clan_war.update_one(
             {'_id':self._id},
             {'$set':self.to_json()},
             upsert=True

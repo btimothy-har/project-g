@@ -5,8 +5,6 @@ import pendulum
 from typing import *
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient as client
-
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.coc_constants import WarResult, WarState
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisTownHall
@@ -16,8 +14,6 @@ from coc_main.coc_objects.clans.clan import aClan
 from coc_main.coc_objects.events.helpers import clan_war_embed
 from coc_main.coc_objects.events.clan_war import aClanWar
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
-
-bot_client = client()
 
 class ClanWarLog(DefaultView):
     def __init__(self,
@@ -138,7 +134,7 @@ class ClanWarLog(DefaultView):
         
         self.is_active = True
 
-        self.war_summary = await bot_client.run_in_thread(aClanWarSummary.for_clan,self.clan.tag,get_all_wars)
+        self.war_summary = await self.run_in_thread(aClanWarSummary.for_clan,self.clan.tag,get_all_wars)
         self.war_selector = [
             discord.SelectOption(
                 label=f"{w.get_clan(self.clan.tag).name} vs {w.get_opponent(self.clan.tag).name}",

@@ -6,7 +6,8 @@ from typing import *
 
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason
+from coc_main.client.global_client import GlobalClient
+from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
@@ -29,10 +30,8 @@ cwl_roster_headers = [
     'Roster Finalized?'
     ]
 
-bot_client = BotClashClient()
-
 async def generate_cwl_roster_export(season:aClashSeason):    
-    report_file = bot_client.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
+    report_file = GlobalClient.bot.coc_report_path + '/' + f'{season.description} CWL Roster.xlsx'
 
     if pendulum.now() > season.cwl_end:
         if os.path.exists(report_file):
@@ -55,7 +54,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
         col += 1
     
     all_signups = await WarLeaguePlayer.signups_by_season(season=season)
-    participant_players = [p async for p in bot_client.coc.get_players([m.tag for m in all_signups])]
+    participant_players = [p async for p in GlobalClient.coc_client.get_players([m.tag for m in all_signups])]
     
     a_iter = AsyncIter(all_signups)
     async for league_player in a_iter:
@@ -67,7 +66,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
         m_data.append(player.tag)
         m_data.append(player.name)
         m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
-        m_data.append(getattr(bot_client.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
+        m_data.append(getattr(GlobalClient.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
         m_data.append(str(player.discord_user) if player.discord_user else " ")
         m_data.append(player.town_hall.level)
 
@@ -114,7 +113,7 @@ async def generate_cwl_roster_export(season:aClashSeason):
             m_data.append(player.tag)
             m_data.append(player.name)
             m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
-            m_data.append(getattr(bot_client.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
+            m_data.append(getattr(GlobalClient.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
             m_data.append(str(player.discord_user) if player.discord_user else " ")
             m_data.append(player.town_hall.level)
             

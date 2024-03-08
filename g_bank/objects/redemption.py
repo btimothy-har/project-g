@@ -3,20 +3,24 @@ import asyncio
 import pendulum
 import bson
 import discord
+import logging
 
 from typing import *
 
-from redbot.core import commands
 from pymongo import ReturnDocument
 from collections import defaultdict
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
 
+from redbot.core import commands
+from redbot.core.bot import Red
+
+from coc_main.client.global_client import GlobalClient
 from coc_main.utils.components import clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisClash
 
 from .inventory import InventoryItem
 from .item import ShopItem
+
+LOG = logging.getLogger('coc.main')
 
 # db__redemption = {
 #   '_id': ObjectId(),
@@ -28,9 +32,7 @@ from .item import ShopItem
 #   'close_timestamp': int,
 #   }
 
-bot_client = BotClashClient()
-
-class RedemptionTicket():
+class RedemptionTicket(GlobalClient):
     _locks = defaultdict(asyncio.Lock)
     __slots__ = [
         '_id',
@@ -42,15 +44,11 @@ class RedemptionTicket():
         'open_timestamp',
         'close_user',
         'close_timestamp',
-        ]
-    
-    @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
+        ]    
     
     @classmethod
     async def get_by_id(cls,ticket_id:str) -> Optional['RedemptionTicket']:        
-        query = await bot_client.coc_db.db__redemption.find_one({'_id':bson.ObjectId(ticket_id)})
+        query = await GlobalClient.database.db__redemption.find_one({'_id':bson.ObjectId(ticket_id)})
         if query:
             return cls(query)
         return None
@@ -75,15 +73,15 @@ class RedemptionTicket():
     @property
     def lock(self) -> asyncio.Lock:
         return self._locks[self.id]
-    
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot    
     @property
     def bank_cog(self) -> commands.Cog:
-        return bot_client.bot.get_cog("Bank")
-    
+        return self.bot.get_cog("Bank")    
     @property
     def user(self) -> Optional[discord.Member]:
-        return self.bank_cog.bank_guild.get_member(self.user_id)
-    
+        return self.bank_cog.bank_guild.get_member(self.user_id)    
     @property
     def channel(self) -> Optional[discord.TextChannel]:
         return self.bank_cog.bank_guild.get_channel(self.channel_id)
@@ -96,10 +94,10 @@ class RedemptionTicket():
             'goldpass_tag': goldpass_tag,
             'open_timestamp': pendulum.now().int_timestamp,
             }
-        new_ticket = await bot_client.coc_db.db__redemption.insert_one(query)
+        new_ticket = await GlobalClient.database.db__redemption.insert_one(query)
 
         ticket_id = str(new_ticket.inserted_id)
-        await cog.redemption_log_channel.send(f"--ticket {ticket_id} {user_id}")
+        await cog.redm_listener.send(f"--ticket {ticket_id} {user_id}")
 
         count = 0
         while True:
@@ -110,12 +108,12 @@ class RedemptionTicket():
                 break
             if count > 20:
                 break
-        bot_client.coc_main_log.info(f"New redemption ticket: {ticket.id}")
+        LOG.info(f"New redemption ticket: {ticket.id}")
         return ticket
 
     async def update_channel(self,channel_id:int):
         async with self.lock:
-            await bot_client.coc_db.db__redemption.update_one(
+            await self.database.db__redemption.update_one(
                 {'_id':self._id},
                 {'$set':{'channel_id': channel_id}},
                 )
@@ -126,7 +124,7 @@ class RedemptionTicket():
             ticket = await RedemptionTicket.get_by_id(self.id)
 
             if not ticket.close_user:
-                new_doc = await bot_client.coc_db.db__redemption.find_one_and_update(
+                new_doc = await self.database.db__redemption.find_one_and_update(
                     {'_id':self._id},
                     {'$set':{
                         'close_user': user_id,
@@ -146,7 +144,7 @@ class RedemptionTicket():
             ticket = await RedemptionTicket.get_by_id(self.id)
             
             if ticket.close_user:
-                await bot_client.coc_db.db__redemption.update_one(
+                await self.database.db__redemption.update_one(
                     {'_id':self._id},
                     {'$set':{
                         'close_user': None,
@@ -167,12 +165,12 @@ class RedemptionTicket():
         item = await self.get_item()
 
         try:
-            gp_account = await bot_client.coc.get_player(self.goldpass_tag) if self.goldpass_tag else None
+            gp_account = await self.coc_client.get_player(self.goldpass_tag) if self.goldpass_tag else None
         except coc.NotFound:
             gp_account = None
         except (coc.Maintenance,coc.GatewayError):
             embed = await clash_embed(
-                context=bot_client.bot,
+                context=self.bot,
                 title=f"Redemption: {getattr(self.user,'display_name','Unknown User')}",
                 message="*The Clash of Clans API is currently unavailable.*"
                     + f"\n\nTicket ID: `{self.id}`"
@@ -182,7 +180,7 @@ class RedemptionTicket():
                 )
         else:
             embed = await clash_embed(
-                context=bot_client.bot,
+                context=self.bot,
                 title=f"Redemption: {getattr(self.user,'display_name','Unknown User')}",
                 message=f"Ticket ID: `{self.id}`"
                     + f"\nUser: {getattr(self.user,'mention','Unknown User')}"

@@ -1,25 +1,26 @@
 import coc
 import hashlib
 import pendulum
+import logging
 
 from typing import *
 
 from async_property import AwaitLoader
 
-from ...api_client import BotClashClient as client
+from ...client.db_client import MotorClient
 
 from ..season.season import aClashSeason
 from ..clans.base_clan import BasicClan
 from ..players.base_player import BasicPlayer
 
-bot_client = client()
+DATA_LOG = logging.getLogger("coc.main")
 
 ##################################################
 #####
 ##### DATABASE
 #####
 ##################################################
-class aRaidWeekend(AwaitLoader):
+class aRaidWeekend(MotorClient,AwaitLoader):
     _cache = {}
     __slots__ = [
         '_id',
@@ -62,7 +63,7 @@ class aRaidWeekend(AwaitLoader):
                 'members.tag': player_tag
                 }
         
-        query = bot_client.coc_db.db__raid_weekend.find(query_doc,{'_id':1})
+        query = cls.database.db__raid_weekend.find(query_doc,{'_id':1})
         ret_raids = [await cls(q['_id']) async for q in query]
         return sorted(ret_raids, key=lambda w:(w.start_time),reverse=True)
 
@@ -80,7 +81,7 @@ class aRaidWeekend(AwaitLoader):
             query_doc = {
                 'clan_tag': clan_tag
                 }
-        query = bot_client.coc_db.db__raid_weekend.find(query_doc,{'_id':1})
+        query = cls.database.db__raid_weekend.find(query_doc,{'_id':1})
         ret_raids = [await cls(q['_id']) async for q in query]
         return sorted(ret_raids, key=lambda w:(w.start_time),reverse=True)
 
@@ -130,7 +131,7 @@ class aRaidWeekend(AwaitLoader):
         if self._loaded_from_db:
             return
         
-        query = await bot_client.coc_db.db__raid_weekend.find_one({'_id':self._id})
+        query = await self.database.db__raid_weekend.find_one({'_id':self._id})
         self._loaded_from_db = True
         if not query:
             return
@@ -220,7 +221,7 @@ class aRaidWeekend(AwaitLoader):
     async def save_to_database(self):
         self._last_save = pendulum.now()
         self._found_in_db = True
-        await bot_client.coc_db.db__raid_weekend.update_one(
+        await self.database.db__raid_weekend.update_one(
             {'_id':self._id},
             {'$set': self.to_json()},
             upsert=True
@@ -263,7 +264,7 @@ class aRaidWeekend(AwaitLoader):
     def defense_raids_completed(self) -> int:
         return len([a for a in self.defense_log if a.destroyed_district_count == a.district_count])
     
-    def get_member(self,tag) -> ['aRaidMember']:
+    def get_member(self,tag) -> 'aRaidMember':
         find_member = [rm for rm in self.members if rm.tag == tag]
         if len(find_member) == 0:
             return None
@@ -326,7 +327,7 @@ class aRaidClan(BasicClan):
             'attacks': [a.to_json() for a in self.attacks]
             }
     
-    def get_district(self,district_id) -> ['aRaidDistrict']:
+    def get_district(self,district_id) -> 'aRaidDistrict':
         find_district = [rd for rd in self.districts if rd.id == district_id]
         if len(find_district) == 0:
             return None
@@ -434,10 +435,10 @@ class aRaidAttack():
             }
     
     @property
-    def district(self) -> ['aRaidDistrict']:
+    def district(self) -> 'aRaidDistrict':
         return self.clan.get_district(self.district_id)    
     @property
-    def attacker(self) -> ['aRaidMember']:
+    def attacker(self) -> 'aRaidMember':
         return self.raid.get_member(self.attacker_tag)    
     @property
     def new_stars(self) -> int:

@@ -443,7 +443,7 @@ class BaseVaultMenu(DefaultView):
         embed = await eclipse_embed(
             context=self.ctx,
             title="**E.C.L.I.P.S.E. Base Vault**",
-            message=(f"## **Oops!\nWe currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
+            message=(f"## Oops!\n**We currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
                 + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"

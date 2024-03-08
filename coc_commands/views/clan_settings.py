@@ -7,14 +7,12 @@ from redbot.core import commands
 from redbot.core.utils import AsyncIter
 from redbot.core.utils import chat_formatting as chat
 
-from coc_main.api_client import CommandUnauthorized
-
 from coc_main.coc_objects.clans.clan import aClan
-from coc_main.discord.feeds.clan_feed import ClanDataFeed, feed_description
-from coc_main.discord.feeds.member_movement import ClanMemberFeed
-from coc_main.discord.feeds.donations import ClanDonationFeed
-from coc_main.discord.feeds.raid_results import RaidResultsFeed
-from coc_main.discord.feeds.reminders import EventReminder
+from coc_discord.feeds.clan_feed import ClanDataFeed
+from coc_discord.feeds.member_movement import ClanMemberFeed
+from coc_discord.feeds.donations import ClanDonationFeed
+from coc_discord.feeds.raid_results import RaidResultsFeed
+from coc_discord.feeds.reminders import EventReminder
 
 from coc_main.utils.components import clash_embed, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView, DiscordModal
 
@@ -55,7 +53,14 @@ class ClanSettingsMenu(DefaultView):
         
         if not check_permissions:
             self.stop_menu()
-            raise CommandUnauthorized
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"**You do not have permission to access this menu.**")
+            if isinstance(self.ctx,discord.Interaction):
+                await self.ctx.edit_original_response(embed=embed,view=self)
+            else:
+                await self.ctx.reply(embed=embed,view=self)
+            return
 
         self.load_main_menu_items()
         embed = await self.get_main_embed()

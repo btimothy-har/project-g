@@ -2,6 +2,7 @@ import discord
 import pendulum
 import re
 import coc
+import logging
 
 from typing import *
 from collections import Counter
@@ -10,10 +11,14 @@ from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason, InvalidRole
-from coc_main.cog_coc_client import aClan
+from coc_main.client.global_client import GlobalClient
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
+from coc_main.coc_objects.season.season import aClashSeason
+from coc_main.coc_objects.clans.clan import aClan
 
-from coc_main.utils.components import clash_embed, handle_command_error, handle_exception, MenuConfirmation, ClanLinkMenu
+from coc_main.exceptions import InvalidRole
+
+from coc_main.utils.components import clash_embed, MenuConfirmation, ClanLinkMenu
 from coc_main.utils.utils import chunks
 from coc_main.utils.autocomplete import autocomplete_clans, autocomplete_clans_coleader, autocomplete_seasons
 from coc_main.utils.checks import is_admin, is_coleader, is_admin_or_leader, is_admin_or_coleader
@@ -28,7 +33,7 @@ from .views.clan_members import ClanMembersMenu
 from .views.clan_warlog import ClanWarLog
 from .excel.clan_export import ClanExcelExport
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 async def autocomplete_clan_settings(interaction:discord.Interaction,current:str):
     try:
@@ -39,43 +44,48 @@ async def autocomplete_clan_settings(interaction:discord.Interaction,current:str
             return await autocomplete_clans_coleader(interaction,current)
         
     except Exception as exc:
-        await handle_exception(exc)        
+        LOG.exception(f"Error in autocomplete_clan_settings: {exc}")
+        return []
 
 ############################################################
 ############################################################
 #####
-##### CLIENT COG
+##### CLAN COMMANDS COG
 #####
 ############################################################
 ############################################################
-class Clans(commands.Cog):
+class Clans(commands.Cog,GlobalClient):
     """
     Clan Commands
     """
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
 
-    def __init__(self,bot:Red,version:int):
-        self.bot = bot
-        self.sub_v = version
+    def __init__(self):
+        pass
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
     
     @property
-    def bot_client(self) -> BotClashClient:
-        return BotClashClient()
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
         original_exc = getattr(error,'original',error)
-        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
+        await GlobalClient.handle_command_error(original_exc,ctx)
 
     async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
         original_exc = getattr(error,'original',error)
-        await handle_command_error(original_exc,interaction)
+        await GlobalClient.handle_command_error(original_exc,interaction)
     
+    ############################################################
+    #####
+    ##### ASSISTANT FUNCTIONS
+    #####
+    ############################################################
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schemas = [
@@ -121,25 +131,27 @@ class Clans(commands.Cog):
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__clan.aggregate(pipeline)
+        query = self.database.db__clan.aggregate(pipeline)
 
         clan_tags = [c['_id'] async for c in query]
-        clans = [p async for p in bot_client.coc.get_clans(clan_tags)]
+        clans = [p async for p in self.coc_client.get_clans(clan_tags)]
         ret_clans = [c.assistant_name_json() for c in clans]
         return f"Found {len(ret_clans)} Clans matching `{clan_name_or_abbreviation}`. Clans: {ret_clans}"
 
     async def _assistant_get_clan_information(self,clan_tag:str,*args,**kwargs) -> str:
         try:
-            clan = await bot_client.coc.get_clan(clan_tag)
+            clan = await self.coc_client.get_clan(clan_tag)
         except Exception as exc:
-            return await handle_exception(exc)
+            return self.get_exception_response(exc)
         
         ret_clan = clan.assistant_clan_information()
         return f"Found Clan: {ret_clan}"
     
-    ##################################################
-    ### CLAN ABBREVIATION LISTENER
-    ##################################################
+    ############################################################
+    #####
+    ##### CLAN ABBREVIATION LISTENER
+    #####
+    ############################################################
     @commands.Cog.listener("on_message")
     async def clan_abbreviation_listener(self,message:discord.Message):
 
@@ -159,7 +171,7 @@ class Clans(commands.Cog):
 
         for text in content_text.split():
             try:
-                clan = await bot_client.coc.from_clan_abbreviation(text)                
+                clan = await self.coc_client.from_clan_abbreviation(text)                
             except:
                 chk = False
             else:
@@ -181,104 +193,14 @@ class Clans(commands.Cog):
                     )
                 embeds.append(embed)
             return await message.reply(embeds=embeds,view=view)
-    
-    ############################################################
-    ############################################################
-    #####
-    ##### COMMAND DIRECTORY
-    ##### - Clan / Export
-    ##### - Clan / Compo
-    ##### - Clan / Strength
-    ##### - Clan / Donations
-    ##### - Clan / Members
-    ##### - Clan / Info
-    ##### - Clan-Games
-    ##### - ClanData / War Log** [under construction]
-    ##### - ClanData / Raid Log** [under construction]
-    ##### - ClanSet / Register
-    ##### - ClanSet / Delete
-    ##### - ClanSet / Link
-    ##### - ClanSet / Unlink
-    ##### - ClanSet / SetLeader
-    ##### - ClanSet / Config    
-    #####
-    ############################################################
-    ############################################################
-
-    ##################################################
-    ### PARENT COMMAND GROUPS
-    ##################################################
-    @commands.group(name="clan")
-    @commands.guild_only()
-    async def command_group_clan(self,ctx):
-        """
-        Group for Clan-related commands.
-
-        **This is a command group. To use the sub-commands below, follow the syntax: `$clan [sub-command]`.**
-        """
-        if not ctx.invoked_subcommand:
-            pass
-
-    app_command_group_clan = app_commands.Group(
-        name="clan",
-        description="Group for Clan Data. Equivalent to [p]clandata.",
-        guild_only=True
-        )
-    
-    @commands.group(name="clanset")
-    @commands.guild_only()
-    async def command_group_clanset(self,ctx):
-        """
-        Group for Clan Settings.
-
-        **This is a command group. To use the sub-commands below, follow the syntax: `$clanset [sub-command]`.**
-        """
-        if not ctx.invoked_subcommand:
-            pass
-
-    app_command_group_clanset = app_commands.Group(
-        name="clan-set",
-        description="Group for Clan Settings. Equivalent to [p]clanset.",
-        guild_only=True
-        )
-    
-    ##################################################
-    ### CLAN FAMILY
-    ##################################################
-    async def helper_family_clans(self,context:Union[commands.Context,discord.Interaction]):
-        clans = await bot_client.coc.get_registered_clans()
-        a_iter = AsyncIter(clans)
-        embed = await clash_embed(
-            context=context,
-            title=f"**{bot_client.bot.user.name} Registered Clans**",
-            message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" async for clan in a_iter]),
-            )
-        return embed
-
-    @commands.command(name="familyclans")
-    @commands.guild_only()
-    async def command_family_clans(self,ctx:commands.Context):
-        """
-        Displays all Clans registered to the bot.
-        """
-        embed = await self.helper_family_clans(ctx)
-        await ctx.reply(embed=embed)
         
-    @app_commands.command(
-        name="family-clans",
-        description="Displays all Clans registered to the bot.")
-    @app_commands.guild_only()
-    async def app_command_family_clans(self,interaction:discord.Interaction):
-
-        await interaction.response.defer()
-        embed = await self.helper_family_clans(interaction)
-        await interaction.followup.send(embed=embed)
-
-    ##################################################
-    ### FIND-CLAN (ALIAS: CLAN INFO)
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: FIND CLAN
+    #####
+    ############################################################
     async def helper_find_clan(self,context:Union[commands.Context,discord.Interaction],clan_tag:str) -> Tuple[discord.Embed,Optional[ClanLinkMenu]]:        
-        clan = await bot_client.coc.get_clan(clan_tag)
+        clan = await self.coc_client.get_clan(clan_tag)
         if not clan:
             embed = await clash_embed(
             context=context,
@@ -300,11 +222,11 @@ class Clans(commands.Cog):
     
     @commands.command(name="findclan")
     @commands.guild_only()
-    async def command_find_clan(self,ctx:commands.Context,clan_tag:str):
+    async def cmd_findclan(self,ctx:commands.Context,clan_tag:str):
         """
         Gets information about an in-game Clan.
 
-        This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p]abbreviation` instead.
+        This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p][abbreviation]` instead.
         """
 
         embed, view = await self.helper_find_clan(ctx,clan_tag)
@@ -312,48 +234,77 @@ class Clans(commands.Cog):
         
     @app_commands.command(
         name="find-clan",
-        description="Get information about a Clan.")
+        description="Gets information about a Clan.")
     @app_commands.guild_only()
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan or manually enter a Tag.")
-    async def app_command_find_clan(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_findclan(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
         embed, view = await self.helper_find_clan(interaction,clan)
         await interaction.followup.send(embed=embed,view=view)
-    
-    @command_group_clan.command(name="info")
+
+    ############################################################
+    #####
+    ##### COMMAND GROUP: CLAN
+    #####
+    ############################################################
+    @commands.group(name="clan")
     @commands.guild_only()
-    async def command_get_clan_information(self,ctx:commands.Context,clan_tag:str):
+    async def cmdgroup_clan(self,ctx:commands.Context):
+        """
+        Group for Clan-related commands.
+
+        **This is a command group. To use the sub-commands below, follow the syntax: `[p]clan [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    appgrp_clan = app_commands.Group(
+        name="clan",
+        description="Group for Clan-related Commands. Equivalent to [p]clan.",
+        guild_only=True
+        )    
+
+    ############################################################
+    #####
+    ##### COMMAND: CLAN INFO
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="info",aliases=['profile'])
+    @commands.guild_only()
+    async def subcmd_clan_info(self,ctx:commands.Context,clan_tag:str):
         """
         Gets information about an in-game Clan.
 
-        This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p]abbreviation` instead.
+        This command accepts an in-game Clash Tag. To use Alliance abbreviations, simply use `[p][abbreviation]` instead.
         """
 
         embed, view = await self.helper_find_clan(ctx,clan_tag)
         await ctx.reply(embed=embed,view=view)
         
-    @app_command_group_clan.command(
+    @appgrp_clan.command(
         name="info",
         description="Get information about a Clan.")
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan or manually enter a Tag.")
-    async def app_command_clan_information(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_info(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
         embed, view = await self.helper_find_clan(interaction,clan)
         await interaction.followup.send(embed=embed,view=view)
     
-    ##################################################
-    ### CLANDATA / EXPORT
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: CLAN EXPORT
+    #####
+    ############################################################
     async def _clan_export_helper(self,
         context:Union[commands.Context,discord.Interaction],
         clan_tag_or_abbreviation:str,
         season:Optional[aClashSeason]=None):
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)        
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)        
         if not clan:
             embed = await clash_embed(
                 context=context,
@@ -371,71 +322,73 @@ class Clans(commands.Cog):
             return embed, None
         
         if not season:
-            season = bot_client.current_season
+            season = aClashSeason.current()
         rp_file = await ClanExcelExport.generate_report(clan,season)
         discord_file = discord.File(rp_file)
 
         message = f"Here is your Data for **{clan}**.\n\nSeason: {season.description}."
         return message,discord_file
 
-    # @command_group_clan.command(name="export")
-    # @commands.guild_only()
-    # @commands.check(is_coleader)
-    # async def command_export_clan_data(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
-    #     """
-    #     Exports a Clan's data to Excel.
+    @cmdgroup_clan.command(name="export")
+    @commands.guild_only()
+    @commands.check(is_coleader)
+    async def cmd_clan_export(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+        """
+        Exports a Clan's data to Excel.
 
-    #     Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
-    #     """
+        Only usable for Alliance clans. Defaults to current season. To export for different seasons, use the Slash command.
+        """
 
-    #     embed = await clash_embed(
-    #         context=ctx,
-    #         message=f"{EmojisUI.LOADING} Exporting data... please wait.",
-    #         timestamp=pendulum.now(),
-    #         )
-    #     message = await ctx.reply(embed=embed)
+        embed = await clash_embed(
+            context=ctx,
+            message=f"{EmojisUI.LOADING} Exporting data... please wait.",
+            timestamp=pendulum.now(),
+            )
+        message = await ctx.reply(embed=embed)
 
-    #     embed, discord_file = await self._clan_export_helper(ctx,clan_tag_or_abbreviation)
-    #     attachments = [discord_file] if discord_file else []
+        embed, discord_file = await self._clan_export_helper(ctx,clan_tag_or_abbreviation)
+        attachments = [discord_file] if discord_file else []
 
-    #     await message.edit(
-    #         content=f'{ctx.author.mention} {embed}',
-    #         embed=None,
-    #         attachments=attachments
-    #         )
+        await message.edit(
+            content=f'{ctx.author.mention} {embed}',
+            embed=None,
+            attachments=attachments
+            )
 
-    # @app_command_group_clan.command(name="export",
-    #     description="Export seasonal Clan Data to an Excel file.")
-    # @app_commands.check(is_coleader)
-    # @app_commands.autocomplete(
-    #     clan=autocomplete_clans_coleader,
-    #     season=autocomplete_seasons)
-    # @app_commands.describe(
-    #     clan="Select a Clan. Only Alliance Clans can be selected.",
-    #     season="Select a Season to export.")
-    # async def app_command_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
+    @appgrp_clan.command(name="export",
+        description="Export seasonal Clan Data to an Excel file.")
+    @app_commands.check(is_coleader)
+    @app_commands.autocomplete(
+        clan=autocomplete_clans_coleader,
+        season=autocomplete_seasons)
+    @app_commands.describe(
+        clan="Select a Clan. Only Alliance Clans can be selected.",
+        season="Select a Season to export.")
+    async def appcmd_clan_export(self,interaction:discord.Interaction,clan:str,season:str):  
         
-    #     await interaction.response.defer()
+        await interaction.response.defer()
 
-    #     get_season = await aClashSeason(season)
+        get_season = await aClashSeason(season)
 
-    #     embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
-    #     attachments = [discord_file] if discord_file else []
+        embed, discord_file = await self._clan_export_helper(interaction,clan,get_season)
+        attachments = [discord_file] if discord_file else []
 
-    #     await interaction.edit_original_response(
-    #         content=f'{interaction.user.mention} {embed}',
-    #         embed=None,
-    #         attachments=attachments
-    #         )
+        await interaction.edit_original_response(
+            content=f'{interaction.user.mention} {embed}',
+            embed=None,
+            attachments=attachments
+            )
     
-    ##################################################
-    ### CLANDATA / COMPO
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: CLAN COMPO
+    #####
+    ############################################################
     async def _clan_composition_helper(self,
         context:Union[commands.Context,discord.Interaction],
         clan_tag_or_abbreviation:str) -> discord.Embed:
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)        
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)        
         if not clan:
             embed = await clash_embed(
                 context=context,
@@ -451,10 +404,10 @@ class Clans(commands.Cog):
             thumbnail=clan.badge,
             )
                    
-        ingame_members = [p async for p in bot_client.coc.get_players([m.tag for m in clan.members])]
+        ingame_members = [p async for p in self.coc_client.get_players([m.tag for m in clan.members])]
 
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
-            clan_members = [p async for p in bot_client.coc.get_players(clan.alliance_members)]
+            clan_members = [p async for p in self.coc_client.get_players(clan.alliance_members)]
             townhall_levels = [member.town_hall.level for member in clan_members]
             townhall_levels.sort(reverse=True)
 
@@ -491,9 +444,9 @@ class Clans(commands.Cog):
             )
         return embed
 
-    @command_group_clan.command(name="compo")
+    @cmdgroup_clan.command(name="compo")
     @commands.guild_only()
-    async def command_clan_composition(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def cmd_clan_compo(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
         View a Clan's Town Hall composition.
 
@@ -503,12 +456,12 @@ class Clans(commands.Cog):
         embed = await self._clan_composition_helper(ctx,clan_tag_or_abbreviation)
         await ctx.reply(embed=embed)
 
-    @app_command_group_clan.command(
+    @appgrp_clan.command(
         name="compo",
         description="View a Clan's Townhall composition.")
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clan_composition(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_compo(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
         embed = await self._clan_composition_helper(interaction,clan)
@@ -521,7 +474,7 @@ class Clans(commands.Cog):
         context:Union[commands.Context,discord.Interaction],
         clan_tag_or_abbreviation:str) -> discord.Embed:
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)        
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)        
         if not clan:
             embed = await clash_embed(
                 context=context,
@@ -532,10 +485,10 @@ class Clans(commands.Cog):
         
         if clan.is_alliance_clan and clan.alliance_member_count > 0:
             showing_registered = True
-            clan_members = [p async for p in bot_client.coc.get_players(clan.alliance_members)]
+            clan_members = [p async for p in self.coc_client.get_players(clan.alliance_members)]
         else:
             showing_registered = False
-            clan_members = [p async for p in bot_client.coc.get_players([m.tag for m in clan.members])]
+            clan_members = [p async for p in self.coc_client.get_players([m.tag for m in clan.members])]
         
         townhall_levels = list(set([member.town_hall.level for member in clan_members]))
         townhall_levels.sort(reverse=True)
@@ -580,9 +533,9 @@ class Clans(commands.Cog):
                     )
         return embed
 
-    @command_group_clan.command(name="strength")
+    @cmdgroup_clan.command(name="strength")
     @commands.guild_only()
-    async def subcommand_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def subcmd_clan_strength(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
         View a Clan's overall Offensive Strength.
 
@@ -592,23 +545,25 @@ class Clans(commands.Cog):
         embed = await self._clan_strength_helper(ctx,clan_tag_or_abbreviation)
         await ctx.reply(embed=embed)
     
-    @app_command_group_clan.command(
+    @appgrp_clan.command(
         name="strength",
         description="View a Clan's Offensive strength.")
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clan_strength(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_strength(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
         embed = await self._clan_strength_helper(interaction,clan)
         await interaction.followup.send(embed=embed)
     
-    ##################################################
-    ### CLAN / MEMBERS
-    ##################################################
-    @command_group_clan.command(name="members")
+    ############################################################
+    #####
+    ##### COMMAND: CLAN MEMBERS
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="members")
     @commands.guild_only()
-    async def subcommand_clan_membersummary(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def subcmd_clan_members(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
         Display info on a Clan's Members.
 
@@ -617,7 +572,7 @@ class Clans(commands.Cog):
         By default, this shows all in-game members. For Alliance Clans, this will also return registered members who are not in the in-game clan.
         """
   
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)
         if not clan:
             embed = await clash_embed(
                 context=ctx,
@@ -629,16 +584,16 @@ class Clans(commands.Cog):
         menu = ClanMembersMenu(ctx,clan)
         await menu.start()
 
-    @app_command_group_clan.command(name="members",
+    @appgrp_clan.command(name="members",
         description="View Clan Member information.")
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(
         clan="Select a Clan.") 
-    async def app_command_clan_membersummary(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_members(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
 
-        get_clan = await bot_client.coc.get_clan(clan)
+        get_clan = await self.coc_client.get_clan(clan)
         if not clan:
             embed = await clash_embed(
                 context=interaction,
@@ -650,19 +605,21 @@ class Clans(commands.Cog):
         menu = ClanMembersMenu(interaction,get_clan)
         await menu.start()
     
-    ##################################################
-    ### CLANDATA / WARLOG
-    ##################################################
-    @command_group_clan.command(name="warlog")
+    ############################################################
+    #####
+    ##### COMMAND: CLAN WARLOG
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="warlog")
     @commands.guild_only()
-    async def command_clan_warlog(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def subcmd_clan_warlog(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
         View a Clan's War Log.
 
         Only usable for Alliance clans.
         """
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)
         if not clan.is_alliance_clan:
             embed = await clash_embed(
                 context=ctx,
@@ -674,15 +631,15 @@ class Clans(commands.Cog):
         menu = ClanWarLog(ctx,clan)
         await menu.start()
 
-    @app_command_group_clan.command(
+    @appgrp_clan.command(
         name="war-log",
         description="View a Clan's Townhall composition.")
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_command_clan_warlog(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_warlog(self,interaction:discord.Interaction,clan:str):
 
         await interaction.response.defer()
-        get_clan = await bot_client.coc.get_clan(clan)
+        get_clan = await self.coc_client.get_clan(clan)
         if not get_clan.is_alliance_clan:
             embed = await clash_embed(
                 context=interaction,
@@ -694,9 +651,11 @@ class Clans(commands.Cog):
         menu = ClanWarLog(interaction,get_clan)
         await menu.start()
     
-    ##################################################
-    ### CLANSET / REGISTER
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: CLAN REGISTER
+    #####
+    ############################################################
     async def helper_register_clan(self,
         context:Union[commands.Context,discord.Interaction],
         clan_tag:str,
@@ -704,7 +663,7 @@ class Clans(commands.Cog):
         unicode_emoji:str,
         abbreviation:str):
 
-        clan = await bot_client.coc.get_clan(clan_tag)
+        clan = await self.coc_client.get_clan(clan_tag)
         await clan.register(abbreviation=abbreviation,emoji=emoji,unicode_emoji=unicode_emoji)
         embed = await clash_embed(
             context=context,
@@ -715,12 +674,12 @@ class Clans(commands.Cog):
             )
         return embed
 
-    @command_group_clanset.command(name="register")
+    @cmdgroup_clan.command(name="register")
     @commands.guild_only()
     @commands.admin()
-    async def subcommand_register_clan(self,ctx:commands.Context,clan_tag:str,emoji:str,unicode_emoji:str,abbreviation:str):
+    async def subcmd_clan_register(self,ctx:commands.Context,clan_tag:str,emoji:str,unicode_emoji:str,abbreviation:str):
         """
-        [Admin-only] Register an in-game Clan to the bot.
+        Registers an in-game Clan to the bot.
 
         Assigns:
         > - Clan Emoji
@@ -730,9 +689,9 @@ class Clans(commands.Cog):
         embed = await self.helper_register_clan(ctx,clan_tag,emoji,unicode_emoji,abbreviation)
         await ctx.reply(embed=embed)
     
-    @app_command_group_clanset.command(
+    @appgrp_clan.command(
         name="register",
-        description="[Admin-only] Register an in-game Clan to the bot.")
+        description="Register an in-game Clan to the bot.")
     @app_commands.check(is_admin)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(
@@ -740,7 +699,7 @@ class Clans(commands.Cog):
         emoji="Provide the Emoji to use for the Clan.",
         unicode_emoji="Provide the Unicode Emoji to use for the Clan.",
         abbreviation="Provide the Clan's abbreviation.")
-    async def app_subcommand_register_clan(self,interaction:discord.Interaction,
+    async def appcmd_clan_register(self,interaction:discord.Interaction,
         clan:str,
         emoji:str,
         unicode_emoji:str,
@@ -750,13 +709,15 @@ class Clans(commands.Cog):
         embed = await self.helper_register_clan(interaction,clan,emoji,unicode_emoji,abbreviation)
         await interaction.followup.send(embed=embed)
     
-    ##################################################
-    ### CLANSET / UNREGISTER
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: CLAN UNREGISTER
+    #####
+    ############################################################
     async def helper_unregister_clan(self,
         context:Union[commands.Context,discord.Interaction],clan_tag:str):
 
-        clan = await bot_client.coc.get_clan(clan_tag)
+        clan = await self.coc_client.get_clan(clan_tag)
         await clan.unregister()
         embed = await clash_embed(
             context=context,
@@ -767,26 +728,28 @@ class Clans(commands.Cog):
             )
         return embed
 
-    @command_group_clanset.command(name="unregister")
+    @appgrp_clan.command(name="unregister")
     @commands.guild_only()
     @commands.is_owner()
     async def subcommand_unregister_clan(self,ctx:commands.Context,clan_tag:str):
         """
-        [Admin-only] Register an in-game Clan to the bot.
+        Removes an in-game Clan from the bot.
         """
         
         embed = await self.helper_unregister_clan(ctx,clan_tag)
         await ctx.reply(embed=embed)
     
-    ##################################################
-    ### CLANSET / LINK
-    ##################################################
-    @command_group_clanset.command(name="link")
+    ############################################################
+    #####
+    ##### COMMAND: CLAN LINK
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="link")
     @commands.guild_only()
     @commands.admin()
-    async def subcommand_link_clan(self,ctx:commands.Context,clan_tag:str,coleader_role_id:int,elder_role_id:int,member_role_id:int):
+    async def subcmd_clan_link(self,ctx:commands.Context,clan_tag:str,coleader_role_id:int,elder_role_id:int,member_role_id:int):
         """
-        [Admin-only] Links a Clan to this Discord Server.
+        Links a Clan to this Discord Server.
 
         Linked Clans have linked Discord Roles, and will be synced based on membership status.
         > - Co-Leader Role
@@ -796,7 +759,7 @@ class Clans(commands.Cog):
         This command requires you to provide Co-Leader, Elder, and Member roles. To add a Visitor or Clan War Role, use the Slash command.
         """
         
-        clan = await bot_client.coc.get_clan(clan_tag)
+        clan = await self.coc_client.get_clan(clan_tag)
 
         coleader_role = ctx.guild.get_role(coleader_role_id)
         if not coleader_role:
@@ -859,9 +822,9 @@ class Clans(commands.Cog):
                 thumbnail=clan.badge)
             return await message.edit(content=None,embed=complete_embed,view=None)
 
-    @app_command_group_clanset.command(
+    @appgrp_clan.command(
         name="link",
-        description="[Admin-only] Links a Clan to this Discord Server.")
+        description="Links a Clan to this Discord Server.")
     @app_commands.check(is_admin)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(
@@ -871,7 +834,8 @@ class Clans(commands.Cog):
         member_role="The Role to assign to registered Members. Only applicable if this is a Guild Clan.",
         visitor_role="The Role to assign to all in-game members, if linked to a Discord user.",
         clan_war_role="The Role to assign to all in-game members who are participating in the current Clan War.")
-    async def app_subcommand_link_clan(self,interaction:discord.Interaction,
+    async def appcmd_clan_link(self,
+        interaction:discord.Interaction,
         clan:str,
         coleader_role:Optional[discord.Role]=None,
         elder_role:Optional[discord.Role]=None,
@@ -881,7 +845,7 @@ class Clans(commands.Cog):
         
         await interaction.response.defer()
         
-        select_clan = await bot_client.coc.get_clan(clan)
+        select_clan = await self.coc_client.get_clan(clan)
         embed = await clash_embed(
             context=interaction,
             title=f"Link Clan: **{select_clan.title}**",
@@ -942,17 +906,19 @@ class Clans(commands.Cog):
                 thumbnail=select_clan.badge)
             return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
-    ##################################################
-    ### CLANSET / UNLINK
-    ##################################################
-    @command_group_clanset.command(name="unlink")
+    ############################################################
+    #####
+    ##### COMMAND: CLAN UNLINK
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="unlink")
     @commands.guild_only()
     @commands.admin()
-    async def subcommand_unlink_clan(self,ctx:commands.Context,clan_tag:str):
+    async def subcmd_clan_unlink(self,ctx:commands.Context,clan_tag:str):
         """
-        [Admin-only] Unlinks a Clan from this Discord Server.
+        Unlinks a Clan from this Discord Server.
         """
-        clan = await bot_client.coc.get_clan(clan_tag)
+        clan = await self.coc_client.get_clan(clan_tag)
         link = await ClanGuildLink.get_link(clan.tag,ctx.guild.id)
         
         embed = await clash_embed(
@@ -996,17 +962,17 @@ class Clans(commands.Cog):
                 thumbnail=clan.badge)
             return await message.edit(content=None,embed=complete_embed,view=None)
 
-    @app_command_group_clanset.command(
+    @appgrp_clan.command(
         name="unlink",
-        description="[Admin-only] Unlinks a Clan from this Discord Server.")
+        description="Unlinks a Clan from this Discord Server.")
     @app_commands.check(is_admin)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_subcommand_unlink_clan(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_unlink(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
         
-        select_clan = await bot_client.coc.get_clan(clan)
+        select_clan = await self.coc_client.get_clan(clan)
         link = await ClanGuildLink.get_link(select_clan.tag,interaction.guild.id)
 
         if not link:
@@ -1059,9 +1025,11 @@ class Clans(commands.Cog):
                 thumbnail=select_clan.badge)
             return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
-    ##################################################
-    ### CLANSET / SETLEADER
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: CLAN SETLEADER
+    #####
+    ############################################################
     def check_change_leader(self,guild:discord.Guild,clan:aClan,user_id:int):
         if user_id in self.bot.owner_ids:
             return True
@@ -1072,17 +1040,17 @@ class Clans(commands.Cog):
             return True
         return False
         
-    @command_group_clanset.command(name="leader")
+    @cmdgroup_clan.command(name="changeleader")
     @commands.guild_only()
     @commands.check(is_admin_or_leader)
-    async def subcommand_change_clan_leader(self,ctx:commands.Context,clan_abbreviation:str,new_leader:discord.Member):
+    async def subcmd_clan_change_leader(self,ctx:commands.Context,clan_abbreviation:str,new_leader:discord.Member):
         """
         Change the Leader of a registered Clan.
 
         Only the current Leader, or a Server Admin can use this Command.
         """
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_abbreviation)
+        clan = await self.coc_client.from_clan_abbreviation(clan_abbreviation)
 
         if not self.check_change_leader(ctx.guild,clan,ctx.author.id):
             embed = await clash_embed(
@@ -1095,7 +1063,7 @@ class Clans(commands.Cog):
         embed = await clash_embed(
             context=ctx,
             title=f"Change Leader: **{clan.title}**",
-            message=f"**Current Leader:** <@{clan.leader}>"
+            message=f"**Current Leader:** " + (f"<@{clan.leader}>" if clan.leader else "None Assigned")
                 + f"\n**New Leader:** {new_leader.mention}"
                 + f"\n\n{clan.long_description}"
                 + f"\n\n>>> {clan.description}",
@@ -1128,7 +1096,7 @@ class Clans(commands.Cog):
             complete_embed = await clash_embed(
                 context=ctx,
                 title=f"Change Leader: **{clan.title}**",
-                message=f"Leader: <@{clan.leader}>"
+                message=f"New Leader: <@{clan.leader}>"
                     + f"\n\n{clan.long_description}"
                     + f"\n\n>>> {clan.description}",
                 url=clan.share_link,
@@ -1140,17 +1108,17 @@ class Clans(commands.Cog):
                 view=None
                 )
 
-    @app_command_group_clanset.command(
-        name="leader",
-        description="[Admin-only] Change the Leader of a registered Clan.")
+    @appgrp_clan.command(
+        name="change-leader",
+        description="Change the Leader of a registered Clan.")
     @app_commands.check(is_admin_or_leader)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def app_subcommand_change_leader(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
+    async def subcmd_clan_change_leader(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
 
         await interaction.response.defer()
 
-        select_clan = await bot_client.coc.get_clan(clan)
+        select_clan = await self.coc_client.get_clan(clan)
 
         if not self.check_change_leader(interaction.guild,select_clan,interaction.user.id):
             embed = await clash_embed(
@@ -1163,7 +1131,7 @@ class Clans(commands.Cog):
         embed = await clash_embed(
             context=interaction,
             title=f"Change Leader: **{select_clan.title}**",
-            message=f"**Current Leader:** <@{select_clan.leader}>"
+            message=f"**Current Leader:** " + (f"<@{clan.leader}>" if clan.leader else "None Assigned")
                 + f"\n**New Leader:** {new_leader.mention}"
                 + f"\n\n{select_clan.long_description}"
                 + f"\n\n>>> {select_clan.description}",
@@ -1205,32 +1173,115 @@ class Clans(commands.Cog):
                 thumbnail=select_clan.badge)
             return await interaction.edit_original_response(content=None,embed=complete_embed,view=None)
     
-    ##################################################
-    ### CLANSET / CONFIG
-    ##################################################
-    @command_group_clanset.command(name="config")
+    ############################################################
+    #####
+    ##### COMMAND: CLAN SETTINGS
+    #####
+    ############################################################
+    @cmdgroup_clan.command(name="settings")
     @commands.guild_only()
     @commands.check(is_admin_or_coleader)
-    async def subcommand_change_clan_config(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
+    async def subcmd_clan_settings(self,ctx:commands.Context,clan_tag_or_abbreviation:str):
         """
-        [Admin or Co-Leaders] Show/change Clan Configuration Options.
+        Show/change Clan Configuration Options.
 
         Allows Co-Leaders to set up Recruitment Levels, Custom Clan Descriptions, War/Raid Reminders.
         """
 
-        clan = await bot_client.coc.from_clan_abbreviation(clan_tag_or_abbreviation)
+        clan = await self.coc_client.from_clan_abbreviation(clan_tag_or_abbreviation)
         menu = ClanSettingsMenu(ctx,clan)
         await menu.start() 
     
-    @app_command_group_clanset.command(
-        name="config",
-        description="[Admin or Co-Leaders] Show/change Clan Configuration Options.")
+    @appgrp_clan.command(
+        name="settings",
+        description="Show/change Clan Configuration Options.")
     @app_commands.check(is_admin_or_coleader)
     @app_commands.autocomplete(clan=autocomplete_clan_settings)
     @app_commands.describe(clan="Select a Clan. You must be a Server Admin or Leader/Co-Leader for the Clan.")
     async def app_command_clan_settings(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
-        get_clan = await bot_client.coc.get_clan(clan)
+        get_clan = await self.coc_client.get_clan(clan)
         menu = ClanSettingsMenu(interaction,get_clan)
         await menu.start()
+    
+    ############################################################
+    #####
+    ##### COMMAND GROUP: FAMILY
+    #####
+    ############################################################
+    @commands.group(name="family")
+    @commands.guild_only()
+    async def cmdgroup_family(self,ctx):
+        """
+        Group for Clan Family-related commands.
+
+        **This is a command group. To use the sub-commands below, follow the syntax: `[p]family [sub-command]`.**
+        """
+        if not ctx.invoked_subcommand:
+            pass
+
+    appgrp_family = app_commands.Group(
+        name="family",
+        description="Group for Clan Family-related commands. Equivalent to [p]family.",
+        guild_only=True
+        )    
+    
+    ############################################################
+    #####
+    ##### COMMAND: FAMILY CLANS
+    #####
+    ############################################################    
+    async def helper_family_clans(self,context:Union[commands.Context,discord.Interaction],only_server:bool):
+        if only_server:
+            clan_links = await ClanGuildLink.get_for_guild(context.guild.id)
+            embed = await clash_embed(
+                context=context,
+                title=f"**Linked Clans: {context.guild.name}**"
+                )
+            
+            iter = AsyncIter(clan_links)            
+            async for link in iter:
+                try:
+                    clan = await self.coc_client.get_clan(link.tag)
+                except:
+                    continue
+
+                embed.add_field(
+                    name=f"**{clan.title}**",
+                    value=f"Co-Leader Role: {getattr(link.coleader_role,'mention','None')}"
+                        + f"\nElder Role: {getattr(link.elder_role,'mention','None')}"
+                        + f"\nMember Role: {getattr(link.member_role,'mention','None')}",
+                    inline=False
+                    )
+            return embed
+
+        else:
+            clans = await self.coc_client.get_registered_clans()
+            a_iter = AsyncIter(clans)
+            embed = await clash_embed(
+                context=context,
+                title=f"**{self.bot.user.name} Registered Clans**",
+                message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" async for clan in a_iter]),
+                )
+            return embed
+
+    @cmdgroup_family.command(name="clans")
+    @commands.guild_only()
+    async def subcmd_family_clans(self,ctx:commands.Context,only_server:Optional[bool]=True):
+        """
+        Displays all Clans registered to the bot.
+        """
+        embed = await self.helper_family_clans(ctx,only_server)
+        await ctx.reply(embed=embed)
+        
+    @appgrp_clan.command(
+        name="clans",
+        description="Displays all Clans registered to the bot.")
+    @app_commands.describe(only_server="Only show Clans registered to this server.")
+    @app_commands.guild_only()
+    async def appcmd_family_clan(self,interaction:discord.Interaction,only_server:Optional[bool]=True):
+
+        await interaction.response.defer()
+        embed = await self.helper_family_clans(interaction,only_server)
+        await interaction.followup.send(embed=embed)

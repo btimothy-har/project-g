@@ -1,18 +1,18 @@
 import coc
-import random
+import logging
 
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
 
-from coc_main.api_client import BotClashClient as client
-
+from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.players.player import aPlayer
-from coc_main.coc_objects.players.player_stat import aPlayerActivity
+from coc_main.coc_objects.players.player_season import aPlayerSeason
+from coc_main.coc_objects.players.player_activity import aPlayerActivity
 
 from coc_main.utils.constants.coc_constants import HeroAvailability, TroopAvailability, SpellAvailability, PetAvailability
 
-bot_client = client()
 default_sleep = 60
+LOG = logging.getLogger("coc.data")
 
 ############################################################
 ############################################################
@@ -27,14 +27,17 @@ class PlayerTasks():
     async def on_player_check_snapshot(old_player:aPlayer,new_player:aPlayer):
         if not new_player._create_snapshot:
             return
-        last_activity = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'snapshot')
-        if not last_activity or last_activity._timestamp - new_player.timestamp.int_timestamp > 3600:
-            await aPlayerActivity.create_new(
-                player=new_player,
-                timestamp=new_player.timestamp,
-                activity="snapshot",
-                )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Created new snapshot.")
+        await aPlayerActivity.create_new(
+            player=new_player,
+            timestamp=new_player.timestamp,
+            activity="snapshot",
+            )
+        
+        all_seasons = aClashSeason.all_seasons()        
+        player_seasons = await bounded_gather(*[new_player.get_season_stats(s) for s in all_seasons])
+        await bounded_gather(*[s.create_member_snapshot() for s in player_seasons if isinstance(s,aPlayerSeason)])
+            
+        LOG.debug(f"{new_player.tag} {new_player.name}: Created player snapshots.")
     
     @coc.PlayerEvents.name()
     async def on_player_update_name(old_player:aPlayer,new_player:aPlayer):
@@ -44,7 +47,7 @@ class PlayerTasks():
             activity="change_name",
             new_value=new_player.name
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Name Change from {old_player.name} to {new_player.name}.")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Name Change from {old_player.name} to {new_player.name}.")
     
     @coc.PlayerEvents.war_opted_in()
     async def on_player_update_war_opted_in(old_player:aPlayer,new_player:aPlayer):
@@ -55,7 +58,7 @@ class PlayerTasks():
                 activity="change_war_option",
                 new_value=new_player.war_opted_in
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: War Opt In from {old_player.war_opted_in} to {new_player.war_opted_in}.")
+            LOG.debug(f"{new_player.tag} {new_player.name}: War Opt In from {old_player.war_opted_in} to {new_player.war_opted_in}.")
     
     @coc.PlayerEvents.label_ids()
     async def on_player_update_labels(old_player:aPlayer,new_player:aPlayer):
@@ -65,7 +68,7 @@ class PlayerTasks():
             activity="change_label",
             new_value=new_player.label_ids
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Labels changed to {new_player.label_ids}.")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Labels changed to {new_player.label_ids}.")
     
     @coc.PlayerEvents.town_hall_level()
     async def on_player_upgrade_townhall(old_player:aPlayer,new_player:aPlayer):
@@ -76,7 +79,7 @@ class PlayerTasks():
             change=new_player.town_hall.level - old_player.town_hall.level,
             new_value=new_player.town_hall.level
             )        
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Townhall upgraded to {new_player.town_hall.description}.")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Townhall upgraded to {new_player.town_hall.description}.")
     
     @coc.PlayerEvents.town_hall_weapon()
     async def on_player_upgrade_townhall_weapon(old_player:aPlayer,new_player:aPlayer):
@@ -87,7 +90,7 @@ class PlayerTasks():
             change=max(0,new_player.town_hall.weapon - old_player.town_hall.weapon),
             new_value=new_player.town_hall.weapon
             )        
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Townhall Weapon upgraded to {new_player.town_hall.description}.")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Townhall Weapon upgraded to {new_player.town_hall.description}.")
     
     @coc.PlayerEvents.hero_strength()
     async def on_player_upgrade_hero(old_player:aPlayer,new_player:aPlayer):        
@@ -104,7 +107,7 @@ class PlayerTasks():
                     change=getattr(new_hero,'level',0) - getattr(old_hero,'level',0),
                     new_value=new_hero.level
                     )
-                bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {hero} upgraded to {new_hero.level}.")
+                LOG.debug(f"{new_player.tag} {new_player.name}: {hero} upgraded to {new_hero.level}.")
 
         heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(heroes)
@@ -125,7 +128,7 @@ class PlayerTasks():
                     change=getattr(new_troop,'level',0) - getattr(old_troop,'level',0),
                     new_value=new_troop.level
                     )
-                bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {troop} upgraded to {new_troop.level}.")
+                LOG.debug(f"{new_player.tag} {new_player.name}: {troop} upgraded to {new_troop.level}.")
         
         async def _check_pet_upgrade(pet:str):
             old_troop = old_player.get_pet(pet)
@@ -140,7 +143,7 @@ class PlayerTasks():
                     change=getattr(new_troop,'level',0) - getattr(old_troop,'level',0),
                     new_value=new_troop.level
                     )
-                bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {pet} upgraded to {new_troop.level}.")
+                LOG.debug(f"{new_player.tag} {new_player.name}: {pet} upgraded to {new_troop.level}.")
         
         tasks = []
         troops = TroopAvailability.return_all_unlocked(new_player.town_hall.level)
@@ -168,7 +171,7 @@ class PlayerTasks():
                     change=getattr(new_spell,'level',0) - getattr(old_spell,'level',0),
                     new_value=new_spell.level
                     )
-                bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: {spell} upgraded to {new_spell.level}.")
+                LOG.debug(f"{new_player.tag} {new_player.name}: {spell} upgraded to {new_spell.level}.")
 
         spells = SpellAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(spells)
@@ -182,7 +185,7 @@ class PlayerTasks():
                 timestamp=new_player.timestamp,
                 activity="leave_clan"
                 )
-            bot_client.coc_data_log.debug(f"{old_player.tag} {old_player.name}: Left Clan {old_player.clan.tag} {old_player.clan.name}.")
+            LOG.debug(f"{old_player.tag} {old_player.name}: Left Clan {old_player.clan.tag} {old_player.clan.name}.")
         
         if new_player.clan_tag:
             await aPlayerActivity.create_new(
@@ -190,7 +193,7 @@ class PlayerTasks():
                 timestamp=new_player.timestamp,
                 activity="join_clan",
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Joined Clan {new_player.clan.tag} {new_player.clan.name}.")
+            LOG.debug(f"{new_player.tag} {new_player.name}: Joined Clan {new_player.clan.tag} {new_player.clan.name}.")
     
     @coc.PlayerEvents.trophies()
     async def on_player_update_trophies(old_player:aPlayer,new_player:aPlayer):
@@ -201,7 +204,7 @@ class PlayerTasks():
             change=new_player.trophies - old_player.trophies,
             new_value=new_player.trophies
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Trophies changed to {new_player.trophies} ({log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Trophies changed to {new_player.trophies} ({log.change}).")
     
     @coc.PlayerEvents.attack_wins()
     async def on_player_update_attack_wins(old_player:aPlayer,new_player:aPlayer):
@@ -216,7 +219,7 @@ class PlayerTasks():
                 change=change,
                 new_value=new_player.attack_wins
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Attack Wins changed to {new_player.attack_wins} (+{log.change}).")
+            LOG.debug(f"{new_player.tag} {new_player.name}: Attack Wins changed to {new_player.attack_wins} (+{log.change}).")
     
     @coc.PlayerEvents.defense_wins()
     async def on_player_update_defense_wins(old_player:aPlayer,new_player:aPlayer):
@@ -232,7 +235,7 @@ class PlayerTasks():
                 change=change,
                 new_value=new_player.defense_wins
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Defense Wins changed to {new_player.defense_wins} (+{log.change}).")
+            LOG.debug(f"{new_player.tag} {new_player.name}: Defense Wins changed to {new_player.defense_wins} (+{log.change}).")
     
     @coc.PlayerEvents.war_stars()
     async def on_player_update_war_stars(old_player:aPlayer,new_player:aPlayer):
@@ -245,7 +248,7 @@ class PlayerTasks():
             change=max(0,new_player.war_stars - ref_value),
             new_value=new_player.war_stars
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: War Stars changed to {new_player.war_stars} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: War Stars changed to {new_player.war_stars} (+{log.change}).")
     
     @coc.PlayerEvents.donations()
     async def on_player_update_donations(old_player:aPlayer,new_player:aPlayer):
@@ -261,7 +264,7 @@ class PlayerTasks():
                 change=change,
                 new_value=new_player.donations
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Sent changed to {new_player.donations} (+{log.change}).")
+            LOG.debug(f"{new_player.tag} {new_player.name}: Donations Sent changed to {new_player.donations} (+{log.change}).")
     
     @coc.PlayerEvents.received()
     async def on_player_update_received(old_player:aPlayer,new_player:aPlayer):
@@ -277,7 +280,7 @@ class PlayerTasks():
                 change=change,
                 new_value=new_player.received
                 )
-            bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Donations Rcvd changed to {new_player.received} (+{log.change}).")
+            LOG.debug(f"{new_player.tag} {new_player.name}: Donations Rcvd changed to {new_player.received} (+{log.change}).")
     
     @coc.PlayerEvents.clan_capital_contributions()
     async def on_player_update_capital_contributions(old_player:aPlayer,new_player:aPlayer):
@@ -291,7 +294,7 @@ class PlayerTasks():
             change=max(0,new_player.clan_capital_contributions - ref_value),
             new_value=new_player.clan_capital_contributions
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Capital Contribution changed to {new_player.clan_capital_contributions} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Capital Contribution changed to {new_player.clan_capital_contributions} (+{log.change}).")
     
     @coc.PlayerEvents.capital_gold_looted()
     async def on_player_update_loot_capital_gold(old_player:aPlayer,new_player:aPlayer):
@@ -305,7 +308,7 @@ class PlayerTasks():
             change=max(0,new_player.capital_gold_looted - ref_value),
             new_value=new_player.capital_gold_looted
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Capital Gold Looted changed to {new_player.capital_gold_looted} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Capital Gold Looted changed to {new_player.capital_gold_looted} (+{log.change}).")
     
     @coc.PlayerEvents.loot_gold()
     async def on_player_update_loot_gold(old_player:aPlayer,new_player:aPlayer):
@@ -318,7 +321,7 @@ class PlayerTasks():
             change=max(0,new_player.loot_gold - ref_value),
             new_value=new_player.loot_gold
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Loot Gold changed to {new_player.loot_gold} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Loot Gold changed to {new_player.loot_gold} (+{log.change}).")
     
     @coc.PlayerEvents.loot_gold()
     async def on_player_update_loot_elixir(old_player:aPlayer,new_player:aPlayer):
@@ -331,7 +334,7 @@ class PlayerTasks():
             change=max(0,new_player.loot_elixir - ref_value),
             new_value=new_player.loot_elixir
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Loot Elixir changed to {new_player.loot_elixir} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Loot Elixir changed to {new_player.loot_elixir} (+{log.change}).")
     
     @coc.PlayerEvents.loot_darkelixir()
     async def on_player_update_loot_darkelixir(old_player:aPlayer,new_player:aPlayer):
@@ -344,7 +347,7 @@ class PlayerTasks():
             change=max(0,new_player.loot_darkelixir - ref_value),
             new_value=new_player.loot_darkelixir
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Loot Dark Elixir changed to {new_player.loot_darkelixir} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Loot Dark Elixir changed to {new_player.loot_darkelixir} (+{log.change}).")
     
     @coc.PlayerEvents.clan_games()
     async def on_player_update_clan_games(old_player:aPlayer,new_player:aPlayer):
@@ -357,4 +360,4 @@ class PlayerTasks():
             change=max(0,new_player.clan_games - ref_value),
             new_value=new_player.clan_games
             )
-        bot_client.coc_data_log.debug(f"{new_player.tag} {new_player.name}: Clan Games changed to {new_player.clan_games} (+{log.change}).")
+        LOG.debug(f"{new_player.tag} {new_player.name}: Clan Games changed to {new_player.clan_games} (+{log.change}).")

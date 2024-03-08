@@ -3,23 +3,20 @@ import discord
 
 from typing import *
 
-from ..api_client import BotClashClient, ClashAPIError, InvalidTag
-from ..cog_coc_client import ClashOfClansClient, BasicPlayer
-
-from .member import aMember
-
+from ..client.coc_client import ClashClient
+from ..coc_objects.players.base_player import BasicPlayer
 from ..utils.components import DefaultView, DiscordSelectMenu, DiscordButton, DiscordModal, clash_embed
 from ..utils.constants.coc_emojis import EmojisTownHall
 
-bot_client = BotClashClient()
+from .member import aMember
 
 class AddLinkMenu(DefaultView):
     def __init__(self,
         context:discord.Interaction,
-        member:aMember):
+        member:discord.User):
 
         self.m_id = 0
-        self.member = member
+        self.member = aMember(member.id)
         self.start_add_link = DiscordButton(
             function=self._callback_add_link,
             label="I have my Tag/Token",
@@ -43,10 +40,6 @@ class AddLinkMenu(DefaultView):
             placeholder="API Tokens are not case sensitive.",
             required=True
             )
-        
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -94,21 +87,16 @@ class AddLinkMenu(DefaultView):
         api_token = modal.children[1].value
 
         if not coc.utils.is_valid_tag(o_tag):
-            raise InvalidTag(o_tag)
+            raise coc.NotFound()
         
         tag = coc.utils.correct_tag(o_tag)
         
         if self.bot.user.id == 828838353977868368:
             verify = True
         else:
-            try:
-                verify = await bot_client.coc.verify_player_token(player_tag=tag,token=api_token)
-            except (coc.NotFound) as exc:
-                raise InvalidTag(tag) from exc
-            except (coc.Maintenance,coc.GatewayError) as exc:
-                raise ClashAPIError(exc) from exc
+            verify = await self.coc_client.verify_player_token(player_tag=tag,token=api_token)
 
-        self.add_link_account = await bot_client.coc.get_player(tag)
+        self.add_link_account = await self.coc_client.get_player(tag)
 
         if self.add_link_account.is_member:
             verify = False
@@ -128,7 +116,7 @@ class AddLinkMenu(DefaultView):
             await BasicPlayer.set_discord_link(self.add_link_account.tag,interaction.user.id)
             embed = await clash_embed(
                 context=self.ctx,
-                message=f"The account **{self.add_link_account.tag}** is now linked to your Discord account!",
+                message=f"The account **{self.add_link_account.title}** is now linked to your Discord account!",
                 success=True
                 )
             await interaction.followup.edit_message(self.m_id,embed=embed,view=None)
@@ -144,18 +132,13 @@ class AddLinkMenu(DefaultView):
 class DeleteLinkMenu(DefaultView):
     def __init__(self,
         context:discord.Interaction,
-        member:aMember):
+        member:discord.User):
 
         self.is_active = True
         self.waiting_for = False
-
-        self.member = member
+        self.member = aMember(member.id)
 
         super().__init__(context,timeout=120)
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -173,7 +156,7 @@ class DeleteLinkMenu(DefaultView):
     ################################################## 
     async def _start_delete_link(self):
         await self.member.load()
-        m_accounts = [p async for p in bot_client.coc.get_players(self.member.account_tags)]
+        m_accounts = [p async for p in self.coc_client.get_players(self.member.account_tags)]
         m_accounts.sort(key=lambda x:(x.town_hall_level,x.exp_level,x.clean_name),reverse=True)
 
         select_options = [discord.SelectOption(
@@ -210,7 +193,7 @@ class DeleteLinkMenu(DefaultView):
         
     async def _callback_remove_account(self,interaction:discord.Interaction,menu:DiscordSelectMenu):
         await interaction.response.defer()
-        remove_accounts = [p async for p in bot_client.coc.get_players(menu.values)]
+        remove_accounts = [p async for p in self.coc_client.get_players(menu.values)]
 
         for account in remove_accounts:
             await BasicPlayer.set_discord_link(account.tag,0)

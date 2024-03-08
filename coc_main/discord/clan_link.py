@@ -2,42 +2,34 @@ import discord
 
 from typing import *
 from async_property import async_cached_property
-from redbot.core.utils import AsyncIter, bounded_gather
+from redbot.core.utils import AsyncIter
 
-from ..api_client import BotClashClient as client
+from ..client.global_client import GlobalClient
 from ..coc_objects.clans.clan import BasicClan
 
-bot_client = client()
+class ClanGuildLink(GlobalClient):
 
-class ClanGuildLink():
     @classmethod
     async def get_link(cls,clan_tag:str,guild_id:int) -> Optional['ClanGuildLink']:
-        link = await bot_client.coc_db.db__clan_guild_link.find_one(
-            {
-                'tag':clan_tag,
-                'guild_id':guild_id
-                }
-            )
+        filter = {
+            'tag':clan_tag,
+            'guild_id':guild_id
+            }
+        link = await cls.database.db__clan_guild_link.find_one(filter)
         if link:
             return cls(link)
         return None
     
     @classmethod
     async def get_links_for_clan(cls,clan_tag:str) -> List['ClanGuildLink']:
-        query = bot_client.coc_db.db__clan_guild_link.find(
-            {
-                'tag':clan_tag
-                }
-            )
+        filter = {'tag':clan_tag}
+        query = cls.database.db__clan_guild_link.find(filter)
         return [cls(link) async for link in query]
 
     @classmethod
     async def get_for_guild(cls,guild_id:int) -> List['ClanGuildLink']:
-        query = bot_client.coc_db.db__clan_guild_link.find(
-            {
-                'guild_id':guild_id
-                }
-            )
+        filter = {'guild_id':guild_id}
+        query = cls.database.db__clan_guild_link.find(filter)
         return [cls(link) async for link in query]
     
     def __init__(self,database_dict:dict):
@@ -54,7 +46,7 @@ class ClanGuildLink():
     @classmethod
     async def link_member_role(cls,clan_tag:str,guild:discord.Guild,member_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+        await cls.database.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
             {'$set':
                 {
@@ -70,7 +62,7 @@ class ClanGuildLink():
     @classmethod
     async def link_elder_role(cls,clan_tag:str,guild:discord.Guild,elder_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+        await cls.database.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
             {'$set':
                 {
@@ -86,7 +78,7 @@ class ClanGuildLink():
     @classmethod
     async def link_coleader_role(cls,clan_tag:str,guild:discord.Guild,coleader_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+        await cls.database.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
             {'$set':
                 {
@@ -102,7 +94,7 @@ class ClanGuildLink():
     @classmethod
     async def link_visitor_role(cls,clan_tag:str,guild:discord.Guild,visitor_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+        await cls.database.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
             {'$set':
                 {
@@ -118,7 +110,7 @@ class ClanGuildLink():
     @classmethod
     async def link_clan_war_role(cls,clan_tag:str,guild:discord.Guild,clan_war_role:discord.Role):
         link_id = {'guild':guild.id,'tag':clan_tag}
-        await bot_client.coc_db.db__clan_guild_link.find_one_and_update(
+        await cls.database.db__clan_guild_link.find_one_and_update(
             {'_id':link_id},
             {'$set':
                 {
@@ -133,7 +125,7 @@ class ClanGuildLink():
     
     @classmethod
     async def delete(cls,clan_tag:str,guild:discord.Guild):
-        await bot_client.coc_db.db__clan_guild_link.delete_one({'tag':clan_tag,'guild_id':guild.id})
+        await cls.database.db__clan_guild_link.delete_one({'tag':clan_tag,'guild_id':guild.id})
     
     @async_cached_property
     async def clan(self) -> BasicClan:
@@ -144,7 +136,7 @@ class ClanGuildLink():
     
     @property
     def guild(self) -> discord.Guild:
-        return bot_client.bot.get_guild(self.guild_id)
+        return self.bot.get_guild(self.guild_id)
     
     @property
     def member_role(self) -> discord.Role:

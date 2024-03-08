@@ -1,16 +1,19 @@
+import coc
+
 from typing import *
-
-from ...api_client import coc as coc
-from ...api_client import BotClashClient as client
-
+from ...client.db_client import MotorClient
 from ...utils.constants.coc_emojis import EmojisTroops
 
-bot_client = client()
-
 class aTroop():
+
+    @staticmethod
+    def coc_client() -> coc.Client:
+        cog = MotorClient.bot.get_cog("ClashOfClansMain")
+        return cog.global_client.coc_client
+
     @classmethod
     def _not_yet_unlocked(cls,name:str,th_level:int):
-        i = bot_client.coc.get_troop(name,level=1)
+        i = aTroop.coc_client().get_troop(name,level=1)
         troop = cls(i,th_level)
         troop._level = 0
         return troop

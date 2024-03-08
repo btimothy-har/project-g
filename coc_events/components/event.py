@@ -8,16 +8,15 @@ from typing import *
 from collections import defaultdict
 from async_property import AwaitLoader
 
+from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient as client
+from coc_main.client.global_client import GlobalClient
 
 from coc_main.coc_objects.players.player import aPlayer
 from coc_main.discord.member import aMember
 
 from ..exceptions import EventClosed, AlreadyRegistered, NotEligible
-
-bot_client = client()
 
 # Participant Document
 # participant = {
@@ -32,7 +31,7 @@ bot_client = client()
 ##### EVENT PARTICIPANT
 #####
 ##################################################
-class Participant(aPlayer,AwaitLoader):
+class Participant(aPlayer,AwaitLoader,GlobalClient):
     def __init__(self,**kwargs):
         self._id = None
         self.participant_id = 0
@@ -45,17 +44,21 @@ class Participant(aPlayer,AwaitLoader):
             'event_id':self.event_id,
             'tag':self.tag
             }        
-        get_db = await bot_client.coc_db.db__event_participant.find_one(filter)
+        get_db = await self.database.db__event_participant.find_one(filter)
 
         if get_db:
             self._id = get_db['_id']
             self.participant_id = self._id
             self.registered_timestamp = pendulum.from_timestamp(get_db['timestamp'])
         await aPlayer.load(self)
+    
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
 
     @property
     def participant(self) -> Optional[discord.User]:
-        return bot_client.bot.get_user(self.discord_id)
+        return self.bot.get_user(self.discord_id)
 
 # Event Document
 # event = {
@@ -77,12 +80,12 @@ class Participant(aPlayer,AwaitLoader):
 ##### EVENT
 #####
 ##################################################
-class Event():
+class Event(GlobalClient):
     _locks = defaultdict(asyncio.Lock)
     
     @classmethod
     async def get_event(cls,event_id:str) -> Optional['Event']:
-        db = await bot_client.coc_db.db__event.find_one({'_id':bson.ObjectId(event_id)})
+        db = await GlobalClient.database.db__event.find_one({'_id':bson.ObjectId(event_id)})
         if db:
             return cls(db)
         return None
@@ -90,7 +93,7 @@ class Event():
     @classmethod
     async def get_by_channel(cls,channel_id:int) -> Optional['Event']:
         filter = {'channel_id':channel_id}
-        db = await bot_client.coc_db.db__event.find_one(filter)
+        db = await GlobalClient.database.db__event.find_one(filter)
         if db:
             return cls(db)
         return None
@@ -113,13 +116,13 @@ class Event():
             }
         }
         ]
-        query = bot_client.coc_db.db__event.aggregate(pipeline)
+        query = GlobalClient.database.db__event.aggregate(pipeline)
         return [cls(event) async for event in query]
     
     @classmethod
     async def get_participating_for_user(cls,user:int) -> List['Event']:
         filter = {'discord_id':user}
-        query = bot_client.coc_db.db__event_participant.find(filter)
+        query = GlobalClient.database.db__event_participant.find(filter)
         events = [await cls.get_event(participant['event_id']) async for participant in query]
         return [event for event in events if event.end_time > pendulum.now()]
 
@@ -151,21 +154,22 @@ class Event():
     @property
     def lock(self) -> asyncio.Lock:
         return self._locks[self.id]
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     @property
     def guild(self) -> Optional[discord.Guild]:
-        cog = bot_client.bot.get_cog('Events')
+        cog = self.bot.get_cog('Events')
         if cog:
             return cog.events_guild
-        return None
-    
+        return None    
     @property
     def master_role(self) -> Optional[discord.Role]:
-        cog = bot_client.bot.get_cog('Events')
+        cog = self.bot.get_cog('Events')
         if cog:
             return cog.events_role
-        return None
-    
+        return None    
     @property
     def event_role(self) -> Optional[discord.Role]:
         if self.guild and self.role_id:
@@ -179,7 +183,7 @@ class Event():
 
     @classmethod
     async def create(cls,name:str,max_participants:int,start_time:pendulum.DateTime,**kwargs):
-        new_event = await bot_client.coc_db.db__event.insert_one(
+        new_event = await GlobalClient.database.db__event.insert_one(
             {
             'name':name,
             'description':kwargs.get('description',''),
@@ -196,7 +200,7 @@ class Event():
     
     async def edit(self,**kwargs) -> 'Event':
         async with self.lock:
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':kwargs}
                 )
@@ -204,14 +208,14 @@ class Event():
     
     async def delete(self) -> None:
         async with self.lock:
-            await bot_client.coc_db.db__event.delete_one({'_id':self._id})
+            await self.database.db__event.delete_one({'_id':self._id})
 
     ##################################################
     ##### EVENT FUNCTIONS
     ##################################################    
     async def open_event(self) -> None:
         async with self.lock:
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':{'status':'open'}}
                 )
@@ -219,7 +223,7 @@ class Event():
     
     async def close_event(self) -> None:
         async with self.lock:
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':{'status':'closed'}}
                 )
@@ -243,7 +247,7 @@ class Event():
                 entity_type=discord.EntityType.external,
                 location="Clash of Clans"
                 )
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':{'discord_id':event.id}}
                 )
@@ -260,7 +264,7 @@ class Event():
             role = await self.guild.create_role(
                 name=self.name,
                 reason="Create event role.",)
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':{'role_id':role.id}}
                 )
@@ -272,7 +276,7 @@ class Event():
     
     async def set_discord_channel(self,channel:discord.TextChannel) -> None:
         async with self.lock:
-            await bot_client.coc_db.db__event.update_one(
+            await self.database.db__event.update_one(
                 {'_id':self._id},
                 {'$set':{'channel_id':channel.id}}
                 )
@@ -331,7 +335,7 @@ class Event():
                 'discord_id':user,
                 'timestamp':pendulum.now().int_timestamp
                 }
-            await bot_client.coc_db.db__event_participant.update_one(
+            await self.database.db__event_participant.update_one(
                 filter,
                 {'$set':update},
                 upsert=True
@@ -347,15 +351,15 @@ class Event():
                 raise EventClosed()
             
             filter = {'event_id':self.id,'tag':tag}
-            await bot_client.coc_db.db__event_participant.delete_one(filter)
+            await self.database.db__event_participant.delete_one(filter)
 
     async def get_participant_count(self) -> int:
-        query = await bot_client.coc_db.db__event_participant.find({'event_id':self.id}).to_list(None)
+        query = await self.database.db__event_participant.find({'event_id':self.id}).to_list(None)
         return len(query)
     
     async def get_all_participants(self) -> List[Participant]:
-        query = bot_client.coc_db.db__event_participant.find({'event_id':self.id})        
-        get_players = bot_client.coc.get_players(
+        query = self.database.db__event_participant.find({'event_id':self.id})        
+        get_players = self.coc_client.get_players(
             [participant['tag'] async for participant in query],
             cls=Participant,
             event_id=self.id)
@@ -363,8 +367,8 @@ class Event():
     
     async def get_participants_for_user(self,user:int) -> List[Participant]:
         filter = {'event_id':self.id,'discord_id':user}
-        query = bot_client.coc_db.db__event_participant.find(filter)
-        get_players = bot_client.coc.get_players(
+        query = self.database.db__event_participant.find(filter)
+        get_players = self.coc_client.get_players(
             [participant['tag'] async for participant in query],
             cls=Participant,
             event_id=self.id)
@@ -373,7 +377,7 @@ class Event():
     async def get_participant(self,tag:str) -> Optional[Participant]:
         tag = coc.utils.correct_tag(tag)
         filter = {'event_id':self.id,'tag':tag}
-        query = await bot_client.coc_db.db__event_participant.find_one(filter)
+        query = await self.database.db__event_participant.find_one(filter)
         if query:
-            return await bot_client.coc.get_player(tag,cls=Participant,event_id=self.id)
+            return await self.coc_client.get_player(tag,cls=Participant,event_id=self.id)
         return None

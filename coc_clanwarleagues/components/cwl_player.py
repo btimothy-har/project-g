@@ -8,8 +8,7 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter, bounded_gather
 
-from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
@@ -19,8 +18,6 @@ from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, D
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarResult, CWLLeagueGroups, MultiplayerLeagues
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-bot_client = BotClashClient()
 
 class NewRegistration():
     def __init__(self,account:WarLeaguePlayer,league:int):
@@ -45,14 +42,6 @@ class CWLPlayerMenu(DefaultView):
         self.live_cwl_accounts = []
         
         super().__init__(context=context,timeout=300)
-    
-    @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     def get_live_account(self,tag:str) -> WarLeaguePlayer:
         return next((p for p in self.live_cwl_accounts if p.tag == tag),None)
@@ -89,7 +78,7 @@ class CWLPlayerMenu(DefaultView):
     ### START SIGNUP
     ##################################################
     async def start_signup(self):
-        guild = bot_client.bot.get_guild(1132581106571550831) if bot_client.bot.user.id == 1031240380487831664 else bot_client.bot.get_guild(680798075685699691)
+        guild = self.bot.get_guild(1132581106571550831) if self.bot.user.id == 1031240380487831664 else self.bot.get_guild(680798075685699691)
         member = guild.get_member(self.member.user_id)
         if member is None:
             embed = await clash_embed(
@@ -107,7 +96,7 @@ class CWLPlayerMenu(DefaultView):
                     self.message = await self.ctx.send(embed=embed, view=self)
             return            
 
-        self.accounts = [p async for p in bot_client.coc.get_players([p.tag for p in self.member.accounts])]
+        self.accounts = [p async for p in self.coc_client.get_players([p.tag for p in self.member.accounts])]
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.name),reverse=True)
 
         self.is_active = True
@@ -524,7 +513,7 @@ class CWLPlayerMenu(DefaultView):
         a_iter = AsyncIter(self.current_signups)
         async for cwl_account in a_iter:
             try:
-                player = await bot_client.coc.get_player(cwl_account.tag)
+                player = await self.coc_client.get_player(cwl_account.tag)
             except coc.NotFound:
                 continue
 
@@ -594,7 +583,7 @@ class CWLPlayerMenu(DefaultView):
         r_iter = AsyncIter(list(self.user_registration.values()))
         async for m_account in r_iter:
             try:
-                player = await bot_client.coc.get_player(m_account.account.tag)
+                player = await self.coc_client.get_player(m_account.account.tag)
             except coc.NotFound:
                 continue
             change_embed.add_field(
@@ -832,7 +821,7 @@ class CWLPlayerMenu(DefaultView):
         a_iter = AsyncIter(self.live_cwl_accounts)
         async for cwl_player in a_iter:
             try:
-                player = await bot_client.coc.get_player(cwl_player.tag)
+                player = await self.coc_client.get_player(cwl_player.tag)
             except coc.NotFound:
                 continue
 
@@ -886,7 +875,7 @@ class CWLPlayerMenu(DefaultView):
             overall_stats = [aClanWarSummary.for_player(a.tag,a.league_clan.league_wars) for a in self.live_cwl_accounts if a.league_clan]
             return overall_stats
 
-        overall_stats = await bot_client.run_in_thread(_get_overall_stats)
+        overall_stats = await self.run_in_thread(_get_overall_stats)
 
         total_wars = sum([x.wars_participated for x in overall_stats])
         total_attacks = sum([x.attack_count for x in overall_stats])

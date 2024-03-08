@@ -5,14 +5,10 @@ import asyncio
 from typing import *
 from async_property import AwaitLoader
 
-from ...api_client import BotClashClient as client
-
 from .base_clan import BasicClan
 
 from ...utils.constants.coc_emojis import EmojisClash, EmojisCapitalHall, EmojisLeagues
 from ...utils.constants.ui_emojis import EmojisUI
-
-bot_client = client()
 
 class aClan(coc.Clan,BasicClan,AwaitLoader):
     def __init__(self,**kwargs):
@@ -55,9 +51,9 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             base['emoji'] = self.emoji
         if self.is_alliance_clan:
             base['member_count'] = self.alliance_member_count
-            base['leader'] = getattr(bot_client.bot.get_user(self.leader),'display_name','No Leader')
-            base['coleaders'] = [bot_client.bot.get_user(i).display_name for i in self.coleaders if bot_client.bot.get_user(i)]
-            base['elders'] = [bot_client.bot.get_user(i).display_name for i in self.elders if bot_client.bot.get_user(i)]
+            base['leader'] = getattr(self.bot.get_user(self.leader),'display_name','No Leader')
+            base['coleaders'] = [self.bot.get_user(i).display_name for i in self.coleaders if self.bot.get_user(i)]
+            base['elders'] = [self.bot.get_user(i).display_name for i in self.elders if self.bot.get_user(i)]
         else:
             base['member_count'] = self.member_count
         return base
@@ -66,11 +62,9 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
     ### DATA FORMATTERS
     ##################################################
     def __str__(self) -> str:
-        return f"{self.name} ({self.tag})"
-    
+        return f"{self.name} ({self.tag})"    
     def __eq__(self,other) -> bool:
-        return isinstance(other,aClan) and self.tag == other.tag
-    
+        return isinstance(other,aClan) and self.tag == other.tag    
     def __hash__(self):
         return hash(self.tag)
     
@@ -156,7 +150,7 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
                 return
             
             await basic_clan.update_last_sync(pendulum.now())
-            if bot_client.bot.user.id == 1031240380487831664:
+            if self.bot.user.id == 1031240380487831664:
                 #only nebula to handle elders/coleaders
                 tasks = [
                     basic_clan.clean_elders(),

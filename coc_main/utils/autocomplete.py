@@ -1,23 +1,23 @@
 import discord
 import random
+import logging
 
 from typing import *
 
 from redbot.core import app_commands
 from redbot.core.utils import AsyncIter
 
-from ..api_client import BotClashClient
+from ..client.global_client import GlobalClient
+
+from ..coc_objects.season.season import aClashSeason
 from ..discord.clan_link import ClanGuildLink
 from ..discord.member import aMember
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 async def autocomplete_seasons(interaction:discord.Interaction,current:str):
     try:
-        seasons = bot_client.tracked_seasons[:3]
-        current_season = bot_client.current_season
-        if current_season not in seasons:
-            seasons.append(current_season)
+        seasons = aClashSeason.all_seasons()[:3]
         
         #sort seasons by startdate
         seasons.sort(key=lambda s: s.season_start,reverse=True)
@@ -35,7 +35,7 @@ async def autocomplete_seasons(interaction:discord.Interaction,current:str):
             for s in sel_seasons
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_seasons")
+        LOG.exception("Error in autocomplete_seasons")
 
 ####################################################################################################
 #####
@@ -58,7 +58,7 @@ async def autocomplete_clans(interaction:discord.Interaction,current:str):
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__clan.aggregate(pipeline)
+        query = GlobalClient.database.db__clan.aggregate(pipeline)
         return [
             app_commands.Choice(
                 name=f"{c.get('name','')} | {c['_id']}",
@@ -66,7 +66,7 @@ async def autocomplete_clans(interaction:discord.Interaction,current:str):
             async for c in query
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_clans")
+        LOG.exception("Error in autocomplete_clans")
 
 async def autocomplete_clans_coleader(interaction:discord.Interaction,current:str):
     try:
@@ -90,7 +90,7 @@ async def autocomplete_clans_coleader(interaction:discord.Interaction,current:st
             async for c in a_iter
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_clans_coleader")
+        LOG.exception("Error in autocomplete_clans_coleader")
 
 ####################################################################################################
 #####
@@ -112,7 +112,7 @@ async def autocomplete_players(interaction:discord.Interaction,current:str):
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__player.aggregate(pipeline)
+        query = GlobalClient.database.db__player.aggregate(pipeline)
         return [
             app_commands.Choice(
                 name=f"{p.get('name','')} | TH{p.get('townhall',1)} | {p['_id']}",
@@ -121,7 +121,7 @@ async def autocomplete_players(interaction:discord.Interaction,current:str):
             async for p in query
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_players")
+        LOG.exception("Error in autocomplete_players")
 
 async def autocomplete_players_members_only(interaction:discord.Interaction,current:str):
     try:
@@ -140,7 +140,7 @@ async def autocomplete_players_members_only(interaction:discord.Interaction,curr
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__player.aggregate(pipeline)
+        query = GlobalClient.database.db__player.aggregate(pipeline)
         return [
             app_commands.Choice(
                 name=f"{p.get('name','')} | TH{p.get('townhall',1)} | {p['_id']}",
@@ -149,4 +149,4 @@ async def autocomplete_players_members_only(interaction:discord.Interaction,curr
             async for p in query
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_players_members_only")
+        LOG.exception("Error in autocomplete_players_members_only")

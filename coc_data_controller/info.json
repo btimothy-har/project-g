@@ -1,0 +1,19 @@
+{
+    "author": ["bakkutteh"],
+    "description": "Handles a multi-cycle data refresh environment by assigning Players and Clans to separate cycles. Data Cycles can be set up using separate processes.",
+    "install_msg": "This cog does not handle data refresh. Remember to load the coc_data cog.",
+    "short": "COC Data Controller",
+    "end_user_data_statement": "This cog does not collect or store any data.",
+    "min_bot_version": "3.5.2",
+    "min_python_version": [3,11,3],
+    "hidden": false,
+    "disabled": false,
+    "required_cogs": {},
+    "requirements": [
+        "coc.py"
+        ],
+    "tags": [
+        "clash of clans",
+        "api"
+        ]
+}

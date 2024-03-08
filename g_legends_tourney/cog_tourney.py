@@ -14,33 +14,27 @@ from redbot.core.commands import Context
 from redbot.core.utils import AsyncIter
 from redbot.core.bot import Red
 
-from coc_main.api_client import BotClashClient as client
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
+from coc_main.client.global_client import GlobalClient
+
 from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
-from coc_main.coc_objects.players.player_stat import aPlayerActivity
+from coc_main.coc_objects.players.player_activity import aPlayerActivity
 from coc_main.discord.add_delete_link import AddLinkMenu
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu, DiscordModal
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisLeagues
-from coc_main.exceptions import ClashAPIError, InvalidTag
-
-bot_client = client()
-
-default_global = {
-    "global_scope": 0,
-    }
 
 tournament_clans = ['#2LVJ98RR0']
 
-class LegendsTourney(commands.Cog):
+class LegendsTourney(commands.Cog,GlobalClient):
     """1LxGuild Legends League Tournament March 2024"""
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
+    __release__ = 4
 
     def __init__(self,bot:Red):
-        self.bot: Red = bot
         _id = "1LxGuildLegendsLeagueTourneyMarch2024"
         self.event_id = hashlib.sha256(_id.encode()).hexdigest()
 
@@ -59,11 +53,41 @@ class LegendsTourney(commands.Cog):
     
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
+    
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,ctx)
 
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,interaction)
+    
+    ############################################################
+    #####
+    ##### COG LOAD / UNLOAD
+    #####
+    ############################################################
+    async def cog_load(self):
+        self._info_channel = await self.config.info_channel()
+        self._lb_channel = await self.config.lb_channel()
+        self._participant_role = await self.config.participant_role()
+        self._tourney_season = '3-2024'
+
+        asyncio.create_task(self.load_info_embed())
+        self.tourney_update_loop.start()
+    
+    async def cog_unload(self):
+        self.tourney_update_loop.cancel()
+
+    ############################################################
+    #####
+    ##### COG PROPERTIES
+    #####
+    ############################################################
     @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")    
+    def bot(self) -> Red:
+        return GlobalClient.bot
     @property
     def info_channel(self) -> Optional[discord.TextChannel]:
         return self.bot.get_channel(self._info_channel)
@@ -83,19 +107,11 @@ class LegendsTourney(commands.Cog):
             return self.guild.get_role(self._participant_role)
         return None
 
-    async def cog_load(self):
-        self._info_channel = await self.config.info_channel()
-        self._lb_channel = await self.config.lb_channel()
-        self._participant_role = await self.config.participant_role()
-        self._tourney_season = '3-2024'
-
-        asyncio.create_task(self.load_info_embed())
-
-        self.tourney_update_loop.start()
-    
-    async def cog_unload(self):
-        self.tourney_update_loop.cancel()
-    
+    ############################################################
+    #####
+    ##### TOURNAMENT INFO
+    #####
+    ############################################################    
     async def load_info_embed(self):
         await self.bot.wait_until_ready()
 
@@ -105,7 +121,7 @@ class LegendsTourney(commands.Cog):
         except:
             message = None
 
-        tourn_season = await aClashSeason(self._tourney_season)
+        tourn_season = aClashSeason(self._tourney_season)
 
         embeds = []
         embed = await clash_embed(
@@ -153,12 +169,17 @@ class LegendsTourney(commands.Cog):
         
         if message:
             await message.edit(embeds=embeds,view=view)
-        
+
+    ############################################################
+    #####
+    ##### HELPER FUNCTIONS
+    #####
+    ############################################################        
     async def fetch_participant(self,tag:str) -> aPlayer:
-        player = await bot_client.coc.get_player(tag)        
+        player = await self.coc_client.get_player(tag)        
 
         db_query = {'event_id':self.event_id,'tag':player.tag}
-        tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)
+        tournament_db = await self.database.db__event_participant.find_one(db_query)
         
         player.is_participant = tournament_db.get('is_participant',False) if tournament_db else False
         player.discord_user = tournament_db.get('discord_user',0) if tournament_db else 0
@@ -170,7 +191,7 @@ class LegendsTourney(commands.Cog):
     
     async def fetch_all_participants(self) -> List[aPlayer]:
         db_query = {'event_id':self.event_id,'is_participant':True}
-        tournament_db = bot_client.coc_db.db__event_participant.find(db_query)
+        tournament_db = self.database.db__event_participant.find(db_query)
 
         participants = []
         async for participant in tournament_db:
@@ -190,7 +211,7 @@ class LegendsTourney(commands.Cog):
     
     async def fetch_participant_for_user(self,user_id:int) -> Optional[aPlayer]:
         db_query = {'event_id':self.event_id,'discord_user':user_id,'is_participant':True}
-        tournament_db = await bot_client.coc_db.db__event_participant.find_one(db_query)
+        tournament_db = await self.database.db__event_participant.find_one(db_query)
 
         if not tournament_db:
             return None
@@ -198,7 +219,7 @@ class LegendsTourney(commands.Cog):
     
     async def register_participant(self,player:aPlayer,user_id:int) -> aPlayer:
         db_query = {'event_id':self.event_id,'tag':player.tag}
-        await bot_client.coc_db.db__event_participant.update_one(
+        await self.database.db__event_participant.update_one(
             db_query,
             {'$set':{
                 'tag': player.tag,
@@ -218,7 +239,7 @@ class LegendsTourney(commands.Cog):
     
     async def withdraw_participant(self,user_id:int) -> Optional[aPlayer]:
         db_query = {'event_id':self.event_id,'discord_user':user_id}
-        await bot_client.coc_db.db__event_participant.update_many(
+        await self.database.db__event_participant.update_many(
             db_query,
             {'$set':{'is_participant': False}},
             )
@@ -339,11 +360,10 @@ class LegendsTourney(commands.Cog):
         await self.bot.wait_until_ready()
         
         async with self._update_lock:
-
-            league_season = await bot_client.coc.get_seasons(29000022)
+            league_season = await self.coc_client.get_seasons(29000022)
 
             # league_season[0] is in YYYY-MM format, change to MM-YYYY
-            last_season = await aClashSeason(pendulum.from_format(league_season[-1], 'YYYY-MM').format('M-YYYY'))
+            last_season = aClashSeason(pendulum.from_format(league_season[-1], 'YYYY-MM').format('M-YYYY'))
             
             # is current season
             if self._tourney_season == last_season.next_season().id:
@@ -391,7 +411,7 @@ class LegendsTourney(commands.Cog):
     @commands.guild_only()
     @commands.is_owner()
     async def command_register_participant(self,ctx:commands.Context,tag:str,user:discord.Member):
-        player = await bot_client.coc.get_player(tag)
+        player = await self.coc_client.get_player(tag)
         await self.register_participant(player,user.id)
         await ctx.send(f"Registered {player.name} for the Tournament.") 
 
@@ -400,19 +420,18 @@ class LegendsTourney(commands.Cog):
 ##### MAIN APPLICATION MENU
 #####
 ##################################################
-class TournamentApplicationMenu(discord.ui.View):
+class TournamentApplicationMenu(discord.ui.View,GlobalClient):
     def __init__(self):
 
         super().__init__(timeout=None)
         self.reload_items()
 
     @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
+    def bot(self) -> Red:
+        return GlobalClient.bot    
     @property
     def tournament_cog(self) -> LegendsTourney:
-        return bot_client.bot.get_cog("LegendsTourney")
+        return self.bot.get_cog("LegendsTourney")
     
     @property
     def button_registration(self) -> DiscordButton:
@@ -421,8 +440,7 @@ class TournamentApplicationMenu(discord.ui.View):
             label="Register",
             emoji=EmojisLeagues.LEGEND_LEAGUE,
             style=discord.ButtonStyle.blurple
-            )
-    
+            )    
     @property
     def button_cancel(self) -> DiscordButton:
         return DiscordButton(
@@ -468,7 +486,7 @@ class RegistrationMenu(AddLinkMenu):
 
     @property
     def tournament_cog(self) -> LegendsTourney:
-        return bot_client.bot.get_cog("LegendsTourney")
+        return self.bot.get_cog("LegendsTourney")
     
     ##################################################
     #####
@@ -523,19 +541,14 @@ class RegistrationMenu(AddLinkMenu):
         api_token = modal.children[1].value
 
         if not coc.utils.is_valid_tag(o_tag):
-            raise InvalidTag(o_tag)
+            raise coc.NotFound
         
         tag = coc.utils.correct_tag(o_tag)
         
         if self.bot.user.id == 828838353977868368:
             verify = True
         else:
-            try:
-                verify = await bot_client.coc.verify_player_token(player_tag=tag,token=api_token)
-            except (coc.NotFound) as exc:
-                raise InvalidTag(tag) from exc
-            except (coc.Maintenance,coc.GatewayError) as exc:
-                raise ClashAPIError(exc) from exc
+            verify = await self.coc_client.verify_player_token(player_tag=tag,token=api_token)
 
         self.add_link_account = await self.tournament_cog.fetch_participant(tag)
 
@@ -662,7 +675,7 @@ class CancelRegistrationMenu(DefaultView):
 
     @property
     def tournament_cog(self) -> LegendsTourney:
-        return bot_client.bot.get_cog("LegendsTourney")
+        return self.bot.get_cog("LegendsTourney")
     
     async def on_timeout(self):
         if self.message:

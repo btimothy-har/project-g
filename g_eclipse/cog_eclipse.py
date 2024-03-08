@@ -3,7 +3,7 @@ import coc
 import discord
 import pendulum
 import os
-import urllib
+import logging
 
 from typing import *
 
@@ -12,8 +12,8 @@ from redbot.core import Config, commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
 
-from coc_main.api_client import BotClashClient, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
+from coc_main.client.global_client import GlobalClient
 
 from coc_main.utils.components import clash_embed, MultipleChoiceSelectionMenu, DiscordModal
 from coc_main.utils.constants.coc_constants import TroopCampSize, clan_castle_size
@@ -23,7 +23,7 @@ from .views.base_vault import BaseVaultMenu
 from .objects.war_base import eWarBase
 from .components import eclipse_embed
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 ############################################################
 ############################################################
@@ -32,7 +32,7 @@ bot_client = BotClashClient()
 #####
 ############################################################
 ############################################################
-class ECLIPSE(commands.Cog):
+class ECLIPSE(commands.Cog, GlobalClient):
     """
     E.C.L.I.P.S.E.
 
@@ -41,20 +41,19 @@ class ECLIPSE(commands.Cog):
     Your Clash of Clans database of attack strategies, guides and war bases.
     """
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
     __release__ = 4
 
     def __init__(self,bot:Red):        
-        self.bot = bot
         self._dump_channel = 1079665410770739201
         self._dump_lock = asyncio.Lock()
         self.dump_messages = []
 
         resource_path = f"{cog_data_path(self)}"
-        self.bot.base_image_path = f"{resource_path}/base_images"
-        if not os.path.exists(self.bot.base_image_path):
-            os.makedirs(self.bot.base_image_path)
+        bot.base_image_path = f"{resource_path}/base_images"
+        if not os.path.exists(bot.base_image_path):
+            os.makedirs(bot.base_image_path)
 
         self.config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)
         default_global = {
@@ -67,24 +66,19 @@ class ECLIPSE(commands.Cog):
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
     
-    @property
-    def client(self) -> ClashOfClansClient:
-        return self.bot.get_cog("ClashOfClansClient")
-    
-    @property
-    def dump_channel(self) -> discord.TextChannel:
-        return self.bot.get_channel(self._dump_channel)
-    
-    @property
-    def vault_pass_guild(self) -> Optional[discord.Guild]:
-        return self.bot.get_guild(self._vault_pass_guild)
-    
-    @property
-    def vault_pass(self) -> Optional[discord.Role]:
-        if self.vault_pass_guild:
-            return self.vault_pass_guild.get_role(self._vault_pass_role)
-        return None
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,ctx)
 
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,interaction)
+    
+    ############################################################
+    #####
+    ##### COG LOAD / UNLOAD
+    #####
+    ############################################################
     async def cog_load(self):        
         self.delete_dump_messages.start()
         try:
@@ -99,32 +93,31 @@ class ECLIPSE(commands.Cog):
     async def cog_unload(self):
         self.delete_dump_messages.cancel()
     
-    async def cog_command_error(self,ctx,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
-            embed = await clash_embed(
-                context=ctx,
-                message=f"{error.original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
-
-    async def cog_app_command_error(self,interaction,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{error.original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed,view=None)
-            else:
-                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
-            return
+    ############################################################
+    #####
+    ##### COG PROPERTIES
+    #####
+    ############################################################
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+    @property
+    def dump_channel(self) -> discord.TextChannel:
+        return self.bot.get_channel(self._dump_channel)
+    @property
+    def vault_pass_guild(self) -> Optional[discord.Guild]:
+        return self.bot.get_guild(self._vault_pass_guild)
+    @property
+    def vault_pass(self) -> Optional[discord.Role]:
+        if self.vault_pass_guild:
+            return self.vault_pass_guild.get_role(self._vault_pass_role)
+        return None
     
+    ############################################################
+    #####
+    ##### TASKS
+    #####
+    ############################################################    
     @tasks.loop(minutes=10)
     async def delete_dump_messages(self):
         if self._dump_lock.locked():
@@ -142,33 +135,35 @@ class ECLIPSE(commands.Cog):
                             self.dump_messages.remove(message.id)
                         await message.delete()
                 except Exception:
-                    bot_client.coc_main_log.exception(f"Error deleting ECLIPSE Dump Message {message.id} in {self.dump_channel.id}.")
+                    LOG.exception(f"Error deleting ECLIPSE Dump Message {message.id} in {self.dump_channel.id}.")
                     continue    
     
     ############################################################
-    ############################################################
     #####
-    ##### COMMAND DIRECTORY
-    ##### - eclipse
-    #####
-    ############################################################
+    ##### COMMAND GROUP: ECLIPSE SET
+    ##### 
     ############################################################                
     @commands.group(name="eclipseset")
     @commands.guild_only()
     @commands.is_owner()
-    async def command_group_eclipseset(self,ctx):
+    async def cmdgroup_eclipseset(self,ctx:commands.Context):
         """
         Config for E.C.L.I.P.S.E.
         """
         if not ctx.invoked_subcommand:
             pass
-                
-    @command_group_eclipseset.command(name="vaultpass")
+
+    ############################################################
+    #####
+    ##### COMMAND: ECLIPSESET / VAULTPASS
+    #####
+    ############################################################                
+    @cmdgroup_eclipseset.command(name="vaultpass")
     @commands.guild_only()
     @commands.is_owner()
-    async def subcommand_bank_eclipseset_vaultpass(self,ctx:commands.Context,role:discord.Role):
+    async def subcmd_eclipseset_vaultpass(self,ctx:commands.Context,role:discord.Role):
         """
-        [Owner only] Assign a Role as a Vault Pass.
+        Assign a Role as a Vault Pass.
         """
 
         self._vault_pass_guild = role.guild.id
@@ -180,13 +175,15 @@ class ECLIPSE(commands.Cog):
 
         await ctx.tick()        
 
-    ##################################################
-    ### BASE VAULT
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: ECLIPSE
+    #####
+    ############################################################
     @commands.command(name="eclipse")
     @commands.guild_only()
     @commands.check(is_member)
-    async def command_eclipse_base_vault(self,ctx):
+    async def cmd_eclipse(self,ctx):
         """
         Access the E.C.L.I.P.S.E. Base Vault.
         """
@@ -207,7 +204,7 @@ class ECLIPSE(commands.Cog):
         description="Access the E.C.L.I.P.S.E. Base Vault.")
     @app_commands.guild_only()
     @app_commands.check(is_member)
-    async def appcommand_eclipse_base_vault(self,interaction:discord.Interaction):
+    async def appcmd_eclipse(self,interaction:discord.Interaction):
      
         await interaction.response.defer(ephemeral=True)
     
@@ -224,34 +221,13 @@ class ECLIPSE(commands.Cog):
         menu = BaseVaultMenu(interaction)
         await menu.start()
     
-    @property
-    def builder_notes_modal(self) -> DiscordModal:
-        m = DiscordModal(
-            function=self._get_builder_notes,
-            title=f"Add New Base",
-            )
-        defensive_cc = discord.ui.TextInput(
-            label="Defensive CC",
-            style=discord.TextStyle.short,
-            required=True
-            )
-        builder_notes = discord.ui.TextInput(
-            label="Builder Notes",
-            style=discord.TextStyle.long,
-            required=False
-            )        
-        m.add_item(defensive_cc)
-        m.add_item(builder_notes)
-        return m
-
-    async def _get_builder_notes(self,interaction:discord.Interaction,modal:DiscordModal):
-        await interaction.response.defer(ephemeral=True)
-        modal.defensive_cc = modal.children[0].value
-        modal.notes = modal.children[1].value if len(modal.children[1].value) > 0 else "*"
-        modal.stop()
-    
+    ############################################################
+    #####
+    ##### COMMAND: ADD BASE
+    #####
+    ############################################################    
     @app_commands.command(name="add-base",
-        description="[Owner-only] Add a Base to the E.C.L.I.P.S.E. Base Vault.")
+        description="Add a Base to the E.C.L.I.P.S.E. Base Vault.")
     @app_commands.guild_only()
     @app_commands.check(is_owner)
     @app_commands.choices(base_source=[
@@ -264,7 +240,7 @@ class ECLIPSE(commands.Cog):
         app_commands.Choice(name="Legends Base",value="Legends Base"),
         app_commands.Choice(name="Trophy/Farm Base",value="Trophy/Farm Base")
         ])
-    async def appcommand_eclipse_add_base(self,
+    async def appcmd_add_base(self,
         interaction:discord.Interaction,
         base_link:str,
         base_image:discord.Attachment,
@@ -292,3 +268,29 @@ class ECLIPSE(commands.Cog):
         embed.add_field(name="Base Link",value=new_base.base_link)
 
         return await interaction.followup.send(content="Base Added!",embed=embed,files=[image])
+    
+    @property
+    def builder_notes_modal(self) -> DiscordModal:
+        m = DiscordModal(
+            function=self._get_builder_notes,
+            title=f"Add New Base",
+            )
+        defensive_cc = discord.ui.TextInput(
+            label="Defensive CC",
+            style=discord.TextStyle.short,
+            required=True
+            )
+        builder_notes = discord.ui.TextInput(
+            label="Builder Notes",
+            style=discord.TextStyle.long,
+            required=False
+            )        
+        m.add_item(defensive_cc)
+        m.add_item(builder_notes)
+        return m
+
+    async def _get_builder_notes(self,interaction:discord.Interaction,modal:DiscordModal):
+        await interaction.response.defer(ephemeral=True)
+        modal.defensive_cc = modal.children[0].value
+        modal.notes = modal.children[1].value if len(modal.children[1].value) > 0 else "*"
+        modal.stop()

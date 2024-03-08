@@ -8,8 +8,10 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter, bounded_gather
 
-from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
+from coc_main.client.global_client import GlobalClient
+
+from coc_main.coc_objects.season.season import aClashSeason
+from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu
@@ -17,8 +19,6 @@ from coc_main.utils.constants.coc_emojis import EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.utils import chunks
-
-bot_client = BotClashClient()
 
 class CWLRosterMenu(DefaultView):
     def __init__(self,
@@ -43,14 +43,6 @@ class CWLRosterMenu(DefaultView):
         self.group_filter = []
         
         super().__init__(context=context,timeout=300)
-    
-    @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     @property
     def modified_to_save(self) -> List[WarLeaguePlayer]:
@@ -558,7 +550,7 @@ class CWLRosterMenu(DefaultView):
                 ))
         
         clan_participants = [p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag]
-        participants = [p async for p in bot_client.coc.get_players(clan_participants)]
+        participants = [p async for p in self.coc_client.get_players(clan_participants)]
         _add_main_menu(participants)
     
     ##################################################
@@ -723,7 +715,7 @@ class CWLRosterMenu(DefaultView):
                 return league_player.league_group in self.group_filter
             return True
         
-        participants = [p async for p in bot_client.coc.get_players([p.tag for p in self.all_participants])]
+        participants = [p async for p in self.coc_client.get_players([p.tag for p in self.all_participants])]
 
         all_participants = sorted(participants,key=lambda x:(x.town_hall.level,x.hero_strength),reverse=True)
         eligible_participants = sorted(
@@ -735,7 +727,7 @@ class CWLRosterMenu(DefaultView):
     async def autofill_participants(self,max_participants:int):
         eligible_participants = [p for p in self.all_participants if p.league_group <= CWLLeagueGroups.from_league_name(self.clan.league) and p.league_group < 99]
         
-        unrostered_players = [p async for p in bot_client.coc.get_players([p.tag for p in eligible_participants if p.roster_clan is None])]
+        unrostered_players = [p async for p in self.coc_client.get_players([p.tag for p in eligible_participants if p.roster_clan is None])]
         unrostered_players.sort(key=lambda p:(p.town_hall.level,p.war_elo,p.hero_strength),reverse=True)
 
         a_iter = AsyncIter(unrostered_players)
@@ -768,7 +760,7 @@ class CWLRosterMenu(DefaultView):
             show_author=False,
             )
         
-        participants = [p async for p in bot_client.coc.get_players([p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag][:35])]
+        participants = [p async for p in self.coc_client.get_players([p.tag for p in self.all_participants if getattr(p.roster_clan,'tag',None) == self.clan.tag][:35])]
 
         a_participants = AsyncIter(participants)
         async for i,p in a_participants.enumerate(start=1):
@@ -908,10 +900,10 @@ class CWLRosterMenu(DefaultView):
         header_text += f"\n**Status:** {clan.status}"
         header_text += f"\n**League:** {EmojisLeagues.get(clan.league)}{clan.league}"
         if clan.status in ["CWL Started"]:
-            roster_players = [p async for p in bot_client.coc.get_players([p.tag for p in clan.master_roster])]
+            roster_players = [p async for p in GlobalClient.coc_client.get_players([p.tag for p in clan.master_roster])]
             header_text += f"\n\n**Participants:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.master_roster])} in CWL"
         else:
-            roster_players = [p async for p in bot_client.coc.get_players([p.tag for p in clan.participants])]
+            roster_players = [p async for p in GlobalClient.coc_client.get_players([p.tag for p in clan.participants])]
             header_text += f"\n\n**Rostered:** {len([p for p in roster_players if p.clan.tag == clan.tag])} In Clan / {len([p for p in clan.participants])} Rostered"
 
         header_text += f"\n"
@@ -921,12 +913,12 @@ class CWLRosterMenu(DefaultView):
         header_text += f"{EmojisUI.LOGOUT}: this player is not in the in-game Clan.\n\n"
             
         if clan.status in ["CWL Started"]:
-            ref_members = [p async for p in bot_client.coc.get_players([p.tag for p in clan.master_roster])]
+            ref_members = [p async for p in GlobalClient.coc_client.get_players([p.tag for p in clan.master_roster])]
         else:
-            ref_members = [p async for p in bot_client.coc.get_players([p.tag for p in clan.participants])]
+            ref_members = [p async for p in GlobalClient.coc_client.get_players([p.tag for p in clan.participants])]
         
-            full_clan = await bot_client.coc.get_clan(clan.tag)                                               
-            async for mem in bot_client.coc.get_players([p.tag for p in full_clan.members]):
+            full_clan = await GlobalClient.coc_client.get_clan(clan.tag)                                               
+            async for mem in GlobalClient.coc_client.get_players([p.tag for p in full_clan.members]):
                 if mem.tag not in [p.tag for p in ref_members]:
                     ref_members.append(mem)
 

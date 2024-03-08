@@ -1,23 +1,18 @@
 import asyncio
 import coc
-import copy
 import pendulum
+import logging
 
 from typing import *
 from redbot.core.utils import AsyncIter,bounded_gather
-from .default import TaskLoop
 
-from coc_main.api_client import BotClashClient as client
-from coc_main.cog_coc_client import ClashOfClansClient
-from coc_main.exceptions import InvalidTag, ClashAPIError
+from .default import TaskLoop, GlobalClient
 
 from coc_main.coc_objects.clans.clan import aClan
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
-from coc_main.discord.feeds.reminders import EventReminder
-from coc_main.discord.feeds.raid_results import RaidResultsFeed
 
-bot_client = client()
 default_sleep = 60
+LOG = logging.getLogger("coc.data")
 
 ############################################################
 ############################################################
@@ -29,20 +24,16 @@ default_sleep = 60
 class DefaultRaidTasks():
 
     @staticmethod
-    def _get_client() -> ClashOfClansClient:
-        return bot_client.bot.get_cog('ClashOfClansClient')     
-
-    @staticmethod
     async def _raid_start(clan:aClan,raid:aRaidWeekend):           
         try:
             await asyncio.sleep(120)
 
-            new_clan = await bot_client.coc.get_clan(clan.tag)
+            new_clan = await GlobalClient.coc_client.get_clan(clan.tag)
             raid.starting_trophies = new_clan.capital_points
             await raid.save_to_database()
 
         except:
-            bot_client.coc_main_log.exception(f"Error in New Raid task.")
+            LOG.exception(f"Error in New Raid task.")
     
     @staticmethod
     async def _raid_ongoing(clan:aClan,raid:aRaidWeekend):           
@@ -50,23 +41,17 @@ class DefaultRaidTasks():
             if raid.do_i_save:
                 await raid.save_to_database()
         except:
-            bot_client.coc_main_log.exception(f"Error in New Raid task.")
+            LOG.exception(f"Error in New Raid task.")
     
     @staticmethod
     async def _raid_ended(clan:aClan,raid:aRaidWeekend):
         try:
-            await asyncio.sleep(180)
-            coc_client = DefaultRaidTasks._get_client()
-            
-            new_clan = await bot_client.coc.get_clan(clan.tag)
+            await asyncio.sleep(180)            
+            new_clan = await GlobalClient.coc_client.get_clan(clan.tag)
             raid.ending_trophies = new_clan.capital_points
             await raid.save_to_database()
-
-            if raid.attack_count > 0:
-                await RaidResultsFeed.start_feed(new_clan,raid)
-
         except:
-            bot_client.coc_main_log.exception(f"Error in Raid Ended task.")
+            LOG.exception(f"Error in Raid Ended task.")
 
 class ClanRaidLoop(TaskLoop):
     _instance = None
@@ -76,22 +61,30 @@ class ClanRaidLoop(TaskLoop):
     _raid_ended_events = [DefaultRaidTasks._raid_ended]
     
     @classmethod
-    async def _setup_raid_reminder(cls,clan:aClan,current_raid:aRaidWeekend,reminder:EventReminder):        
-        remind_members = [m for m in current_raid.members if m.attack_count < 6]
-        await reminder.send_reminder(current_raid,*remind_members)
-    
-    @classmethod
     def add_raid_end_event(cls,event):
         if event.__name__ not in [e.__name__ for e in cls._raid_ended_events]:
             cls._raid_ended_events.append(event)
-            bot_client.coc_main_log.info(f"Registered {event.__name__} {event} to Raid Ended Events.")
+            LOG.info(f"Registered {event.__name__} {event} to Raid Ended Events.")
     
     @classmethod
     def remove_raid_end_event(cls,event):        
         if event.__name__ in [e.__name__ for e in cls._raid_ended_events]:
             event = [e for e in cls._raid_ended_events if e.__name__ == event.__name__][0]
             cls._raid_ended_events.remove(event)
-            bot_client.coc_main_log.info(f"Removed {event.__name__} {event} from Raid Ended Events.")
+            LOG.info(f"Removed {event.__name__} {event} from Raid Ended Events.")
+    
+    @classmethod
+    def add_raid_ongoing_event(cls,event):
+        if event.__name__ not in [e.__name__ for e in cls._raid_ongoing_events]:
+            cls._raid_ongoing_events.append(event)
+            LOG.info(f"Registered {event.__name__} {event} to Raid Ongoing Events.")
+    
+    @classmethod
+    def remove_raid_ongoing_event(cls,event):        
+        if event.__name__ in [e.__name__ for e in cls._raid_ongoing_events]:
+            event = [e for e in cls._raid_ongoing_events if e.__name__ == event.__name__][0]
+            cls._raid_ongoing_events.remove(event)
+            LOG.info(f"Removed {event.__name__} {event} from Raid Ongoing Events.")
 
     def __new__(cls):
         if cls._instance is None:
@@ -105,12 +98,12 @@ class ClanRaidLoop(TaskLoop):
             self._is_new = False            
     
     async def start(self):
-        bot_client.coc_main_log.info(f"Raid Loop started.")
+        LOG.info(f"Raid Loop started.")
         await super().start()
     
     async def stop(self):
         try:
-            bot_client.coc_main_log.info(f"Raid Loop stopped.")
+            LOG.info(f"Raid Loop stopped.")
         except:
             pass
         await super().stop()
@@ -137,12 +130,11 @@ class ClanRaidLoop(TaskLoop):
                 tasks = [self._run_single_loop(tag) async for tag in a_iter]
                 await bounded_gather(*tasks,semaphore=self._loop_semaphore)
 
-                et = pendulum.now()
-                bot_client.last_loop['raid'] = et
+                self.last_loop = et = pendulum.now()
                 self._running = False
                 try:
                     runtime = et - st
-                    bot_client.raid_loop_runtime.append(runtime.total_seconds())
+                    self.run_time.append(runtime.total_seconds())
                 except:
                     pass
 
@@ -156,7 +148,11 @@ class ClanRaidLoop(TaskLoop):
                     error=exc,
                     )
                 await self.start()
-    
+    ############################################################
+    #####
+    ##### SINGLE LOOP
+    #####
+    ############################################################    
     async def _run_single_loop(self,tag:str):
         try:
             lock = self._locks[tag]
@@ -165,12 +161,12 @@ class ClanRaidLoop(TaskLoop):
             await lock.acquire()
             cached = self._cached.get(tag,None)
         
-            clan = await bot_client.coc.get_clan(tag,cls=aClan)    
+            clan = await self.coc_client.get_clan(tag)    
             
             raid_log = None
             new_raid = None            
             
-            raid_log = await bot_client.coc.get_raid_log(clan_tag=tag,limit=1)
+            raid_log = await self.coc_client.get_raid_log(clan_tag=tag,limit=1)
             wait = getattr(raid_log,'_response_retry',default_sleep)
             self.loop.call_later(wait,self.unlock,lock)
                 
@@ -217,12 +213,6 @@ class ClanRaidLoop(TaskLoop):
         elif new_raid.state == 'ongoing' and getattr(cached_raid,'state',None) == 'ongoing':
             a_iter = AsyncIter(ClanRaidLoop._raid_ongoing_events)
             tasks.extend([event(clan,current_raid) async for event in a_iter])
-        
-        raid_reminders = await EventReminder.raid_reminders_for_clan(clan)
-        a_iter = AsyncIter(raid_reminders)
-        tasks.extend(
-            [ClanRaidLoop._setup_raid_reminder(clan,current_raid,reminder) async for reminder in a_iter]
-            )
         
         lock = self._locks['dispatch']
         async with lock:

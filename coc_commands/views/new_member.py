@@ -6,16 +6,14 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, CacheNotReady, NoClansRegistered
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer, aClan
+from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.clans.clan import aClan
 
 from coc_main.discord.member import aMember
-from coc_main.discord.guild import aGuild, ClanGuildLink
+from coc_main.discord.clan_link import ClanGuildLink
 
 from coc_main.utils.components import DiscordButton, DefaultView, MultipleChoiceSelectionMenu, DiscordSelectMenu, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-bot_client = BotClashClient()
 
 class NewMember():
     def __init__(self,account:aPlayer,home_clan:Optional[aClan]=None):
@@ -42,10 +40,6 @@ class NewMemberMenu(DefaultView):
             style=discord.ButtonStyle.danger)
  
         super().__init__(context)
-    
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ####################################################################################################
     #####
@@ -83,7 +77,7 @@ class NewMemberMenu(DefaultView):
                 await self._manual_tag_entry()
             else:
                 await self._get_accounts_select()
-        except CacheNotReady:
+        except:
             await self._manual_tag_entry()
     
     async def _callback_close_button(self,interaction:discord.Interaction,button:DiscordButton):
@@ -104,7 +98,7 @@ class NewMemberMenu(DefaultView):
     async def _get_accounts_select(self):
         main_embed = await self.new_member_embed()
 
-        player_accounts = [p async for p in bot_client.coc.get_players(self.member.account_tags)]
+        player_accounts = [p async for p in self.coc_client.get_players(self.member.account_tags)]
         player_accounts.sort(
             key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),
             reverse=True)
@@ -220,7 +214,7 @@ class NewMemberMenu(DefaultView):
     ### COLLATE ACCOUNTS
     ##################################################    
     async def _collate_player_accounts(self,tags:List[str]):
-        self.accounts = [p async for p in bot_client.coc.get_players(tags)]
+        self.accounts = [p async for p in self.coc_client.get_players(tags)]
         self.accounts.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.exp_level,x.clean_name),reverse=True)
         await self._get_home_clans()
     
@@ -248,11 +242,16 @@ class NewMemberMenu(DefaultView):
     async def _select_home_clan(self,account:aPlayer):
         await account._sync_cache()
         linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
-        guild_clans = [a async for a in bot_client.coc.get_clans([c.tag for c in linked_clans]) if a.is_alliance_clan]
+        guild_clans = [a async for a in self.coc_client.get_clans([c.tag for c in linked_clans]) if a.is_alliance_clan]
 
         alliance_clans = sorted([c for c in guild_clans if c.is_alliance_clan],key=lambda x:(x.level,x.max_recruitment_level,x.capital_hall),reverse=True)
         if len(alliance_clans) == 0:
-            raise NoClansRegistered()
+            embed = await clash_embed(
+                context=self.ctx,
+                message=f"There are no Alliance Clans linked to this server. Please contact a server admin.",
+                success=False)
+            await self.message.edit(embed=embed,view=None)
+            return self.stop_menu()
 
         player_notes = ""
         if account.discord_user and account.discord_user != self.member.user_id:

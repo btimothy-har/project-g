@@ -5,11 +5,9 @@ import xlsxwriter
 from typing import *
 
 from redbot.core.utils import AsyncIter
-from coc_main.api_client import BotClashClient as client
+from coc_main.client.global_client import GlobalClient
 
 from .event import Event, Participant
-
-bot_client = client()
 
 participant_headers = [
     'Tag',
@@ -27,7 +25,7 @@ participant_headers = [
     ]
 
 async def generate_event_export(event:Event) -> str:
-    report_file = bot_client.bot.coc_report_path + '/' + f'Participants - {event.name}.xlsx'
+    report_file = GlobalClient.bot.coc_report_path + '/' + f'Participants - {event.name}.xlsx'
     
     if os.path.exists(report_file):
         os.remove(report_file)
@@ -55,7 +53,7 @@ async def generate_event_export(event:Event) -> str:
         m_data.append(player.tag)
         m_data.append(player.name)
         m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
-        m_data.append(getattr(bot_client.bot.get_user(player.participant_id),'display_name',' ') if player.participant_id else " ")
+        m_data.append(getattr(GlobalClient.bot.get_user(player.participant_id),'display_name',' ') if player.participant_id else " ")
         m_data.append(str(player.participant_id) if player.participant_id else " ")
         m_data.append(player.town_hall.level)
 

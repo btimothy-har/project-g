@@ -5,14 +5,13 @@ import xlsxwriter
 from collections import defaultdict
 from async_property import AwaitLoader
 
+from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClan
+from coc_main.client.global_client import GlobalClient
+from coc_main.coc_objects.clans.clan import aClan
 
-bot_client = BotClashClient()
-
-class BankAccount(AwaitLoader):
+class BankAccount(AwaitLoader,GlobalClient):
     _master_locks = defaultdict(asyncio.Lock)
     _locks = defaultdict(asyncio.Lock)
 
@@ -21,11 +20,8 @@ class BankAccount(AwaitLoader):
         self.balance = 0
     
     @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")    
+    def bot(self) -> Red:
+        return GlobalClient.bot
     @property
     def _master_lock(self) -> asyncio.Lock:
         return self._master_locks[self.id]    
@@ -39,7 +35,7 @@ class BankAccount(AwaitLoader):
                 {'$match': {'account': self.id,'amount': {'$ne': 0}}},
                 {'$group': {'_id': None, 'total_amount': {'$sum': '$amount'}}}
                 ]
-            balance_query = await bot_client.coc_db.db__bank_transaction.aggregate(q_pipeline).to_list(length=None)
+            balance_query = await self.database.db__bank_transaction.aggregate(q_pipeline).to_list(length=None)
             self.balance = balance_query[0]['total_amount'] if len(balance_query) > 0 else 0
     
     async def deposit(self,amount:int,user_id:int=None,comment:str=None):
@@ -47,7 +43,7 @@ class BankAccount(AwaitLoader):
             async with self._master_lock:
                 await asyncio.sleep(0.1)        
         async with self._lock:
-            await bot_client.coc_db.db__bank_transaction.insert_one(
+            await self.database.db__bank_transaction.insert_one(
                 {
                     'account': self.id,
                     'amount': amount,
@@ -64,7 +60,7 @@ class BankAccount(AwaitLoader):
                 await asyncio.sleep(0.1)
 
         async with self._lock:
-            await bot_client.coc_db.db__bank_transaction.insert_one(
+            await self.database.db__bank_transaction.insert_one(
                 {
                     'account': self.id,
                     'amount': amount * -1,
@@ -77,7 +73,7 @@ class BankAccount(AwaitLoader):
     
     async def admin_adjust(self,amount:int,user_id:int=None,comment:str=None):
         async with self._lock:
-            await bot_client.coc_db.db__bank_transaction.insert_one(
+            await self.database.db__bank_transaction.insert_one(
                 {
                     'account': self.id,
                     'amount': amount,
@@ -89,7 +85,7 @@ class BankAccount(AwaitLoader):
     
     async def query_transactions(self):        
         cut_off = pendulum.now().subtract(days=30).int_timestamp
-        transactions = await bot_client.coc_db.db__bank_transaction.find(
+        transactions = await self.database.db__bank_transaction.find(
             {'account': self.id,'timestamp': {'$gte': cut_off},'amount': {'$ne': 0}}
             ).to_list(length=10000)
 
@@ -98,7 +94,7 @@ class BankAccount(AwaitLoader):
         return transactions
 
     async def export(self,transactions):
-        report_file = bot_client.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
+        report_file = self.bot.coc_bank_path + '/' + f'BankTransactions_{pendulum.now().format("YYYYMMDDHHmmss")}.xlsx'
 
         workbook = xlsxwriter.Workbook(report_file)
         worksheet = workbook.add_worksheet('Bank Transactions')
@@ -120,10 +116,10 @@ class BankAccount(AwaitLoader):
 
             m_data = []
             m_data.append(pendulum.from_timestamp(t['timestamp']).to_iso8601_string())
-            if t['user'] == bot_client.bot.user.id:
+            if t['user'] == self.bot.user.id:
                 m_data.append('System')
             else:
-                transaction_user = bot_client.bot.get_user(t['user'])
+                transaction_user = self.bot.get_user(t['user'])
                 m_data.append(transaction_user.name if transaction_user else t['user'])
                 
             m_data.append(t['account'])

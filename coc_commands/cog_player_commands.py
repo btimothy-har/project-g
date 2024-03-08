@@ -1,23 +1,20 @@
 import coc
 import discord
-import pendulum
-import asyncio
 
 from typing import *
 
 from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 
-from coc_main.api_client import BotClashClient, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient, aPlayer
+from coc_main.client.global_client import GlobalClient
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
 
+from coc_main.coc_objects.players.player import aPlayer
 from coc_main.discord.member import aMember
 
-from coc_main.utils.components import handle_command_error, handle_exception, clash_embed
+from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_coleader, has_manage_roles
 from coc_main.utils.autocomplete import autocomplete_players, autocomplete_players_members_only
-
-from coc_main.exceptions import InvalidUser
 
 from .views.new_member import NewMemberMenu
 from .views.remove_member import RemoveMemberMenu
@@ -25,8 +22,6 @@ from .views.promote_demote import MemberRankMenu
 from .views.member_nickname import MemberNicknameMenu
 from .views.user_profile import UserProfileMenu
 from .views.player_profile import PlayerProfileMenu
-
-bot_client = BotClashClient()
 
 ############################################################
 ############################################################
@@ -44,7 +39,7 @@ async def context_menu_user_profile(interaction:discord.Interaction,member:disco
         menu = UserProfileMenu(interaction,member)
         await menu.start()
     except Exception as exc:
-        await handle_command_error(exc,interaction,getattr(menu,'message',None))
+        await GlobalClient.handle_command_error(exc,interaction,getattr(menu,'message',None))
 
 @app_commands.context_menu(name="Clash Accounts")
 @app_commands.guild_only()
@@ -54,12 +49,12 @@ async def context_menu_clash_accounts(interaction:discord.Interaction,member:dis
         await interaction.response.defer()
 
         member = await aMember(member.id,member.guild.id)
-        accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
+        accounts = [p async for p in GlobalClient.coc_client.get_players(member.account_tags)]
         menu = PlayerProfileMenu(interaction,accounts)
         await menu.start()
 
     except Exception as exc:
-        await handle_command_error(exc,interaction,getattr(menu,'message',None))
+        await GlobalClient.handle_command_error(exc,interaction,getattr(menu,'message',None))
 
 @app_commands.context_menu(name="Change Nickname")
 @app_commands.guild_only()
@@ -77,7 +72,7 @@ async def context_menu_change_nickname(interaction:discord.Interaction,member:di
                     )
         await menu.start()
     except Exception as exc:
-        await handle_command_error(exc,interaction,getattr(menu,'message',None))
+        await GlobalClient.handle_command_error(exc,interaction,getattr(menu,'message',None))
 
 @app_commands.context_menu(name="Restore Roles")
 @app_commands.guild_only()
@@ -116,7 +111,7 @@ async def context_menu_restore_roles(interaction:discord.Interaction,member:disc
         await interaction.followup.send(embed=embed,ephemeral=True)
 
     except Exception as exc:
-        await handle_command_error(exc,interaction)
+        await GlobalClient.handle_command_error(exc,interaction)
 
 @app_commands.context_menu(name="Sync Roles")
 @app_commands.guild_only()
@@ -157,62 +152,47 @@ async def context_menu_sync_roles(interaction:discord.Interaction,member:discord
         await interaction.followup.send(embed=embed,ephemeral=True)
 
     except Exception as exc:
-        await handle_command_error(exc,interaction)
+        await GlobalClient.handle_command_error(exc,interaction)
 
 ############################################################
 ############################################################
 #####
-##### CLIENT COG
+##### PLAYER COMMANDS COG
 #####
 ############################################################
 ############################################################
-class Players(commands.Cog):
+class Players(commands.Cog,GlobalClient):
     """
     Player Commands.
     """
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
 
-    def __init__(self,bot:Red,version:int):
-        self.bot = bot
-        self.sub_v = version
+    def __init__(self):
+        pass
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.sub_v}"
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
 
-    @property
-    def bot_client(self) -> BotClashClient:
-        return BotClashClient()
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
-    
-    @commands.Cog.listener("on_member_update")
-    async def member_role_sync(self,before:discord.Member,after:discord.Member):
-        try:
-            before_roles = sorted([r.id for r in before.roles])
-            after_roles = sorted([r.id for r in after.roles])
-
-            if before_roles != after_roles:
-                try:
-                    member = await aMember(after.id,after.guild.id)
-                    await member.sync_clan_roles()
-                except InvalidUser:
-                    pass
-        except Exception:
-            bot_client.coc_main_log.exception("Error in Player Cog member_role_sync.")
-    
     async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
         original_exc = getattr(error,'original',error)
-        await handle_command_error(original_exc,ctx,getattr(error,'message',None))
+        await GlobalClient.handle_command_error(original_exc,ctx)
 
     async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
         original_exc = getattr(error,'original',error)
-        await handle_command_error(original_exc,interaction)
+        await GlobalClient.handle_command_error(original_exc,interaction)
     
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+    
+    ############################################################
+    #####
+    ##### ASSISTANT FUNCTIONS
+    #####
+    ############################################################   
     @commands.Cog.listener()
     async def on_assistant_cog_add(self,cog:commands.Cog):
         schema = [
@@ -277,13 +257,13 @@ class Players(commands.Cog):
                 {'$match': q_doc},
                 {'$sample': {'size': 8}}
                 ]
-            query = bot_client.coc_db.db__player.aggregate(pipeline)
+            query = self.database.db__player.aggregate(pipeline)
 
             player_tags = [c['_id'] async for c in query]
             if len(player_tags) == 0:
                 return f"No matches for {player_name} found."
             
-            players = [p async for p in bot_client.coc.get_players(player_tags)]
+            players = [p async for p in self.coc_client.get_players(player_tags)]
             ret_players = [p.name_json() for p in players]
             return f"Found {len(ret_players)} Players matching `{player_name}`. Players: {ret_players}"
         except:
@@ -293,12 +273,12 @@ class Players(commands.Cog):
         if not user:
             return "No user found."        
         member = await aMember(user.id,guild.id)
-        accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
+        accounts = [p async for p in self.coc_client.get_players(member.account_tags)]
         return f"{user.name} has the following accounts linked: {[a.name_json() for a in accounts]}"
     
     async def _assistant_get_player_clan_status(self,player_tag:str,*args,**kwargs) -> str:
         try:
-            account = await bot_client.coc.get_player(player_tag)
+            account = await self.coc_client.get_player(player_tag)
         except coc.NotFound:
             return "The player tag provided does not exist."
         except (coc.Maintenance,coc.GatewayError):
@@ -311,7 +291,7 @@ class Players(commands.Cog):
     
     async def _assistant_get_account_heroes(self,player_tag:str,*args,**kwargs) -> str:
         try:
-            account = await bot_client.coc.get_player(player_tag)
+            account = await self.coc_client.get_player(player_tag)
         except coc.NotFound:
             return "The player tag provided does not exist."
         except (coc.Maintenance,coc.GatewayError):
@@ -321,30 +301,15 @@ class Players(commands.Cog):
         if not account:
             return "No account found."
         return f"Hero Levels for account {account.name} (Tag: {account.tag}): {account.hero_json()}"
-    
-    ############################################################
-    ############################################################
-    #####
-    ##### MEMBER / PLAYER COMMANDS
-    ##### - Member / Add
-    ##### - Member / Remove
-    ##### - Member / SetNickname
-    ##### - Promote
-    ##### - Demote
-    ##### - SendWelcome / DM
-    ##### - Nickname
-    ##### - Profile
-    ##### - Player
-    #####
-    ############################################################
-    ############################################################
 
-    ##################################################
-    ### PARENT COMMAND GROUPS
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND GROUP: MEMBER
+    #####
+    ############################################################
     @commands.group(name="member")
     @commands.guild_only()
-    async def command_group_member(self,ctx):
+    async def cmdgroup_member(self,ctx):
         """
         Group for Member-related Commands.
 
@@ -353,19 +318,21 @@ class Players(commands.Cog):
         if not ctx.invoked_subcommand:
             pass
 
-    app_command_group_member = app_commands.Group(
+    appgrp_member = app_commands.Group(
         name="member",
         description="Group for Member commands. Equivalent to [p]member.",
         guild_only=True
         )
 
-    ##################################################
-    ### MEMBER / SEND-DM
-    ##################################################
-    @command_group_member.command(name="senddm")
+    ############################################################
+    #####
+    ##### COMMAND: MEMBER SENDDM
+    #####
+    ############################################################
+    @cmdgroup_member.command(name="senddm")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def subcommand_send_welcome_dm(self,ctx:commands.Context,member:discord.Member):
+    async def subcmd_member_senddm(self,ctx:commands.Context,member:discord.Member):
         """
         Sends the Welcome DM to the user.
         """
@@ -377,12 +344,12 @@ class Players(commands.Cog):
         else:
             return await ctx.send(f"Could not send Welcome DM to {member.display_name}.")
     
-    @app_command_group_member.command(name="send-dm",
-        description="[Co-Leader+] Sends the Welcome DM to the user.")
+    @appgrp_member.command(name="senddm",
+        description="Sends the Welcome DM to the user.")
     @app_commands.check(is_coleader)
     @app_commands.describe(
         member="The Discord User to send the DM to.")
-    async def app_subcommand_send_welcome_dm(self,interaction:discord.Interaction,member:discord.Member):
+    async def appcmd_member_senddm(self,interaction:discord.Interaction,member:discord.Member):
 
         await interaction.response.defer(ephemeral=True)
         menu = NewMemberMenu(interaction,member)
@@ -392,13 +359,15 @@ class Players(commands.Cog):
         else:
             return await interaction.followup.send(f"Could not send Welcome DM to {member.display_name}.")
 
-    ##################################################
-    ### MEMBER / ADD
-    ##################################################
-    @command_group_member.command(name="add")
+    ############################################################
+    #####
+    ##### COMMAND: MEMBER ADD
+    #####
+    ############################################################
+    @cmdgroup_member.command(name="add")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def subcommand_add_member(self,ctx:commands.Context,member:discord.Member):
+    async def subcmd_member_add(self,ctx:commands.Context,member:discord.Member):
         """
         Add a Member to the Alliance.
         """
@@ -406,8 +375,8 @@ class Players(commands.Cog):
         menu = NewMemberMenu(ctx,member)
         await menu.start()
     
-    @app_command_group_member.command(name="add",
-        description="[Co-Leader+] Add a Member to the Alliance.")
+    @appgrp_member.command(name="add",
+        description="Add a Member to the Alliance.")
     @app_commands.check(is_coleader)
     @app_commands.describe(
         member="The Discord User to add to the Alliance.",
@@ -415,19 +384,21 @@ class Players(commands.Cog):
     @app_commands.choices(send_dm=[
         app_commands.Choice(name="Yes",value=0),
         app_commands.Choice(name="No",value=1)])
-    async def app_subcommand_add_member(self,interaction:discord.Interaction,member:discord.Member,send_dm:Optional[app_commands.Choice[int]]=0):
+    async def appcmd_member_add(self,interaction:discord.Interaction,member:discord.Member,send_dm:Optional[app_commands.Choice[int]]=0):
 
         await interaction.response.defer()
         menu = NewMemberMenu(interaction,member,bool(send_dm))
         await menu.start()
     
-    ##################################################
-    ### MEMBER / REMOVE
-    ##################################################
-    @command_group_member.command(name="remove")
+    ############################################################
+    #####
+    ##### COMMAND: MEMBER REMOVE
+    #####
+    ############################################################
+    @cmdgroup_member.command(name="remove")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def subcommand_remove_member(self,ctx:commands.Context,discord_member:discord.Member):
+    async def subcmd_member_remove(self,ctx:commands.Context,discord_member:discord.Member):
         """
         Remove a Member/Member's Accounts from the Alliance.
 
@@ -437,15 +408,15 @@ class Players(commands.Cog):
         menu = RemoveMemberMenu(ctx,member=discord_member)            
         await menu.start()
     
-    @app_command_group_member.command(name="remove",
-        description="[Co-Leader+] Removes a Member/Clash Account from the Alliance.")
+    @appgrp_member.command(name="remove",
+        description="Removes a Member/Clash Account from the Alliance.")
     @app_commands.check(is_coleader)
     @app_commands.autocomplete(player=autocomplete_players_members_only)
     @app_commands.describe(
         member="Select a Discord Member to remove from the Alliance.",
         player="Select a Clash of Clans account to remove. Only member accounts are valid.",
         discord_id="The Discord User ID to remove from the Alliance.")
-    async def app_subcommand_remove_member(self,
+    async def appcmd_member_remove(self,
         interaction:discord.Interaction,
         member:Optional[discord.Member]=None,
         player:Optional[str]=None,
@@ -458,19 +429,21 @@ class Players(commands.Cog):
         discord_id = int(discord_id) if discord_id else None
 
         if player:
-            selected_account = await bot_client.coc.get_player(player)
+            selected_account = await self.coc_client.get_player(player)
         selected_member = member if member else discord_id if discord_id else None
 
         menu = RemoveMemberMenu(interaction,member=selected_member,account=selected_account)
         await menu.start()
     
-    ##################################################
-    ### PROMOTE
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: PROMOTE
+    #####
+    ############################################################
     @commands.command(name="promote")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def command_promote_member(self,ctx:commands.Context,discord_member:discord.Member):
+    async def cmd_promote_member(self,ctx:commands.Context,discord_member:discord.Member):
         """
         Promote a Member.
 
@@ -488,23 +461,25 @@ class Players(commands.Cog):
         await menu.promote()
 
     @app_commands.command(name="promote",
-        description="[Co-Leader+] Promote a Member. Use `$help promote` for details.")
+        description="Promote a Member. Use `$help promote` for details.")
     @app_commands.check(is_coleader)
     @app_commands.describe(
         discord_member="The Member to promote. Members must have an active account to be eligible.")
-    async def app_command_promote_member(self,interaction:discord.Interaction,discord_member:discord.Member):
+    async def appcmd_promote_member(self,interaction:discord.Interaction,discord_member:discord.Member):
         
         await interaction.response.defer()
         menu = MemberRankMenu(interaction,discord_member)
         await menu.promote()
     
-    ##################################################
-    ### DEMOTE
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: DEMOTE
+    #####
+    ############################################################
     @commands.command(name="demote")
     @commands.guild_only()
     @commands.check(is_coleader)
-    async def command_demote_member(self,ctx:commands.Context,discord_member:discord.Member):
+    async def cmd_demote_member(self,ctx:commands.Context,discord_member:discord.Member):
         """
         Demote a Member.
 
@@ -524,26 +499,26 @@ class Players(commands.Cog):
         await menu.demote()
 
     @app_commands.command(name="demote",
-        description="[Co-Leader+] Demote a Member. Use `$help demote` for details.")
+        description="Demote a Member. Use `$help demote` for details.")
     @app_commands.check(is_coleader)
     @app_commands.describe(
         discord_member="The Member to demote. Members must have an active account to be eligible.")
-    async def app_command_demote_member(self,interaction:discord.Interaction,discord_member:discord.Member):
+    async def appcmd_demote_member(self,interaction:discord.Interaction,discord_member:discord.Member):
 
         await interaction.response.defer()
         menu = MemberRankMenu(interaction,discord_member)
         await menu.demote()
     
-    ##################################################
-    ### NICKNAME
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: NICKNAME
+    #####
+    ############################################################
     @commands.command(name="nickname")
     @commands.guild_only()
-    async def command_change_nickname(self,ctx:commands.Context):
+    async def cmd_user_nickname(self,ctx:commands.Context):
         """
         Change your Server Nickname.
-
-        Nicknames follow a fixed pattern of "In-Game Name | Clan Membership".
         
         You can choose from one of your active member accounts to be displayed as your nickname.
         If you are not an active member, your nickname will default to your highest ranked Clash account.
@@ -554,18 +529,20 @@ class Players(commands.Cog):
     @app_commands.command(name="nickname",
         description="Select a Clash account to be displayed as your nickname.")
     @app_commands.guild_only()
-    async def app_command_change_nickname(self,interaction:discord.Interaction):
+    async def appcmd_user_nickname(self,interaction:discord.Interaction):
 
         await interaction.response.defer()
         menu = MemberNicknameMenu(interaction,interaction.user)
         await menu.start()
     
-    ##################################################
-    ### PROFILE
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: PROMOTE
+    #####
+    ############################################################
     @commands.command(name="profile")
     @commands.guild_only()
-    async def command_member_profile(self,ctx:commands.Context,discord_member:Optional[discord.User]=None):
+    async def cmd_user_profile(self,ctx:commands.Context,discord_member:Optional[discord.User]=None):
         """
         View a Member's Clash Profile.
 
@@ -585,7 +562,7 @@ class Players(commands.Cog):
     @app_commands.guild_only()
     @app_commands.describe(
         member="User to display profile for. If not specified, your own profile will be displayed.")
-    async def app_command_member_profile(self,interaction:discord.Interaction,member:Optional[discord.Member]=None):            
+    async def appcmd_user_profile(self,interaction:discord.Interaction,member:Optional[discord.Member]=None):            
         
         await interaction.response.defer()
         if member is None:
@@ -594,12 +571,14 @@ class Players(commands.Cog):
         menu = UserProfileMenu(interaction,member)
         await menu.start()
     
-    ####################################################################################################
-    ### PLAYER
-    ####################################################################################################
+    ############################################################
+    #####
+    ##### COMMAND: PLAYER
+    #####
+    ############################################################
     @commands.command(name="player")
     @commands.guild_only()
-    async def command_player_profile(self,ctx:commands.Context,player_tag:Optional[str]):
+    async def cmd_player_profile(self,ctx:commands.Context,player_tag:Optional[str]):
         """
         View Player Summary, Stats and Details.
 
@@ -608,12 +587,20 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player_tag:
-            player = await bot_client.coc.get_player(player_tag)
+            player = await self.coc_client.get_player(player_tag)
             if isinstance(player,aPlayer):
                 view_accounts.append(player)
         else:
             member = await aMember(ctx.author.id,ctx.guild.id)
-            view_accounts.extend([p async for p in bot_client.coc.get_players(member.account_tags)])
+            view_accounts.extend([p async for p in self.coc_client.get_players(member.account_tags)])
+        
+        if len(view_accounts) == 0:
+            embed = await clash_embed(
+                context=self.ctx,
+                message="I couldn't find any accounts to show. Check your input, maybe?",
+                success=False
+                )
+            return await ctx.send(embed=embed)
         
         menu = PlayerProfileMenu(ctx,view_accounts)
         await menu.start()
@@ -626,7 +613,7 @@ class Players(commands.Cog):
         member="Show all accounts for a Discord Member.",
         player="Search for a Clash Player or manually input a Player Tag.",
         user_id="Get accounts for a Discord User, by Discord ID.")
-    async def app_command_player_profile(self,
+    async def appcmd_player_profile(self,
         interaction:discord.Interaction,
         member:Optional[discord.Member]=None,
         player:Optional[str]=None,
@@ -636,24 +623,32 @@ class Players(commands.Cog):
 
         view_accounts = []
         if player:
-            get_player = await bot_client.coc.get_player(player)
+            get_player = await self.coc_client.get_player(player)
             if isinstance(get_player,aPlayer):
                 view_accounts.append(get_player)
 
         if member:
             get_member = await aMember(member.id,interaction.guild.id)
-            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
+            view_accounts.extend([p async for p in self.coc_client.get_players(get_member.account_tags)])
 
         if user_id:
             get_member = await aMember(user_id,interaction.guild.id)
-            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
+            view_accounts.extend([p async for p in self.coc_client.get_players(get_member.account_tags)])
 
         if not (player or member or user_id):
             get_member = await aMember(interaction.user.id,interaction.guild.id)
-            view_accounts.extend([p async for p in bot_client.coc.get_players(get_member.account_tags)])
+            view_accounts.extend([p async for p in self.coc_client.get_players(get_member.account_tags)])
         
         if len(view_accounts) == 0:
             return await interaction.followup.send(content=f"Did not find any accounts for the provided input.")
+        
+        if len(view_accounts) == 0:
+            embed = await clash_embed(
+                context=self.ctx,
+                message="I couldn't find any accounts to show. Check your input, maybe?",
+                success=False
+                )
+            return await interaction.followup.send(embed=embed)
         
         menu = PlayerProfileMenu(interaction,view_accounts)
         await menu.start()

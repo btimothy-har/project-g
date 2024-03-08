@@ -5,8 +5,7 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.client.global_client import GlobalClient
 
 from coc_main.discord.member import aMember
 from coc_main.discord.add_delete_link import AddLinkMenu, DeleteLinkMenu
@@ -14,8 +13,6 @@ from coc_main.discord.add_delete_link import AddLinkMenu, DeleteLinkMenu
 from coc_main.utils.components import DefaultView, DiscordButton, clash_embed
 from coc_main.utils.constants.coc_constants import ClanRanks
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-bot_client = BotClashClient()
 
 ####################################################################################################
 #####
@@ -46,10 +43,6 @@ class UserProfileMenu(DefaultView):
         if self.user.id == self.member.user_id:
             self.add_item(self.add_link_button)
             self.add_item(self.delete_link_button)
-    
-    @classmethod
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -78,7 +71,7 @@ class UserProfileMenu(DefaultView):
     ##################################################
     async def _add_link(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
-        add_link_view = AddLinkMenu(interaction,self.member)
+        add_link_view = AddLinkMenu(interaction,self.member.discord_member)
         await add_link_view._start_add_link()
 
         await add_link_view.wait()
@@ -89,7 +82,7 @@ class UserProfileMenu(DefaultView):
     
     async def _delete_link(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer(ephemeral=True)
-        delete_link_view = DeleteLinkMenu(interaction,self.member)
+        delete_link_view = DeleteLinkMenu(interaction,self.member.discord_member)
         await delete_link_view._start_delete_link()
 
         await delete_link_view.wait()
@@ -103,7 +96,7 @@ class UserProfileMenu(DefaultView):
     ##################################################
     @staticmethod
     async def profile_embed(ctx:Union[discord.Interaction,commands.Context],member:aMember):
-        m_accounts = [p async for p in bot_client.coc.get_players(member.account_tags)]
+        m_accounts = [p async for p in GlobalClient.coc_client.get_players(member.account_tags)]
 
         m_accounts.sort(
             key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall_level,x.exp_level),

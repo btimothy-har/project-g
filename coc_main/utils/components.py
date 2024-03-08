@@ -1,11 +1,12 @@
 import discord
 import pendulum
-import coc
+import logging
 
 from typing import *
 from redbot.core import commands
+from redbot.core.bot import Red
 
-from ..api_client import BotClashClient as client
+from ..client.global_client import GlobalClient
 
 from .constants.coc_constants import *
 from .constants.coc_emojis import *
@@ -13,58 +14,9 @@ from .constants.ui_emojis import *
 
 from .utils import *
 
+LOG = logging.getLogger("coc.main")
+
 _ACCEPTABLE_PAGE_TYPES = Union[Dict[str, Union[str, discord.Embed]], discord.Embed, str]
-
-async def handle_exception(exception:Exception) -> str:
-    bot_client = client()
-
-    if isinstance(exception,coc.HTTPException):
-        if exception.status == 404:
-            return "The requested Tag doesn't seem to be valid."
-        elif exception.status in [502,503,504]:
-            return "The Clash of Clans API is currently unavailable."
-        else:
-            bot_client.coc_main_log.exception(f"Clash of Clans API HTTP Error: {exception}")
-            return "The Clash of Clans API is currently unavailable."
-    else:
-        bot_client.coc_main_log.exception(f"{exception}")
-        return "An unexpected error occurred and has been logged. Please try again later."
-
-async def handle_command_error(
-    exception:Exception,
-    context:Union[discord.Interaction,commands.Context]=None,
-    message:Optional[discord.Message]=None):
-
-    bot_client = client()
-
-    response = await handle_exception(exception)
-    error_embed = await clash_embed(
-        context=bot_client.bot,
-        message=response,
-        success=False,
-        timestamp=pendulum.now()
-        )
-    
-    if isinstance(context,discord.Interaction):
-        try:
-            if context.response.is_done():
-                await context.edit_original_response(embed=error_embed,view=None)
-            else:
-                if context.type is discord.InteractionType.application_command:
-                    await context.response.send_message(embed=error_embed,ephemeral=True)
-                else:
-                    await context.response.edit_message(embed=error_embed)
-        except:
-            return True
-        
-    elif isinstance(context,commands.Context):
-        try:
-            if message:
-                await message.edit(embed=error_embed,view=None)
-            else:
-                await context.reply(embed=error_embed,view=None)
-        except:
-            return True
 
 ####################################################################################################
 #####
@@ -140,7 +92,7 @@ async def clash_embed(
 ##### DISCORD UI COMPONENTS
 #####
 ####################################################################################################
-class DefaultView(discord.ui.View):
+class DefaultView(GlobalClient,discord.ui.View):
     def __init__(self,context:Union[commands.Context,discord.Interaction],timeout:int=120):
 
         self.is_active = False
@@ -149,17 +101,19 @@ class DefaultView(discord.ui.View):
 
         self.ctx = context
         if isinstance(context,commands.Context):
-            self.bot = self.ctx.bot
             self.user = self.ctx.author
             self.channel = self.ctx.channel
             self.guild = self.ctx.guild
         elif isinstance(context,discord.Interaction):
-            self.bot = self.ctx.client
             self.user = self.ctx.user
             self.channel = self.ctx.channel
             self.guild = self.ctx.guild
         
         super().__init__(timeout=timeout)
+    
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     ##################################################
     ### OVERRIDE BUILT IN METHODS
@@ -184,23 +138,15 @@ class DefaultView(discord.ui.View):
         return True
 
     async def on_timeout(self):
-        timeout_embed = await clash_embed(
-            context=self.ctx,
-            message="Menu timed out.",
-            success=False
-            )
-        try:
-            if self.message:
-                await self.message.edit(embed=timeout_embed,view=None)
-            elif isinstance(self.ctx,discord.Interaction):
-                if self.ctx.response.is_done():
-                    await self.ctx.edit_original_response(embed=timeout_embed,view=None)
-        except:
-            pass
-        self.stop_menu()
+        self.clear_items()
+        self.stop()
+        if self.message:
+            await self.message.edit(view=None)
+        else:
+            await self.ctx.edit_original_response(view=None)
     
     async def on_error(self, interaction:discord.Interaction, error:Exception, item):
-        err = await handle_command_error(error,interaction,self.message)
+        err = await GlobalClient.handle_command_error(error,interaction,self.message)
         if err:
             return
         self.stop_menu()
@@ -336,7 +282,7 @@ class DiscordChannelSelect(discord.ui.ChannelSelect):
 ##### VIEW MENU: YES/NO CONFIRMATION
 #####
 ####################################################################################################
-class MenuConfirmation(discord.ui.View):
+class MenuConfirmation(discord.ui.View,GlobalClient):
     def __init__(self,
         context: Union[commands.Context,discord.Interaction]):
 
@@ -385,7 +331,7 @@ class MenuConfirmation(discord.ui.View):
         self.stop()
     
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
-        await handle_command_error(interaction,error)
+        await self.handle_command_error(interaction,error)
     
     ##################################################
     ### CALLBACKS
@@ -437,7 +383,7 @@ class MenuConfirmation(discord.ui.View):
 ##### VIEW MENU: MULTIPLE CHOICE SELECT
 #####
 ####################################################################################################
-class MultipleChoiceSelectionMenu(discord.ui.View):
+class MultipleChoiceSelectionMenu(discord.ui.View,GlobalClient):
     def __init__(self,
         context: Union[commands.Context,discord.Interaction],
         timeout:int = 180,
@@ -488,7 +434,7 @@ class MultipleChoiceSelectionMenu(discord.ui.View):
         if self.error_function:
             await self.error_function(interaction,error)
         else:
-            await handle_command_error(interaction,error)
+            await self.handle_command_error(interaction,error)
 
     ##################################################
     ### STOP / CALLBACKS
@@ -523,7 +469,7 @@ class MultipleChoiceSelectionMenu(discord.ui.View):
 ##### VIEW MENU: PAGINATOR
 #####
 ####################################################################################################
-class MenuPaginator(discord.ui.View):
+class MenuPaginator(discord.ui.View,GlobalClient):
     def __init__(self,
         context: Union[commands.Context,discord.Interaction],
         message_list: List[_ACCEPTABLE_PAGE_TYPES],
@@ -531,7 +477,6 @@ class MenuPaginator(discord.ui.View):
 
         self.ctx = context
         if isinstance(context, commands.Context):
-            self.bot = context.bot
             self.user = context.author
             self.channel = context.channel
             self.guild = context.guild
@@ -553,6 +498,10 @@ class MenuPaginator(discord.ui.View):
         self.stop_button = DiscordButton(function=self.stop_menu,style=discord.ButtonStyle.red,emoji=EmojisUI.EXIT)
         
         super().__init__(timeout=timeout)
+    
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     async def start(self):
         if len(self.paginate_options) > 3:
@@ -590,7 +539,10 @@ class MenuPaginator(discord.ui.View):
             await self.ctx.edit_original_response(view=None)        
     
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
-        await handle_command_error(error,interaction,self.message)
+        err = await GlobalClient.handle_command_error(error,interaction,self.message)
+        if err:
+            return
+        self.stop_menu()
 
     ##################################################
     ### NAVIGATION CALLBACKS

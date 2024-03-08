@@ -17,9 +17,9 @@ def is_bank_admin(ctx:Union[discord.Interaction,commands.Context]):
         guild = bot.get_guild(1132581106571550831) #assassins guild server
         user = guild.get_member(ctx.user.id) if guild else bot.get_user(ctx.user.id)
 
-    bank_admins = bot.get_cog("Bank").bank_admins
+    bank_admins = bot.get_cog("Bank").admin_role
     
-    if getattr(user,'id',0) in bot.owner_ids or getattr(user,'id',0) in bank_admins:
+    if getattr(user,'id',0) in bot.owner_ids or getattr(user,'id',0) in [m.id for m in bank_admins.members]:
         return True
     return False
 

@@ -1,17 +1,18 @@
 import discord
 import random
+import logging
 
 from redbot.core import app_commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
+from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 async def autocomplete_all_league_clans(interaction:discord.Interaction,current:str):
     try:
-        league_clans = await bot_client.coc.get_war_league_clans()
+        league_clans = await GlobalClient.coc_client.get_war_league_clans()
 
         if current:
             clans = [c for c in league_clans 
@@ -30,11 +31,11 @@ async def autocomplete_all_league_clans(interaction:discord.Interaction,current:
             async for c in a_iter
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_all_league_clans")
+        LOG.exception("Error in autocomplete_all_league_clans")
 
 async def autocomplete_season_league_clans(interaction:discord.Interaction,current:str):
     try:
-        cog = bot_client.bot.get_cog("ClanWarLeagues")
+        cog = GlobalClient.bot.get_cog("ClanWarLeagues")
         if not cog:
             return []
         season = cog.active_war_league_season
@@ -58,11 +59,11 @@ async def autocomplete_season_league_clans(interaction:discord.Interaction,curre
             async for c in a_iter
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_season_league_clans")
+        LOG.exception("Error in autocomplete_season_league_clans")
 
 async def autocomplete_season_league_participants(interaction:discord.Interaction,current:str):
     try:
-        cog = bot_client.bot.get_cog("ClanWarLeagues")
+        cog = GlobalClient.bot.get_cog("ClanWarLeagues")
         if not cog:
             return []
         season = cog.active_war_league_season
@@ -85,4 +86,4 @@ async def autocomplete_season_league_participants(interaction:discord.Interactio
             async for p in a_iter
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_season_league_participants")
+        LOG.exception("Error in autocomplete_season_league_participants")

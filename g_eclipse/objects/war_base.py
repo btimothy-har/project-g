@@ -9,12 +9,12 @@ from async_property import AwaitLoader
 from collections import defaultdict
 from functools import cached_property
 
-from coc_main.api_client import BotClashClient
+from redbot.core.bot import Red
+
+from coc_main.client.global_client import GlobalClient
 from coc_main.utils.constants.coc_emojis import EmojisTroops, EmojisTownHall
 
 from ..components import eclipse_embed
-
-bot_client = BotClashClient()
 
 max_th = 16
 
@@ -31,7 +31,7 @@ max_th = 16
 #   'claims': [ int ]
 #   }
 
-class eWarBase(AwaitLoader):
+class eWarBase(GlobalClient,AwaitLoader):
     _locks = defaultdict(asyncio.Lock)    
     __slots__ = [
         'id',
@@ -49,7 +49,7 @@ class eWarBase(AwaitLoader):
 
     @classmethod
     async def by_user_claim(cls,user_id:int):
-        query = bot_client.coc_db.db_war_base.find({'claims':user_id})
+        query = cls.database.db_war_base.find({'claims':user_id})
         bases = [await cls(q['_id']) async for q in query]
         return sorted(bases,key=lambda x:(x.added_on),reverse=True)
 
@@ -64,7 +64,7 @@ class eWarBase(AwaitLoader):
         else:
             cutoff = pendulum.now().subtract(months=12).int_timestamp
 
-        query = bot_client.coc_db.db_war_base.find({
+        query = cls.database.db_war_base.find({
             'townhall':townhall,
             'added_on':{'$gte':cutoff}
             })
@@ -86,7 +86,7 @@ class eWarBase(AwaitLoader):
         self.claims = []
     
     async def load(self):
-        query = await bot_client.coc_db.db_war_base.find_one({'_id':self.id})
+        query = await self.database.db_war_base.find_one({'_id':self.id})
         if query:
             self.town_hall = query['townhall']
             self.defensive_cc = query['defensive_cc']
@@ -112,10 +112,10 @@ class eWarBase(AwaitLoader):
         defensive_troops = urllib.parse.quote_plus(urllib.parse.parse_qs(cc_parse.query)['army'][0])
 
         image_filename = base_id + '.' + image_attachment.filename.split('.')[-1]
-        image_filepath = bot_client.bot.base_image_path + "/" + image_filename
+        image_filepath = cls.bot.base_image_path + "/" + image_filename
         await image_attachment.save(image_filepath)
 
-        await bot_client.coc_db.db_war_base.update_one(
+        await cls.database.db_war_base.update_one(
             {'_id':base_id},
             {
                 '$set': {
@@ -139,7 +139,7 @@ class eWarBase(AwaitLoader):
         return f"https://link.clashofclans.com/en?action=CopyArmy&army={self.defensive_cc}"    
     @cached_property
     def defensive_cc_str(self):
-        parsed_cc = bot_client.coc.parse_army_link(self.defensive_cc_link)
+        parsed_cc = self.coc_client.parse_army_link(self.defensive_cc_link)
         defensive_cc_str = ""
         for troop in parsed_cc[0]:
             if defensive_cc_str != "":
@@ -150,10 +150,13 @@ class eWarBase(AwaitLoader):
     @property
     def lock(self):
         return self._locks[self.id]
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
 
     async def add_claim(self,user_id:int):
         async with self.lock:
-            await bot_client.coc_db.db_war_base.update_one(
+            await self.database.db_war_base.update_one(
                 {'_id':self.id},
                 {'$addToSet': {
                     'claims': user_id
@@ -164,7 +167,7 @@ class eWarBase(AwaitLoader):
 
     async def remove_claim(self,user_id:int):
         async with self.lock:
-            await bot_client.coc_db.db_war_base.update_one(
+            await self.database.db_war_base.update_one(
                 {'_id':self.id},
                 {'$pull': {
                     'claims': user_id
@@ -175,7 +178,7 @@ class eWarBase(AwaitLoader):
 
     async def base_embed(self):
         try:
-            image_file_path = bot_client.bot.base_image_path + '/' + self.base_image
+            image_file_path = self.bot.base_image_path + '/' + self.base_image
             image_file = discord.File(image_file_path,'image.png')
         except:
             image_file = None
@@ -188,7 +191,7 @@ class eWarBase(AwaitLoader):
             base_text += f"\n\n**Builder Notes**:\n{self.notes}"
         base_text += "\n\u200b"
         embed = await eclipse_embed(
-            context=bot_client.bot,
+            context=self.bot,
             title=f"**TH{self.town_hall} {EmojisTownHall.get(int(self.town_hall))} {self.base_type}**",
             message=base_text)
         if image_file:

@@ -4,15 +4,13 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient, aClashSeason
+from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.events.clan_war_leagues import WarLeaguePlayer, WarLeagueClan
 
 from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, DiscordSelectMenu
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisLeagues
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
-
-bot_client = BotClashClient()
 
 class CWLSeasonSetup(DefaultView):
     def __init__(self,
@@ -50,15 +48,11 @@ class CWLSeasonSetup(DefaultView):
         self.add_item(self._close_signups_button)
         self.add_item(self.close_button)
     
-    @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-    
     ##################################################
     ### START / STOP CALL
     ##################################################
     async def start(self):
-        cwl_clans = await bot_client.coc.get_war_league_clans()
+        cwl_clans = await self.coc_client.get_war_league_clans()
         if len(cwl_clans) == 0:
             embed = await clash_embed(
                 context=self.ctx,
@@ -171,7 +165,7 @@ class CWLSeasonSetup(DefaultView):
             self.clan_selector = None
 
         if not self.season.cwl_signup_lock:
-            clans = await bot_client.coc.get_war_league_clans()
+            clans = await self.coc_client.get_war_league_clans()
 
             options = []
             async for c in AsyncIter(clans):

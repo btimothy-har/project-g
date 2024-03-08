@@ -1,12 +1,13 @@
 import discord
 import random
+import logging
 
 from redbot.core import app_commands
-from coc_main.api_client import BotClashClient
+from coc_main.client.global_client import GlobalClient
 
 from .components.event import Event
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 async def autocomplete_active_events(interaction:discord.Interaction,current:str):
     try:
@@ -23,7 +24,7 @@ async def autocomplete_active_events(interaction:discord.Interaction,current:str
             for event in random.sample(sel_events,min(5,len(sel_events)))
             ]
     except:
-        bot_client.coc_main_log.exception(f"Error in autocomplete_all_active_events")
+        LOG.exception(f"Error in autocomplete_all_active_events")
 
 async def autocomplete_user_players(interaction:discord.Interaction,current:str):
     try:
@@ -45,7 +46,7 @@ async def autocomplete_user_players(interaction:discord.Interaction,current:str)
             {'$match': q_doc},
             {'$sample': {'size': 8}}
             ]
-        query = bot_client.coc_db.db__player.aggregate(pipeline)
+        query = GlobalClient.database.db__player.aggregate(pipeline)
         return [
             app_commands.Choice(
                 name=f"{p.get('name','')} | TH{p.get('townhall',1)} | {p['_id']}",
@@ -54,4 +55,4 @@ async def autocomplete_user_players(interaction:discord.Interaction,current:str)
             async for p in query
             ]
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_user_players")
+        LOG.exception("Error in autocomplete_user_players")

@@ -1,18 +1,27 @@
+import asyncio
 import pendulum
 import logging
-import asyncio
+import motor.motor_asyncio
 
 from typing import *
 
 from collections import defaultdict
-from async_property import AwaitLoader
 
-from redbot.core.bot import Red
+from ...client.db_client import MotorClient
+from ...exceptions import SeasonNotLoaded
 
-coc_main_logger = logging.getLogger("coc.main")
+LOG = logging.getLogger("coc.main")
 
-class aClashSeason(AwaitLoader):
-    _bot = None
+# d_season = {
+#     '_id': string,
+#     's_is_current': bool,
+#     's_month': int,
+#     's_year': int,
+#     'clangames_max': int,
+#     'cwl_signup': bool
+#     }
+
+class aClashSeason(MotorClient):
     _cache = {}
     _locks = defaultdict(asyncio.Lock)
 
@@ -25,10 +34,44 @@ class aClashSeason(AwaitLoader):
         'clangames_max',
         'cwl_signup'
         ]
+    
+    @classmethod
+    async def load_seasons(cls) -> List['aClashSeason']:
+        ret_seasons = []
+
+        find_seasons = cls.database.d_season.find({})
+        async for db_season in find_seasons:
+            season = cls(db_season['_id'])
+            await season.load()
+            ret_seasons.append(season)        
+        return ret_seasons
+    
+    @classmethod
+    def current(cls) -> 'aClashSeason':
+        try:
+            return [s for s in list(cls._cache.values()) if s.is_current][0]
+        except IndexError as e:
+            raise SeasonNotLoaded() from e
+    
+    @classmethod
+    def tracked(cls) -> List['aClashSeason']:
+        seasons = [s for s in list(cls._cache.values()) if not s.is_current]
+        if len(seasons) == 0:
+            raise SeasonNotLoaded()
+        return sorted(seasons,
+            key=lambda x: x.season_start.int_timestamp,
+            reverse=True
+            )
 
     @classmethod
-    def initialize_bot(cls,bot:Red):
-        cls._bot = bot
+    def all_seasons(cls) -> List['aClashSeason']:
+        seasons = [s for s in list(cls._cache.values())]
+        if len(seasons) == 0:
+            raise SeasonNotLoaded()
+        return sorted(seasons,
+            key=lambda x: x.season_start.int_timestamp,
+            reverse=True
+            )    
 
     def __new__(cls,id:str):
         if id not in cls._cache:
@@ -62,7 +105,7 @@ class aClashSeason(AwaitLoader):
         return hash(self.season_start)
 
     async def load(self):
-        season = await self._bot.coc_db.d_season.find_one({'_id':self.id})
+        season = await self.database.d_season.find_one({'_id':self.id})
 
         self.is_current = season.get('s_is_current',False) if season else False
         self.clangames_max = season.get('clangames_max',4000) if season else 4000
@@ -71,16 +114,8 @@ class aClashSeason(AwaitLoader):
     ##################################################
     ### DATABASE ATTRIBUTES
     ##################################################    
-    @classmethod
-    async def get_current_season(cls) -> 'aClashSeason':
-        now = pendulum.now()
-        season = await aClashSeason(now.format('M-YYYY'))
-        if now < season.season_start:
-            season = await aClashSeason(now.subtract(months=1).format('M-YYYY'))
-        return season
-    
     @property
-    def _lock(self):
+    def _lock(self) -> asyncio.Lock:
         return self._locks[self.id]
     
     ##################################################
@@ -88,14 +123,12 @@ class aClashSeason(AwaitLoader):
     ##################################################        
     @property
     def is_current_season(self) -> bool:
-        return self.is_current
- 
+        return self.is_current 
     @property
     def cwl_signup_lock(self) -> bool:
         if self.cwl_start.subtract(days=20) < pendulum.now() < self.cwl_start.subtract(hours=12):
             return False
-        return True
-    
+        return True    
     @property
     def cwl_signup_status(self) -> bool:
         if self.cwl_signup_lock:
@@ -107,8 +140,7 @@ class aClashSeason(AwaitLoader):
     ##################################################    
     @property
     def season_start(self):
-        return pendulum.datetime(self.season_year, self.season_month, 1, 8)
-    
+        return pendulum.datetime(self.season_year, self.season_month, 1, 8)    
     @property
     def season_end(self):
         return pendulum.datetime(self.season_start.add(months=1).year, self.season_start.add(months=1).month, 1, 8)
@@ -119,8 +151,7 @@ class aClashSeason(AwaitLoader):
         for day in range(last_day_of_last_month.day, 0, -1):
             date = pendulum.datetime(last_day_of_last_month.year, last_day_of_last_month.month, day,5,0,0)
             if date.day_of_week == pendulum.MONDAY:
-                return date
-                
+                return date                
     @property
     def trophy_season_end(self):
         last_day_of_this_month = pendulum.datetime(self.season_start.year, self.season_start.month, 1).end_of('month')
@@ -174,7 +205,7 @@ class aClashSeason(AwaitLoader):
     
     async def set_as_current(self):
         async with self._lock:
-            await self._bot.coc_db.d_season.update_one(
+            await self.database.d_season.update_one(
                 {'_id':self.id},
                 {'$set': {
                     's_is_current':True
@@ -182,38 +213,38 @@ class aClashSeason(AwaitLoader):
                 },
                 upsert=True
                 )
-            await self._bot.coc_db.d_season.update_many(
+            await self.database.d_season.update_many(
                 {'_id':{'$ne':self.id}},
                 {'$set': {
                     's_is_current':False
                     }
                 }
                 )
-            coc_main_logger.info(f"Season {self.id} {self.description} set as current season.")
+            LOG.info(f"Season {self.id} {self.description} set as current season.")
     
     async def open_cwl_signups(self):            
         async with self._lock:
             self.cwl_signup = True
-            await self._bot.coc_db.d_season.update_one(
+            await self.database.d_season.update_one(
                 {'_id':self.id},
                 {'$set': 
                     {'cwl_signup':True}
                 },
                 upsert=True
                 )
-            coc_main_logger.info(f"Season {self.id} {self.description} CWL signups opened.")
+            LOG.info(f"Season {self.id} {self.description} CWL signups opened.")
 
     async def close_cwl_signups(self):
         async with self._lock:
             self.cwl_signup = False
-            await self._bot.coc_db.d_season.update_one(
+            await self.database.d_season.update_one(
                 {'_id':self.id},
                 {'$set': 
                     {'cwl_signup':False}
                 },
                 upsert=True
                 )
-            coc_main_logger.info(f"Season {self.id} {self.description} CWL signups closed.")
+            LOG.info(f"Season {self.id} {self.description} CWL signups closed.")
     
     ##################################################
     ### STATIC METHODS
@@ -239,5 +270,5 @@ class aClashSeason(AwaitLoader):
     
     @staticmethod
     async def last_completed_clangames():
-        current_season = await aClashSeason.get_current_season()
+        current_season = aClashSeason.current()
         return current_season if pendulum.now() >= current_season.clangames_start else current_season.previous_season()

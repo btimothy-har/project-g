@@ -1,6 +1,6 @@
-from coc_main.exceptions import ClashOfClansError
+from coc_main.exceptions import ProjectGError
 
-class LeaderboardExists(ClashOfClansError):
+class LeaderboardExists(ProjectGError):
     def __init__(self, exc):
         self.message = exc
         super().__init__(self.message)

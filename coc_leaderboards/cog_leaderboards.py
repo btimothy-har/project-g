@@ -2,6 +2,7 @@ import asyncio
 import discord
 import pendulum
 import random
+import logging
 
 from typing import *
 from discord.ext import tasks
@@ -10,8 +11,8 @@ from redbot.core import commands, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils import AsyncIter,bounded_gather
 
-from coc_main.api_client import BotClashClient, ClashOfClansError
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.cog_coc_main import ClashOfClansMain as coc_main
+from coc_main.client.global_client import GlobalClient
 from coc_main.utils.checks import is_admin
 from coc_main.utils.components import clash_embed
 
@@ -24,7 +25,7 @@ lb_type_selector = [
     app_commands.Choice(name="Clan Games", value=5)
     ]
 
-bot_client = BotClashClient()
+LOG = logging.getLogger("coc.main")
 
 async def autocomplete_leaderboard_selector(interaction:discord.Interaction,current:str):
     try:
@@ -40,98 +41,70 @@ async def autocomplete_leaderboard_selector(interaction:discord.Interaction,curr
         return [
             app_commands.Choice(name=str(lb),value=lb.id) for lb in sample] 
     except Exception:
-        bot_client.coc_main_log.exception("Error in autocomplete_leaderboard_selector")
+        LOG.exception("Error in autocomplete_leaderboard_selector")
 
 ############################################################
 ############################################################
 #####
-##### CLIENT COG
+##### LEADERBOARD COG
 #####
 ############################################################
 ############################################################
-class Leaderboards(commands.Cog):
+class Leaderboards(commands.Cog,GlobalClient):
     """
     Auto-updating Discord Leaderboards for Clash of Clans.
     """
 
-    __author__ = bot_client.author
-    __version__ = bot_client.version
-    __release__ = 2
+    __author__ = coc_main.__author__
+    __version__ = coc_main.__version__
 
-    def __init__(self,bot:Red):
-        self.bot = bot
+    def __init__(self):
         self.leaderboard_lock = asyncio.Lock()
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
-        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}.{self.__release__}"
-
-    @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
+        return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
     
+    async def cog_command_error(self,ctx:commands.Context,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,ctx)
+
+    async def cog_app_command_error(self,interaction:discord.Interaction,error:discord.DiscordException):
+        original_exc = getattr(error,'original',error)
+        await GlobalClient.handle_command_error(original_exc,interaction)
+    
+    @property
+    def bot(self) -> Red:
+        return GlobalClient.bot
+    
+    ############################################################
+    #####
+    ##### COG LOAD/UNLOAD
+    #####
+    ############################################################
     async def cog_load(self):
         async def start_cog():
             while True:
-                if getattr(bot_client,'_api_logged_in',False):
+                if getattr(self,'_ready',False):
                     break
                 await asyncio.sleep(1)
                 
-            await bot_client.bot.wait_until_ready()
+            await self.bot.wait_until_ready()
             self.update_leaderboards.start()
         
         asyncio.create_task(start_cog())
     
     async def cog_unload(self):
         self.update_leaderboards.cancel()
-    
-    async def cog_command_error(self,ctx,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
-            embed = await clash_embed(
-                context=ctx,
-                message=f"{error.original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            await ctx.send(embed=embed)
-            return
-        await self.bot.on_command_error(ctx,error,unhandled_by_cog=True)
 
-    async def cog_app_command_error(self,interaction,error):
-        if isinstance(getattr(error,'original',None),ClashOfClansError):
-            embed = await clash_embed(
-                context=interaction,
-                message=f"{error.original.message}",
-                success=False,
-                timestamp=pendulum.now()
-                )
-            if interaction.response.is_done():
-                await interaction.edit_original_response(embed=embed,view=None)
-            else:
-                await interaction.response.send_message(embed=embed,view=None,ephemeral=True)
-            return
-    
-    ############################################################
     ############################################################
     #####
-    ##### COMMAND DIRECTORY
-    ##### - Leaderboard / List
-    ##### - Leaderboard / Create
-    ##### - Leaderboard / Delete
+    ##### COMMAND GROUP: LEADERBOARDS
     #####
     ############################################################
-    ############################################################
-
-    ##################################################
-    ### PARENT COMMAND GROUPS
-    ##################################################
     @commands.group(name="cocleaderboard",aliases=["coclb"])
     @commands.guild_only()
-    async def command_group_clash_leaderboards(self,ctx):
+    async def cmdgroup_coclb(self,ctx):
         """
         Group to set up Clash Leaderboards.
 
@@ -140,15 +113,31 @@ class Leaderboards(commands.Cog):
         if not ctx.invoked_subcommand:
             pass
 
-    app_command_group_leaderboards = app_commands.Group(
+    appgroup_coclb = app_commands.Group(
         name="coc-leaderboard",
         description="Group to set up Clash Leaderboards.",
         guild_only=True
         )
 
-    ##################################################
-    ### LEADERBOARD / LIST
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: LEADERBOARD DELHIST
+    #####
+    ############################################################
+    @cmdgroup_coclb.command(name="delhist",aliases=['hdel'])
+    @commands.is_owner()
+    async def subcmd_coclb_delhist(self,ctx):
+        """
+        Delete all historical leaderboards.
+        """        
+        await self.database.db__leaderboard_archive.delete_many({})
+        await ctx.reply("Historical Leaderboards Deleted.")
+
+    ############################################################
+    #####
+    ##### COMMAND: LEADERBOARD LIST
+    #####
+    ############################################################
     async def helper_list_guild_leaderboards(self,
         context:Union[discord.Interaction,commands.Context],
         guild:discord.Guild) -> discord.Embed:
@@ -171,22 +160,12 @@ class Leaderboards(commands.Cog):
                     + f"\n\u200b",
                 inline=True
                 )            
-        return embed
+        return embed    
 
-    @command_group_clash_leaderboards.command(name="hdel")
-    @commands.guild_only()
-    @commands.is_owner()
-    async def command_delete_history_leaderboard(self,ctx):
-        """
-        Delete all historical leaderboards.
-        """        
-        await bot_client.coc_db.db__leaderboard_archive.delete_many({})
-        await ctx.reply("Historical Leaderboards Deleted.")
-
-    @command_group_clash_leaderboards.command(name="list")
+    @cmdgroup_coclb.command(name="list")
     @commands.guild_only()
     @commands.admin()
-    async def command_list_leaderboard(self,ctx):
+    async def subcmd_coclb_list(self,ctx):
         """
         List all Leaderboards setup in this server.
         """
@@ -194,20 +173,22 @@ class Leaderboards(commands.Cog):
         embed = await self.helper_list_guild_leaderboards(ctx,ctx.guild)
         await ctx.reply(embed=embed)        
     
-    @app_command_group_leaderboards.command(name="list",
+    @appgroup_coclb.command(name="list",
         description="List all Leaderboards setup in this server.")
     @app_commands.check(is_admin)
     @app_commands.guild_only()
-    async def sub_appcommand_leaderboards_list(self,interaction:discord.Interaction):
+    async def appcmd_coclb_list(self,interaction:discord.Interaction):
         
         await interaction.response.defer()
 
         embed = await self.helper_list_guild_leaderboards(interaction,interaction.guild)
         await interaction.edit_original_response(embed=embed,view=None)
     
-    ##################################################
-    ### LEADERBOARD / CREATE
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: LEADERBOARD CREATE
+    #####
+    ############################################################
     async def helper_create_guild_leaderboard(self,
         context:Union[discord.Interaction,commands.Context],
         type:int,
@@ -250,10 +231,10 @@ class Leaderboards(commands.Cog):
             )
         return embed
                                               
-    @command_group_clash_leaderboards.command(name="create")
+    @cmdgroup_coclb.command(name="create")
     @commands.guild_only()
     @commands.admin()
-    async def command_create_leaderboard(self,ctx,type:int,is_global:int,channel:discord.TextChannel):
+    async def subcmd_coclb_create(self,ctx,type:int,is_global:int,channel:discord.TextChannel):
         """
         Create a new Clash Leaderboard.
 
@@ -277,7 +258,7 @@ class Leaderboards(commands.Cog):
         embed = await self.helper_create_guild_leaderboard(ctx,type,is_global,channel)
         await ctx.reply(embed=embed)
     
-    @app_command_group_leaderboards.command(name="create",
+    @appgroup_coclb.command(name="create",
         description="Create a new Clash Leaderboard in this server.")
     @app_commands.check(is_admin)
     @app_commands.describe(
@@ -288,15 +269,17 @@ class Leaderboards(commands.Cog):
     @app_commands.choices(is_global=[
         app_commands.Choice(name="Yes",value=1),
         app_commands.Choice(name="No",value=0)])
-    async def app_command_create_leaderboard(self,interaction:discord.Interaction,type:int,is_global:int,channel:discord.TextChannel):
+    async def appcmd_coclb_create(self,interaction:discord.Interaction,type:int,is_global:int,channel:discord.TextChannel):
         
         await interaction.response.defer()
         embed = await self.helper_create_guild_leaderboard(interaction,type,is_global,channel)
         await interaction.edit_original_response(embed=embed)
     
-    ##################################################
-    ### LEADERBOARD / DELETE
-    ##################################################
+    ############################################################
+    #####
+    ##### COMMAND: LEADERBOARD DELETE
+    #####
+    ############################################################
     async def helper_delete_guild_leaderboard(self,
         context:Union[discord.Interaction,commands.Context],
         leaderboard_id:str) -> discord.Embed:  
@@ -330,10 +313,10 @@ class Leaderboards(commands.Cog):
             )
         return embed
     
-    @command_group_clash_leaderboards.command(name="delete")
+    @cmdgroup_coclb.command(name="delete")
     @commands.guild_only()
     @commands.admin()
-    async def command_delete_leaderboard(self,ctx,leaderboard_id:str):
+    async def subcmd_coclb_delete(self,ctx,leaderboard_id:str):
         """
         Delete a Leaderboard by ID.
 
@@ -342,31 +325,32 @@ class Leaderboards(commands.Cog):
         embed = await self.helper_delete_guild_leaderboard(ctx,leaderboard_id)
         await ctx.reply(embed=embed)
     
-    @app_command_group_leaderboards.command(name="delete",
+    @appgroup_coclb.command(name="delete",
         description=f"Deletes a Leaderboard.")
     @app_commands.check(is_admin)
     @app_commands.guild_only()
     @app_commands.autocomplete(leaderboard=autocomplete_leaderboard_selector)
     @app_commands.describe(
         leaderboard="The Leaderboard to delete.")
-    async def appcommand_delete_leaderboard(self,interaction:discord.Interaction,leaderboard:str):
+    async def appcmd_coclb_delete(self,interaction:discord.Interaction,leaderboard:str):
         
         await interaction.response.defer()
         embed = await self.helper_delete_guild_leaderboard(interaction,leaderboard)
         await interaction.edit_original_response(embed=embed,view=None)
-    
+
+    ############################################################
+    #####
+    ##### LOOP: UPDATE LEADERBOARDS
+    #####
+    ############################################################    
     @tasks.loop(minutes=15.0)
     async def update_leaderboards(self):
         if self.leaderboard_lock.locked():
             return
 
         async with self.leaderboard_lock:
-            st = pendulum.now()
-            bot_client.coc_main_log.info("Updating Leaderboards...")
-
             all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
 
             tasks = [lb.update_leaderboard() for lb in all_leaderboards]
             await bounded_gather(*tasks,return_exceptions=True)
-            et = pendulum.now()
-            bot_client.coc_main_log.info(f"Leaderboards Updated. Time Taken: {et.int_timestamp - st.int_timestamp} seconds.")
+            

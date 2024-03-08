@@ -2,9 +2,14 @@ import os
 import xlsxwriter
 
 from redbot.core.utils import AsyncIter
+from redbot.core.bot import Red
 
-from coc_main.api_client import BotClashClient, aClashSeason
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aClanWar, aRaidWeekend
+from coc_main.client.global_client import GlobalClient
+from coc_main.coc_objects.season.season import aClashSeason
+from coc_main.coc_objects.clans.clan import aClan
+
+from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 
@@ -67,18 +72,16 @@ raid_headers = [
     'Destruction',
     ]
 
-bot_client = BotClashClient()
-
-class ClanExcelExport():
+class ClanExcelExport(GlobalClient):
     def __init__(self,clan:aClan,season:aClashSeason):
         self.clan = clan
         self.season = season
-        self.file_path = bot_client.bot.coc_report_path + '/' + f"{clan.name} {season.description}.xlsx"
+        self.file_path = self.bot.coc_report_path + '/' + f"{clan.name} {season.description}.xlsx"
         self.workbook = None
     
     @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     @classmethod
     async def generate_report(cls,clan:aClan,season:aClashSeason):
@@ -103,7 +106,7 @@ class ClanExcelExport():
             members_worksheet.write(row,col,header,bold)
             col += 1
         
-        members = await bot_client.coc.get_members_by_season(self.clan,self.season)
+        members = await self.coc_client.get_members_by_season(self.clan,self.season)
         async for m in AsyncIter(members):
             col = 0
             row += 1
@@ -123,7 +126,7 @@ class ClanExcelExport():
             m_data.append(stats.tag)
             m_data.append(stats.name)
 
-            m_data.append(getattr(bot_client.bot.get_user(m.discord_user),'name',''))
+            m_data.append(getattr(self.bot.get_user(m.discord_user),'name',''))
 
             m_data.append(f"{getattr(stats.home_clan,'name','')} ({stats.home_clan_tag})")
             m_data.append(stats.time_in_home_clan / (24*60*60))

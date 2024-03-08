@@ -7,8 +7,7 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClanWar
+from coc_main.coc_objects.events.clan_war import aClanWar
 from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.helpers import clan_war_embed
@@ -17,8 +16,6 @@ from coc_main.utils.components import clash_embed, DefaultView, DiscordButton, D
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisLeagues, EmojisTownHall
 from coc_main.utils.constants.coc_constants import WarState, WarResult
 from coc_main.utils.constants.ui_emojis import EmojisUI
-
-bot_client = BotClashClient()
 
 class CWLClanGroupMenu(DefaultView):
     def __init__(self,
@@ -30,14 +27,6 @@ class CWLClanGroupMenu(DefaultView):
         self.war = None
         self.clan_nav = None
         super().__init__(context,timeout=300)
-    
-    @property
-    def bot_client(self) -> BotClashClient:
-        return bot_client
-
-    @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
     
     ##################################################
     ### START / STOP
@@ -237,7 +226,7 @@ class CWLClanGroupMenu(DefaultView):
     ##################################################    
     async def _content_embed_league_group(self):
         emoji_id = re.search(r'\d+',EmojisLeagues.get(self.league_group.league)).group()
-        league_emoji = self.bot_client.bot.get_emoji(int(emoji_id))
+        league_emoji = self.bot.get_emoji(int(emoji_id))
 
         content_body = (f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
             + f"\n**Rounds:** {self.league_group.number_of_rounds}"
@@ -265,7 +254,7 @@ class CWLClanGroupMenu(DefaultView):
     
     async def _content_embed_league_table(self):
         emoji_id = re.search(r'\d+',EmojisLeagues.get(self.league_group.league)).group()
-        league_emoji = self.bot_client.bot.get_emoji(int(emoji_id))
+        league_emoji = self.bot.get_emoji(int(emoji_id))
         league_clans = sorted(self.league_group.clans,key=lambda x: (x.total_score,x.total_destruction),reverse=True)
 
         league_table = f"```{'':^3}{'STARS':>5}{'':^2}{'DESTR %':>7}{'':^20}\n"        
@@ -301,7 +290,7 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_roster(self):
-        roster_players = [p async for p in bot_client.coc.get_players([p.tag for p in self.clan.master_roster])]
+        roster_players = [p async for p in self.coc_client.get_players([p.tag for p in self.clan.master_roster])]
         roster_players.sort(key=lambda x:(x.town_hall.level,x.hero_strength,x.troop_strength,x.spell_strength,x.name),reverse=True)
  
         embed = await clash_embed(

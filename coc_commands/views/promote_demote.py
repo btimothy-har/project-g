@@ -4,9 +4,9 @@ import asyncio
 from typing import *
 
 from redbot.core import commands
+from redbot.core.bot import Red
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient
+from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.clans.clan import BasicClan
 
 from coc_main.discord.member import aMember
@@ -15,15 +15,13 @@ from coc_main.utils.components import MultipleChoiceSelectionMenu, MenuConfirmat
 from coc_main.utils.constants.coc_constants import ClanRanks
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
-bot_client = BotClashClient()
-
 ###################################################################################################
 #####
 ##### RANK HANDLER FOR PROMOTE / DEMOTE
 ##### **We don't have to sub-class this to ui.View as we don't have any child views here.**
 #####
 ####################################################################################################
-class MemberRankMenu():
+class MemberRankMenu(GlobalClient):
     def __init__(self,
         context:commands.Context,
         member:discord.Member):
@@ -33,12 +31,10 @@ class MemberRankMenu():
 
         self.ctx = context
         if isinstance(context,commands.Context):
-            self.bot = self.ctx.bot
             self.user = self.ctx.author
             self.channel = self.ctx.channel
             self.guild = self.ctx.guild
         elif isinstance(context,discord.Interaction):
-            self.bot = self.ctx.client
             self.user = self.ctx.user
             self.channel = self.ctx.channel
             self.guild = self.ctx.guild
@@ -48,8 +44,8 @@ class MemberRankMenu():
         self.member = aMember(member.id)
     
     @property
-    def client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
+    def bot(self) -> Red:
+        return GlobalClient.bot
     
     ####################################################################################################
     #####
@@ -231,7 +227,7 @@ class MemberRankMenu():
     async def _apply_rank_changes(self,target_clan:str):
         report_output = ""
 
-        clan = await bot_client.coc.get_clan(target_clan)
+        clan = await self.coc_client.get_clan(target_clan)
         current_rank_int = ClanRanks.get_number(self.get_current_rank(clan))
         new_rank = ClanRanks.get_rank(current_rank_int + self.rank_action)
 

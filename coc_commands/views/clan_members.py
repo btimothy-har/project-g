@@ -1,4 +1,3 @@
-import asyncio
 import discord
 import re
 
@@ -7,17 +6,12 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.api_client import BotClashClient
-from coc_main.cog_coc_client import ClashOfClansClient, aClan, aPlayer
+from coc_main.coc_objects.clans.clan import aClan
 
-from coc_main.utils.components import clash_embed, handle_command_error, MenuPaginator, DiscordButton, DiscordSelectMenu, DiscordChannelSelect, DefaultView
-
+from coc_main.utils.components import clash_embed, MenuPaginator, DiscordButton
 from coc_main.utils.constants.coc_emojis import EmojisTownHall, EmojisClash
 from coc_main.utils.constants.ui_emojis import EmojisUI
-from coc_main.exceptions import ClashAPIError
 from coc_main.utils.utils import chunks
-
-bot_client = BotClashClient()
 
 class ClanMembersMenu(MenuPaginator):
     def __init__(self,
@@ -33,41 +27,13 @@ class ClanMembersMenu(MenuPaginator):
         self.all_clan_members = []
 
         super().__init__(context,[])
-    
-    @property
-    def coc_client(self) -> ClashOfClansClient:
-        return bot_client.bot.get_cog("ClashOfClansClient")
 
     ##################################################
     ### OVERRIDE BUILT IN METHODS
-    ##################################################
-    async def interaction_check(self, interaction:discord.Interaction):
-        if not self.is_active:
-            await interaction.response.send_message(
-                content="This menu is not active.", ephemeral=True,view=None
-                )
-            return False
-        if self.waiting_for and interaction.user.id == self.user.id:
-            await interaction.response.send_message(
-                content="Please respond first!", ephemeral=True,view=None
-                )
-            return False
-        if interaction.user.id != self.user.id:
-            await interaction.response.send_message(
-                content="This doesn't belong to you!", ephemeral=True,view=None
-                )
-            return False
-        return True
-    
+    ##################################################    
     async def on_timeout(self):
         self.stop_menu()
         await self.message.edit(view=None)
-        
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item):
-        err = await handle_command_error(error,interaction,self.message)
-        if err:
-            return
-        self.stop_menu()
     
     ##################################################
     ### START / STOP
@@ -80,9 +46,9 @@ class ClanMembersMenu(MenuPaginator):
     async def start(self):
         registered_members = []
         if self.clan.is_alliance_clan and self.clan.alliance_member_count > 0:
-            registered_members = [p async for p in bot_client.coc.get_players(self.clan.alliance_members)]
+            registered_members = [p async for p in self.coc_client.get_players(self.clan.alliance_members)]
 
-        self.members_in_clan = [p async for p in bot_client.coc.get_players([m.tag for m in self.clan.members])]
+        self.members_in_clan = [p async for p in self.coc_client.get_players([m.tag for m in self.clan.members])]
         self.members_not_in_clan = [member for member in registered_members if member not in self.members_in_clan]
         self.all_clan_members = self.members_in_clan + self.members_not_in_clan
         self.is_active = True
