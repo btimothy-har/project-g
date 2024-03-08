@@ -262,7 +262,8 @@ class LegendsTourney(commands.Cog,GlobalClient):
         embeds = []
         async for i,chunk in c_iter.enumerate(start=1):
             player_text = "\n".join([
-                f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {p.legend_statistics.current_season.trophies:<6,}` <@{p.discord_user}>" for p in chunk if p.legend_statistics.current_season.trophies >= 5000])
+                f"{p.town_hall.emoji} `{p.clean_name[:15]:<15} {p.trophies:<6,}` <@{p.discord_user}>" for p in chunk
+                ])
             if i == 1:
                 season = aClashSeason(self._tourney_season)
                 days_difference = pendulum.now().diff(season.trophy_season_start).in_days() + 1
