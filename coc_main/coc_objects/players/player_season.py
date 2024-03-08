@@ -1,8 +1,9 @@
 import pendulum
-import numerize
 
 from typing import *
+from numerize import numerize
 from async_property import AwaitLoader
+
 from redbot.core.utils import AsyncIter
 
 from .player_activity import aPlayerActivity
