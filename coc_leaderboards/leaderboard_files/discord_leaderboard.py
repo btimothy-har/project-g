@@ -114,7 +114,7 @@ class DiscordLeaderboard(GlobalClient):
 
     @staticmethod
     def get_leaderboard_seasons():
-        return [i for i in aClashSeason.all_seasons() if pendulum.now() <= i.season_end][:4]
+        return [i for i in aClashSeason.all_seasons() if  i.season_start.int_timestamp <= pendulum.now().int_timestamp][:4]
 
     def __init__(self,database_entry:dict):
         self._id = database_entry.get('_id')

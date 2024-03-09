@@ -481,7 +481,6 @@ class MenuPaginator(discord.ui.View,GlobalClient):
             self.channel = context.channel
             self.guild = context.guild
         elif isinstance(context, discord.Interaction):
-            self.bot = context.client
             self.user = context.user
             self.channel = context.channel
             self.guild = context.guild
