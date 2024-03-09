@@ -277,7 +277,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             if self.coc_client.maintenance:
                 return
             
-            if self.cycle_id >= 1:
+            if self.cycle_id == 1:
                 current = list(self.coc_client._player_updates)            
                 query = {
                     "$and": [
@@ -287,7 +287,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                             {"is_member": True}
                             ]}
                         ]
-                    }
+                    }                
                 db_query = self.database.db__player.find(query,{'_id':1})
                 async for p in db_query:
                     if p['_id'] in current:
@@ -296,16 +296,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         {"_id": p['_id']},
                         {"$unset": {"_cycle_id": 1}}
                         )
-            
-            current = list(self.coc_client._player_updates)
-            if self.cycle_id >= 1:
-                query = {
-                    "$and": [
-                        {"_id": {"$nin": current}},
-                        {"_cycle_id": {"$gte":self.cycle_id}}
-                        ]
-                    }
-            else:
+
+                current = list(self.coc_client._player_updates)
                 query = {
                     "$and": [
                         {"_id": {"$nin": current}},
@@ -313,8 +305,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         ]
                     }
 
-            db_query = self.database.db__player.find(query,{'_id':1})
-            self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
+                db_query = self.database.db__player.find(query,{'_id':1})
+                self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
     
     @tasks.loop(minutes=10)
     async def update_clan_loop(self):        
@@ -322,22 +314,17 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             if self.coc_client.maintenance:
                 return            
             
-            current = list(self.coc_client._clan_updates)
-            if self.cycle_id >= 1:
+            if self.cycle_id == 2:
+                current = list(self.coc_client._clan_updates)
                 query = {
                     "$and": [
                         {"_id": {"$nin": current}},
-                        {"_cycle_id": {"$gte":self.cycle_id}}
+                        {"_cycle_id": self.cycle_id}
                         ]
                     }
-            query = {
-                "$and": [
-                    {"_id": {"$nin": current}},
-                    {"_cycle_id": self.cycle_id}
-                    ]
-                }
-            db_query = self.database.db__clan.find(query,{'_id':1})
-            self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
+                    
+                db_query = self.database.db__clan.find(query,{'_id':1})
+                self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
     
     async def _player_discovery_loop(self):
         sleep = 0.1

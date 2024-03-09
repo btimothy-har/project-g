@@ -99,19 +99,15 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             },
             upsert=True
             )
-        LOG.info(f"Clash of Clans Data Controller started by {self.bot.user.id}.")
-
-        await self._refresh_cycle_availability()
+        LOG.info(f"Clash of Clans Data Controller started by {self.bot.user.id}.")        
         
-        self.refresh_cycle_availability.start()
         self.update_cycles.start()
 
     ##################################################
     ### COG UNLOAD
     ##################################################
     async def cog_unload(self):
-        self.update_cycles.stop()
-        self.refresh_cycle_availability.stop()        
+        self.update_cycles.stop()       
 
         await self.database.db_data_controller.update_one(
             {"_id": "env_control"},
@@ -131,31 +127,14 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             return
         
         async with self.control_lock:
-            await self.clean_unused_cycles()
+            await self.cleanup_cycle()
 
-            available_cycles = [k for k,v in self.cycle_availability.items() if v > 0]
+            cycles = [0,1,2]
+            c_iter = AsyncIter(cycles)
+            async for cycle_num in c_iter:
+                await self.assign_to_cycle(cycle_num)
 
-            if len(available_cycles) == 0:
-                LOG.warning("No available cycles left!")
-                await self.bot.send_to_owners("No available cycles left!")
-                await asyncio.sleep(60*10)
-                return
-            
-            cycle_iter = AsyncIter([k for k,v in self.cycle_availability.items()])
-
-            async for cycle_num in cycle_iter:
-                available_slots = self.cycle_availability[cycle_num]
-                
-                if available_slots < 0:
-                    await self.unassign_from_cycle(cycle_num)
-                elif available_slots > 0:
-                    await self.assign_to_cycle(cycle_num)
-    
     async def assign_to_cycle(self,cycle_num:int):
-        available_slots = self.cycle_availability[cycle_num]
-        if available_slots <= 0:
-            return
-        
         if cycle_num == 0:
             query = {
                 "$and": [
@@ -170,7 +149,7 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                         ]}
                     ]
                 }
-        else:
+        elif cycle_num == 1:
             query = {
                 "$or": [
                     {"_cycle_id": {"$exists": False}},
@@ -178,128 +157,49 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                     ]
                 }
         
-        count = 0
-        find_players = self.database.db__player.find(query).limit(min(1000,int(available_slots/2)))
-        async for player in find_players:
-            if available_slots == 0:
-                break
-
-            await self.database.db__player.update_one(
-                {"_id": player['_id']},
-                {"$set": {"_cycle_id": cycle_num}}
-                )
-            count += 1
-            available_slots -= 1       
-        if count > 0:
-            LOG.info(f"Assigned {count} Players to Cycle {cycle_num}.")
+            count = 0
+            find_players = self.database.db__player.find(query).limit(1000)
+            async for player in find_players:
+                await self.database.db__player.update_one(
+                    {"_id": player['_id']},
+                    {"$set": {"_cycle_id": cycle_num}}
+                    )
+                count += 1
+            if count > 0:
+                LOG.info(f"Assigned {count} Players to Cycle {cycle_num}.")
         
-        count = 0
-        find_clans = self.database.db__clan.find(query).limit(min(1000,int(available_slots/2)))
-        async for clan in find_clans:
-            if available_slots == 0:
-                break
-
-            await self.database.db__clan.update_one(
-                {"_id": clan['_id']},
-                {"$set": {"_cycle_id": cycle_num}}
-                )
-            count += 1
-            available_slots -= 1
-        if count > 0:
-            LOG.info(f"Assigned {count} Clans to Cycle {cycle_num}.")
-        
-        self.cycle_availability[cycle_num] = available_slots
-    
-    async def unassign_from_cycle(self,cycle_num:int):
-        available_slots = self.cycle_availability[cycle_num]
-        if available_slots >= 0:
-            return
-        
-        query = {"_cycle_id": cycle_num}
-        find_excess = self.database.db__player.find(query).limit(abs(available_slots))
-
-        count = 0
-        async for player in find_excess:
-            if available_slots >= 0:
-                break
-
-            await self.database.db__player.update_one(
-                {"_id": player['_id']},
-                {"$unset": {"_cycle_id": 1}}
-                )
-            count += 1
-            available_slots += 1
-        if count > 0:
-            LOG.info(f"Removed {count} Players from Cycle {cycle_num}.")
-        
-        count = 0
-        find_excess = self.database.db__clan.find(query).limit(abs(available_slots))
-        async for clan in find_excess:
-            if available_slots >= 0:
-                break
-
-            await self.database.db__clan.update_one(
-                {"_id": clan['_id']},
-                {"$unset": {"_cycle_id": 1}}
-                )
-            count += 1
-            available_slots += 1
-        if count > 0:
-            LOG.info(f"Removed {count} Clans from Cycle {cycle_num}.")
-
-        self.cycle_availability[cycle_num] = available_slots
-    
-    async def clean_unused_cycles(self):        
-        query = {"_cycle_id": {'$gte':self.max_cycle}}
-        find_unused = self.database.db__player.find(query).limit(1000)
-
-        count = 0
-        async for player in find_unused:
-            await self.database.db__player.update_one(
-                {"_id": player['_id']},
-                {"$unset": {"_cycle_id": 1}}
-                )
-            count += 1
-        if count > 0:
-            LOG.info(f"Removed {count} Players from unused cycle.")
-        
-        count = 0
-        find_unused = self.database.db__clan.find(query).limit(1000)
-        async for clan in find_unused:
-            await self.database.db__clan.update_one(
-                {"_id": clan['_id']},
-                {"$unset": {"_cycle_id": 1}}
-                )
-            count += 1
-        if count > 0:
-            LOG.info(f"Removed {count} Clans from unused cycle.")
-
-    @tasks.loop(minutes=10)
-    async def refresh_cycle_availability(self):
-        await self._refresh_cycle_availability()
-        
-    async def _refresh_cycle_availability(self):
-        async with self.control_lock:
-            cycle_iter = AsyncIter(range(self.max_cycle))
-            async for cycle in cycle_iter:
-                available_slots = self.slots_per_cycle
-                pipeline = [
-                    {"$match": {"_cycle_id": cycle}},
-                    {"$group": {
-                        "_id": "$_cycle_id",
-                        "count": {"$sum": 1}
-                        }
-                    }
+        elif cycle_num == 2:
+            query = {
+                "$or": [
+                    {"_cycle_id": {"$exists": False}},
+                    {"_cycle_id": {"$lt": 0}}
                     ]
-                player_result = await self.database.db__player.aggregate(pipeline).to_list(length=None)
-                if player_result:
-                    available_slots -= player_result[0]['count']
-                
-                clan_result = await self.database.db__clan.aggregate(pipeline).to_list(length=None)
-                if clan_result:
-                    available_slots -= clan_result[0]['count']
-                
-                self.cycle_availability[cycle] = available_slots
+                }
+        
+            count = 0
+            find_clans = self.database.db__clan.find(query).limit(1000)
+            async for clan in find_clans:
+                await self.database.db_clan.update_one(
+                    {"_id": clan['_id']},
+                    {"$set": {"_cycle_id": cycle_num}}
+                    )
+                count += 1
+            if count > 0:
+                LOG.info(f"Assigned {count} Clans to Cycle {cycle_num}.")
+
+    async def cleanup_cycle(self):
+        query = {
+            "$and": [
+                {"_cycle_id": {"$exists": True}},
+                {"_cycle_id": {"$gt": 1}}
+                ]
+            }
+        find_players = self.database.db__player.find(query).limit(1000)
+        async for player in find_players:
+            await self.database.db__player.update_one(
+                {"_id": player['_id']},
+                {"$unset": {"_cycle_id": 1}}
+                )
 
     ############################################################
     #####
