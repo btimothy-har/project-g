@@ -287,7 +287,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                             {"is_member": True}
                             ]}
                         ]
-                    }                
+                    }
                 db_query = self.database.db__player.find(query,{'_id':1})
                 async for p in db_query:
                     if p['_id'] in current:
@@ -296,7 +296,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         {"_id": p['_id']},
                         {"$unset": {"_cycle_id": 1}}
                         )
-
+                
+            if self.cycle_id in [0,1]:
                 current = list(self.coc_client._player_updates)
                 query = {
                     "$and": [
