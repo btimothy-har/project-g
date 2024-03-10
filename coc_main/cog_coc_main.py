@@ -8,6 +8,7 @@ from typing import *
 
 from discord.ext import tasks
 from art import text2art
+from time import process_time
 
 from redbot.core import Config, commands
 from redbot.core.bot import Red
@@ -197,6 +198,22 @@ class ClashOfClansMain(commands.Cog):
                     )              
         except Exception:
             COC_LOG.exception(f"Error in Bot Status Loop")
+    
+    @tasks.loop(seconds=1.0)
+    async def reset_throttler_counter(self):
+        async with self.coc_client.http_throttler.sent_lock:
+            nt = process_time()
+            calc_sent = self.coc_client.http_throttler.current_sent / (nt - self.coc_client.http_throttler.sent_time)            
+            self.coc_client.http_throttler.sent.append(calc_sent)
+            self.coc_client.http_throttler.current_sent = 0
+            self.coc_client.http_throttler.sent_time = nt
+        
+        async with self.coc_client.http_throttler.rcvd_lock:
+            nt = process_time()
+            calc_rcvd = self.coc_client.http_throttler.current_rcvd / (nt - self.coc_client.http_throttler.rcvd_time)            
+            self.coc_client.http_throttler.rcvd.append(calc_rcvd)
+            self.coc_client.http_throttler.current_rcvd = 0
+            self.coc_client.http_throttler.rcvd_time = nt
             
     @tasks.loop(minutes=1.0)
     async def clash_season_check(self):

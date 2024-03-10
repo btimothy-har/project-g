@@ -1,5 +1,6 @@
 import coc
 import logging
+import asyncio
 
 from typing import *
 from redbot.core.utils import AsyncIter, bounded_gather
@@ -43,65 +44,65 @@ class PlayerTasks():
             
             LOG.debug(f"{player.tag} {player.name}: Created player snapshots.")
 
-        task = create_snapshot(new_player)
+        task = asyncio.create_task(create_snapshot(new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.name()
     async def on_player_update_name(old_player:aPlayer,new_player:aPlayer):        
         
-        task = aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="change_name",
             new_value=new_player.name
-            )
+            ))
         await GlobalClient.task_queue.put(task)
         LOG.debug(f"{new_player.tag} {new_player.name}: Name Change from {old_player.name} to {new_player.name}.")
     
     @coc.PlayerEvents.war_opted_in()
     async def on_player_update_war_opted_in(old_player:aPlayer,new_player:aPlayer):
         if old_player.war_opted_in != None and new_player.war_opted_in != None:         
-            task = aPlayerActivity.create_new(
+            task = asyncio.create_task(aPlayerActivity.create_new(
                 player=new_player,
                 timestamp=new_player.timestamp,
                 activity="change_war_option",
                 new_value=new_player.war_opted_in
-                )
+                ))
             await GlobalClient.task_queue.put(task)
             LOG.debug(f"{new_player.tag} {new_player.name}: War Opt In from {old_player.war_opted_in} to {new_player.war_opted_in}.")
     
     @coc.PlayerEvents.label_ids()
     async def on_player_update_labels(old_player:aPlayer,new_player:aPlayer):
-        task = aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="change_label",
             new_value=new_player.label_ids
-            )
+            ))
         await GlobalClient.task_queue.put(task)
         LOG.debug(f"{new_player.tag} {new_player.name}: Labels changed to {new_player.label_ids}.")
     
     @coc.PlayerEvents.town_hall_level()
     async def on_player_upgrade_townhall(old_player:aPlayer,new_player:aPlayer):        
-        task = aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="upgrade_townhall",
             change=new_player.town_hall.level - old_player.town_hall.level,
             new_value=new_player.town_hall.level
-            )
+            ))
         await GlobalClient.task_queue.put(task)
         LOG.debug(f"{new_player.tag} {new_player.name}: Townhall upgraded to {new_player.town_hall.description}.")
     
     @coc.PlayerEvents.town_hall_weapon()
     async def on_player_upgrade_townhall_weapon(old_player:aPlayer,new_player:aPlayer):
-        task = aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="upgrade_townhall_weapon",
             change=max(0,new_player.town_hall.weapon - old_player.town_hall.weapon),
             new_value=new_player.town_hall.weapon
-            )
+            ))
         await GlobalClient.task_queue.put(task)
         LOG.debug(f"{new_player.tag} {new_player.name}: Townhall Weapon upgraded to {new_player.town_hall.description}.")
     
@@ -126,7 +127,7 @@ class PlayerTasks():
         heroes = HeroAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(heroes)
         async for hero in a_iter:
-            task = _check_upgrade(old_player,new_player,hero)
+            task = asyncio.create_task(_check_upgrade(old_player,new_player,hero))
             await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.troop_strength()
@@ -165,13 +166,13 @@ class PlayerTasks():
         troops = TroopAvailability.return_all_unlocked(new_player.town_hall.level)
         troop_iter = AsyncIter(troops)
         async for t in troop_iter:
-            task = _check_troop_upgrade(old_player,new_player,t)
+            task = asyncio.create_task(_check_troop_upgrade(old_player,new_player,t))
             await GlobalClient.task_queue.put(task)
         
         pets = PetAvailability.return_all_unlocked(new_player.town_hall.level)
         pet_iter = AsyncIter(pets)
         async for p in pet_iter:
-            task = _check_pet_upgrade(old_player,new_player,p)
+            task = asyncio.create_task(_check_pet_upgrade(old_player,new_player,p))
             await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.spell_strength()
@@ -195,38 +196,38 @@ class PlayerTasks():
         spells = SpellAvailability.return_all_unlocked(new_player.town_hall.level)
         a_iter = AsyncIter(spells)
         async for spell in a_iter:
-            task = _check_spell_upgrade(old_player,new_player,spell)
+            task = asyncio.create_task(_check_spell_upgrade(old_player,new_player,spell))
             await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.clan_tag()
     async def on_player_update_clan(old_player:aPlayer,new_player:aPlayer):
         if old_player.clan_tag:            
-            task = aPlayerActivity.create_new(
+            task = asyncio.create_task(aPlayerActivity.create_new(
                 player=old_player,
                 timestamp=new_player.timestamp,
                 activity="leave_clan"
-                )
+                ))
             await GlobalClient.task_queue.put(task)
             LOG.debug(f"{old_player.tag} {old_player.name}: Left Clan {old_player.clan.tag} {old_player.clan.name}.")
         
         if new_player.clan_tag:
-            task = aPlayerActivity.create_new(
+            task = asyncio.create_task(aPlayerActivity.create_new(
                 player=new_player,
                 timestamp=new_player.timestamp,
                 activity="join_clan",
-                )
+                ))
             await GlobalClient.task_queue.put(task)
             LOG.debug(f"{new_player.tag} {new_player.name}: Joined Clan {new_player.clan.tag} {new_player.clan.name}.")
     
     @coc.PlayerEvents.trophies()
     async def on_player_update_trophies(old_player:aPlayer,new_player:aPlayer):
-        task = aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="trophies",
             change=new_player.trophies - old_player.trophies,
             new_value=new_player.trophies
-            )
+            ))
         await GlobalClient.task_queue.put(task)
         LOG.debug(f"{new_player.tag} {new_player.name}: Trophies changed to {new_player.trophies} ({new_player.trophies - old_player.trophies}).")
     
@@ -247,7 +248,7 @@ class PlayerTasks():
                 )            
             LOG.debug(f"{new_player.tag} {new_player.name}: Attack Wins changed to {new_player.attack_wins} (+{change}).")
 
-        task = _check_attack_wins(old_player,new_player)
+        task = asyncio.create_task(_check_attack_wins(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.defense_wins()
@@ -267,7 +268,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Defense Wins changed to {new_player.defense_wins} (+{change}).")
         
-        task = _check_defense_wins(old_player,new_player)
+        task = asyncio.create_task(_check_defense_wins(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.war_stars()
@@ -287,7 +288,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: War Stars changed to {new_player.war_stars} (+{change}).")
 
-        task = _check_war_stars(old_player,new_player)
+        task = asyncio.create_task(_check_war_stars(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.donations()
@@ -307,7 +308,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Donations Sent changed to {new_player.donations} (+{change}).")
 
-        task = _check_donations(old_player,new_player)
+        task = asyncio.create_task(_check_donations(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.received()
@@ -327,7 +328,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Donations Rcvd changed to {new_player.received} (+{change}).")
         
-        task = _check_received(old_player,new_player)
+        task = asyncio.create_task(_check_received(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.clan_capital_contributions()
@@ -347,7 +348,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Capital Contribution changed to {new_player.clan_capital_contributions} (+{change}).")
         
-        task = _check_capital_contribution(old_player,new_player)
+        task = asyncio.create_task(_check_capital_contribution(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.capital_gold_looted()
@@ -367,7 +368,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Capital Gold Looted changed to {new_player.capital_gold_looted} (+{change}).")
         
-        task = _check_capital_gold_looted(old_player,new_player)
+        task = asyncio.create_task(_check_capital_gold_looted(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.loot_gold()
@@ -387,7 +388,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Loot Gold changed to {new_player.loot_gold} (+{change}).")
         
-        task = _check_loot_gold(old_player,new_player)
+        task = asyncio.create_task(_check_loot_gold(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.loot_gold()
@@ -407,7 +408,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Loot Elixir changed to {new_player.loot_elixir} (+{change}).")
         
-        task = _check_loot_elixir(old_player,new_player)
+        task = asyncio.create_task(_check_loot_elixir(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.loot_darkelixir()
@@ -427,7 +428,7 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Loot Dark Elixir changed to {new_player.loot_darkelixir} (+{change}).")
         
-        task = _check_loot_darkelixir(old_player,new_player)
+        task = asyncio.create_task(_check_loot_darkelixir(old_player,new_player))
         await GlobalClient.task_queue.put(task)
     
     @coc.PlayerEvents.clan_games()
@@ -445,5 +446,5 @@ class PlayerTasks():
                 )
             LOG.debug(f"{new_player.tag} {new_player.name}: Clan Games changed to {new_player.clan_games} (+{max(0,new_player.clan_games - ref_value)}).")
             
-        task = _check_clan_games(old_player,new_player)
+        task = asyncio.create_task(_check_clan_games(old_player,new_player))
         await GlobalClient.task_queue.put(task)

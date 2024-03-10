@@ -45,18 +45,8 @@ class CounterThrottler(coc.BasicThrottler):
     
     async def increment_sent(self):
         async with self.sent_lock:
-            nt = process_time()
-            if nt - self.sent_time > 1:
-                self.sent.append(self.current_sent / (nt - self.sent_time))
-                self.current_sent = 0
-                self.sent_time = nt
             self.current_sent += 1
     
     async def increment_rcvd(self):
         async with self.rcvd_lock:
-            nt = process_time()
-            if nt - self.rcvd_time > 1:
-                self.rcvd.append(self.current_rcvd / (nt - self.rcvd_time))
-                self.current_rcvd = 0
-                self.rcvd_time = nt
             self.current_rcvd += 1
