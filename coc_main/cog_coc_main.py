@@ -236,7 +236,7 @@ class ClashOfClansMain(commands.Cog):
             COC_LOG.exception(f"Error in Season Refresh")
     
     async def _task_queue_loop(self):
-        sleep = 0.1
+        sleep = 0
         try:
             while True:
                 try:
@@ -255,7 +255,7 @@ class ClashOfClansMain(commands.Cog):
                     task = await GlobalClient.task_queue.get()
                     if task:
                         await task
-                    if self._log_queue.qsize() == 0:
+                    if GlobalClient.task_queue.qsize() == 0:
                         break
                 except Exception:
                     pass

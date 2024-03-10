@@ -2,6 +2,7 @@ import bson
 import pendulum
 
 from typing import *
+from collections import defaultdict
 
 from ...client.db_client import MotorClient
 
@@ -35,6 +36,10 @@ valid_activity_types = [
     'clan_games'
     ]
 
+def default_cache_dict() -> dict:
+    d = {i:None for i in valid_activity_types}
+    return d
+
 class aPlayerActivity(MotorClient):
     __slots__ = [
         '_id',
@@ -53,6 +58,7 @@ class aPlayerActivity(MotorClient):
         'change',      
         'new_value'        
         ]
+    __cache__ = defaultdict(default_cache_dict)
     
     @classmethod
     async def get_by_id(cls,aid:str) -> Optional['aPlayerActivity']:
@@ -63,6 +69,9 @@ class aPlayerActivity(MotorClient):
 
     @classmethod
     async def get_last_for_player_by_type(cls,tag:str,activity:str) -> Optional['aPlayerActivity']:
+        if cls.__cache__[tag][activity]:
+            return cls.__cache__[tag][activity]
+        
         filter_criteria = {
             'tag':tag,
             'activity':activity,
@@ -119,7 +128,6 @@ class aPlayerActivity(MotorClient):
         if activity not in valid_activity_types:
             raise ValueError(f"Invalid activity type: {activity}.")
 
-        await player._sync_cache(force=True)
         new_entry = await cls.database.db__player_activity.insert_one(
             {
                 'tag':player.tag,
@@ -138,6 +146,7 @@ class aPlayerActivity(MotorClient):
                 }
             )
         entry = await cls.get_by_id(str(new_entry.inserted_id))
+        cls.__cache__[player.tag][activity] = entry
         return entry
     
     def __init__(self,database:dict):
