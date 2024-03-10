@@ -260,8 +260,9 @@ class ClashOfClansMain(commands.Cog):
                 try:
                     await asyncio.sleep(sleep)
                     task = await GlobalClient.task_queue.get()
-                    if task:
-                        await task
+                    if not task.done():
+                        await GlobalClient.task_queue.put(task)
+                        
                 except asyncio.CancelledError:
                     raise
                 except Exception:

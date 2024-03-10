@@ -31,7 +31,7 @@ class PlayerTasks():
         if not new_player._create_snapshot:
             return
 
-        task = asyncio.create_task(await aPlayerActivity.create_new(
+        task = asyncio.create_task(aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,
             activity="snapshot",
