@@ -128,24 +128,25 @@ class aPlayerActivity(MotorClient):
         if activity not in valid_activity_types:
             raise ValueError(f"Invalid activity type: {activity}.")
 
-        new_entry = await cls.database.db__player_activity.insert_one(
-            {
-                'tag':player.tag,
-                'name':player.name,
-                'is_member':player.is_member,
-                'discord_user':player.discord_user,
-                'townhall':player.town_hall.json(),
-                'home_clan':getattr(player.home_clan,'tag','None'),
-                'clan':getattr(player.clan,'tag','None'),
-                'activity':activity,
-                'stat':kwargs.get('stat',''),
-                'change':kwargs.get('change',0),
-                'new_value':kwargs.get('new_value',''),
-                'timestamp':timestamp.int_timestamp,
-                'read_by_bank':False
-                }
-            )
-        entry = await cls.get_by_id(str(new_entry.inserted_id))
+        new_dict = {
+            'tag':player.tag,
+            'name':player.name,
+            'is_member':player.is_member,
+            'discord_user':player.discord_user,
+            'townhall':player.town_hall.json(),
+            'home_clan':getattr(player.home_clan,'tag','None'),
+            'clan':getattr(player.clan,'tag','None'),
+            'activity':activity,
+            'stat':kwargs.get('stat',''),
+            'change':kwargs.get('change',0),
+            'new_value':kwargs.get('new_value',''),
+            'timestamp':timestamp.int_timestamp,
+            'read_by_bank':False
+            }
+
+        new_entry = await cls.database.db__player_activity.insert_one(new_dict)
+        new_dict['_id'] = new_entry.inserted_id            
+        entry = cls(new_dict)
         cls.__cache__[player.tag][activity] = entry
         return entry
     

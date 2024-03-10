@@ -21,7 +21,7 @@ class GlobalClient():
     coc_client:ClassVar[ClashClient] = None
     database:ClassVar[motor.motor_asyncio.AsyncIOMotorDatabase] = None
     thread_pool:ClassVar[ThreadPoolExecutor] = ThreadPoolExecutor(max_workers=4)
-    task_queue = asyncio.Queue(maxsize=1000000)
+    task_queue = asyncio.Queue(maxsize=10000)
 
     bot:ClassVar[Red] = None
     _ready = False
