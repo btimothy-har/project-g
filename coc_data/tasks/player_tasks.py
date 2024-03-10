@@ -30,22 +30,25 @@ class PlayerTasks():
     async def on_player_check_snapshot(old_player:aPlayer,new_player:aPlayer):
         if not new_player._create_snapshot:
             return
-        
-        async def create_snapshot(player:aPlayer):
-            await aPlayerActivity.create_new(
-                player=player,
-                timestamp=player.timestamp,
-                activity="snapshot",
-                )
-            
-            all_seasons = aClashSeason.all_seasons()        
-            player_seasons = await bounded_gather(*[player.get_season_stats(s) for s in all_seasons])
-            await bounded_gather(*[s.create_member_snapshot() for s in player_seasons if isinstance(s,aPlayerSeason)])
-            
-            LOG.debug(f"{player.tag} {player.name}: Created player snapshots.")
 
-        task = asyncio.create_task(create_snapshot(new_player))
+        task = asyncio.create_task(await aPlayerActivity.create_new(
+            player=new_player,
+            timestamp=new_player.timestamp,
+            activity="snapshot",
+            ))        
         await GlobalClient.task_queue.put(task)
+        
+        async def create_snapshot(player:aPlayer,season:aClashSeason):
+            season_stats = await player.get_season_stats(season)
+            await season_stats.create_member_snapshot()
+        
+        all_seasons = aClashSeason.all_seasons()        
+        s_iter = AsyncIter(all_seasons)
+        async for s in s_iter:
+            task = asyncio.create_task(create_snapshot(new_player,s))
+            await GlobalClient.task_queue.put(task)
+
+        LOG.debug(f"{new_player.tag} {new_player.name}: Created player snapshots.")
     
     @coc.PlayerEvents.name()
     async def on_player_update_name(old_player:aPlayer,new_player:aPlayer):        
