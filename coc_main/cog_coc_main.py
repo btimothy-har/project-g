@@ -109,6 +109,7 @@ class ClashOfClansMain(commands.Cog):
 
         self.global_client._ready = True
 
+        self.reset_throttler_counter.start()
         self.bot_status_update_loop.start() 
         self.clash_season_check.start()
         self._task_queue = asyncio.create_task(self._task_queue_loop())
