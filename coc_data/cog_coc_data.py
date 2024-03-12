@@ -4,6 +4,7 @@ import discord
 import pendulum
 import logging
 import coc
+import random
 
 from typing import *
 
@@ -411,11 +412,16 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 entry = await aPlayerActivity.__queue__.get()
                 batch.append(entry)
 
-                if len(batch) > 1000:
+                n = random.randint(100,1000)
+                if len(batch) > n:
+                    st = pendulum.now()
                     await self.database.db__player_activity.insert_many(batch)
                     batch = []
-                    LOG.info(f"Inserted 1000 Player Activity entries. Remaining: {aPlayerActivity.__queue__.qsize():,}")
-                await asyncio.sleep(0)
+                    LOG.info(
+                        f"Inserted {n} Player Activity entries. "
+                        + f"Remaining: {aPlayerActivity.__queue__.qsize():,}. "
+                        + f"Took {pendulum.now().diff(st).in_seconds()}s."
+                        )
 
         except asyncio.CancelledError:
             while True:
@@ -450,7 +456,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         embed.add_field(
             name="**Player Loops**",
             value=f"Last: " + (f"<t:{getattr(self.player_loop_last,'int_timestamp')}:R>" if self.player_loop_last else "None")
-                + f"\nCurrent: {self._player_loop_num}"
                 + "```ini"
                 + f"\n{'[Refresh]':<10} {True if self._player_loop_lock.locked() else False}"
                 + f"\n{'[Running]':<10} {self.player_loop_status}"
@@ -462,8 +467,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             )
         embed.add_field(
             name="**Clan Loops**",
-            value=f"Last: " + (f"<t:{getattr(self.clan_loop_last,'int_timestamp')}:R>" if self.clan_loop_last else "None")
-                + f"\nCurrent: {self._clan_loop_num}"
+            value=f"Last: " + (f"<t:{getattr(self.clan_loop_last,'int_timestamp')}:R>" if self.clan_loop_last else "None") 
                 + "```ini"
                 + f"\n{'[Refresh]':<10} {True if self._clan_loop_lock.locked() else False}"
                 + f"\n{'[Running]':<10} {self.clan_loop_status}"

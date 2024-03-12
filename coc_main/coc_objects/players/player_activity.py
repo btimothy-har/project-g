@@ -146,8 +146,7 @@ class aPlayerActivity(MotorClient):
             'read_by_bank':False
             }
         await cls.__queue__.put(new_dict)
-        entry = cls(new_dict)
-        cls.__cache__[player.tag][activity] = entry
+        cls.__cache__[player.tag][activity] = entry = cls(new_dict)
         return entry
     
     def __init__(self,database:dict):
