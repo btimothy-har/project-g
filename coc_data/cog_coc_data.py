@@ -413,8 +413,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
         embed.add_field(
             name="**Data Client**",
-            value=f"Cycle ID: {self.cycle_id}"
-                + f"\nActivity Queue: {aPlayerActivity.__insert_queue__.qsize():,}",
+            value=f"Cycle ID: {self.cycle_id}",
             inline=False
             )
         
