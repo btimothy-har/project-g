@@ -167,7 +167,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.update_clan_loop.start()
         except:
             pass
-        asyncio.create_task(self._player_activity_queue())
+        self.player_activity_loop = asyncio.create_task(self._player_activity_queue())
 
     ##################################################
     ### COG UNLOAD
@@ -198,6 +198,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 upsert=True
                 )
             LOG.info(f"Cycle ID {self.cycle_id} released by {self.bot.user.id}.")
+
+        self.player_activity_loop.cancel()
     
     ##################################################
     ### REFRESH TASKS
@@ -403,10 +405,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             return
     
     async def _player_activity_queue(self):
-        sleep = 0
         try:
+            batch = []
             while True:
-                batch = []
                 entry = await aPlayerActivity.__queue__.get()
                 batch.append(entry)
 
@@ -414,6 +415,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     await self.database.db__player_activity.insert_many(batch)
                     batch = []
                     LOG.info(f"Inserted 1000 Player Activity entries. Remaining: {aPlayerActivity.__queue__.qsize():,}")
+                await asyncio.sleep(0)
 
         except asyncio.CancelledError:
             while True:
@@ -441,7 +443,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         embed.add_field(
             name="**Data Client**",
             value=f"Cycle ID: {self.cycle_id}"
-                + f"\nActivity Q: {aPlayerActivity.__queue__.qsize():,}",
+                + f"\nActivity Queue: {aPlayerActivity.__queue__.qsize():,}",
             inline=False
             )
         
