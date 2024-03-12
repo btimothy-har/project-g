@@ -6,8 +6,8 @@ from typing import *
 
 from redbot.core.utils import AsyncIter, bounded_gather
 
-
-from coc_main.client.coc_client import aClan
+from coc_main.client.global_client import GlobalClient
+from coc_main.coc_objects.clans.clan import aClan
 
 from coc_main.utils.constants.coc_emojis import EmojisClash
 from coc_main.utils.components import clash_embed, get_bot_webhook
@@ -63,7 +63,7 @@ class ClanDonationFeed(ClanDataFeed):
     @classmethod
     async def donation_embed(cls,clan,donation_delta):
         embed = await clash_embed(
-            context=cls.bot,
+            context=GlobalClient.bot,
             title=f"**{clan.name}** ({clan.tag})",
             show_author=False,
             embed_color=discord.Colour.default(),

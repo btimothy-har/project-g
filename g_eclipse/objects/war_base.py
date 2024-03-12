@@ -112,7 +112,7 @@ class eWarBase(GlobalClient,AwaitLoader):
         defensive_troops = urllib.parse.quote_plus(urllib.parse.parse_qs(cc_parse.query)['army'][0])
 
         image_filename = base_id + '.' + image_attachment.filename.split('.')[-1]
-        image_filepath = cls.bot.base_image_path + "/" + image_filename
+        image_filepath = GlobalClient.bot.base_image_path + "/" + image_filename
         await image_attachment.save(image_filepath)
 
         await cls.database.db_war_base.update_one(

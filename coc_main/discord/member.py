@@ -47,7 +47,7 @@ class aMember(GlobalClient,AwaitLoader):
     
     @classmethod
     async def _update_scopes(cls):
-        guilds = cls.bot.guilds
+        guilds = GlobalClient.bot.guilds
         guild_iter = AsyncIter(guilds)
         async for guild in guild_iter:
             cls._master_scope[guild.id] = [link.tag for link in await ClanGuildLink.get_for_guild(guild.id)]

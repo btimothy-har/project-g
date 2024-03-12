@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from redbot.core.utils import AsyncIter, bounded_gather
+from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.clans.clan import aClan
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 
@@ -75,7 +76,7 @@ class RaidResultsFeed(ClanDataFeed):
 
             emoji_id = re.search(r'<:.*:(\d+)>', clan.emoji)
             if emoji_id:
-                emoji = cls.bot.get_emoji(int(emoji_id.group(1)))
+                emoji = GlobalClient.bot.get_emoji(int(emoji_id.group(1)))
                 async with aiohttp.ClientSession() as session:
                     async with session.get(emoji.url) as resp:
                         if resp.status != 200:
@@ -138,7 +139,7 @@ class RaidResultsFeed(ClanDataFeed):
             draw.text((1245, 370), f"{raid_weekend.defensive_reward}", anchor="lm", fill=(255, 255, 255), stroke_width=stroke, stroke_fill=(0, 0, 0), font=split_medal_font)
 
             def save_im(background):            
-                fp = cls.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}.png"
+                fp = GlobalClient.bot.coc_imggen_path + f"{clan.name} - {raid_weekend.start_time.format('DD MMM YYYY')}.png"
                 background.save(fp, format="png", compress_level=1)
                 return fp
 
