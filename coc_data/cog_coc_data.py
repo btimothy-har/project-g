@@ -67,6 +67,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
         #PLAYER LOOP
         self._player_loop_lock = asyncio.Lock()
+        self._player_activity_lock = asyncio.Lock()
         self._player_loop_tracker = {}        
         self.player_loop_runtime = []
         self.player_loop_status = False
@@ -397,25 +398,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         except asyncio.CancelledError:
             return
     
-    async def _activity_queue_loop(self):
-        try:
-            while True:
-                batch = []
-                new = await aPlayerActivity.__insert_queue__.get()
-                batch.append(new)
-                if len(batch) > 1000:
-                    await self.database.db__player_activity.insert_many(batch)
-                    batch = []
-
-        except asyncio.CancelledError:
-            while True:
-                new = await aPlayerActivity.__insert_queue__.get()
-                batch.append(new)
-                if GlobalClient.task_queue.qsize() == 0:
-                    break
-            if len(batch) > 0:
-                await self.database.db__player_activity.insert_many(batch)
-    
     ############################################################
     #####
     ##### COMMANDS
@@ -431,7 +413,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
         embed.add_field(
             name="**Data Client**",
-            value=f"Cycle ID: {self.cycle_id}",
+            value=f"Cycle ID: {self.cycle_id}"
+                + f"\nActivity Queue: {aPlayerActivity.__insert_queue__.qsize():,}",
             inline=False
             )
         
@@ -563,7 +546,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     #####
     ############################################################    
     @coc.ClientEvents.player_loop_start()
-    async def player_loop_start(self,iteration_number:int):        
+    async def player_loop_start(self,iteration_number:int):
         self._player_loop_tracker[iteration_number] = pendulum.now()
         self.player_loop_status = True
 
@@ -575,6 +558,10 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.player_loop_status = False
             self.player_loop_runtime.append(end.diff(start).in_seconds())
             del self._player_loop_tracker[iteration_number]
+        
+        async with aPlayerActivity.__q_lock__:
+            await self.database.db__player_activity.insert_many(aPlayerActivity.__queue__)
+            aPlayerActivity.__queue__ = []
 
     @coc.ClientEvents.clan_loop_start()
     async def clan_loop_start(self,iteration_number:int):
