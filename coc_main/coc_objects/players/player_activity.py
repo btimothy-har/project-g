@@ -60,8 +60,7 @@ class aPlayerActivity(MotorClient):
         'new_value'        
         ]
     __cache__ = defaultdict(default_cache_dict)
-    __q_lock__ = asyncio.Lock()
-    __queue__ = []
+    __queue__ = asyncio.Queue(maxsize=10000)
     
     @classmethod
     async def get_by_id(cls,aid:str) -> Optional['aPlayerActivity']:
@@ -146,11 +145,10 @@ class aPlayerActivity(MotorClient):
             'timestamp':timestamp.int_timestamp,
             'read_by_bank':False
             }
-        async with cls.__q_lock__:
-            cls.__queue__.append(new_dict)
-            entry = cls(new_dict)
-            cls.__cache__[player.tag][activity] = entry
-            return entry
+        await cls.__queue__.put(new_dict)
+        entry = cls(new_dict)
+        cls.__cache__[player.tag][activity] = entry
+        return entry
     
     def __init__(self,database:dict):
         self._id = str(database.get('_id',None))
