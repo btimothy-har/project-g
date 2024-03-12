@@ -559,8 +559,11 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             del self._player_loop_tracker[iteration_number]
         
         async with aPlayerActivity.__q_lock__:
-            await self.database.db__player_activity.insert_many(aPlayerActivity.__queue__)
-            aPlayerActivity.__queue__ = []
+            length = len(aPlayerActivity.__queue__)
+            if length > 0:
+                await self.database.db__player_activity.insert_many(aPlayerActivity.__queue__)
+                aPlayerActivity.__queue__ = []
+                LOG.info(f"Inserted {length} Player Activities.")
 
     @coc.ClientEvents.clan_loop_start()
     async def clan_loop_start(self,iteration_number:int):
