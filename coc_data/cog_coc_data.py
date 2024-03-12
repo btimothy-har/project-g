@@ -18,6 +18,7 @@ from coc_main.client.global_client import GlobalClient
 
 from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.players.player_activity import aPlayerActivity
 from coc_main.coc_objects.clans.clan import aClan
 
 from coc_main.utils.components import DefaultView, DiscordButton, clash_embed
@@ -395,6 +396,25 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     continue
         except asyncio.CancelledError:
             return
+    
+    async def _activity_queue_loop(self):
+        try:
+            while True:
+                batch = []
+                new = await aPlayerActivity.__insert_queue__.get()
+                batch.append(new)
+                if len(batch) > 1000:
+                    await self.database.db__player_activity.insert_many(batch)
+                    batch = []
+
+        except asyncio.CancelledError:
+            while True:
+                new = await aPlayerActivity.__insert_queue__.get()
+                batch.append(new)
+                if GlobalClient.task_queue.qsize() == 0:
+                    break
+            if len(batch) > 0:
+                await self.database.db__player_activity.insert_many(batch)
     
     ############################################################
     #####

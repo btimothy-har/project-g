@@ -1,5 +1,6 @@
 import bson
 import pendulum
+import asyncio
 
 from typing import *
 from collections import defaultdict
@@ -59,6 +60,7 @@ class aPlayerActivity(MotorClient):
         'new_value'        
         ]
     __cache__ = defaultdict(default_cache_dict)
+    __insert_queue__ = asyncio.Queue(maxsize=10000)
     
     @classmethod
     async def get_by_id(cls,aid:str) -> Optional['aPlayerActivity']:
@@ -143,15 +145,13 @@ class aPlayerActivity(MotorClient):
             'timestamp':timestamp.int_timestamp,
             'read_by_bank':False
             }
-
-        new_entry = await cls.database.db__player_activity.insert_one(new_dict)
-        new_dict['_id'] = new_entry.inserted_id            
+        await cls.__insert_queue__.put(new_dict)
         entry = cls(new_dict)
         cls.__cache__[player.tag][activity] = entry
         return entry
     
     def __init__(self,database:dict):
-        self._id = str(database['_id'])
+        self._id = str(database.get('_id',None))
         self.tag = database['tag']
         self.name = database['name']
 
@@ -179,6 +179,8 @@ class aPlayerActivity(MotorClient):
         return f"{self.name} - {self.activity} - {self.new_value} ({self.change})"
     
     async def mark_as_read(self) -> None:
+        if not self._id:
+            return
         await self.database.db__player_activity.update_one(
             {'_id':bson.ObjectId(self._id)},
             {'$set':{'read_by_bank':True}}
@@ -186,6 +188,8 @@ class aPlayerActivity(MotorClient):
         self._read_by_bank = True
     
     async def mark_as_unread(self) -> None:
+        if not self._id:
+            return
         await self.database.db__player_activity.update_one(
             {'_id':bson.ObjectId(self._id)},
             {'$set':{'read_by_bank':False}}
