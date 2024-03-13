@@ -1114,7 +1114,7 @@ class Clans(commands.Cog,GlobalClient):
     @app_commands.check(is_admin_or_leader)
     @app_commands.autocomplete(clan=autocomplete_clans)
     @app_commands.describe(clan="Select a Clan.")
-    async def subcmd_clan_change_leader(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
+    async def appcmd_clan_change_leader(self,interaction:discord.Interaction,clan:str,new_leader:discord.Member):
 
         await interaction.response.defer()
 
@@ -1198,7 +1198,7 @@ class Clans(commands.Cog,GlobalClient):
     @app_commands.check(is_admin_or_coleader)
     @app_commands.autocomplete(clan=autocomplete_clan_settings)
     @app_commands.describe(clan="Select a Clan. You must be a Server Admin or Leader/Co-Leader for the Clan.")
-    async def app_command_clan_settings(self,interaction:discord.Interaction,clan:str):
+    async def appcmd_clan_settings(self,interaction:discord.Interaction,clan:str):
         
         await interaction.response.defer()
         get_clan = await self.coc_client.get_clan(clan)
