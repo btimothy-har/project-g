@@ -1167,7 +1167,7 @@ class Clans(commands.Cog,GlobalClient):
                 title=f"Leader Changed: **{select_clan.title}**",
                 message=f"New Leader: <@{select_clan.leader}>"
                     + f"\n\n{select_clan.long_description}"
-                    + f"\n\n>>> {select_clan.c_description}",
+                    + f"\n\n>>> {select_clan.description}",
                 url=select_clan.share_link,
                 success=True,
                 thumbnail=select_clan.badge)
