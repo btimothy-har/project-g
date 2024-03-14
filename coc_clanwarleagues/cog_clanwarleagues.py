@@ -219,6 +219,9 @@ class ClanWarLeagues(commands.Cog,GlobalClient):
     
     @commands.Cog.listener("on_guild_channel_create")
     async def league_channel_ticket_create_listener(self,channel:discord.TextChannel):
+        if not isinstance(channel, discord.TextChannel):
+            return
+        
         clan_tag = None
         await asyncio.sleep(1)
         

@@ -28,6 +28,7 @@ class PlayerTasks():
 
     @coc.PlayerEvents._create_snapshot()
     async def on_player_check_snapshot(old_player:aPlayer,new_player:aPlayer):
+        return
         if not new_player._create_snapshot:
             return
 
@@ -216,7 +217,8 @@ class PlayerTasks():
     
     @coc.PlayerEvents.attack_wins()
     async def on_player_update_attack_wins(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'attack_wins')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'attack_wins')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.attack_wins
         change = max(0,new_player.attack_wins - ref_value)
 
@@ -231,7 +233,8 @@ class PlayerTasks():
 
     @coc.PlayerEvents.defense_wins()
     async def on_player_update_defense_wins(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'defense_wins')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'defense_wins')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.defense_wins
         change = max(0,new_player.defense_wins - ref_value)
 
@@ -246,7 +249,8 @@ class PlayerTasks():
     
     @coc.PlayerEvents.war_stars()
     async def on_player_update_war_stars(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'war_stars')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'war_stars')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.war_stars
         change = max(0,new_player.war_stars - ref_value)
 
@@ -261,7 +265,8 @@ class PlayerTasks():
     
     @coc.PlayerEvents.donations()
     async def on_player_update_donations(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_sent')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_sent')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.donations
         change = max(0,new_player.donations - ref_value)
 
@@ -277,7 +282,8 @@ class PlayerTasks():
     
     @coc.PlayerEvents.received()
     async def on_player_update_received(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_received')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'donations_received')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.received
         change = max(0,new_player.received - ref_value)
 
@@ -292,7 +298,8 @@ class PlayerTasks():
     
     @coc.PlayerEvents.clan_capital_contributions()
     async def on_player_update_capital_contributions(old_player:aPlayer,new_player:aPlayer):        
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'capital_contribution')
+        #last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'capital_contribution')
+        last_stat = None
         ref_value = last_stat.new_value if last_stat else old_player.clan_capital_contributions
         change = max(0,new_player.clan_capital_contributions - ref_value)
 
@@ -307,8 +314,7 @@ class PlayerTasks():
     
     @coc.PlayerEvents.capital_gold_looted()
     async def on_player_update_loot_capital_gold(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_capital_gold')
-        ref_value = last_stat.new_value if last_stat else old_player.capital_gold_looted
+        ref_value = old_player.capital_gold_looted
         change = max(0,new_player.capital_gold_looted - ref_value)
 
         await aPlayerActivity.create_new(
@@ -322,8 +328,7 @@ class PlayerTasks():
     
     @coc.PlayerEvents.loot_gold()
     async def on_player_update_loot_gold(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_gold')
-        ref_value = last_stat.new_value if last_stat else old_player.loot_gold
+        ref_value = old_player.loot_gold
         change = max(0,new_player.loot_gold - ref_value)
 
         await aPlayerActivity.create_new(
@@ -336,9 +341,8 @@ class PlayerTasks():
         LOG.debug(f"{new_player.tag} {new_player.name}: Loot Gold changed to {new_player.loot_gold} (+{change}).")
     
     @coc.PlayerEvents.loot_gold()
-    async def on_player_update_loot_elixir(old_player:aPlayer,new_player:aPlayer):        
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_elixir')
-        ref_value = last_stat.new_value if last_stat else old_player.loot_elixir
+    async def on_player_update_loot_elixir(old_player:aPlayer,new_player:aPlayer):
+        ref_value = old_player.loot_elixir
         change = max(0,new_player.loot_elixir - ref_value)
 
         await aPlayerActivity.create_new(
@@ -352,8 +356,7 @@ class PlayerTasks():
         
     @coc.PlayerEvents.loot_darkelixir()
     async def on_player_update_loot_darkelixir(old_player:aPlayer,new_player:aPlayer):
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'loot_darkelixir')
-        ref_value = last_stat.new_value if last_stat else old_player.loot_darkelixir
+        ref_value = old_player.loot_darkelixir
         change = max(0,new_player.loot_darkelixir - ref_value)
 
         await aPlayerActivity.create_new(
@@ -366,9 +369,8 @@ class PlayerTasks():
         LOG.debug(f"{new_player.tag} {new_player.name}: Loot Dark Elixir changed to {new_player.loot_darkelixir} (+{change}).")
     
     @coc.PlayerEvents.clan_games()
-    async def on_player_update_clan_games(old_player:aPlayer,new_player:aPlayer):        
-        last_stat = await aPlayerActivity.get_last_for_player_by_type(new_player.tag,'clan_games')
-        ref_value = last_stat.new_value if last_stat else old_player.clan_games
+    async def on_player_update_clan_games(old_player:aPlayer,new_player:aPlayer):
+        ref_value = old_player.clan_games
         await aPlayerActivity.create_new(
             player=new_player,
             timestamp=new_player.timestamp,

@@ -133,6 +133,8 @@ class Bank(commands.Cog,GlobalClient):
             1136575140910604299,
             1136575146681958410
             ]
+        
+        self._reward_semaphore = asyncio.Semaphore(10)
   
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -275,9 +277,9 @@ class Bank(commands.Cog,GlobalClient):
             )
         return embed
     
-    async def _compute_multiplier(self,player_activity_log:aPlayerActivity) -> float:
+    async def _compute_multiplier(self,player:aPlayer) -> float:
         multi = 0.0
-        user = self.bot.get_user(player_activity_log.discord_user)
+        user = self.bot.get_user(player.discord_user)
         if not user:
             return 0
         
@@ -289,35 +291,35 @@ class Bank(commands.Cog,GlobalClient):
             return 0
         
         if guild_user and self.bank_pass_role in guild_user.roles:
-            if reward_tag == player_activity_log.tag:
+            if reward_tag == player.tag:
                 multi = 1.5
-            elif player_activity_log.is_member:
+            elif player.is_member:
                 multi = 1.0
             else:
                 multi = 0.4
         elif guild_user and self.guild_minister in [r.id for r in guild_user.roles]:
-            if reward_tag == player_activity_log.tag:
+            if reward_tag == player.tag:
                 multi = 1.2
-            elif player_activity_log.is_member:
+            elif player.is_member:
                 multi = 0.8
             else:
                 multi = 0.2
         elif guild_user and set(self.guild_staff).intersection(set([r.id for r in guild_user.roles])):
-            if reward_tag == player_activity_log.tag:
+            if reward_tag == player.tag:
                 multi = 1.0
-            elif player_activity_log.is_member:
+            elif player.is_member:
                 multi = 0.6
             else:
                 multi = 0.2
         else:            
-            if reward_tag == player_activity_log.tag:
+            if reward_tag == player.tag:
                 multi = 1.0
-            elif player_activity_log.is_member:
+            elif player.is_member:
                 multi = 0.4
             else:
                 multi = 0.2
         
-        if player_activity_log.town_hall.level <= 8:
+        if player.town_hall.level <= 8:
             return min(0.5,multi) # multi capped at 0.5 for TH8 and below        
         return multi
     
@@ -571,6 +573,8 @@ class Bank(commands.Cog,GlobalClient):
     ############################################################    
     @commands.Cog.listener("on_guild_channel_create")
     async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
+        if not isinstance(channel, discord.TextChannel):
+            return
         redemption_id = None
         await asyncio.sleep(1)
         
@@ -2812,13 +2816,10 @@ class Bank(commands.Cog,GlobalClient):
     async def progress_reward_townhall(self):
         async def distribute_reward_townhall(player_activity_log:aPlayerActivity):
             try:
-                await player_activity_log.mark_as_read()                
-                member = self.bot.get_user(player_activity_log.discord_user)
-                if not member:
-                    return
+                await player_activity_log.mark_as_read()
                 if player_activity_log.change <= 0:
                     return
-                
+
                 try:
                     player = await self.coc_client.get_player(player_activity_log.tag)
                 except coc.NotFound:
@@ -2826,8 +2827,12 @@ class Bank(commands.Cog,GlobalClient):
                 except (coc.Maintenance,coc.GatewayError):
                     await player_activity_log.mark_as_unread()
                     return
-                
-                if not player_activity_log.is_member:
+            
+                member = self.bot.get_user(player.discord_user)
+                if not member:
+                    return
+
+                if not player.is_member:
                     reward = 0
                 elif player.hero_rushed_pct > 0:
                     reward = 0
@@ -2838,20 +2843,20 @@ class Bank(commands.Cog,GlobalClient):
                 else:
                     reward = 20000
                 
-                multi = await self._compute_multiplier(player_activity_log)
+                multi = await self._compute_multiplier(player)
                 new_reward = round(reward * multi)
 
                 await bank.deposit_credits(member,new_reward)
                 await self.current_account.withdraw(
                     amount = new_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Townhall Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    comment = f"Townhall Bonus (x{multi}) for {player.title}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=new_reward,
-                    comment=f"Townhall Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
+                    comment=f"Townhall Bonus (x{multi}) for {player.title}: Upgraded to TH{player_activity_log.new_value} (+{player_activity_log.change})."
                     )
 
             except Exception as e:
@@ -2870,7 +2875,7 @@ class Bank(commands.Cog,GlobalClient):
             if len(event_logs) == 0:
                 return        
             distribute_rewards = [distribute_reward_townhall(log) for log in event_logs]
-            await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
+            await bounded_gather(*distribute_rewards,semaphore=self._reward_semaphore)
     
     ############################################################
     #####
@@ -2882,18 +2887,26 @@ class Bank(commands.Cog,GlobalClient):
         async def distribute_reward_hero_upgrade(player_activity_log:aPlayerActivity):
             try:
                 await player_activity_log.mark_as_read()
-                
-                member = self.bot.get_user(player_activity_log.discord_user)
-                if not member:
-                    return
                 if player_activity_log.change <= 0:
                     return
                 
+                try:
+                    player = await self.coc_client.get_player(player_activity_log.tag)
+                except coc.NotFound:
+                    return
+                except (coc.Maintenance,coc.GatewayError):
+                    await player_activity_log.mark_as_unread()
+                    return
+                
+                member = self.bot.get_user(player.discord_user)
+                if not member:
+                    return
+
                 hero = aHero.get_hero(player_activity_log.stat,player_activity_log.town_hall.level)
                 upgrades = range(player_activity_log.new_value - player_activity_log.change + 1,player_activity_log.new_value + 1)
 
                 async for u in AsyncIter(upgrades):            
-                    if not player_activity_log.is_member:
+                    if not player.is_member:
                         reward = 0
                     else:   
                         reward = 0 if u <= hero.min_level else 1000
@@ -2905,13 +2918,13 @@ class Bank(commands.Cog,GlobalClient):
                     await self.current_account.withdraw(
                         amount = new_rew,
                         user_id = self.bot.user.id,
-                        comment = f"Hero Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
+                        comment = f"Hero Bonus (x{multi}) for {player.title}: {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
                     await self._send_log(
                         user=member,
                         done_by=self.bot.user,
                         amount=new_rew,
-                        comment=f"Hero Bonus (x{multi}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
+                        comment=f"Hero Bonus (x{multi}) for {player.title}: {player_activity_log.stat} upgraded to {u}/{player_activity_log.new_value}."
                         )
 
             except Exception as e:
@@ -2930,7 +2943,7 @@ class Bank(commands.Cog,GlobalClient):
             if len(event_logs) == 0:
                 return        
             distribute_rewards = [distribute_reward_hero_upgrade(log) for log in event_logs]
-            await bounded_gather(*distribute_rewards,return_exceptions=True,limit=1)
+            await bounded_gather(*distribute_rewards,semaphore=self._reward_semaphore)
     
     ############################################################
     #####
@@ -2942,11 +2955,19 @@ class Bank(commands.Cog,GlobalClient):
         async def distribute_capital_contribution_reward(player_activity_log:aPlayerActivity):
             try:
                 await player_activity_log.mark_as_read()
-                member = self.bot.get_user(player_activity_log.discord_user)
-                if not member:
+                if not player_activity_log.stat:
                     return
                 
-                if not player_activity_log.stat:
+                try:
+                    player = await self.coc_client.get_player(player_activity_log.tag)
+                except coc.NotFound:
+                    return
+                except (coc.Maintenance,coc.GatewayError):
+                    await player_activity_log.mark_as_unread()
+                    return
+                
+                member = self.bot.get_user(player.discord_user)
+                if not member:
                     return
                 
                 try:
@@ -2980,13 +3001,13 @@ class Bank(commands.Cog,GlobalClient):
                 await self.current_account.withdraw(
                     amount = total_reward,
                     user_id = self.bot.user.id,
-                    comment = f"Capital Gold Bonus (x{mult}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): {increment}"
+                    comment = f"Capital Gold Bonus (x{mult}) for {player.title}: {increment}"
                     )
                 await self._send_log(
                     user=member,
                     done_by=self.bot.user,
                     amount=total_reward,
-                    comment=f"Capital Gold Bonus (x{mult}) for {EmojisTownHall.get(player_activity_log.town_hall.level)} {player_activity_log.name} ({player_activity_log.tag}): Donated {increment:,} Gold to {target_clan.name}."
+                    comment=f"Capital Gold Bonus (x{mult}) for {player.title}: Donated {increment:,} Gold to {target_clan.name}."
                     )
 
             except Exception as e:
@@ -3005,7 +3026,7 @@ class Bank(commands.Cog,GlobalClient):
             if len(event_logs) == 0:
                 return        
             distribute_rewards = [distribute_capital_contribution_reward(log) for log in event_logs]
-            await asyncio.gather(*distribute_rewards)
+            await bounded_gather(*distribute_rewards,semaphore=self._reward_semaphore)
     
     ############################################################
     #####
@@ -3085,7 +3106,7 @@ class Bank(commands.Cog,GlobalClient):
             
             a_iter = AsyncIter(war_clan.members)            
             tasks = [war_bank_rewards(player) async for player in a_iter]
-            await bounded_gather(*tasks,return_exceptions=True,limit=1)
+            await bounded_gather(*tasks,semaphore=self._reward_semaphore)
     
     ############################################################
     #####
@@ -3157,7 +3178,7 @@ class Bank(commands.Cog,GlobalClient):
         if clan.is_alliance_clan:
             a_iter = AsyncIter(raid.members)
             tasks = [raid_bank_rewards(player) async for player in a_iter]
-            await bounded_gather(*tasks,return_exceptions=True,limit=1)
+            await bounded_gather(*tasks,semaphore=self._reward_semaphore)
     
     ############################################################
     #####

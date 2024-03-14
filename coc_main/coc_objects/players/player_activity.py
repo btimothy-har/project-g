@@ -60,7 +60,8 @@ class aPlayerActivity(MotorClient):
         'new_value'        
         ]
     __cache__ = defaultdict(default_cache_dict)
-    __queue__ = asyncio.Queue(maxsize=10000)
+    _queue = []
+    _queue_lock = asyncio.Lock()
     
     @classmethod
     async def get_by_id(cls,aid:str) -> Optional['aPlayerActivity']:
@@ -133,10 +134,10 @@ class aPlayerActivity(MotorClient):
         new_dict = {
             'tag':player.tag,
             'name':player.name,
-            'is_member':player.is_member,
-            'discord_user':player.discord_user,
+            #'is_member':player.is_member,
+            #'discord_user':player.discord_user,
             'townhall':player.town_hall.json(),
-            'home_clan':getattr(player.home_clan,'tag','None'),
+            #'home_clan':getattr(player.home_clan,'tag','None'),
             'clan':getattr(player.clan,'tag','None'),
             'activity':activity,
             'stat':kwargs.get('stat',''),
@@ -145,7 +146,9 @@ class aPlayerActivity(MotorClient):
             'timestamp':timestamp.int_timestamp,
             'read_by_bank':False
             }
-        await cls.__queue__.put(new_dict)
+
+        async with cls._queue_lock:
+            cls._queue.append(new_dict)
         cls.__cache__[player.tag][activity] = entry = cls(new_dict)
         return entry
     

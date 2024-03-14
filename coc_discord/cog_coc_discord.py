@@ -196,6 +196,8 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
     ############################################################
     @commands.Cog.listener("on_guild_channel_create")
     async def recruiting_ticket_listener(self,channel):
+        if not isinstance(channel, discord.TextChannel):
+            return
         
         await asyncio.sleep(2)
         if isinstance(channel,discord.TextChannel):

@@ -728,7 +728,7 @@ class Clans(commands.Cog,GlobalClient):
             )
         return embed
 
-    @appgrp_clan.command(name="unregister")
+    @cmdgroup_clan.command(name="unregister")
     @commands.guild_only()
     @commands.is_owner()
     async def subcommand_unregister_clan(self,ctx:commands.Context,clan_tag:str):
@@ -1131,7 +1131,7 @@ class Clans(commands.Cog,GlobalClient):
         embed = await clash_embed(
             context=interaction,
             title=f"Change Leader: **{select_clan.title}**",
-            message=f"**Current Leader:** " + (f"<@{clan.leader}>" if clan.leader else "None Assigned")
+            message=f"**Current Leader:** " + (f"<@{select_clan.leader}>" if select_clan.leader else "None Assigned")
                 + f"\n**New Leader:** {new_leader.mention}"
                 + f"\n\n{select_clan.long_description}"
                 + f"\n\n>>> {select_clan.description}",
@@ -1262,7 +1262,7 @@ class Clans(commands.Cog,GlobalClient):
             embed = await clash_embed(
                 context=context,
                 title=f"**{self.bot.user.name} Registered Clans**",
-                message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})" async for clan in a_iter]),
+                message='\n'.join([f"{clan.emoji} {clan.abbreviation} {clan.clean_name} ({clan.tag})\n> Leader: {getattr(self.bot.get_user(clan.leader),'mention','None')}" async for clan in a_iter]),
                 )
             return embed
 
@@ -1275,7 +1275,7 @@ class Clans(commands.Cog,GlobalClient):
         embed = await self.helper_family_clans(ctx,only_server)
         await ctx.reply(embed=embed)
         
-    @appgrp_clan.command(
+    @appgrp_family.command(
         name="clans",
         description="Displays all Clans registered to the bot.")
     @app_commands.describe(only_server="Only show Clans registered to this server.")

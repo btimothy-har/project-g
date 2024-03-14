@@ -135,6 +135,7 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                 await self.assign_to_cycle(cycle_num)
 
     async def assign_to_cycle(self,cycle_num:int):
+        # 0 = Registered Players
         if cycle_num == 0:
             query = {
                 "$and": [
@@ -149,6 +150,7 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                         ]}
                     ]
                 }
+        # 1 = All other Players
         elif cycle_num == 1:
             query = {
                 "$or": [
@@ -168,6 +170,7 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             if count > 0:
                 LOG.info(f"Assigned {count} Players to Cycle {cycle_num}.")
         
+        # 2 = All Clans
         elif cycle_num == 2:
             query = {
                 "$or": [

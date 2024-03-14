@@ -227,18 +227,20 @@ class aPlayerSeason(MotorClient,AwaitLoader):
 
     async def load(self):
         season_entries = await aPlayerActivity.get_by_player_season(self.tag,self.season)
+        snapshot = await self.database.db_player_member_snapshot.find_one(
+            {'season':self.season.id,'tag':self.tag}
+            )
+        
+        self.name = snapshot.get('name',None)
+        self.town_hall = snapshot.get('town_hall',0)
+        self.is_member = snapshot.get('is_member',False)
+        self.home_clan_tag = snapshot.get('home_clan_tag',None)
+        self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
         self._activity_count = len(season_entries)        
         if self._activity_count <= 0:
             return
-            
-        self.name = season_entries[-1].name
-        self.town_hall = season_entries[-1].town_hall.level
-        self.is_member = season_entries[-1].is_member
         
-        self.home_clan_tag = season_entries[-1].home_clan_tag
-        self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
-
         if self.home_clan:
             a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
             ts = None
@@ -250,7 +252,7 @@ class aPlayerSeason(MotorClient,AwaitLoader):
                     if a.clan_tag == a.home_clan_tag:                   
                         self.time_in_home_clan += max(0,a._timestamp - ts)
                     ts = a._timestamp
-        
+
         if self.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
             self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
@@ -295,9 +297,6 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         return self.clan_games
     
     async def create_member_snapshot(self):
-        if self._activity_count <= 0:
-            return
-        
         snapshot_id = {
             'season':self.season.id,
             'tag':self.tag
@@ -317,20 +316,3 @@ class aPlayerSeason(MotorClient,AwaitLoader):
                 },
                 upsert=True
                 )
-        
-        else:
-            find_existing = await self.database.db_player_member_snapshot.find_one(
-                {'_id':snapshot_id}
-                )
-            if not find_existing:
-                await self.database.db_player_member_snapshot.insert_one(
-                    {
-                        '_id':snapshot_id,
-                        'tag':self.tag,
-                        'season':self.season.id,
-                        'name':self.name,
-                        'town_hall':self.town_hall,
-                        'is_member':self.is_member,
-                        'home_clan_tag':self.home_clan_tag,
-                        }
-                    )

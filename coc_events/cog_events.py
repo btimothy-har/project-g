@@ -103,6 +103,8 @@ class Events(commands.Cog,GlobalClient):
     ############################################################    
     @commands.Cog.listener("on_guild_channel_create")
     async def event_channel_ticket_create_listener(self,channel:discord.TextChannel):
+        if not isinstance(channel, discord.TextChannel):
+            return
         event_id = None
         await asyncio.sleep(1)
         

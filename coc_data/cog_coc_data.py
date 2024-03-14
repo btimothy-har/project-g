@@ -18,7 +18,7 @@ from coc_main.cog_coc_main import ClashOfClansMain as coc_main
 from coc_main.client.global_client import GlobalClient
 
 from coc_main.coc_objects.season.season import aClashSeason
-from coc_main.coc_objects.players.player import aPlayer
+from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
 from coc_main.coc_objects.players.player_activity import aPlayerActivity
 from coc_main.coc_objects.clans.clan import aClan
 
@@ -154,12 +154,12 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         self.coc_client.add_events(
             self.player_loop_start,
             self.player_loop_end,
+            self.insert_player_activities,
             self.clan_loop_start,
             self.clan_loop_end
             )
         
         await self.refresh_event_tasks()
-        
         try:
             self.update_player_loop.start()
         except:
@@ -168,7 +168,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.update_clan_loop.start()
         except:
             pass
-        self.player_activity_loop = asyncio.create_task(self._player_activity_queue())
 
     ##################################################
     ### COG UNLOAD
@@ -200,8 +199,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 )
             LOG.info(f"Cycle ID {self.cycle_id} released by {self.bot.user.id}.")
 
-        self.player_activity_loop.cancel()
-    
     ##################################################
     ### REFRESH TASKS
     ##################################################
@@ -216,7 +213,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         
         elif self.cycle_id >= 0:
             self.coc_client.add_events(
-                PlayerTasks.on_player_check_snapshot,
                 PlayerTasks.on_player_update_name,
                 PlayerTasks.on_player_update_war_opted_in,
                 PlayerTasks.on_player_update_labels,
@@ -245,7 +241,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         if self.cycle_id == -10:
             await self._war_loop.stop()
             await self._raid_loop.stop()
-            await self._discord_loop.stop()
         
         elif self.cycle_id >= 0:
             self.coc_client.remove_events(
@@ -352,13 +347,23 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         player = await self.coc_client.get_player(tag)
                     except coc.NotFound:
                         self.coc_client._player_discovery.task_done()
+                        basic_player = await BasicPlayer(tag)
+                        await basic_player._attributes.load_data()
+                        if basic_player.discord_user:
+                            await basic_player.unlink_discord()
+                        if basic_player.is_member:
+                            await basic_player.remove_member()
                         continue
+                    
                     except (coc.Maintenance,coc.GatewayError):
                         await self.coc_client._player_discovery.put(tag)
                         continue
                     
                     self.coc_client._player_discovery.task_done()
                     await player._sync_cache()
+                    player_season = await player.get_current_season()
+                    await player_season.create_member_snapshot()
+
                 except asyncio.CancelledError:
                     raise
                 except Exception:
@@ -405,34 +410,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         except asyncio.CancelledError:
             return
     
-    async def _player_activity_queue(self):
-        try:
-            batch = []
-            while True:
-                entry = await aPlayerActivity.__queue__.get()
-                batch.append(entry)
-
-                n = random.randint(100,1000)
-                if len(batch) > n:
-                    st = pendulum.now()
-                    await self.database.db__player_activity.insert_many(batch)
-                    batch = []
-                    LOG.info(
-                        f"Inserted {n} Player Activity entries. "
-                        + f"Remaining: {aPlayerActivity.__queue__.qsize():,}. "
-                        + f"Took {pendulum.now().diff(st).in_seconds()}s."
-                        )
-
-        except asyncio.CancelledError:
-            while True:
-                entry = await aPlayerActivity.__queue__.get()
-                batch.append(entry)
-                if aPlayerActivity.__queue__.empty():
-                    break
-            if len(batch) > 0:
-                await self.database.db__player_activity.insert_many(batch)
-                LOG.info(f"Inserted {len(batch):,} Player Activity entries.")
-    
     ############################################################
     #####
     ##### COMMANDS
@@ -448,8 +425,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
         embed.add_field(
             name="**Data Client**",
-            value=f"Cycle ID: {self.cycle_id}"
-                + f"\nActivity Queue: {aPlayerActivity.__queue__.qsize():,}",
+            value=f"Cycle ID: {self.cycle_id}",
             inline=False
             )
         
@@ -594,6 +570,17 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.player_loop_status = False
             self.player_loop_runtime.append(end.diff(start).in_seconds())
             del self._player_loop_tracker[iteration_number]
+    
+    @coc.ClientEvents.player_loop_finish()
+    async def insert_player_activities(self,iteration_number:int):
+        async with aPlayerActivity._queue_lock:
+            pending = list(aPlayerActivity._queue)
+            aPlayerActivity._queue.clear()
+
+        if len(pending) > 0:
+            st = pendulum.now()
+            await self.database.db__player_activity.insert_many(pending)
+            LOG.info(f"Inserted {len(pending)} Player Activities. Took {pendulum.now().diff(st).in_seconds()}s.")
 
     @coc.ClientEvents.clan_loop_start()
     async def clan_loop_start(self,iteration_number:int):
