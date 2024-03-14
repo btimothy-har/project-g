@@ -226,47 +226,47 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         return isinstance(other,aPlayerSeason) and self.tag == other.tag and self.season == other.season
 
     async def load(self):
-        season_entries = await aPlayerActivity.get_by_player_season(self.tag,self.season)
         snapshot = await self.database.db_player_member_snapshot.find_one(
             {'season':self.season.id,'tag':self.tag}
             )
         
-        self.name = snapshot.get('name',None)
-        self.town_hall = snapshot.get('town_hall',0)
-        self.is_member = snapshot.get('is_member',False)
-        self.home_clan_tag = snapshot.get('home_clan_tag',None)
-        self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
+        if snapshot:
+            self.name = snapshot.get('name',None)
+            self.town_hall = snapshot.get('town_hall',0)
+            self.is_member = snapshot.get('is_member',False)
+            self.home_clan_tag = snapshot.get('home_clan_tag',None)
+            self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
+        season_entries = await aPlayerActivity.get_by_player_season(self.tag,self.season)
         self._activity_count = len(season_entries)        
-        if self._activity_count <= 0:
-            return
         
-        if self.home_clan:
-            a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
-            ts = None
-            async for a in a_iter:
-                if not ts:
-                    if a.clan_tag == a.home_clan_tag:
+        if self._activity_count > 0:
+            if self.home_clan:
+                a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
+                ts = None
+                async for a in a_iter:
+                    if not ts:
+                        if a.clan_tag == a.home_clan_tag:
+                            ts = a._timestamp
+                    if ts:
+                        if a.clan_tag == a.home_clan_tag:                   
+                            self.time_in_home_clan += max(0,a._timestamp - ts)
                         ts = a._timestamp
-                if ts:
-                    if a.clan_tag == a.home_clan_tag:                   
-                        self.time_in_home_clan += max(0,a._timestamp - ts)
-                    ts = a._timestamp
 
-        if self.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
-            self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
+            if self.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
+                self.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
-        self.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]
+            self.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]
 
-        self.attack_wins.compute_stat([a for a in season_entries if a.activity == 'attack_wins'])
-        self.defense_wins.compute_stat([a for a in season_entries if a.activity == 'defense_wins'])
-        self.donations_sent.compute_stat([a for a in season_entries if a.activity == 'donations_sent'])
-        self.donations_rcvd.compute_stat([a for a in season_entries if a.activity == 'donations_received'])
-        self.loot_gold.compute_stat([a for a in season_entries if a.activity == 'loot_gold'])
-        self.loot_elixir.compute_stat([a for a in season_entries if a.activity == 'loot_elixir'])
-        self.loot_darkelixir.compute_stat([a for a in season_entries if a.activity == 'loot_darkelixir'])
-        self.capital_contribution.compute_stat([a for a in season_entries if a.activity == 'capital_contribution'])
-        self.clan_games.compute_stat([a for a in season_entries if a.activity == 'clan_games'])
+            self.attack_wins.compute_stat([a for a in season_entries if a.activity == 'attack_wins'])
+            self.defense_wins.compute_stat([a for a in season_entries if a.activity == 'defense_wins'])
+            self.donations_sent.compute_stat([a for a in season_entries if a.activity == 'donations_sent'])
+            self.donations_rcvd.compute_stat([a for a in season_entries if a.activity == 'donations_received'])
+            self.loot_gold.compute_stat([a for a in season_entries if a.activity == 'loot_gold'])
+            self.loot_elixir.compute_stat([a for a in season_entries if a.activity == 'loot_elixir'])
+            self.loot_darkelixir.compute_stat([a for a in season_entries if a.activity == 'loot_darkelixir'])
+            self.capital_contribution.compute_stat([a for a in season_entries if a.activity == 'capital_contribution'])
+            self.clan_games.compute_stat([a for a in season_entries if a.activity == 'clan_games'])
         
     @property
     def is_current_season(self) -> bool:
