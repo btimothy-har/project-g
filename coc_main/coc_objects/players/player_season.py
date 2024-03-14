@@ -246,10 +246,10 @@ class aPlayerSeason(MotorClient,AwaitLoader):
                 ts = None
                 async for a in a_iter:
                     if not ts:
-                        if a.clan_tag == a.home_clan_tag:
+                        if a.clan_tag == self.home_clan_tag:
                             ts = a._timestamp
                     if ts:
-                        if a.clan_tag == a.home_clan_tag:                   
+                        if a.clan_tag == self.home_clan_tag:                   
                             self.time_in_home_clan += max(0,a._timestamp - ts)
                         ts = a._timestamp
 
