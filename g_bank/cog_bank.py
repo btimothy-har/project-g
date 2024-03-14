@@ -575,6 +575,7 @@ class Bank(commands.Cog,GlobalClient):
     async def new_redemption_ticket_listener(self,channel:discord.TextChannel):
         if not isinstance(channel, discord.TextChannel):
             return
+        
         redemption_id = None
         await asyncio.sleep(1)
         
@@ -2911,7 +2912,7 @@ class Bank(commands.Cog,GlobalClient):
                     else:   
                         reward = 0 if u <= hero.min_level else 1000
 
-                    multi = await self._compute_multiplier(player_activity_log)
+                    multi = await self._compute_multiplier(player)
                     new_rew = round(reward * multi)
                     await bank.deposit_credits(member,new_rew)
 
