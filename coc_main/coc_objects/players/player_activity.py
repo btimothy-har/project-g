@@ -49,10 +49,7 @@ class aPlayerActivity(MotorClient):
         '_legacy_conversion',
         'tag',
         'name',
-        'is_member',
-        'discord_user',
         'town_hall',
-        'home_clan_tag',
         'clan_tag',
         'activity',
         'stat',
@@ -157,15 +154,11 @@ class aPlayerActivity(MotorClient):
         self.tag = database['tag']
         self.name = database['name']
 
-        self.is_member = database['is_member']
-        self.discord_user = database['discord_user']
-
         self.town_hall = aTownHall(
             level=database['townhall']['level'],
             weapon=database['townhall']['weapon']
             )
         
-        self.home_clan_tag = database['home_clan'] if database['home_clan'] != 'None' else None
         self.clan_tag = database['clan'] if database['clan'] != 'None' else None
 
         self.activity = database['activity']
