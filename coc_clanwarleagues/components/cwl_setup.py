@@ -130,8 +130,8 @@ class CWLSeasonSetup(DefaultView):
         embed.add_field(
             name=f"**Player Registration**: `{'OPEN' if self.season.cwl_signup_status else 'CLOSED'}`",
             value=f"**Total:** `{len(current_signups):>3}`"
-                + f"\n**Rostered:** `{len([p for p in current_signups if p.roster_clan]):>3}`"
-                + f"\u3000**Unrostered:** `{len([p for p in current_signups if not p.roster_clan]):>3}`"
+                + f"\n**Rostered:** `{len([p for p in current_signups if p.roster_clan_tag]):>3}`"
+                + f"\u3000**Unrostered:** `{len([p for p in current_signups if not p.roster_clan_tag]):>3}`"
                 + '\n'
                 + '\u3000'.join([f"{EmojisTownHall.get(th)} `{len([p for p in current_signups if p.town_hall == th]):^3}`" for th in all_th[:5]])
                 + ('\n' if len(all_th) > 5 else "")
