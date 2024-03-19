@@ -126,7 +126,7 @@ class ClanWarLeagues(commands.Cog,GlobalClient):
     def active_war_league_season(self) -> aClashSeason:
         if not self._current_season or pendulum.now() > self.last_season_check.add(minutes=10):
             current = aClashSeason.current()
-            if pendulum.now() > current.cwl_end.add(days=20):
+            if pendulum.now() > current.cwl_end.add(days=4):
                 self._current_season = current.next_season()
             else:
                 self._current_season = aClashSeason.current()
