@@ -110,7 +110,8 @@ class DefaultWarTasks():
 
     @coc.WarEvents.state_change()
     async def save_war_on_change(war:bClanWar):
-        await war.save_to_database()    
+        if war.state in ['preparation','inWar','warEnded']:
+            await war.save_to_database()    
     
     @coc.WarEvents.state_change()
     async def sync_clan_war_leagues(war:bClanWar):
