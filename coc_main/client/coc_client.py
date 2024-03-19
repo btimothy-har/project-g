@@ -384,7 +384,7 @@ class ClashClient(coc.EventsClient):
     async def get_clan_wars_for_clan(self,clan_tag:str,season:aClashSeason=None,**kwargs) -> List[bClanWar]:
         tag = coc.utils.correct_tag(clan_tag)
         query = await bClanWar._search_for_clan(clan_tag=tag,season=season)
-        wars = [bClanWar(data=w,client=self) for w in query]
+        wars = [bClanWar(data=w,client=self,clan_tag=tag) for w in query]
         await asyncio.gather(*[w.load() for w in wars])
         return sorted(wars,key=lambda w:w.preparation_start_time,reverse=True)
     
