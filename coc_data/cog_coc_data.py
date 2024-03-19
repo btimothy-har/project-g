@@ -380,6 +380,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 async for location in l_iter:
                     try:
                         location_players = await self.coc_client.get_location_players(location.id)
+                    except coc.ClashOfClansException:
+                        pass
                     except:
                         LOG.exception(f"Error in Player Discovery for Location {location.id}.")
                     else:
@@ -387,6 +389,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
                     try:
                         builderbase_players = await self.coc_client.get_location_players_builder_base(location.id)
+                    except coc.ClashOfClansException:
+                        pass
                     except:
                         LOG.exception(f"Error in Player Discovery for Location {location.id}.")
                     else:
@@ -394,6 +398,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             
                     try:
                         location_clans = await self.coc_client.get_location_clans(location.id)
+                    except coc.ClashOfClansException:
+                        pass
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
@@ -401,6 +407,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     
                     try:
                         builderbase_clans = await self.coc_client.get_location_clans_builder_base(location.id)
+                    except coc.ClashOfClansException:
+                        pass
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
@@ -408,6 +416,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     
                     try:
                         capital_clans = await self.coc_client.get_location_clans_capital(location.id)
+                    except coc.ClashOfClansException:
+                        pass
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
