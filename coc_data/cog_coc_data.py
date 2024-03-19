@@ -68,8 +68,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         self.cycle_id = -1
 
         self._leaderboard_discovery_lock = asyncio.Lock()
-        self.player_discovery = None
-        self.clan_discovery = None
+        self.player_cache = None
+        self.clan_cache = None
 
         #PLAYER LOOP
         self._player_loop_lock = asyncio.Lock()
@@ -159,8 +159,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
         self.coc_client._use_discovery = True
         
-        asyncio.create_task(self._player_cache_task())
-        asyncio.create_task(self._clan_cache_task())
+        self.player_cache = asyncio.create_task(self._player_cache_task())
+        self.clan_cache = asyncio.create_task(self._clan_cache_task())
 
         self.coc_client.add_events(
             self.player_loop_start,
@@ -195,6 +195,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ##################################################
     async def cog_unload(self):
         self.coc_client._use_discovery = False
+        self.player_cache.cancel()
+        self.clan_cache.cancel()
         self.leaderboard_discovery.cancel()
         
         await self.unload_event_tasks()
@@ -424,77 +426,75 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     #####
     ############################################################    
     async def _player_cache_task(self):
-        try:
-            if self.coc_client.maintenance:
-                await asyncio.sleep(600)
-                return
-
-            tag = await self.coc_client._player_cache_queue.get()
-
+        while True:
             try:
-                player = await self.coc_client.get_player(tag)
+                if self.coc_client.maintenance:
+                    await asyncio.sleep(600)
+                    return
 
-            except coc.NotFound:
-                self.coc_client._player_cache_queue.task_done()
+                tag = await self.coc_client._player_cache_queue.get()
 
-                basic_player = await BasicPlayer(tag)
-                await basic_player._attributes.load_data()
+                try:
+                    player = await self.coc_client.get_player(tag)
 
-                if basic_player.discord_user:
-                    await basic_player.unlink_discord()
+                except coc.NotFound:
+                    self.coc_client._player_cache_queue.task_done()
 
-                if basic_player.is_member:
-                    await basic_player.remove_member()
-            
-            except (coc.Maintenance,coc.GatewayError):
-                await self.coc_client._player_cache_queue.put(tag)
-            
-            else:            
-                self.coc_client._player_cache_queue.task_done()
-                await aPlayer._sync_cache(player)
+                    basic_player = await BasicPlayer(tag)
+                    await basic_player._attributes.load_data()
+
+                    if basic_player.discord_user:
+                        await basic_player.unlink_discord()
+
+                    if basic_player.is_member:
+                        await basic_player.remove_member()
                 
-                player_season = await player.get_current_season()
-                await player_season.create_member_snapshot()
-
-        except Exception:
-            LOG.exception("Error in Player Discovery.")
-
-        finally:
-            if not self.coc_client._use_discovery:
+                except (coc.Maintenance,coc.GatewayError):
+                    await self.coc_client._player_cache_queue.put(tag)
+                
+                else:            
+                    self.coc_client._player_cache_queue.task_done()
+                    await aPlayer._sync_cache(player)
+                    
+                    player_season = await player.get_current_season()
+                    await player_season.create_member_snapshot()
+            
+            except asyncio.CancelledError:
                 return
-            await self._player_cache_task()
+
+            except Exception:
+                LOG.exception("Error in Player Discovery.")
         
     async def _clan_cache_task(self):
-        try:
-            if self.coc_client.maintenance:
-                await asyncio.sleep(600)
-                return
-
-            tag = await self.coc_client._clan_cache_queue.get()
-
+        while True:
             try:
-                clan = await self.coc_client.get_clan(tag)
+                if self.coc_client.maintenance:
+                    await asyncio.sleep(600)
+                    return
 
-            except coc.NotFound:
-                self.coc_client._clan_cache_queue.task_done()
+                tag = await self.coc_client._clan_cache_queue.get()
+
+                try:
+                    clan = await self.coc_client.get_clan(tag)
+
+                except coc.NotFound:
+                    self.coc_client._clan_cache_queue.task_done()
+                    
+                except (coc.Maintenance,coc.GatewayError):
+                    await self.coc_client._clan_cache_queue.put(tag)
                 
-            except (coc.Maintenance,coc.GatewayError):
-                await self.coc_client._clan_cache_queue.put(tag)
-            
-            else:            
-                self.coc_client._clan_cache_queue.task_done()
-                await aClan._sync_cache(clan)
+                else:            
+                    self.coc_client._clan_cache_queue.task_done()
+                    await aClan._sync_cache(clan)
 
-            save_members = [self.coc_client._player_cache_queue.put(m.tag) for m in clan.members]
-            await asyncio.gather(*save_members)
-            
-        except Exception:
-            LOG.exception("Error in Clan Discovery.")
-            
-        finally:
-            if not self.coc_client._use_discovery:
+                save_members = [self.coc_client._player_cache_queue.put(m.tag) for m in clan.members]
+                await asyncio.gather(*save_members)
+                
+            except asyncio.CancelledError:
                 return
-            await self._clan_cache_task()
+            
+            except Exception:
+                LOG.exception("Error in Clan Discovery.")
     
     ############################################################
     #####
