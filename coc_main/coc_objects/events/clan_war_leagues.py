@@ -67,6 +67,34 @@ class WarLeagueGroup(GlobalClient,AwaitLoader):
     def __hash__(self) -> int:
         return self.id
     
+    async def _convert(self):
+        await self.load()
+        rounds = []
+        for r in self.rounds:
+            wars = [await aClanWar(war_id) for war_id in r]
+            tags = {
+                'warTags': [w.war_tag for w in wars]
+                }
+            rounds.append(tags)
+
+        await asyncio.gather(*[c.compute_lineup_stats() for c in self.clans],return_exceptions=True)
+
+        self.rounds = rounds
+        await self.database.db__nwar_league_group.update_one(
+            {'_id':self.id},
+            {'$set':self._api_json()},
+            upsert=True
+            )
+
+    def _api_json(self) -> dict:
+        return {
+            'state': 'ended' if self.state == WarState.WAR_ENDED else self.state,
+            'season': pendulum.from_format(self.season.id, 'M-YYYY').format('YYYY-MM'),
+            'league': self.league,
+            'clans': [clan.group_json() for clan in self.clans],
+            'rounds': self.rounds
+            }
+    
     ##################################################
     ### OBJECT ATTRIBUTES
     ##################################################    
@@ -177,6 +205,19 @@ class WarLeagueClan(BasicClan):
     def _lock(self) -> asyncio.Lock:
         return self._locks[(self.season.id,self.tag)]
     
+    def group_json(self) -> dict:
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'clanLevel': self.level,
+            'badgeUrls': {
+                'small': self.badge,
+                'medium': self.badge,
+                'large': self.badge
+                },
+            'members': [p.group_json() for p in self.master_roster],
+            }
+    
     def assistant_json(self) -> dict:
         ret = {
             'tag': self.tag,
@@ -247,7 +288,7 @@ class WarLeagueClan(BasicClan):
             return "Roster Finalized"
         if self.is_participating:
             return "Roster Pending"
-        return "Not Participating"    
+        return "Not Participating"
     @property
     def league(self) -> str:
         return self.war_league if self.war_league else self.war_league_name
@@ -482,6 +523,13 @@ class WarLeaguePlayer(BasicPlayer):
     
     def __str__(self):
         return f"CWL Player {self.name} {self.tag} ({self.season.id})"
+    
+    def group_json(self):
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'townHallLevel': self.town_hall_level,
+            }
 
     @property
     def db_id(self):

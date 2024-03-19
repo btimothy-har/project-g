@@ -14,7 +14,7 @@ from coc_main.client.global_client import GlobalClient
 
 from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.clans.clan import aClan
-from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 
 from coc_main.utils.components import get_bot_webhook, s_convert_seconds_to_str
@@ -120,7 +120,7 @@ class EventReminder(GlobalClient):
             }
         )
     
-    async def send_reminder(self,event:Union[aClanWar,aRaidWeekend],*players):        
+    async def send_reminder(self,event:Union[bClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
         if self._lock.locked():
             return
@@ -152,7 +152,7 @@ class EventReminder(GlobalClient):
             
             await self.refresh_intervals(time_remaining)
     
-    async def send_war_reminders(self,clan_war:aClanWar):
+    async def send_war_reminders(self,clan_war:bClanWar):
         clan = await self.coc_client.get_clan(self.tag)
                 
         reminder_text = f"You have **NOT** used all of your War Attacks. " 
@@ -215,6 +215,12 @@ class EventReminder(GlobalClient):
     async def get_all(cls) -> List['EventReminder']:
         query = cls.database.db__clan_event_reminder.find({})
         reminders = [cls(r) async for r in query]
+        return reminders
+    
+    @classmethod
+    async def get_war_reminders(cls) -> List['EventReminder']:
+        query = cls.database.db__clan_event_reminder.find({'type':1})
+        reminders = [cls(r) async for r in query]        
         return reminders
     
     @classmethod

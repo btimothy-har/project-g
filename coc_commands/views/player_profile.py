@@ -1,5 +1,6 @@
 import discord
 import pendulum
+import logging
 
 from typing import *
 
@@ -10,7 +11,7 @@ from redbot.core.utils import AsyncIter
 from coc_main.coc_objects.season.season import aClashSeason
 
 from coc_main.coc_objects.players.player import aPlayer
-from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
@@ -18,6 +19,8 @@ from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
 from coc_main.utils.components import DefaultView, DiscordButton, DiscordSelectMenu, clash_embed, s_convert_seconds_to_str
 from coc_main.utils.constants.ui_emojis import EmojisUI
 from coc_main.utils.constants.coc_constants import EmojisClash, EmojisLeagues, EmojisTownHall, WarResult, EmojisEquipment
+
+LOG = logging.getLogger("coc.main")
 
 class PlayerProfileMenu(DefaultView):
     def __init__(self,
@@ -81,10 +84,10 @@ class PlayerProfileMenu(DefaultView):
     ### START / STOP
     ##################################################
     async def start(self):        
-        war_log = await aClanWar.for_player(
+        war_log = await self.coc_client.get_clan_wars_for_player(
             player_tag=self.current_account.tag,
             season=aClashSeason.current()
-            )        
+            )
         self.current_warstats = await self.run_in_thread(aClanWarSummary.for_player,self.current_account.tag,war_log)
 
         raid_log = await aRaidWeekend.for_player(
@@ -174,7 +177,7 @@ class PlayerProfileMenu(DefaultView):
         await interaction.response.defer()
         self.current_account = [account for account in self.accounts if account.tag == menu.values[0]][0]
 
-        war_log = await aClanWar.for_player(
+        war_log = await self.coc_client.get_clan_wars_for_player(
             player_tag=self.current_account.tag,
             season=aClashSeason.current()
             )
@@ -291,7 +294,7 @@ class PlayerProfileMenu(DefaultView):
                 + f"\u200b"
             )
         war_count = 0
-        async for war in AsyncIter(self.current_warstats.war_log):
+        for war in self.current_warstats.war_log:
             if war_count >= 5:
                 break
 
@@ -304,7 +307,7 @@ class PlayerProfileMenu(DefaultView):
             embed.add_field(
                 name=f"{war_member.clan.emoji} {war_member.clan.clean_name} vs {war_member.opponent.clean_name}",
                 value=f"{WarResult.emoji(war_member.clan.result)}\u3000{EmojisClash.ATTACK} `{len(war_member.attacks):^3}`\u3000{EmojisClash.UNUSEDATTACK} `{war_member.unused_attacks:^3}`"
-                    + (f"\u3000{EmojisUI.ELO} `{round(sum([att.elo_effect for att in war_member.attacks]),1):^3}`\n" if war_member.clan.is_alliance_clan else "\n")
+                    + (f"\u3000{EmojisUI.ELO} `{round(sum([att.elo_effect for att in war_member.attacks]),1):^3}`\n" if war_member.clan.is_alliance_clan and war_member.war.type == 'random' else "\n")
                     + (f"*War Ends <t:{war.end_time.int_timestamp}:R>.*\n" if war.start_time < pendulum.now() < war.end_time else "")
                     + (f"*War Starts <t:{war.start_time.int_timestamp}:R>.*\n" if war.start_time > pendulum.now() else "")
                     + (f"{attack_str}\n" if len(war_attacks) > 0 else "")

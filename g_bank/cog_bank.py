@@ -23,7 +23,7 @@ from coc_main.coc_objects.players.player import aPlayer
 from coc_main.coc_objects.players.hero import aHero
 from coc_main.coc_objects.players.player_activity import aPlayerActivity
 from coc_main.coc_objects.clans.clan import aClan
-from coc_main.coc_objects.events.clan_war import aClanWar, aWarPlayer
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar, bWarPlayer
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend, aRaidMember
 
 from coc_main.discord.member import aMember
@@ -35,7 +35,6 @@ from coc_main.utils.constants.coc_emojis import EmojisTownHall
 from coc_main.utils.checks import is_admin, is_owner
 from coc_main.utils.autocomplete import autocomplete_clans_coleader
 
-from coc_data.tasks.war_tasks import ClanWarLoop
 from coc_data.tasks.raid_tasks import ClanRaidLoop
 
 from .objects.accounts import BankAccount, MasterAccount, ClanAccount
@@ -101,6 +100,7 @@ class Bank(commands.Cog,GlobalClient):
         self._reward_lock_townhall = asyncio.Lock()
         self._reward_lock_hero_upgrade = asyncio.Lock()
         self._reward_lock_clan_capital = asyncio.Lock()
+        self._lock_war_loop = asyncio.Lock()
         self._log_queue = asyncio.Queue()
         self._log_task = None
 
@@ -200,14 +200,14 @@ class Bank(commands.Cog,GlobalClient):
 
         self.coc_client.add_events(
             self.end_of_trophy_season,
-            self.end_of_clan_games
+            self.end_of_clan_games,
+            self.war_state_change_bank_rewards
             )
-
-        ClanWarLoop.add_war_end_event(self.clan_war_ended_rewards)
         ClanRaidLoop.add_raid_end_event(self.raid_weekend_ended_rewards)
 
         await self.bot.wait_until_red_ready()
 
+        self.update_clan_loop.start()
         self.progress_reward_townhall.start()
         self.progress_reward_hero_upgrade.start()
         self.clan_capital_contribution_reward.start()        
@@ -216,6 +216,7 @@ class Bank(commands.Cog,GlobalClient):
         self._log_task = asyncio.create_task(self._log_task_loop())    
     
     async def cog_unload(self):
+        self.update_clan_loop.cancel()
         self.staff_item_grant.cancel()
         self.subscription_item_expiry.cancel()        
 
@@ -225,7 +226,6 @@ class Bank(commands.Cog,GlobalClient):
 
         await self._log_task.cancel()
         
-        ClanWarLoop.remove_war_end_event(self.clan_war_ended_rewards)
         ClanRaidLoop.remove_raid_end_event(self.raid_weekend_ended_rewards)
         ClanAccount._cache = {}
         MasterAccount._cache = {}
@@ -3034,8 +3034,24 @@ class Bank(commands.Cog,GlobalClient):
     ##### WAR REWARDS
     #####
     ############################################################
-    async def clan_war_ended_rewards(self,clan:aClan,war:aClanWar):
-        async def war_bank_rewards(player:aWarPlayer):
+    @tasks.loop(minutes=10)
+    async def update_clan_loop(self):
+        if self._lock_war_loop.locked():
+            return        
+        async with self._lock_war_loop:
+            if self.coc_client.maintenance:
+                return
+            
+            alliance_clans = await self.coc_client.get_alliance_clans()
+            self.coc_client.add_war_updates(*[clan.tag for clan in alliance_clans])
+
+    @coc.WarEvents.state_change()
+    async def war_state_change_bank_rewards(self,war:bClanWar):
+
+        if not self.use_rewards:
+            return
+
+        async def war_bank_rewards(player:bWarPlayer):
             try:
                 while True:
                     try:
@@ -3097,17 +3113,17 @@ class Bank(commands.Cog,GlobalClient):
             except Exception:
                 LOG.exception(f"Clan War Ended Rewards: {player.tag}")
         
-        if not self.use_rewards:
-            return
+        tasks = []
         
-        if clan.is_alliance_clan and war.type == ClanWarType.RANDOM:
-            war_clan = war.get_clan(clan.tag)
-            if not war_clan:
-                return
-            
-            a_iter = AsyncIter(war_clan.members)            
-            tasks = [war_bank_rewards(player) async for player in a_iter]
-            await bounded_gather(*tasks,semaphore=self._reward_semaphore)
+        if war.clan_1.is_alliance_clan and war.type == ClanWarType.RANDOM:
+            a_iter = AsyncIter(war.clan_1.members)            
+            tasks.extend([war_bank_rewards(player) async for player in a_iter])
+        
+        if war.clan_2.is_alliance_clan and war.type == ClanWarType.RANDOM:
+            a_iter = AsyncIter(war.clan_2.members)            
+            tasks.extend([war_bank_rewards(player) async for player in a_iter])
+        
+        await bounded_gather(*tasks,semaphore=self._reward_semaphore)    
     
     ############################################################
     #####

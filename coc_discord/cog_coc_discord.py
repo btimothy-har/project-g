@@ -29,7 +29,6 @@ from coc_main.utils.components import clash_embed
 from coc_main.utils.checks import is_admin
 
 from coc_data.cog_coc_data import ClashOfClansData
-from coc_data.tasks.war_tasks import ClanWarLoop
 from coc_data.tasks.raid_tasks import ClanRaidLoop
 
 from .panels.application_panel import GuildApplicationPanel, ClanApplyMenu, ClanApplyMenuUser
@@ -55,6 +54,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
 
     def __init__(self):
         self.loop_update_lock = asyncio.Lock()
+        self.war_reminder_lock = asyncio.Lock()
     
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
@@ -93,8 +93,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
             FeedTasks.on_clan_member_leave_feed,
             FeedTasks.on_clan_member_join_role 
             )
-        ClanWarLoop.add_war_ongoing_event(FeedTasks._setup_war_reminder)
-        ClanWarLoop.add_cwl_setup_event(FeedTasks._setup_cwl_reminder)
+    
         ClanRaidLoop.add_raid_ongoing_event(FeedTasks._setup_raid_reminder)
         ClanRaidLoop.add_raid_end_event(FeedTasks._raid_ended_feed)
 
@@ -131,8 +130,6 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
             FeedTasks.on_clan_member_leave_feed,
             FeedTasks.on_clan_member_join_role 
             )
-        ClanWarLoop.remove_war_ongoing_event(FeedTasks._setup_war_reminder)
-        ClanWarLoop.remove_cwl_setup_event(FeedTasks._setup_cwl_reminder)
         ClanRaidLoop.remove_raid_ongoing_event(FeedTasks._setup_raid_reminder)
         ClanRaidLoop.remove_raid_end_event(FeedTasks._raid_ended_feed)
         LOG.handlers.clear()
@@ -836,7 +833,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
     ##### BACKGROUND UPDATES: CLAN LOOP
     #####
     ############################################################
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=10)
     async def update_clan_loop(self):
         if self.loop_update_lock.locked():
             return        
@@ -858,8 +855,25 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
 
             loop_tags = list(set(tags))
             self.coc_client.add_clan_updates(*loop_tags)
-            self.coc_data._war_loop.add_to_loop(*loop_tags)
+            self.coc_client.add_war_updates(*[reminder.tag for reminder in reminders])
             self.coc_data._raid_loop.add_to_loop(*loop_tags)
+    
+    @tasks.loop(minutes=1)
+    async def run_war_reminders(self):
+        if self.war_reminder_lock.locked():
+            return
+        
+        async def send_reminders(reminder:EventReminder):
+            war = await self.coc_client.get_current_war(reminder.tag)
+            if getattr(war.state,'None') == 'inWar' and getattr(war.type,'') in reminder.sub_type:
+                war_clan = war.get_clan(reminder.tag)
+                remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
+                await reminder.send_reminder(war,*remind_members)
+        
+        async with self.war_reminder_lock:
+            reminders = await EventReminder.get_war_reminders()
+            tasks = [send_reminders(reminder) for reminder in reminders]
+            await bounded_gather(*tasks)
     
     @tasks.loop(minutes=5)
     async def save_member_roles(self):

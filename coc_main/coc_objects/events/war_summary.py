@@ -6,7 +6,7 @@ from collections import defaultdict
 from redbot.core.utils import AsyncIter
 from functools import cached_property
 
-from .clan_war import aClanWar
+from .clan_war_v2 import bClanWar
 
 from ...utils.components import s_convert_seconds_to_str
 
@@ -20,7 +20,7 @@ default_structure = lambda: {
     }
 
 class aClanWarSummary():
-    def __init__(self,war_log:List[aClanWar]):
+    def __init__(self,war_log:List[bClanWar]):
         
         self.timestamp = pendulum.now()    
 
@@ -31,13 +31,13 @@ class aClanWarSummary():
         self.wars_participated = len(self.war_log) if self.war_log else 0
     
     @classmethod
-    def for_player(cls,player_tag:str,war_log:List[aClanWar]):
+    def for_player(cls,player_tag:str,war_log:List[bClanWar]):
         instance = cls([w for w in war_log if w.get_member(player_tag)])
         instance.player_tag = player_tag
         return instance
 
     @classmethod
-    def for_clan(cls,clan_tag:str,war_log:List[aClanWar]):
+    def for_clan(cls,clan_tag:str,war_log:List[bClanWar]):
         instance = cls(war_log)
         instance.clan_tag = clan_tag
         return instance
@@ -193,7 +193,15 @@ class aClanWarSummary():
         except:
             return 0
     
-    async def hit_rate_for_th(self,th_level:int) -> dict:
+    @cached_property
+    def elo_change(self) -> int:
+        try:
+            if self.player_tag:
+                return sum([attack.elo_effect for war in self.war_log for attack in war.get_member(self.player_tag).attacks])
+        except:
+            return 0
+    
+    def hit_rate_for_th(self,th_level:int) -> dict:
         hit_rate = defaultdict(default_structure)
         try:
             if self.player_tag:
@@ -202,12 +210,12 @@ class aClanWarSummary():
             if self.clan_tag:
                 attacks_for_th = [attack for war in self.war_log for attack in war.get_clan(self.clan_tag).attacks if attack.attacker.town_hall == th_level]
 
-            async for attack in AsyncIter(attacks_for_th):
+            for attack in attacks_for_th:
                 hit_rate[attack.defender.town_hall]['attacker'] = th_level
                 hit_rate[attack.defender.town_hall]['defender'] = attack.defender.town_hall
                 hit_rate[attack.defender.town_hall]['total'] += 1
                 hit_rate[attack.defender.town_hall]['stars'] += attack.stars
-                hit_rate[attack.defender.town_hall]['destruction'] += attack.destruction
+                hit_rate[attack.defender.town_hall]['destruction'] += round(attack.destruction,2)
                 hit_rate[attack.defender.town_hall]['triples'] += 1 if attack.is_triple else 0
             return hit_rate
         

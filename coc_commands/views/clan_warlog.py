@@ -12,7 +12,7 @@ from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from coc_main.coc_objects.clans.clan import aClan
 from coc_main.coc_objects.events.helpers import clan_war_embed
-from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
 class ClanWarLog(DefaultView):
@@ -117,7 +117,7 @@ class ClanWarLog(DefaultView):
     ### START / STOP 
     ##################################################
     async def start(self):
-        get_all_wars = await aClanWar.for_clan(self.clan.tag)
+        get_all_wars = await self.coc_client.get_clan_wars_for_clan(self.clan.tag)
 
         if len(get_all_wars) == 0:
             embed = await clash_embed(

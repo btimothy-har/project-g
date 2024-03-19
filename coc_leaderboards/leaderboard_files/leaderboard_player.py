@@ -2,15 +2,17 @@ from typing import *
 
 from redbot.core.utils import AsyncIter
 
+from coc_main.client.global_client import GlobalClient
+
 from coc_main.coc_objects.players.player import aPlayerSeason
 from coc_main.coc_objects.clans.clan import aClan
-from coc_main.coc_objects.events.clan_war import aClanWar, aWarAttack
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar, bWarAttack
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 
 from coc_main.utils.constants.coc_constants import ClanWarType
 from coc_main.utils.utils import check_rtl
 
-class ClanWarLeaderboardPlayer():
+class ClanWarLeaderboardPlayer(GlobalClient):
     __slots__ = [
         'stats',
         'tag',
@@ -52,13 +54,13 @@ class ClanWarLeaderboardPlayer():
         leaderboard_th:int,
         eligible_clans:Optional[List[aClan]]=None):
 
-        def predicate_war(clan_war:aClanWar):
+        def predicate_war(clan_war:bClanWar):
             if eligible_clans:
                 return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False) and (clan_war.clan_1.tag in e_clans or clan_war.clan_2.tag in e_clans)
             else:
                 return getattr(clan_war,'type') == ClanWarType.RANDOM and getattr(clan_war,'is_alliance_war',False)
         
-        def predicate_lb_attack(attack:aWarAttack):
+        def predicate_lb_attack(attack:bWarAttack):
             return attack.attacker.town_hall <= attack.defender.town_hall
             
         lb_player = cls(player_season,leaderboard_th)
@@ -67,9 +69,11 @@ class ClanWarLeaderboardPlayer():
         else:
             e_clans = []
 
+        war_log = await GlobalClient.coc_client.get_clan_wars_for_player(player_season.tag,player_season.season)
         war_stats = aClanWarSummary.for_player(
             player_tag=player_season.tag,
-            war_log=await aClanWar.for_player(player_season.tag,player_season.season))
+            war_log=war_log
+            )
 
         participated_wars = AsyncIter(war_stats.war_log)
         async for war in participated_wars.filter(predicate_war):

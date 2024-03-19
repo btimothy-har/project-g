@@ -72,8 +72,6 @@ class ClashOfClansMain(commands.Cog):
             }
         self.config.register_global(**default_global)
 
-        self._task_queue = None
-
     def format_help_for_context(self, ctx: commands.Context) -> str:
         context = super().format_help_for_context(ctx)
         return f"{context}\n\nAuthor: {self.__author__}\nVersion: {self.__version__}"
@@ -112,12 +110,10 @@ class ClashOfClansMain(commands.Cog):
         self.reset_throttler_counter.start()
         self.bot_status_update_loop.start() 
         self.clash_season_check.start()
-        self._task_queue = asyncio.create_task(self._task_queue_loop())
             
     async def cog_unload(self):
         self.bot_status_update_loop.cancel()
         self.clash_season_check.cancel()
-        self._task_queue.cancel()
 
         await self.client_logout()
         await self.database_logout()
@@ -251,32 +247,6 @@ class ClashOfClansMain(commands.Cog):
                 + f"```{exc}```")
             COC_LOG.exception(f"Error in Season Refresh")
     
-    async def _task_queue_loop(self):
-        sleep = 0
-        try:
-            while True:
-                try:
-                    await asyncio.sleep(sleep)
-                    task = await GlobalClient.task_queue.get()
-                    if not task.done():
-                        await GlobalClient.task_queue.put(task)
-                        
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    COC_LOG.exception("Error in Task Queue Loop")
-
-        except asyncio.CancelledError:
-            while True:
-                try:
-                    task = await GlobalClient.task_queue.get()
-                    if task:
-                        await task
-                    if GlobalClient.task_queue.qsize() == 0:
-                        break
-                except Exception:
-                    pass
-    
     ############################################################
     #####
     ##### STATUS REPORT
@@ -297,7 +267,6 @@ class ClashOfClansMain(commands.Cog):
                 + f"\n{'[API Keys]':<15}" + f"{self.coc_client.http.key_count:,}"
                 + f"\n{'[API Requests]':<15}" + f"{(self.coc_client.http.key_count) - self.coc_client.http._HTTPClient__lock._value:,} / {self.coc_client.http.key_count:,}" + f" (Waiting: {waiters:,})"
                 + f"\n{'[Discovery]':<15}" + f"{self.coc_client._use_discovery}"
-                + f"\n{'[Q Tasks]':<15}" + f"{GlobalClient.task_queue.qsize():,}"
                 + "```",
             inline=False
             )

@@ -37,11 +37,6 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
     __version__ = coc_main.__version__
 
     def __init__(self):
-        self.slots_per_cycle = 0
-        self.max_cycle = 0
-
-        self.cycle_availability = {}
-
         #CONFIG
         self.config:Config = Config.get_conf(self,identifier=644530507505336330,force_registration=True)        
 
@@ -76,9 +71,6 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             )
         data_log_handler.setFormatter(log_formatter)
         LOG.addHandler(data_log_handler)
-
-        self.slots_per_cycle = await self.config.slots_per_cycle()
-        self.max_cycle = await self.config.max_cycle()
 
         asyncio.create_task(self.start_cog())
 
@@ -203,91 +195,3 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                 {"_id": player['_id']},
                 {"$unset": {"_cycle_id": 1}}
                 )
-
-    ############################################################
-    #####
-    ##### COMMANDS
-    #####
-    ############################################################
-    @commands.group(name="cocdatacon",aliases=["controller"])
-    @commands.is_owner()
-    async def command_group_clash_data(self,ctx):
-        """Manage the Clash of Clans Data Controller."""
-        if not ctx.invoked_subcommand:
-            pass        
-
-    @command_group_clash_data.command(name="status")
-    @commands.is_owner()
-    async def subcommand_clash_data_status(self,ctx:commands.Context):
-        """Clash of Clans Data Status."""
-
-        if not getattr(self,'_ready',False):
-            return await ctx.reply("Clash of Clans API Client not yet initialized.")
-
-        embed = await self.status_embed()
-        view = RefreshStatus(ctx)
-        await ctx.reply(embed=embed,view=view)
-    
-    @command_group_clash_data.command(name="maxslots")
-    @commands.is_owner()
-    async def subcommand_clash_data_maxslots(self,ctx:commands.Context,slots:int):
-        """Set the number of available slots per cycle."""
-
-        await self.config.slots_per_cycle.set(slots)
-        self.slots_per_cycle = slots
-        await ctx.reply(f"Slots per cycle set to {slots}.")
-
-    @command_group_clash_data.command(name="maxcycle")
-    @commands.is_owner()
-    async def subcommand_clash_data_maxcycle(self,ctx:commands.Context,cycle:int):
-        """Set the maximum number of cycles."""
-
-        await self.config.max_cycle.set(cycle)
-        self.max_cycle = cycle
-        await ctx.reply(f"Maximum cycle set to {cycle}.")
-        await self._refresh_cycle_availability()
-
-    async def status_embed(self):
-        embed = await clash_embed(self.bot,
-            title="**Clash of Clans Data Controller**",
-            message=f"### {pendulum.now().format('dddd, DD MMM YYYY HH:mm:ssZZ')}",
-            timestamp=pendulum.now()
-            )
-
-        embed.add_field(
-            name="**Controller Client**",
-            value=f"Slots per Cycle: {self.slots_per_cycle:,}"
-                + f"\nMax Cycles: {self.max_cycle}"
-                + f"\nControl Lock: {self.control_lock.locked()}",
-            inline=True
-            )
-        
-        embed.add_field(
-            name="**Cycle Availability**",
-            value='\n'.join([f"Cycle {k}: {v:,}" for k,v in self.cycle_availability.items()]),
-            inline=True
-            )
-        return embed
-
-class RefreshStatus(DefaultView):
-    def __init__(self,context:Union[discord.Interaction,commands.Context]):
-
-        button = DiscordButton(
-            function=self._refresh_embed,
-            emoji=EmojisUI.REFRESH,
-            label="Refresh",
-            )
-
-        super().__init__(context,timeout=9999999)
-        self.is_active = True
-
-        self.add_item(button)
-    
-    @property
-    def cog(self) -> ClashOfClansDataController:
-        return self.bot.get_cog("ClashOfClansDataController")
-    
-    async def _refresh_embed(self,interaction:discord.Interaction,button:DiscordButton):
-        await interaction.response.defer()
-        embed = await self.cog.status_embed()
-        await interaction.followup.edit_message(interaction.message.id,embed=embed)

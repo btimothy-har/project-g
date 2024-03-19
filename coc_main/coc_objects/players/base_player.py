@@ -195,6 +195,20 @@ class BasicPlayer(AwaitLoader):
                 upsert=True
                 )
             DATA_LOG.info(f"{player}: discord_user changed to {player.discord_user}.")            
+    
+    async def unlink_discord(self):
+        async with self._attributes._lock:
+            self._attributes.discord_user = 0
+            await _PlayerAttributes.database.db__player.update_one(
+                {'_id':self.tag},
+                {'$set':{
+                    'discord_user':0,
+                    'is_member':False,
+                    'home_clan':None}
+                    },
+                upsert=True
+                )
+            DATA_LOG.info(f"{self}: discord_user unlinked.")
 
     async def new_member(self,user_id:int,home_clan:BasicClan):
         await BasicPlayer.set_discord_link(self.tag,user_id)
@@ -218,6 +232,9 @@ class BasicPlayer(AwaitLoader):
                 },
                 upsert=True)
             
+            await home_clan.clean_coleaders()
+            await home_clan.clean_elders()
+            
             DATA_LOG.info(
                 f"Player {self} is now an Alliance member!"
                     + f"\n\tHome Clan: {self.home_clan.tag} {self.home_clan.name}"
@@ -228,6 +245,8 @@ class BasicPlayer(AwaitLoader):
         self.home_clan = await BasicClan(tag=self._attributes.home_clan_tag) if self._attributes.home_clan_tag else None
         if self.home_clan:
             await self.home_clan.remove_member(self.tag)
+            await self.home_clan.clean_coleaders()
+            await self.home_clan.clean_elders()
 
         async with self._attributes._lock:
             ts = pendulum.now()

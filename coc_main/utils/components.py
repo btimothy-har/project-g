@@ -146,6 +146,7 @@ class DefaultView(GlobalClient,discord.ui.View):
             await self.ctx.edit_original_response(view=None)
     
     async def on_error(self, interaction:discord.Interaction, error:Exception, item):
+        LOG.exception(f"Error in {self.__class__.__name__}:", exc_info=error)
         err = await GlobalClient.handle_command_error(error,interaction,self.message)
         if err:
             return

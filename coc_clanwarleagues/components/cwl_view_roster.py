@@ -7,7 +7,7 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan
+from coc_main.coc_objects.events.war_clans import bWarLeagueClan
 
 from coc_main.utils.components import DiscordButton, MenuPaginator, clash_embed
 from coc_main.utils.constants.coc_emojis import EmojisClash, EmojisHeroes, EmojisLeagues, EmojisTownHall
@@ -17,7 +17,7 @@ from coc_main.utils.utils import chunks
 class CWLRosterDisplayMenu(MenuPaginator):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
-        clan:WarLeagueClan):
+        clan:bWarLeagueClan):
 
         self.is_active = False
         self.waiting_for = False
@@ -39,9 +39,8 @@ class CWLRosterDisplayMenu(MenuPaginator):
     async def start(self):
         self.clan = await self.coc_client.get_clan(self.league_clan.tag)
 
-        if self.league_clan.status == 'CWL Started':
-            await asyncio.gather(*(self.league_clan.compute_lineup_stats(),self.league_clan.get_participants()))
-            self.reference_list = [p async for p in self.coc_client.get_players(self.league_clan.master_roster_tags)]
+        if self.league_clan.status == 'CWL Started':            
+            self.reference_list = [p async for p in self.coc_client.get_players([p.tag for p in self.league_clan.master_roster])]
             self.reference_list.sort(
                 key=lambda x:(x.town_hall.level,x.hero_strength),
                 reverse=True)
@@ -61,7 +60,6 @@ class CWLRosterDisplayMenu(MenuPaginator):
                     await self.ctx.reply(embed=embed,view=None)
                 return
             
-            await self.league_clan.get_participants()
             self.reference_list = [p async for p in self.coc_client.get_players([p.tag for p in self.league_clan.participants])]
             self.reference_list.sort(
                 key=lambda x:(x.town_hall.level,x.hero_strength),

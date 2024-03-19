@@ -1,6 +1,7 @@
 import coc
 import logging
 import asyncio
+import pendulum
 
 import motor.motor_asyncio
 
@@ -14,6 +15,8 @@ from redbot.core.bot import Red
 from ..coc_objects.season.season import aClashSeason
 from ..coc_objects.players.player import aPlayer
 from ..coc_objects.clans.clan import aClan
+from ..coc_objects.events.clan_war_v2 import bClanWar, bWarLeagueGroup, bWarLeagueClan
+from ..coc_objects.events.war_players import bWarLeaguePlayer
 from ..utils.constants.coc_constants import ClanRanks, MultiplayerLeagues
 
 from .throttler import CounterThrottler
@@ -48,7 +51,7 @@ class LoginNotSet(coc.ClashOfClansException):
     Raised when the Clash API credentials are not set.
     """
 
-class DiscoveryQueue(asyncio.Queue):
+class CacheQueue(asyncio.Queue):
     def __init__(self):
         self.item_set = set()
         super().__init__()
@@ -339,6 +342,160 @@ class ClashClient(coc.EventsClient):
             key=lambda x:(MultiplayerLeagues.get_index(x.war_league_name),x.level,x.capital_hall),
             reverse=True
             )
+    
+    ############################################################
+    #####
+    ##### CLAN WARS
+    #####
+    ############################################################
+    async def get_clan_war(self,clan_tag:str,cls:Type[coc.ClanWar]=None,**kwargs) -> bClanWar:
+        if not cls:
+            cls = bClanWar
+        war = await super().get_clan_war(clan_tag=clan_tag,cls=cls,**kwargs)
+        if isinstance(war,AwaitLoader):
+            await war.load()
+        return war
+
+    async def get_current_war(self,clan_tag:str,cwl_round:coc.WarRound=coc.WarRound.current_war,cls:Type[coc.ClanWar]=None,**kwargs) -> Optional[bClanWar]:
+        if not cls:
+            cls = bClanWar
+        war = await super().get_current_war(clan_tag=clan_tag,cwl_round=cwl_round,cls=cls,**kwargs)
+        if isinstance(war,AwaitLoader):
+            await war.load()
+        return war
+    
+    def get_clan_wars(self,clan_tags:Iterable[str], cls:Type[coc.ClanWar]=None,**kwargs) -> AsyncIterator[bClanWar]:
+        if not cls:
+            cls = bClanWar
+        return super().get_clan_wars(clan_tags=clan_tags,cls=cls,**kwargs)
+
+    def get_current_wars(self,clan_tags:Iterable[str],cls:Type[coc.ClanWar]=coc.ClanWar,**kwargs) -> AsyncIterator[bClanWar]:
+        if not cls:
+            cls = bClanWar
+        return super().get_current_wars(clan_tags=clan_tags,cls=cls,**kwargs)
+
+    async def get_clan_wars_for_player(self,player_tag:str,season:aClashSeason=None,**kwargs) -> List[bClanWar]:
+        tag = coc.utils.correct_tag(player_tag)
+        query = await bClanWar._search_for_player(player_tag=tag,season=season)
+        wars = [bClanWar(data=w,client=self) for w in query]
+        await asyncio.gather(*[w.load() for w in wars])
+        return sorted(wars,key=lambda w:w.preparation_start_time,reverse=True)
+    
+    async def get_clan_wars_for_clan(self,clan_tag:str,season:aClashSeason=None,**kwargs) -> List[bClanWar]:
+        tag = coc.utils.correct_tag(clan_tag)
+        query = await bClanWar._search_for_clan(clan_tag=tag,season=season)
+        wars = [bClanWar(data=w,client=self) for w in query]
+        await asyncio.gather(*[w.load() for w in wars])
+        return sorted(wars,key=lambda w:w.preparation_start_time,reverse=True)
+    
+    ############################################################
+    #####
+    ##### CLAN WAR LEAGUES
+    #####
+    ############################################################
+    async def get_league_player(self,player_tag:str,season:aClashSeason,**kwargs) -> Optional[bWarLeaguePlayer]:
+        query = await bWarLeaguePlayer.search_by_attributes(season=season,tag=player_tag)
+        data = query[0] if query else None
+        if data:
+            player = await bWarLeaguePlayer(data=data,season=season,client=self,from_api=False)
+            return player
+        
+        if pendulum.now().int_timestamp < season.cwl_end.int_timestamp:
+            player = await self.get_player(player_tag)
+            data = {
+                'tag':player.tag,
+                'name':player.name,
+                'townHallLevel':player.town_hall.level,
+                'season':pendulum.from_format(season.id,'M-YYYY').format('YYYY-MM')
+                }
+            player = await bWarLeaguePlayer(data=data,season=season,client=self)
+            return player
+        return None
+    
+    async def get_league_players(self,season:aClashSeason,**kwargs) -> List[bWarLeaguePlayer]:
+        query = await bWarLeaguePlayer.search_by_attributes(season=season,**kwargs)
+        return [bWarLeaguePlayer(data=p,season=season,client=self,from_api=False) for p in query]
+
+    async def get_league_clan(self,clan_tag:str,season:aClashSeason,**kwargs) -> Optional[bWarLeagueClan]:
+        query = await bWarLeagueClan.search_by_attributes(season=season,tag=clan_tag)
+        data = query[0] if query else None
+        if data:
+            clan = await bWarLeagueClan(data=data,season=season,client=self,from_api=False)
+            return clan
+        
+        if pendulum.now().int_timestamp < season.cwl_end.int_timestamp:
+            clan = await self.get_clan(clan_tag)
+            data = {
+                'tag':clan.tag,
+                'name':clan.name,
+                'season':pendulum.from_format(season.id,'M-YYYY').format('YYYY-MM'),
+                'league':clan.war_league_name,
+                'clanLevel':clan.level,
+                'badgeUrls':{
+                    'small':clan.badge,
+                    'medium':clan.badge,
+                    'large':clan.badge
+                    },
+                'members':[]
+                }
+            clan = await bWarLeagueClan(data=data,season=season,client=self)        
+            return clan
+        return None
+    
+    async def get_league_clans(self,season:aClashSeason,**kwargs) -> List[bWarLeagueClan]:
+        query = await bWarLeagueClan.search_by_attributes(season=season,**kwargs)
+        return [await bWarLeagueClan(data=c,season=season,client=self,from_api=False) for c in query]
+
+    async def get_league_group(self,clan_tag:str,cls:Type[coc.ClanWarLeagueGroup]=None,season:aClashSeason=None,**kwargs) -> bWarLeagueGroup:
+        if not season:
+            season = aClashSeason.current()
+        if not cls:
+            cls = bWarLeagueGroup
+        
+        if season.is_current:
+            group = await super().get_league_group(clan_tag=clan_tag,cls=cls,season=season,**kwargs)
+            if isinstance(group,AwaitLoader):
+                await group.load()
+            return group
+
+        else:
+            query = await bWarLeagueGroup.get_for_clan_by_season(clan_tag=clan_tag,season=season)
+            if query:
+                group = cls(data=query,client=self)
+                if isinstance(group,AwaitLoader):
+                    await group.load()
+                return group
+            return None
+    
+    async def get_league_group_from_league_war(self,war_tag:str,cls:Type[coc.ClanWarLeagueGroup]=None,**kwargs) -> Optional[bWarLeagueGroup]:
+        if not cls:
+            cls = bWarLeagueGroup
+        
+        query = await bWarLeagueGroup.get_by_war_tag(war_tag=war_tag)
+        if query:
+            group = cls(data=query,client=self,**kwargs)
+            if isinstance(group,AwaitLoader):
+                await group.load()
+            return group
+        return None
+    
+    async def get_league_war(self,war_tag:str,cls:Type[coc.ClanWar]=None,**kwargs) -> bClanWar:
+        if not cls:
+            cls = bClanWar
+        war = await super().get_league_war(war_tag=war_tag,cls=cls,**kwargs)
+        if war.state == 'notInWar':
+            query = await bClanWar._search_by_tag(war_tag)
+            if query:
+                war = cls(data=query,client=self,**kwargs)
+
+        if isinstance(war,AwaitLoader):
+            await war.load()
+        return war
+    
+    def get_league_wars(self,war_tags: Iterable[str],clan_tag: str = None,cls:Type[coc.ClanWar]=None,**kwargs) -> AsyncIterator[bClanWar]:
+        if not cls:
+            cls = bClanWar
+        return super().get_league_wars(war_tags=war_tags,clan_tag=clan_tag,cls=cls,**kwargs)
     
     ############################################################
     #####

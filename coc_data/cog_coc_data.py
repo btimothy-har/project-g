@@ -13,6 +13,7 @@ from discord.ext import tasks
 from redbot.core import Config, commands
 from redbot.core.bot import Red
 from redbot.core.data_manager import cog_data_path
+from redbot.core.utils import AsyncIter
 
 from coc_main.cog_coc_main import ClashOfClansMain as coc_main
 from coc_main.client.global_client import GlobalClient
@@ -21,13 +22,16 @@ from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.players.player import BasicPlayer, aPlayer
 from coc_main.coc_objects.players.player_activity import aPlayerActivity
 from coc_main.coc_objects.clans.clan import aClan
+from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup
+from coc_main.coc_objects.events.clan_war import aClanWar
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar, bWarLeagueGroup
 
 from coc_main.utils.components import DefaultView, DiscordButton, clash_embed
 from coc_main.utils.constants.ui_emojis import EmojisUI
 
 from .tasks.player_tasks import PlayerTasks
 from .tasks.clan_tasks import ClanTasks
-from .tasks.war_tasks import ClanWarLoop
+from .tasks.war_tasks import DefaultWarTasks
 from .tasks.raid_tasks import ClanRaidLoop
 
 default_global = {
@@ -63,6 +67,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         self.is_global = False
         self.cycle_id = -1
 
+        self._leaderboard_discovery_lock = asyncio.Lock()
         self.player_discovery = None
         self.clan_discovery = None
 
@@ -82,8 +87,14 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         self.clan_loop_status = False
         self.clan_loop_last = None
 
+        #CLAN LOOP
+        self._war_loop_num = 0
+        self._war_loop_tracker = {}        
+        self.war_loop_runtime = []
+        self.war_loop_status = False
+        self.war_loop_last = None
+
         # DATA QUEUE        
-        self._war_loop = ClanWarLoop()
         self._raid_loop = ClanRaidLoop()
 
         self.player_activity_loop = None
@@ -144,24 +155,34 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         
         self.coc_client.player_cls = aPlayer
         self.coc_client.clan_cls = aClan
+        self.coc_client.war_cls = bClanWar
 
-        if self.cycle_id >= 0:
-            self.coc_client._use_discovery = True
+        self.coc_client._use_discovery = True
         
-        self.player_discovery = asyncio.create_task(self._player_discovery_loop())
-        self.clan_discovery = asyncio.create_task(self._clan_discovery_loop())
+        asyncio.create_task(self._player_cache_task())
+        asyncio.create_task(self._clan_cache_task())
 
         self.coc_client.add_events(
             self.player_loop_start,
             self.player_loop_end,
             self.insert_player_activities,
             self.clan_loop_start,
-            self.clan_loop_end
+            self.clan_loop_end,
+            self.war_loop_start,
+            self.war_loop_end
             )
         
         await self.refresh_event_tasks()
         try:
             self.update_player_loop.start()
+        except:
+            pass
+        try:
+            self.update_clan_loop.start()
+        except:
+            pass
+        try:
+            self.leaderboard_discovery.start()
         except:
             pass
         try:
@@ -174,8 +195,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ##################################################
     async def cog_unload(self):
         self.coc_client._use_discovery = False
-        self.player_discovery.cancel()
-        self.clan_discovery.cancel()
+        self.leaderboard_discovery.cancel()
         
         await self.unload_event_tasks()
         try:
@@ -203,12 +223,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ### REFRESH TASKS
     ##################################################
     async def refresh_event_tasks(self):
-        if self.cycle_id == -10:
-            try:
-                self.update_clan_loop.start()
-            except:
-                pass
-            asyncio.create_task(self._war_loop.start())
+        if self.cycle_id == -10:            
             asyncio.create_task(self._raid_loop.start())
         
         elif self.cycle_id >= 0:
@@ -234,12 +249,16 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 PlayerTasks.on_player_update_loot_darkelixir,
                 PlayerTasks.on_player_update_clan_games,
                 ClanTasks.on_clan_member_join_capture,
-                ClanTasks.on_clan_member_leave_capture
+                ClanTasks.on_clan_member_leave_capture,
+                DefaultWarTasks.save_war_on_new_attack,
+                DefaultWarTasks.save_war_on_change,
+                DefaultWarTasks.sync_clan_war_leagues,
+                DefaultWarTasks.sync_war_participants,
+                DefaultWarTasks.check_war_role
                 )
 
     async def unload_event_tasks(self):
         if self.cycle_id == -10:
-            await self._war_loop.stop()
             await self._raid_loop.stop()
         
         elif self.cycle_id >= 0:
@@ -267,14 +286,19 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 PlayerTasks.on_player_update_clan_games,
                 ClanTasks.on_clan_activity,
                 ClanTasks.on_clan_member_join_capture,
-                ClanTasks.on_clan_member_leave_capture
+                ClanTasks.on_clan_member_leave_capture,
+                DefaultWarTasks.save_war_on_new_attack,
+                DefaultWarTasks.save_war_on_change,
+                DefaultWarTasks.sync_clan_war_leagues,
+                DefaultWarTasks.sync_war_participants,
+                DefaultWarTasks.check_war_role
                 )
 
     ############################################################
     #####
-    ##### LOOPS
+    ##### DATA LOOP UPDATES
     #####
-    ############################################################
+    ############################################################            
     @tasks.loop(minutes=10)    
     async def update_player_loop(self):
         async with self._player_loop_lock:
@@ -314,7 +338,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 self.coc_client.add_player_updates(*[p['_id'] async for p in db_query])
     
     @tasks.loop(minutes=10)
-    async def update_clan_loop(self):        
+    async def update_clan_loop(self):
         async with self._clan_loop_lock:
             if self.coc_client.maintenance:
                 return            
@@ -328,87 +352,147 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         ]
                     }
                     
-                db_query = self.database.db__clan.find(query,{'_id':1})
-                self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
+                db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
+                self.coc_client.add_clan_updates(*db_query)
+                self.coc_client.add_war_updates(*db_query)
     
-    async def _player_discovery_loop(self):
-        sleep = 0.1
-        try:
-            while True:
-                try:
-                    await asyncio.sleep(sleep)
-
-                    if self.coc_client.maintenance:
-                        await asyncio.sleep(600)
-                        continue
-
-                    tag = await self.coc_client._player_discovery.get()
-                    try:
-                        player = await self.coc_client.get_player(tag)
-                    except coc.NotFound:
-                        self.coc_client._player_discovery.task_done()
-                        basic_player = await BasicPlayer(tag)
-                        await basic_player._attributes.load_data()
-                        if basic_player.discord_user:
-                            await basic_player.unlink_discord()
-                        if basic_player.is_member:
-                            await basic_player.remove_member()
-                        continue
-                    
-                    except (coc.Maintenance,coc.GatewayError):
-                        await self.coc_client._player_discovery.put(tag)
-                        continue
-                    
-                    self.coc_client._player_discovery.task_done()
-                    await player._sync_cache()
-                    player_season = await player.get_current_season()
-                    await player_season.create_member_snapshot()
-
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    LOG.exception("Error in Player Discovery.")
-                    if not self.coc_client._use_discovery:
-                        break
-                    continue
-        except asyncio.CancelledError:
+    ############################################################
+    #####
+    ##### LEADERBOARD DISCOVERY LOOP
+    #####
+    ############################################################
+    @tasks.loop(minutes=30)    
+    async def leaderboard_discovery(self):
+        return
+    
+        if self._leaderboard_discovery_lock.locked():
             return
         
-    async def _clan_discovery_loop(self):
-        sleep = 0.1
-        try:
-            while True:
-                try:
-                    await asyncio.sleep(sleep)
+        async with self._leaderboard_discovery_lock:
+            if self.coc_client.maintenance:
+                return
+            
+            add_tasks = []            
+            locations = await self.coc_client.search_locations()
+            l_iter = AsyncIter(locations)
 
-                    if self.coc_client.maintenance:
-                        await asyncio.sleep(600)
-                        continue
-
-                    tag = await self.coc_client._clan_discovery.get()
+            if self.cycle_id == 1:            
+                async for location in l_iter:
                     try:
-                        clan = await self.coc_client.get_clan(tag)
-                    except coc.NotFound:
-                        self.coc_client._clan_discovery.task_done()
-                        continue
-                    except (coc.Maintenance,coc.GatewayError):
-                        await self.coc_client._clan_discovery.put(tag)
-                        continue
+                        location_players = await self.coc_client.get_location_players(location.id)
+                    except:
+                        LOG.exception(f"Error in Player Discovery for Location {location.id}.")
+                    else:
+                        add_tasks.extend([self.coc_client._player_discovery.put(p.tag) for p in location_players])
+
+                    try:
+                        builderbase_players = await self.coc_client.get_location_players_builder_base(location.id)
+                    except:
+                        LOG.exception(f"Error in Player Discovery for Location {location.id}.")
+                    else:
+                        add_tasks.extend([self.coc_client._player_discovery.put(p.tag) for p in builderbase_players])
+            
+            if self.cycle_id == 2:
+                async for location in l_iter:
+                    try:
+                        location_clans = await self.coc_client.get_location_clans(location.id)
+                    except:
+                        LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
+                    else:
+                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in location_clans])
                     
-                    self.coc_client._clan_discovery.task_done()
-                    await clan._sync_cache()
-                    save_members = [self.coc_client._player_discovery.put(m.tag) for m in clan.members]
-                    await asyncio.gather(*save_members)
+                    try:
+                        builderbase_clans = await self.coc_client.get_location_clans_builder_base(location.id)
+                    except:
+                        LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
+                    else:
+                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in builderbase_clans])
                     
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    LOG.exception("Error in Clan Discovery.")
-                    if not self.coc_client._use_discovery:
-                        break
-                    continue
-        except asyncio.CancelledError:
-            return
+                    try:
+                        capital_clans = await self.coc_client.get_location_clans_capital(location.id)
+                    except:
+                        LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
+                    else:
+                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in capital_clans])
+            
+            if len(add_tasks) > 0:
+                await asyncio.gather(*add_tasks)                    
+
+    ############################################################
+    #####
+    ##### CACHE REFRESH
+    #####
+    ############################################################    
+    async def _player_cache_task(self):
+        try:
+            if self.coc_client.maintenance:
+                await asyncio.sleep(600)
+                return
+
+            tag = await self.coc_client._player_cache_queue.get()
+
+            try:
+                player = await self.coc_client.get_player(tag)
+
+            except coc.NotFound:
+                self.coc_client._player_cache_queue.task_done()
+
+                basic_player = await BasicPlayer(tag)
+                await basic_player._attributes.load_data()
+
+                if basic_player.discord_user:
+                    await basic_player.unlink_discord()
+
+                if basic_player.is_member:
+                    await basic_player.remove_member()
+            
+            except (coc.Maintenance,coc.GatewayError):
+                await self.coc_client._player_cache_queue.put(tag)
+            
+            else:            
+                self.coc_client._player_cache_queue.task_done()
+                await aPlayer._sync_cache(player)
+                
+                player_season = await player.get_current_season()
+                await player_season.create_member_snapshot()
+
+        except Exception:
+            LOG.exception("Error in Player Discovery.")
+
+        finally:
+            if not self.coc_client._use_discovery:
+                return
+            await self._player_cache_task()
+        
+    async def _clan_cache_task(self):
+        try:
+            if self.coc_client.maintenance:
+                await asyncio.sleep(600)
+                return
+
+            tag = await self.coc_client._clan_cache_queue.get()
+
+            try:
+                clan = await self.coc_client.get_clan(tag)
+            except coc.NotFound:
+                self.coc_client._clan_cache_queue.task_done()
+                
+            except (coc.Maintenance,coc.GatewayError):
+                await self.coc_client._clan_cache_queue.put(tag)
+            
+            self.coc_client._clan_cache_queue.task_done()
+            await aClan._sync_cache(clan)
+
+            save_members = [self.coc_client._clan_cache_queue.put(m.tag) for m in clan.members]
+            await asyncio.gather(*save_members)
+            
+        except Exception:
+            LOG.exception("Error in Clan Discovery.")
+            
+        finally:
+            if not self.coc_client._use_discovery:
+                return
+            await self._clan_cache_task()
     
     ############################################################
     #####
@@ -456,11 +540,12 @@ class ClashOfClansData(commands.Cog,GlobalClient):
         embed.add_field(name="\u200b",value="\u200b",inline=True)
         embed.add_field(
             name="**Clan Wars**",
-            value="Last: " + (f"<t:{getattr(self._war_loop.last_loop,'int_timestamp',0)}:R>" if self._war_loop.last_loop else "None")
+            value="Last: " + (f"<t:{getattr(self.war_loop_last,'int_timestamp',0)}:R>" if self.war_loop_last else "None")
                 + "```ini"                
-                + f"\n{'[Running]':<10} {self._war_loop._running}"
-                + f"\n{'[Tags]':<10} {len(self._war_loop._tags):,}"
-                + f"\n{'[RunTime]':<10} " + (f"{sum(self._war_loop.run_time)/len(self._war_loop.run_time):.2f}" if len(self._war_loop.run_time) > 0 else "0") + "s"
+                + f"\n{'[Running]':<10} {self.war_loop_status}"
+                + f"\n{'[Tags]':<10} {len(self.coc_client._war_updates):,}"
+                + f"\n{'[RunTime]':<10} " + (f"{sum(self.war_loop_runtime)/len(self.war_loop_runtime):.2f}" if len(self.war_loop_runtime) > 0 else "0") + "s"
+                + f"\n{'[Last]':<10} " + (f"{self.war_loop_runtime[-1]:.2f}" if len(self.war_loop_runtime) > 0 else "0") + "s"
                 + "```",
             inline=True
             )
@@ -476,6 +561,35 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             )
         embed.add_field(name="\u200b",value="\u200b",inline=True)
         return embed
+
+    @commands.command(name="convwar")
+    @commands.is_owner()
+    async def cmd_convwar(self,ctx:commands.Context):
+        wars = self.database.db__clan_war.find({})
+        async for war in wars:
+            war = await aClanWar(war['_id'])
+            try:
+                await war._convert()
+                q = await self.database.db__nclan_war.find_one({"_id":war._id})
+                nwar = bClanWar(data=q,client=self.coc_client,clan_tag=q['clan']['tag'])
+                await nwar.load()
+                LOG.info(f"Converted {nwar} {nwar.type}.")
+            except:
+                LOG.exception(f"Error converting {war._id}.")
+        
+        league_groups = self.database.db__war_league_group.find({})
+        async for group in league_groups:
+            league_group = await WarLeagueGroup(group['_id'])
+            try:
+                await league_group._convert()
+                q = await self.database.db__nwar_league_group.find_one({"_id":league_group.id})
+                nleague_group = bWarLeagueGroup(data=q,client=self.coc_client)
+                await nleague_group.load()
+                LOG.info(f"Converted {nleague_group}")
+            except:
+                LOG.exception(f"Error converting {league_group.id}.")
+        
+        await ctx.tick()
     
     @commands.group(name="cocdata")
     @commands.is_owner()
@@ -596,6 +710,21 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.clan_loop_status = False
             self.clan_loop_runtime.append(end.diff(start).in_seconds())
             del self._clan_loop_tracker[iteration_number]
+
+    @coc.ClientEvents.war_loop_start()
+    async def war_loop_start(self,iteration_number:int):
+        self._war_loop_tracker[iteration_number] = pendulum.now()
+        self.war_loop_status = True
+        self._war_loop_num = iteration_number
+
+    @coc.ClientEvents.war_loop_finish()
+    async def war_loop_end(self,iteration_number:int):
+        start = self._war_loop_tracker.get(iteration_number,None)
+        if start:
+            self.war_loop_last = end = pendulum.now()
+            self.war_loop_status = False
+            self.war_loop_runtime.append(end.diff(start).in_seconds())
+            del self._war_loop_tracker[iteration_number]
 
 class RefreshStatus(DefaultView):
     def __init__(self,context:Union[discord.Interaction,commands.Context]):

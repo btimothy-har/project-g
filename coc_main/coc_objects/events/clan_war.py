@@ -117,6 +117,37 @@ class aClanWar(MotorClient,AwaitLoader):
 
             self._is_new = False
     
+    async def _convert(self):
+        await self.load()
+        await self.database.db__nclan_war.update_one(
+            {'_id':self._id},
+            {'$set':self._api_json()},
+            upsert=True
+            )
+    
+    def _api_json(self):
+        json_data = {
+            'type': self.type,
+            'isAllianceWar': self.is_alliance_war,
+            'state': self._state,
+            'teamSize': self.team_size,
+            'attacksPerMember': self.attacks_per_member,
+            'preparationStartTime': self.preparation_start_time.format('YYYYMMDDTHHmmss') + '.000Z',
+            'preparationStartTimeISO': self.preparation_start_time,
+            'startTime': self.start_time.format('YYYYMMDDTHHmmss') + '.000Z',
+            'startTimeISO': self.start_time,
+            'endTime': self.end_time.format('YYYYMMDDTHHmmss') + '.000Z',
+            'endTimeISO': self.end_time,
+            'clan': self.clan_1._api_json(),
+            'opponent': self.clan_2._api_json()
+            }
+
+        if self.type == ClanWarType.CWL:
+            json_data['leagueGroup'] = self._league_group
+            json_data['tag'] = self.war_tag
+        
+        return json_data
+    
     async def load(self):
         if self._loaded_from_db:
             return
@@ -267,7 +298,7 @@ class aClanWar(MotorClient,AwaitLoader):
     
     ##################################################
     ##### CLASS HELPERS
-    ##################################################        
+    ##################################################
     @property
     def league_group_id(self) -> Optional[str]:
         if self._league_group:
@@ -341,6 +372,22 @@ class aWarClan(BasicClan):
 
         self.max_stars = self.war.team_size * self.war.attacks_per_member
         self._result = None
+    
+    def _api_json(self):
+        return {
+            'tag': self.tag,
+            'name': self.name,
+            'badgeUrls': {
+                'small': self.badge,
+                'medium': self.badge,
+                'large': self.badge
+                },
+            'clanLevel': self.level,
+            'attacks': self.attacks_used,
+            'stars': self.stars,
+            'destructionPercentage': self.destruction,
+            'members': [m._api_json() for m in self.members]
+            }
     
     def to_json(self) -> dict:
         return {
@@ -458,6 +505,21 @@ class aWarPlayer(BasicPlayer):
             self.map_position = game_data.map_position
             self.clan_tag = game_data.clan.tag
     
+    def _api_json(self):
+        json_data = {
+            'tag': self.tag,
+            'name': self.name,
+            'townhallLevel': self.town_hall,
+            'mapPosition': self.map_position,
+            'opponentAttacks': len(self.defenses),
+            }
+        if len(self.attacks) > 0:
+            json_data['attacks'] = [att._api_json() for att in self.attacks]
+
+        if self.best_opponent_attack:
+            json_data['bestOpponentAttack'] = self.best_opponent_attack._api_json()
+        return json_data            
+    
     def to_json(self):
         return {
             'tag': self.tag,
@@ -573,6 +635,16 @@ class aWarAttack():
 
         self._new_stars = None
         self._new_destruction = None
+    
+    def _api_json(self):
+        return {
+            'attackerTag': self.attacker_tag,
+            'defenderTag': self.defender_tag,
+            'stars': self.stars,
+            'destructionPercentage': self.destruction,
+            'order': self.order,
+            'duration': self.duration,
+            }
     
     def to_json(self):
         if self.order:

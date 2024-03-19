@@ -132,43 +132,38 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
         description = f"{EmojisClash.CLAN} Level {self.level}\u3000{EmojisCapitalHall.get(self.capital_hall)} CH {self.capital_hall}\u3000{war_league_str}"
         return description
     
-    async def _sync_cache(self,force:bool=False):
-        if force:
-            pass
-        else:
-            if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
+    @classmethod
+    async def _sync_cache(cls,clan:'aClan',force:bool=False):        
+        basic_clan = await BasicClan(clan.tag)
+        await basic_clan._attributes.load_data()
+        
+        if not force:
+            if basic_clan._attributes._last_sync and pendulum.now().int_timestamp - basic_clan._attributes._last_sync.int_timestamp <= 3600:
                 return
         
-        if self._attributes._sync_lock.locked():
-            return
-        
-        async with self._attributes._sync_lock:
-            basic_clan = await BasicClan(self.tag)
-            await basic_clan._attributes.load_data()
-
-            if basic_clan._attributes._last_sync and basic_clan._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
+        async with basic_clan._attributes._sync_lock:
+            if basic_clan._attributes._last_sync and basic_clan._attributes._last_sync.int_timestamp >= clan.timestamp.int_timestamp:
                 return
             
             await basic_clan.update_last_sync(pendulum.now())
-            if self.bot.user.id == 1031240380487831664:
-                #only nebula to handle elders/coleaders
-                tasks = [
-                    basic_clan.clean_elders(),
-                    basic_clan.clean_coleaders(),
-                    ]
-            else:
-                tasks = []
 
-            if basic_clan.name != self.name:
-                tasks.append(basic_clan.set_name(self.name))
-            if basic_clan.badge != self.badge:
-                tasks.append(basic_clan.set_badge(self.badge))
-            if basic_clan.level != self.level:
-                tasks.append(basic_clan.set_level(self.level))
-            if basic_clan.capital_hall != self.capital_hall:
-                tasks.append(basic_clan.set_capital_hall(self.capital_hall))
-            if basic_clan.war_league_name != self.war_league_name:
-                tasks.append(basic_clan.set_war_league(self.war_league_name))            
+            tasks = []
+
+            if basic_clan.name != clan.name:
+                tasks.append(basic_clan.set_name(clan.name))
+
+            if basic_clan.badge != clan.badge:
+                tasks.append(basic_clan.set_badge(clan.badge))
+
+            if basic_clan.level != clan.level:
+                tasks.append(basic_clan.set_level(clan.level))
+
+            if basic_clan.capital_hall != clan.capital_hall:
+                tasks.append(basic_clan.set_capital_hall(clan.capital_hall))
+
+            if basic_clan.war_league_name != clan.war_league_name:
+                tasks.append(basic_clan.set_war_league(clan.war_league_name))            
+
             if tasks:
                 await asyncio.gather(*tasks)
 

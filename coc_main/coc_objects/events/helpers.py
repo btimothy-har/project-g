@@ -3,9 +3,10 @@ import discord
 from typing import *
 from redbot.core import commands 
 
-from .clan_war import aClanWar
-from .clan_war_leagues import WarLeagueGroup
+from .clan_war_v2 import bClanWar, bWarLeagueGroup
 from .war_summary import aClanWarSummary
+
+from ...client.global_client import GlobalClient
 
 from ...utils.components import clash_embed
 from ...utils.constants.coc_constants import WarState
@@ -14,16 +15,15 @@ from ...utils.constants.ui_emojis import EmojisUI
 
 async def clan_war_embed(
     context:Union[commands.Context,discord.Interaction],
-    clan_war:aClanWar):
+    clan_war:bClanWar):
         
-    if clan_war.league_group_id:
-        league_group = WarLeagueGroup(group_id=clan_war.league_group_id)
-        await league_group.load()
+    if clan_war.type == "cwl" and clan_war.war_tag:
+        league_group = await GlobalClient.coc_client.get_league_group_from_league_war(war_tag=clan_war.war_tag)
     
     embed = await clash_embed(
         context=context,
         title=f"\u200E{clan_war.emoji} {clan_war.clan_1.clean_name}\u3000vs\u3000{clan_war.clan_2.clean_name}",
-        message=(f"{EmojisLeagues.get(league_group.league)} {league_group.league} (Round {league_group.get_round_from_war(clan_war)})" if clan_war.league_group_id else "")
+        message=(f"{EmojisLeagues.get(league_group.league)} {league_group.league} (Round {league_group.get_round_from_war(clan_war)})" if league_group else "")
             + f"\n**War State: {WarState.readable_text(clan_war.state)} ({clan_war.team_size} vs {clan_war.team_size})**"
             + (f"\nWar Starts: <t:{clan_war.start_time.int_timestamp}:R>" if clan_war.state == WarState.PREPARATION else "")
             + (f"\nWar Ends: <t:{clan_war.end_time.int_timestamp}:R>" if clan_war.state == WarState.INWAR else "")

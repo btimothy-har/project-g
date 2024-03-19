@@ -417,38 +417,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
          
     ##################################################
     ### PLAYER SEASON STATS
-    ##################################################    
-    async def _sync_cache(self,force:bool=False):
-        if force:
-            pass
-        else:
-            if self._attributes._last_sync and pendulum.now().int_timestamp - self._attributes._last_sync.int_timestamp <= 3600:
-                return
-        
-        async with self._attributes._sync_lock:
-            basic_player = await BasicPlayer(self.tag)
-            await basic_player._attributes.load_data()
-
-            if basic_player._attributes._last_sync and basic_player._attributes._last_sync.int_timestamp >= self.timestamp.int_timestamp:
-                return
-            
-            basic_player._attributes._last_sync = self.timestamp
-
-            if basic_player.is_new:
-                await BasicPlayer.player_first_seen(self.tag)
-            
-            tasks = []
-
-            if basic_player.name != self.name:
-                tasks.append(asyncio.create_task(basic_player.set_name(self.name)))
-            if basic_player.exp_level != self.exp_level:
-                tasks.append(asyncio.create_task(basic_player.set_exp_level(self.exp_level)))
-            if basic_player.town_hall_level != self.town_hall_level:
-                tasks.append(asyncio.create_task(basic_player.set_town_hall_level(self.town_hall_level)))
-            
-            if tasks:
-                await asyncio.gather(*tasks)
-
+    ##################################################
     async def get_current_season(self) -> aPlayerSeason:
         season = aClashSeason.current()
         return await self.get_season_stats(season)
@@ -482,3 +451,35 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def get_pet(self,name:str) -> aPet:
         pet = next((pet for pet in self._pets if pet.name == name),None)
         return aPet(pet,self.town_hall.level) if pet else None
+
+    @classmethod
+    async def _sync_cache(cls,player:'aPlayer',force:bool=False):
+        basic_player = await BasicPlayer(player.tag)
+        await basic_player._attributes.load_data()
+
+        if not force:
+            if basic_player._attributes._last_sync and pendulum.now().int_timestamp - basic_player._attributes._last_sync.int_timestamp <= 3600:
+                return
+        
+        async with basic_player._attributes._sync_lock:
+            if basic_player._attributes._last_sync and basic_player._attributes._last_sync.int_timestamp >= player.timestamp.int_timestamp:
+                return
+            
+            await basic_player._attributes.update_last_sync(player.timestamp)
+
+            if basic_player.is_new:
+                await BasicPlayer.player_first_seen(player.tag)
+            
+            tasks = []
+
+            if basic_player.name != player.name:
+                tasks.append(basic_player.set_name(player.name))
+
+            if basic_player.exp_level != player.exp_level:
+                tasks.append(basic_player.set_exp_level(player.exp_level))
+
+            if basic_player.town_hall_level != player.town_hall_level:
+                tasks.append(basic_player.set_town_hall_level(player.town_hall_level))
+            
+            if tasks:
+                await asyncio.gather(*tasks)

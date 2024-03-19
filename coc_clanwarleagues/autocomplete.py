@@ -6,7 +6,6 @@ from redbot.core import app_commands
 from redbot.core.utils import AsyncIter
 
 from coc_main.client.global_client import GlobalClient
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
 LOG = logging.getLogger("coc.main")
 
@@ -40,7 +39,7 @@ async def autocomplete_season_league_clans(interaction:discord.Interaction,curre
             return []
         season = cog.active_war_league_season
         
-        league_clans = await WarLeagueClan.participating_by_season(season)
+        league_clans = await GlobalClient.coc_client.get_league_clans(season=season,participating=True)
 
         if current:
             clans = [c for c in league_clans 
@@ -68,7 +67,7 @@ async def autocomplete_season_league_participants(interaction:discord.Interactio
             return []
         season = cog.active_war_league_season
 
-        participants = await WarLeaguePlayer.signups_by_season(season)
+        participants = await GlobalClient.coc_client.get_league_players(season=season,registered=True)
 
         if current:
             players = [p for p in participants 

@@ -8,7 +8,6 @@ from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.season.season import aClashSeason
 from coc_main.coc_objects.clans.clan import aClan
 
-from coc_main.coc_objects.events.clan_war import aClanWar
 from coc_main.coc_objects.events.raid_weekend import aRaidWeekend
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.raid_summary import aSummaryRaidStats
@@ -116,7 +115,7 @@ class ClanExcelExport(GlobalClient):
             if stats.is_member and getattr(stats.home_clan,'tag','') != self.clan.tag:
                 continue
 
-            war_log = await aClanWar.for_player(m.tag,season=self.season)
+            war_log = await self.coc_client.get_clan_wars_for_player(m.tag,season=self.season)
             war_stats = aClanWarSummary.for_player(m.tag,war_log)
 
             raid_log = await aRaidWeekend.for_player(m.tag,season=self.season)
@@ -169,8 +168,8 @@ class ClanExcelExport(GlobalClient):
     
     async def war_report(self):
         bold = self.workbook.add_format({'bold': True})
-        
-        clan_wars = await aClanWar.for_clan(clan_tag=self.clan.tag,season=self.season)
+
+        clan_wars = await self.coc_client.get_clan_wars_for_clan(self.clan.tag,season=self.season)
         async for war in AsyncIter(clan_wars):
             war_clan = war.get_clan(self.clan.tag)
             war_opponent = war.get_opponent(self.clan.tag)

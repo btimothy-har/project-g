@@ -7,8 +7,7 @@ from typing import *
 from redbot.core import commands
 from redbot.core.utils import AsyncIter
 
-from coc_main.coc_objects.events.clan_war import aClanWar
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueGroup
+from coc_main.coc_objects.events.clan_war_v2 import bClanWar, bWarLeagueGroup
 from coc_main.coc_objects.events.war_summary import aClanWarSummary
 from coc_main.coc_objects.events.helpers import clan_war_embed
 
@@ -20,7 +19,7 @@ from coc_main.utils.constants.ui_emojis import EmojisUI
 class CWLClanGroupMenu(DefaultView):
     def __init__(self,
         context:Union[commands.Context,discord.Interaction],
-        league_group:WarLeagueGroup):
+        league_group:bWarLeagueGroup):
 
         self.league_group = league_group
         self.clan = None
@@ -32,8 +31,9 @@ class CWLClanGroupMenu(DefaultView):
     ### START / STOP
     ##################################################
     async def start(self):
-        await asyncio.gather(*[clan.compute_lineup_stats() for clan in self.league_group.clans])
         self.is_active = True
+
+        await self.league_group.compute_group_results()
 
         league_group_button = self._button_league_group()
         league_group_button.disabled = True
@@ -105,6 +105,8 @@ class CWLClanGroupMenu(DefaultView):
             self.clan = self.league_group.get_clan(select.values[0])
         self.war = None
 
+        self.league_wars = [war async for war in self.league_group.get_wars_for_clan(self.clan.tag)]
+
         self.clear_items()
         self.add_item(self._button_league_group())
         roster_button = self._button_clan_roster()
@@ -112,7 +114,7 @@ class CWLClanGroupMenu(DefaultView):
         stats_button = self._button_clan_stats()
         self.add_item(stats_button)
         self.add_item(self._dropdown_clan_select())
-        self.add_item(self._dropdown_war_select(self.clan.league_wars))
+        self.add_item(self._dropdown_war_select(self.league_wars))
 
         if not self.clan_nav:
             embed = await self._content_clan_roster()
@@ -150,14 +152,14 @@ class CWLClanGroupMenu(DefaultView):
             item.disabled = True
             
         self.clan_nav = None
-        self.war = self.league_group.get_war(select.values[0])
+        self.war = [w for w in self.league_wars if w._id == select.values[0]][0]
 
         self.clear_items()
         self.add_item(self._button_league_group())
         self.add_item(self._button_clan_roster())
         self.add_item(self._button_clan_stats())
         self.add_item(self._dropdown_clan_select())
-        self.add_item(self._dropdown_war_select(self.clan.league_wars))
+        self.add_item(self._dropdown_war_select(self.league_wars))
 
         #embed = await self.war.war_embed_overview(ctx=self.ctx)
         embed = await clan_war_embed(self.ctx,self.war)
@@ -206,7 +208,7 @@ class CWLClanGroupMenu(DefaultView):
             label=f"Stats: {self.clan.clean_name}",
             style=discord.ButtonStyle.secondary
             )
-    def _dropdown_war_select(self,wars:list[aClanWar]):
+    def _dropdown_war_select(self,wars:list[bClanWar]):
         war_select = [discord.SelectOption(
             label=f"{war.clan_1.clean_name} vs {war.clan_2.clean_name} (Round {self.league_group.get_round_from_war(war)})",
             value=war._id,
@@ -230,23 +232,23 @@ class CWLClanGroupMenu(DefaultView):
 
         content_body = (f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
             + f"\n**Rounds:** {self.league_group.number_of_rounds}"
-            + f"\n**State:** {WarState.readable_text(self.league_group.state)} (Round {self.league_group.current_round})"
+            + f"\n**State:** {self.league_group.state} (Round {self.league_group.current_round})"
             + "\n\u200b"
             )
         embed = await clash_embed(
             context=self.ctx,
             title=f"CWL Group: {self.league_group.season.description}",
             message=content_body,
-            thumbnail=league_emoji.url
+            thumbnail=getattr(league_emoji,'url','')
             )
         
         for lc in self.league_group.clans:
             embed.add_field(
                 name=f"\u200E__**{lc.clean_name} ({lc.tag})**__",
                 value=f"**Level**: {lc.level}"
-                    + f"\n**Players In CWL:** {len(lc.master_roster)}\u3000**Average TH:** {lc.master_average_th}"
+                    + f"\n**Players In CWL:** {len(lc.master_roster)}\u3000**Average TH:** {lc.average_townhall}"
                     + "\n"
-                    + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in lc.master_lineup.items())
+                    + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in lc.lineup.items())
                     + "\n\u200b",
                 inline=False
                 )               
@@ -255,11 +257,11 @@ class CWLClanGroupMenu(DefaultView):
     async def _content_embed_league_table(self):
         emoji_id = re.search(r'\d+',EmojisLeagues.get(self.league_group.league)).group()
         league_emoji = self.bot.get_emoji(int(emoji_id))
-        league_clans = sorted(self.league_group.clans,key=lambda x: (x.total_score,x.total_destruction),reverse=True)
+        league_clans = sorted(self.league_group.clans,key=lambda x: (x.stars,x.destruction),reverse=True)
 
         league_table = f"```{'':^3}{'STARS':>5}{'':^2}{'DESTR %':>7}{'':^20}\n"        
         league_table += '\n'.join([
-            f"\u200E{i:<3}{lc.total_score:>5}{'':^2}{str(lc.total_destruction)+'%':>7}{'':<3}{lc.clean_name[:17]:<17}"
+            f"\u200E{i:<3}{lc.stars:>5}{'':^2}{str(lc.destruction)+'%':>7}{'':<3}{lc.clean_name[:17]:<17}"
             for i,lc in enumerate(league_clans,start=1)
             ])
         league_table += "```"
@@ -274,10 +276,8 @@ class CWLClanGroupMenu(DefaultView):
             thumbnail=league_emoji.url)
         
         for i,rd in enumerate(self.league_group.rounds,start=1):
-            wars = [aClanWar(war) for war in rd]
-
             war_str = ""
-            for war in wars:
+            async for war in self.coc_client.get_league_wars(rd):
                 war_str += f"\u200E`{war.clan_1.clean_name[:10]:>10}\u200E {war.clan_1.stars:>3} {str(round(war.clan_1.destruction))+'%':>4}`{WarResult.WINEMOJI if war.clan_1.result == WarResult.WON else WarResult.LOSEEMOJI if war.clan_1.result == WarResult.LOST else EmojisUI.SPACER}"
                 war_str += f"**vs**"
                 war_str += f"{WarResult.WINEMOJI if war.clan_2.result == WarResult.WON else WarResult.LOSEEMOJI if war.clan_2.result == WarResult.LOST else EmojisUI.SPACER}`{str(round(war.clan_2.destruction))+'%':<4} {war.clan_2.stars:<3} {war.clan_2.clean_name[:10]:<10}`\n"
@@ -298,9 +298,9 @@ class CWLClanGroupMenu(DefaultView):
             title=f"CWL Roster: {self.clan.clean_name} ({self.clan.tag})",
             message=f"**League:** {EmojisLeagues.get(self.league_group.league)} {self.league_group.league}"
                 + f"\n**Players in CWL:** {len(self.clan.master_roster)}"
-                + f"\n**Average TH:** {self.clan.master_average_th}"
+                + f"\n**Average TH:** {self.clan.average_townhall}"
                 + "\n"
-                + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in self.clan.master_lineup.items())
+                + '\u3000'.join(f"{EmojisTownHall.get(th)} {ct}" for th,ct in self.clan.lineup.items())
                 + "\n\n"
                 + f"{EmojisUI.SPACER}`{'':^2}{'BK':>3}{'':^2}{'AQ':>3}{'':^2}{'GW':>3}{'':^2}{'RC':>3}{'':^2}{'':^15}`\n"
                 + '\n'.join([
@@ -317,7 +317,8 @@ class CWLClanGroupMenu(DefaultView):
         return embed
     
     async def _content_clan_stats(self):
-        war_stats = aClanWarSummary.for_clan(self.clan.tag,self.clan.league_wars)
+        league_wars = [w async for w in self.league_group.get_wars_for_clan(self.clan.tag)]
+        war_stats = aClanWarSummary.for_clan(self.clan.tag,league_wars)
 
         embed = await clash_embed(
             context=self.ctx,
@@ -328,15 +329,15 @@ class CWLClanGroupMenu(DefaultView):
                 + f"{EmojisClash.ATTACK} `{war_stats.attack_count:>3}`\u3000"
                 + f"{EmojisClash.UNUSEDATTACK} `{war_stats.unused_attacks:>3}`\u3000"
                 + f"{EmojisClash.THREESTARS} `{war_stats.triples:>3} (" + (f"{str(round((war_stats.triples/war_stats.attack_count)*100))}%" if war_stats.attack_count > 0 else '0%') + f")`\n"
-                + f"{EmojisClash.STAR} `{self.clan.total_score:>4}`\u3000"
-                + f"{EmojisClash.DESTRUCTION} `{str(self.clan.total_destruction)+'%':>7}`"
+                + f"{EmojisClash.STAR} `{self.clan.stars:>4}`\u3000"
+                + f"{EmojisClash.DESTRUCTION} `{str(round(self.clan.destruction,2))+'%':>7}`"
                 + f"\n*Only hit rates with 4 or more attacks are shown below.*\u200b",
             thumbnail=self.clan.badge)
         
-        roster_townhalls = sorted(list(self.clan.master_lineup.keys()),reverse=True)
+        roster_townhalls = sorted(list(self.clan.lineup.keys()),reverse=True)
         
         async for th_level in AsyncIter(roster_townhalls):
-            hitrates = await war_stats.hit_rate_for_th(int(th_level))
+            hitrates = war_stats.hit_rate_for_th(int(th_level))
 
             async for hr in AsyncIter(sorted(list(hitrates.keys()),reverse=True)):
                 if hitrates[hr]['total'] >= 4:
@@ -345,7 +346,7 @@ class CWLClanGroupMenu(DefaultView):
                         name=f"TH{h['attacker']} vs TH{h['defender']}",
                         value=f"{EmojisClash.ATTACK} `{h['total']:^3}`\u3000"
                             + f"{EmojisClash.STAR} `{h['stars']:^3}`\u3000"
-                            + f"{EmojisClash.DESTRUCTION} `{h['destruction']:^5}%`"
+                            + f"{EmojisClash.DESTRUCTION} `{round(h['destruction'],2):^5}%`"
                             + f"\nHit Rate: {h['triples']/h['total']*100:.0f}% ({h['triples']} {EmojisClash.THREESTARS} / {h['total']} {EmojisClash.ATTACK})"
                             + f"\nAverage: {EmojisClash.STAR} {h['stars']/h['total']:.2f}\u3000{EmojisClash.DESTRUCTION} {h['destruction']/h['total']:.2f}%"
                             + "\n\u200b",

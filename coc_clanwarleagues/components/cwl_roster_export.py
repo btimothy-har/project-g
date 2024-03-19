@@ -8,7 +8,6 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.season.season import aClashSeason
-from coc_main.coc_objects.events.clan_war_leagues import WarLeagueClan, WarLeaguePlayer
 
 from coc_main.utils.constants.coc_constants import CWLLeagueGroups
 
@@ -53,12 +52,14 @@ async def generate_cwl_roster_export(season:aClashSeason):
         master.write(row,col,header,bold)
         col += 1
     
-    all_signups = await WarLeaguePlayer.signups_by_season(season=season)
-    participant_players = [p async for p in GlobalClient.coc_client.get_players([m.tag for m in all_signups])]
+    all_signups = await GlobalClient.coc_client.get_league_players(season=season,registered=True)
     
     a_iter = AsyncIter(all_signups)
     async for league_player in a_iter:
-        player = next((p for p in participant_players if p.tag == league_player.tag),None)
+        player = await GlobalClient.coc_client.get_player(league_player.tag)
+
+        if league_player.roster_clan_tag:
+            roster_clan = await GlobalClient.coc_client.get_league_clan(league_player.roster_clan_tag,season=season)
 
         col = 0
         row += 1
@@ -66,8 +67,8 @@ async def generate_cwl_roster_export(season:aClashSeason):
         m_data.append(player.tag)
         m_data.append(player.name)
         m_data.append(f"{player.home_clan.name} ({player.home_clan.tag})" if player.home_clan else "")
-        m_data.append(getattr(GlobalClient.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
-        m_data.append(str(player.discord_user) if player.discord_user else " ")
+        m_data.append(getattr(GlobalClient.bot.get_user(league_player.discord_user),'display_name',' ') if league_player.discord_user else " ")
+        m_data.append(str(league_player.discord_user) if league_player.discord_user else " ")
         m_data.append(player.town_hall.level)
 
         m_data.append(player.hero_strength)
@@ -80,21 +81,16 @@ async def generate_cwl_roster_export(season:aClashSeason):
         m_data.append(f"{round(player.spell_strength_pct)}%")
         
         m_data.append(CWLLeagueGroups.get_description_no_emoji(league_player.league_group))
-        m_data.append(f"{league_player.roster_clan.name} ({league_player.roster_clan.tag})" if league_player.roster_clan else "")
-        m_data.append('Yes' if not getattr(league_player.roster_clan,'roster_open',True) else '')
+        m_data.append(f"{roster_clan.name} ({roster_clan.tag})" if roster_clan else "")
+        m_data.append('Yes' if not getattr(roster_clan,'roster_open',True) else '')
 
         for d in m_data:
             master.write(row,col,d)
             col += 1
-
     
-    participating_clans = await WarLeagueClan.participating_by_season(season=season)
-    a_iter = AsyncIter(participating_clans)
-    async for league_clan in a_iter:
-
-        def filter_roster(player:WarLeaguePlayer):
-            return getattr(player.roster_clan,'tag',None) == league_clan.tag
-        
+    league_clans = await GlobalClient.coc_client.get_league_clans(season=season,participating=True)
+    a_iter = AsyncIter(league_clans)
+    async for league_clan in a_iter:        
         clan_ws = workbook.add_worksheet(league_clan.name)
 
         row = 0
@@ -103,9 +99,9 @@ async def generate_cwl_roster_export(season:aClashSeason):
             clan_ws.write(row,col,header,bold)
             col += 1
 
-        participant_a_iter = AsyncIter(all_signups)
-        async for league_player in participant_a_iter.filter(filter_roster):
-            player = next((p for p in participant_players if p.tag == league_player.tag),None)
+        participant_a_iter = AsyncIter(league_clan.participants)
+        async for league_player in participant_a_iter:
+            player = await GlobalClient.coc_client.get_player(league_player.tag)
 
             col = 0
             row += 1
@@ -127,8 +123,8 @@ async def generate_cwl_roster_export(season:aClashSeason):
             m_data.append(f"{round(player.spell_strength_pct)}%")
 
             m_data.append(CWLLeagueGroups.get_description_no_emoji(league_player.league_group))
-            m_data.append(f"{league_player.roster_clan.name} ({league_player.roster_clan.tag})" if league_player.roster_clan else "")
-            m_data.append('Yes' if not getattr(league_player.roster_clan,'roster_open',True) else '')
+            m_data.append(f"{league_clan.name} ({league_clan.tag})")
+            m_data.append('Yes' if not getattr(league_clan,'roster_open',True) else '')
 
             for d in m_data:
                 clan_ws.write(row,col,d)

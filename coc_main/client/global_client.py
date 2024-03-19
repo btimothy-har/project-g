@@ -12,7 +12,7 @@ from redbot.core import commands, app_commands
 from redbot.core.commands import Context
 from concurrent.futures import ThreadPoolExecutor
 
-from .coc_client import ClashClient
+from .coc_client import ClashClient, bClanWar
 from ..exceptions import ProjectGError
 
 COC_LOG = logging.getLogger("coc.main")
@@ -21,7 +21,6 @@ class GlobalClient():
     coc_client:ClassVar[ClashClient] = None
     database:ClassVar[motor.motor_asyncio.AsyncIOMotorDatabase] = None
     thread_pool:ClassVar[ThreadPoolExecutor] = ThreadPoolExecutor(max_workers=4)
-    task_queue = asyncio.Queue(maxsize=10000)
 
     bot:ClassVar[Red] = None
     _ready = False
@@ -127,3 +126,65 @@ class GlobalClient():
             except:
                 return
         await cls.bot.on_command_error(context,exception,unhandled_by_cog=True)
+    
+    @classmethod
+    async def get_clan_wars_for_player(cls,player_tag:str,**kwargs) -> List['bClanWar']:
+        from_date = kwargs.get('from_date',None)
+        to_date = kwargs.get('to_date',None)
+
+        if from_date and to_date:
+            query_doc = {
+                '$or': [
+                    {'clan.members.tag': player_tag},
+                    {'opponent.members.tag': player_tag}
+                    ],
+                'type': 'random',
+                'preparation_start_time': {
+                    '$gte': from_date.int_timestamp,
+                    '$lte': to_date.int_timestamp
+                    }
+                }
+        else:
+            query_doc = {
+                '$or': [
+                    {'clan.members.tag': player_tag},
+                    {'opponent.members.tag': player_tag}
+                    ],
+                'type': 'random'
+                }        
+        query = cls.database.db__nclan_war.find(query_doc)
+
+        ret_wars = [bClanWar(data=d,client=cls.coc_client,clan_tag=d['clan']['tag']) async for d in query]
+        await asyncio.gather(*[w.load() for w in ret_wars])
+        return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
+
+    @classmethod
+    async def get_clan_wars_for_clan(cls,clan_tag:str,**kwargs) -> List['bClanWar']:
+        from_date = kwargs.get('from_date',None)
+        to_date = kwargs.get('to_date',None)
+
+        if from_date and to_date:
+            query_doc = {
+                '$or': [
+                    {'clan.tag': clan_tag},
+                    {'opponent.tag': clan_tag}
+                    ],
+                'type': 'random',
+                'preparation_start_time': {
+                    '$gte': from_date.int_timestamp,
+                    '$lte': to_date.int_timestamp
+                    }
+                }
+        else:
+            query_doc = {
+                '$or': [
+                    {'clan.tag': clan_tag},
+                    {'opponent.tag': clan_tag}
+                    ],
+                'type': 'random'
+                }        
+        query = cls.database.db__nclan_war.find(query_doc)
+
+        ret_wars = [bClanWar(data=d,client=cls.coc_client,clan_tag=clan_tag) async for d in query]
+        await asyncio.gather(*[w.load() for w in ret_wars])
+        return sorted(ret_wars, key=lambda w:(w.preparation_start_time),reverse=True)
