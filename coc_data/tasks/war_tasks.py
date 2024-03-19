@@ -106,7 +106,7 @@ class DefaultWarTasks():
 
     @coc.WarEvents.war_attack()
     async def save_war_on_new_attack(attack:bWarAttack,war:bClanWar):
-        await war.save_to_database()
+        return
 
     @coc.WarEvents.state_change()
     async def save_war_on_change(war:bClanWar):
