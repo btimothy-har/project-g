@@ -121,8 +121,8 @@ class ClashClient(coc.EventsClient):
         self._links_client = None
 
         self._use_discovery = False
-        self._player_discovery = DiscoveryQueue()
-        self._clan_discovery = DiscoveryQueue()
+        self._player_cache_queue = CacheQueue()
+        self._clan_cache_queue = CacheQueue()
     
         super().__init__(**options)
     
