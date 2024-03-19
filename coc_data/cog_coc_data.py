@@ -345,9 +345,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 current = list(self.coc_client._clan_updates)
                 query = {"_id": {"$nin": current}}
                     
-                db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
-                self.coc_client.add_clan_updates(*db_query)
-                self.coc_client.add_war_updates(*db_query)
+                db_query = self.database.db__clan.find(query,{'_id':1})
+                self.coc_client.add_clan_updates(*[p['_id'] async for p in db_query])
+                self.coc_client.add_war_updates(*[p['_id'] async for p in db_query])
     
     ############################################################
     #####
