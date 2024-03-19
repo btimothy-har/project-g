@@ -145,7 +145,7 @@ class aClan(coc.Clan,BasicClan,AwaitLoader):
             if basic_clan._attributes._last_sync and basic_clan._attributes._last_sync.int_timestamp >= clan.timestamp.int_timestamp:
                 return
             
-            await basic_clan.update_last_sync(pendulum.now())
+            await basic_clan._attributes.update_last_sync(clan.timestamp)
 
             tasks = []
 

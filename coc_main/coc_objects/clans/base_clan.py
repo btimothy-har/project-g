@@ -479,15 +479,6 @@ class BasicClan(AwaitLoader):
                 },
                 upsert=True)
             DATA_LOG.info(f"{self}: recruitment info changed to {self.recruitment_info}.")
-    
-    async def update_last_sync(self,timestamp:pendulum.DateTime):
-        async with self._attributes._lock:
-            self._attributes._last_sync = timestamp
-            await self.database.db__clan.update_one(
-                {'_id':self.tag},
-                {'$set':{'last_sync':timestamp.int_timestamp}},
-                upsert=True
-                )
 
 class _ClanAttributes(MotorClient):
     """
@@ -601,3 +592,13 @@ class _ClanAttributes(MotorClient):
         self.is_active_league_clan = league_db.get('is_active',False) if league_db else False
         
         self._loaded = True
+    
+    async def update_last_sync(self,timestamp:pendulum.DateTime):
+        async with self._lock:
+            self._last_sync = timestamp
+            await self.database.db__clan.update_one(
+                {'_id':self.tag},
+                {'$set':{'last_sync':timestamp.int_timestamp}},
+                upsert=True
+                )
+            DATA_LOG.debug(f"{self}: last_sync changed to {self._last_sync}.")

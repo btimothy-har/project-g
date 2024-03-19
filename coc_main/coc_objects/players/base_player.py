@@ -446,11 +446,11 @@ class _PlayerAttributes(MotorClient):
         return database_entry
     
     async def update_last_sync(self,timestamp:pendulum.DateTime):
-        async with self._attributes._lock:
-            self._attributes._last_sync = timestamp
+        async with self._lock:
+            self._last_sync = timestamp
             await self.database.db__player.update_one(
                 {'_id':self.tag},
                 {'$set':{'last_sync':timestamp.int_timestamp}},
                 upsert=True
                 )
-            DATA_LOG.debug(f"{self}: last_sync changed to {self._attributes._last_sync}.")
+            DATA_LOG.debug(f"{self}: last_sync changed to {self._last_sync}.")
