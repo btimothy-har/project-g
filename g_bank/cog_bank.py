@@ -3113,17 +3113,18 @@ class Bank(commands.Cog,GlobalClient):
             except Exception:
                 LOG.exception(f"Clan War Ended Rewards: {player.tag}")
         
-        tasks = []
-        
-        if war.clan_1.is_alliance_clan and war.type == ClanWarType.RANDOM:
-            a_iter = AsyncIter(war.clan_1.members)            
-            tasks.extend([war_bank_rewards(player) async for player in a_iter])
-        
-        if war.clan_2.is_alliance_clan and war.type == ClanWarType.RANDOM:
-            a_iter = AsyncIter(war.clan_2.members)            
-            tasks.extend([war_bank_rewards(player) async for player in a_iter])
-        
-        await bounded_gather(*tasks,semaphore=self._reward_semaphore)    
+        if war.state in ['warEnded']:
+            tasks = []
+            
+            if war.clan_1.is_alliance_clan and war.type == ClanWarType.RANDOM:
+                a_iter = AsyncIter(war.clan_1.members)            
+                tasks.extend([war_bank_rewards(player) async for player in a_iter])
+            
+            if war.clan_2.is_alliance_clan and war.type == ClanWarType.RANDOM:
+                a_iter = AsyncIter(war.clan_2.members)            
+                tasks.extend([war_bank_rewards(player) async for player in a_iter])
+            
+            await bounded_gather(*tasks,semaphore=self._reward_semaphore)    
     
     ############################################################
     #####
