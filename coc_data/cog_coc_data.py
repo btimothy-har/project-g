@@ -474,16 +474,18 @@ class ClashOfClansData(commands.Cog,GlobalClient):
 
             try:
                 clan = await self.coc_client.get_clan(tag)
+
             except coc.NotFound:
                 self.coc_client._clan_cache_queue.task_done()
                 
             except (coc.Maintenance,coc.GatewayError):
                 await self.coc_client._clan_cache_queue.put(tag)
             
-            self.coc_client._clan_cache_queue.task_done()
-            await aClan._sync_cache(clan)
+            else:            
+                self.coc_client._clan_cache_queue.task_done()
+                await aClan._sync_cache(clan)
 
-            save_members = [self.coc_client._clan_cache_queue.put(m.tag) for m in clan.members]
+            save_members = [self.coc_client._player_cache_queue.put(m.tag) for m in clan.members]
             await asyncio.gather(*save_members)
             
         except Exception:
