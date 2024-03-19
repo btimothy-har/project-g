@@ -470,8 +470,8 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     else:
                         add_tasks.extend([self.coc_client._clan_cache_queue.put(c.tag) for c in capital_clans])
             
-            if len(add_tasks) > 0:
-                await asyncio.gather(*add_tasks)
+                if len(add_tasks) > 0:
+                    await asyncio.gather(*add_tasks)
 
     ############################################################
     #####
