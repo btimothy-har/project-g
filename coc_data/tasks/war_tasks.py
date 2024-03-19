@@ -122,17 +122,13 @@ class DefaultWarTasks():
                 await league_group.save_to_database()
 
                 for clan in league_group.clans:
-                    get_clan = await GlobalClient.coc_client.get_clan(clan.tag)
-
-                    all_war_participants = GlobalClient.coc_client.get_players([m.tag for m in get_clan.members])
-                    async for member in all_war_participants:
-                        continue
+                    await GlobalClient.coc_client._clan_cache_queue.put(clan.tag)
     
     @coc.WarEvents.new_war()
     async def sync_war_participants(war:bClanWar):
         all_war_participants = GlobalClient.coc_client.get_players([m.tag for m in war.members])
         async for member in all_war_participants:
-            continue
+            await GlobalClient.coc_client._player_cache_queue.put(member.tag)
     
     @coc.WarEvents.new_war()
     async def check_war_role(war:bClanWar):

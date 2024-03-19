@@ -24,9 +24,9 @@ class ClanTasks():
     @coc.ClanEvents.member_join()
     async def on_clan_member_join_capture(member:coc.ClanMember,clan:aClan):
         if GlobalClient.coc_client._use_discovery:
-            await GlobalClient.coc_client._player_discovery.put(member.tag)
+            await GlobalClient.coc_client._player_cache_queue.put(member.tag)
 
     @coc.ClanEvents.member_leave()
     async def on_clan_member_leave_capture(member:coc.ClanMember,clan:aClan):
         if GlobalClient.coc_client._use_discovery:
-            await GlobalClient.coc_client._player_discovery.put(member.tag)
+            await GlobalClient.coc_client._player_cache_queue.put(member.tag)

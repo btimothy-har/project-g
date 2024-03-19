@@ -62,6 +62,7 @@ class CacheQueue(asyncio.Queue):
     async def put(self,item):
         if item in self.item_set:
             return
+        self.item_set.add(item)
         await super().put(item)        
     
     async def get(self):
