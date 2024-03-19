@@ -1164,11 +1164,11 @@ class Events(commands.Cog,GlobalClient):
                 )
             return await interaction.followup.send(embed=embed)
         
-        await interaction.edit_original_response("Exporting Event Participants... please wait.")
+        await interaction.edit_original_response(content="Exporting Event Participants... please wait.")
         rp_file = await generate_event_export(get_event)
 
         if not rp_file:
-            await interaction.edit_original_response("Error exporting Event Participants.")
+            await interaction.edit_original_response(content="Error exporting Event Participants.")
         
         await interaction.edit_original_response(
             content="Event Participants for {get_event.name} exported.",
