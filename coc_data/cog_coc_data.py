@@ -353,10 +353,47 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             
             if self.cycle_id == 1:
                 current = list(self.coc_client._clan_updates)
-                query = {"_id": {"$nin": current}}
-                    
+                   
+                clans = []
+                try:
+                    registered_clans = await self.coc_client.get_registered_clans()
+                except:
+                    pass
+                else:
+                    clans.extend([c.tag for c in registered_clans])
+                                
+                try:
+                    war_league_clans = await self.coc_client.get_war_league_clans()
+                except:
+                    pass
+                else:
+                    clans.extend([c.tag for c in war_league_clans])
+
+                current_clan = list(self.coc_client._clan_updates)
+                current_war = list(self.coc_client._war_updates)
+
+                query = {"_id": {"$in": current,"$in":clans}}
+                db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
+                for p in db_query:
+                    if p['_id'] in current_clan:
+                        self.coc_client.remove_clan_updates(p['_id'])
+                    if p['_id'] in current_war:
+                        self.coc_client.remove_war_updates(p['_id'])
+
+                    await self.database.db__clan.update_one(
+                        {"_id": p['_id']},
+                        {"$unset": {"_cycle_id": 1}}
+                        )
+            
+            if self.cycle_id in [0,1]:
+                current_clan = list(self.coc_client._clan_updates)
+                query = {"_id": {"$nin": current}}                    
                 db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
                 self.coc_client.add_clan_updates(*[p['_id'] for p in db_query])
+
+                current_war = list(self.coc_client._war_updates)
+                query = {"_id": {"$nin": current}}
+                db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
                 self.coc_client.add_war_updates(*[p['_id'] for p in db_query])
     
     ############################################################
@@ -373,11 +410,11 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             if self.coc_client.maintenance:
                 return
             
-            add_tasks = []            
-            locations = await self.coc_client.search_locations()
-            l_iter = AsyncIter(locations)
-
-            if self.cycle_id == 1:            
+            if self.cycle_id == 0:
+                add_tasks = []            
+                locations = await self.coc_client.search_locations()
+                l_iter = AsyncIter(locations)
+            
                 async for location in l_iter:
                     try:
                         location_players = await self.coc_client.get_location_players(location.id)

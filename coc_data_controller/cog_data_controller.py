@@ -121,13 +121,13 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
         async with self.control_lock:
             await self.cleanup_cycle()
 
-            cycles = [0,1,2]
+            cycles = [0,1]
             c_iter = AsyncIter(cycles)
             async for cycle_num in c_iter:
                 await self.assign_to_cycle(cycle_num)
 
     async def assign_to_cycle(self,cycle_num:int):
-        # 0 = Registered Players
+        # 0 = Registered Players & Clans
         if cycle_num == 0:
             query = {
                 "$and": [
@@ -142,15 +142,56 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
                         ]}
                     ]
                 }
-        # 1 = All other Players
+            count = 0
+            find_players = self.database.db__player.find(query).limit(1000)
+            async for player in find_players:
+                await self.database.db__player.update_one(
+                    {"_id": player['_id']},
+                    {"$set": {"_cycle_id": cycle_num}}
+                    )
+                count += 1
+            if count > 0:
+                LOG.info(f"Assigned {count} Players to Cycle {cycle_num}.")
+
+            count = 0                    
+            clans = []
+            try:
+                clans.extend([c.tag for c in await self.coc_client.get_registered_clans()])
+            except:
+                pass
+            try:
+                clans.extend([c.tag for c in await self.coc_client.get_war_league_clans()])
+            except:
+                pass
+            query = {
+                "$and": [
+                    {"$or": [
+                        {"_cycle_id": {"$exists": False}},
+                        {"_cycle_id": {"$lt": 0}}
+                        ]
+                    },
+                    {"_id": {"$in": clans}}
+                    ]
+                }
+
+            find_clans = self.database.db__clan.find(query).limit(1000)
+            async for clan in find_clans:
+                await self.database.db__clan.update_one(
+                    {"_id": clan['_id']},
+                    {"$set": {"_cycle_id": cycle_num}}
+                    )
+                count += 1
+            if count > 0:
+                LOG.info(f"Assigned {count} Clans to Cycle {cycle_num}.")
+
+        # 1 = All other Players / Clans
         elif cycle_num == 1:
             query = {
                 "$or": [
                     {"_cycle_id": {"$exists": False}},
                     {"_cycle_id": {"$lt": 0}}
                     ]
-                }
-        
+                }        
             count = 0
             find_players = self.database.db__player.find(query).limit(1000)
             async for player in find_players:
@@ -162,15 +203,12 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             if count > 0:
                 LOG.info(f"Assigned {count} Players to Cycle {cycle_num}.")
         
-        # 2 = All Clans
-        elif cycle_num == 2:
             query = {
                 "$or": [
                     {"_cycle_id": {"$exists": False}},
                     {"_cycle_id": {"$lt": 0}}
                     ]
-                }
-        
+                }        
             count = 0
             find_clans = self.database.db__clan.find(query).limit(1000)
             async for clan in find_clans:
@@ -193,5 +231,12 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
         async for player in find_players:
             await self.database.db__player.update_one(
                 {"_id": player['_id']},
+                {"$unset": {"_cycle_id": 1}}
+                )
+        
+        find_clans = self.database.db__clan.find(query).limit(1000)
+        async for clan in find_clans:
+            await self.database.db__clan.update_one(
+                {"_id": clan['_id']},
                 {"$unset": {"_cycle_id": 1}}
                 )
