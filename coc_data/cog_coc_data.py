@@ -185,10 +185,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             self.leaderboard_discovery.start()
         except:
             pass
-        try:
-            self.update_clan_loop.start()
-        except:
-            pass
 
     ##################################################
     ### COG UNLOAD
@@ -347,12 +343,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             
             if self.cycle_id == 1:
                 current = list(self.coc_client._clan_updates)
-                query = {
-                    "$and": [
-                        {"_id": {"$nin": current}},
-                        {"_cycle_id": 2}
-                        ]
-                    }
+                query = {"_id": {"$nin": current}}
                     
                 db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
                 self.coc_client.add_clan_updates(*db_query)
