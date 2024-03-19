@@ -315,9 +315,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             
             if self.cycle_id == 1:
                 query = {
-                    {"_cycle_id": self.cycle_id},
-                    {"discord_user": {"$exists":True,"$gt":0}},
-                    {"is_member": True}
+                    "_cycle_id": self.cycle_id,
+                    "discord_user": {"$exists":True,"$gt":0},
+                    "is_member": True
                     }
                 
                 db_query = self.database.db__player.find(query,{'_id':1})
