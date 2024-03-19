@@ -345,12 +345,12 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             if self.coc_client.maintenance:
                 return            
             
-            if self.cycle_id == 2:
+            if self.cycle_id == 1:
                 current = list(self.coc_client._clan_updates)
                 query = {
                     "$and": [
                         {"_id": {"$nin": current}},
-                        {"_cycle_id": self.cycle_id}
+                        {"_cycle_id": 2}
                         ]
                     }
                     
@@ -364,9 +364,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     #####
     ############################################################
     @tasks.loop(minutes=30)    
-    async def leaderboard_discovery(self):
-        return
-    
+    async def leaderboard_discovery(self):    
         if self._leaderboard_discovery_lock.locked():
             return
         
@@ -385,37 +383,35 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     except:
                         LOG.exception(f"Error in Player Discovery for Location {location.id}.")
                     else:
-                        add_tasks.extend([self.coc_client._player_discovery.put(p.tag) for p in location_players])
+                        add_tasks.extend([self.coc_client._player_cache_queue.put(p.tag) for p in location_players])
 
                     try:
                         builderbase_players = await self.coc_client.get_location_players_builder_base(location.id)
                     except:
                         LOG.exception(f"Error in Player Discovery for Location {location.id}.")
                     else:
-                        add_tasks.extend([self.coc_client._player_discovery.put(p.tag) for p in builderbase_players])
+                        add_tasks.extend([self.coc_client._player_cache_queue.put(p.tag) for p in builderbase_players])
             
-            if self.cycle_id == 2:
-                async for location in l_iter:
                     try:
                         location_clans = await self.coc_client.get_location_clans(location.id)
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
-                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in location_clans])
+                        add_tasks.extend([self.coc_client._clan_cache_queue.put(c.tag) for c in location_clans])
                     
                     try:
                         builderbase_clans = await self.coc_client.get_location_clans_builder_base(location.id)
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
-                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in builderbase_clans])
+                        add_tasks.extend([self.coc_client._clan_cache_queue.put(c.tag) for c in builderbase_clans])
                     
                     try:
                         capital_clans = await self.coc_client.get_location_clans_capital(location.id)
                     except:
                         LOG.exception(f"Error in Clan Discovery for Location {location.id}.")
                     else:
-                        add_tasks.extend([self.coc_client._clan_discovery.put(c.tag) for c in capital_clans])
+                        add_tasks.extend([self.coc_client._clan_cache_queue.put(c.tag) for c in capital_clans])
             
             if len(add_tasks) > 0:
                 await asyncio.gather(*add_tasks)                    

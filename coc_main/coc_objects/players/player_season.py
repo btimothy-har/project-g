@@ -161,7 +161,6 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         ]
     
     def __init__(self,tag:str,season:aClashSeason):
-
         self._activity_count = 0
 
         self.tag = tag
