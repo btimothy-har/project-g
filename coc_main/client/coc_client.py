@@ -233,7 +233,7 @@ class ClashClient(coc.EventsClient):
             await player.load()
         
         if self._use_discovery:
-            await self._player_discovery.put(player.tag)
+            await self._player_cache_queue.put(player.tag)
         return player
 
     async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[coc.Player]:
@@ -276,7 +276,7 @@ class ClashClient(coc.EventsClient):
             await clan.load()
         
         if self._use_discovery:
-            await self._clan_discovery.put(clan.tag)
+            await self._clan_cache_queue.put(clan.tag)
         return clan
 
     async def from_clan_abbreviation(self,abbreviation:str) -> aClan:
