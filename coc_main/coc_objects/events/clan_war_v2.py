@@ -38,6 +38,7 @@ class bClanWar(coc.ClanWar,MotorClient,AwaitLoader):
         if season:
             query_doc = {
                 '$and': [
+                    {'type': ClanWarType.RANDOM},
                     {'preparationStartTimeISO': {
                         '$gte': season.season_start,
                         '$lte': season.season_end
@@ -52,11 +53,15 @@ class bClanWar(coc.ClanWar,MotorClient,AwaitLoader):
             }
         else:
             query_doc = {
-                '$or': [
-                    {'clan.members.tag': player_tag},
-                    {'opponent.members.tag': player_tag}
-                    ]
-                }
+                '$and': [
+                    {'type': ClanWarType.RANDOM},
+                    {'$or': [
+                        {'clan.members.tag': player_tag},
+                        {'opponent.members.tag': player_tag}
+                        ]
+                    }
+                ]
+            }
         query = await MotorClient.database.db__nclan_war.find(query_doc).to_list(None)
         return query
     
@@ -65,6 +70,7 @@ class bClanWar(coc.ClanWar,MotorClient,AwaitLoader):
         if season:
             query_doc = {
                 '$and': [
+                    {'type': ClanWarType.RANDOM},
                     {'preparationStartTimeISO': {
                         '$gte': season.season_start,
                         '$lte': season.season_end
@@ -79,11 +85,15 @@ class bClanWar(coc.ClanWar,MotorClient,AwaitLoader):
             }
         else:
             query_doc = {
-                '$or': [
-                    {'clan.tag': clan_tag},
+                '$and': [
+                    {'type': ClanWarType.RANDOM},
+                    {'$or': [
+                        {'clan.tag': clan_tag},
                     {'opponent.tag': clan_tag}
-                    ]
-                }
+                        ]
+                    }
+                ]
+            }
         query = await MotorClient.database.db__nclan_war.find(query_doc).to_list(None)
         return query
        
