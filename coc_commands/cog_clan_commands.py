@@ -804,7 +804,7 @@ class Clans(commands.Cog,GlobalClient):
             return await message.edit(content=None,embed=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
-            await clan._sync_cache()
+            await aClan._sync_cache(clan,force=True)
 
             await ClanGuildLink.link_member_role(clan_tag=clan.tag,guild=ctx.guild,member_role=member_role)
             await ClanGuildLink.link_elder_role(clan_tag=clan.tag,guild=ctx.guild,elder_role=elder_role)
@@ -880,7 +880,7 @@ class Clans(commands.Cog,GlobalClient):
             return await interaction.edit_original_response(content=None,embeds=[embed,cancel_embed],view=None)
 
         if confirm_view.confirmation:
-            await select_clan._sync_cache()
+            await aClan._sync_cache(select_clan,force=True)
 
             if member_role:
                 await ClanGuildLink.link_member_role(clan_tag=select_clan.tag,guild=interaction.guild,member_role=member_role)

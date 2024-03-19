@@ -240,7 +240,7 @@ class NewMemberMenu(DefaultView):
         await self._finish_add()
 
     async def _select_home_clan(self,account:aPlayer):
-        await account._sync_cache()
+        await aPlayer._sync_cache(account,force=True)
         linked_clans = await ClanGuildLink.get_for_guild(self.guild.id)
         guild_clans = [a async for a in self.coc_client.get_clans([c.tag for c in linked_clans]) if a.is_alliance_clan]
 
