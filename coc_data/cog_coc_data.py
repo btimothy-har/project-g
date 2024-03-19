@@ -387,12 +387,22 @@ class ClashOfClansData(commands.Cog,GlobalClient):
             
             if self.cycle_id in [0,1]:
                 current_clan = list(self.coc_client._clan_updates)
-                query = {"_id": {"$nin": current_clan}}                    
+                query = {
+                    "$and": [
+                        {"_id": {"$nin": current_clan}},
+                        {"_cycle_id": self.cycle_id}
+                        ]
+                    }
                 db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
                 self.coc_client.add_clan_updates(*[p['_id'] for p in db_query])
 
                 current_war = list(self.coc_client._war_updates)
-                query = {"_id": {"$nin": current_war}}
+                query = {
+                    "$and": [
+                        {"_id": {"$nin": current_war}},
+                        {"_cycle_id": self.cycle_id}
+                        ]
+                    }
                 db_query = await self.database.db__clan.find(query,{'_id':1}).to_list(length=None)
                 self.coc_client.add_war_updates(*[p['_id'] for p in db_query])
     

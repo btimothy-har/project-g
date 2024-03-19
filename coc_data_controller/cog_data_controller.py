@@ -156,13 +156,18 @@ class ClashOfClansDataController(commands.Cog,GlobalClient):
             count = 0                    
             clans = []
             try:
-                clans.extend([c.tag for c in await self.coc_client.get_registered_clans()])
+                registered_clans = await self.coc_client.get_registered_clans()
             except:
                 pass
+            else:
+                clans.extend([c.tag for c in registered_clans])
+                            
             try:
-                clans.extend([c.tag for c in await self.coc_client.get_war_league_clans()])
+                war_league_clans = await self.coc_client.get_war_league_clans()
             except:
                 pass
+            else:
+                clans.extend([c.tag for c in war_league_clans])
             query = {
                 "$and": [
                     {"$or": [
