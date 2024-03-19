@@ -26,6 +26,84 @@ LOG = logging.getLogger("coc.data")
 ############################################################
 class DefaultWarTasks():
 
+    @coc.WarEvents.state_change()
+    async def war_start_status_update(war:bClanWar):
+        try:
+            if war.state == 'inWar':
+                if war.clan_1.is_alliance_clan and len(war.clan_1.abbreviation) > 0:
+                    await GlobalClient.update_bot_status(
+                        cooldown=60,
+                        text=f"{war.clan_1.abbreviation} declare war!"
+                        )
+                
+                if war.clan_2.is_alliance_clan and len(war.clan_2.abbreviation) > 0:
+                    await GlobalClient.update_bot_status(
+                        cooldown=60,
+                        text=f"{war.clan_2.abbreviation} declare war!"
+                        )
+        except:
+            LOG.exception(f"Error in War Start Status Update task.")
+    
+    @coc.WarEvents.state_change()
+    async def war_end_status_update(war:bClanWar):
+        try:
+            if war.state == 'warEnded':
+                await asyncio.sleep(180)
+
+                async def _update_bot_status(clan):
+                    new_clan = await GlobalClient.coc_client.get_clan(clan.tag)
+
+                    if war.type == ClanWarType.RANDOM:
+                        if new_clan.war_win_streak >= 3:
+                            await GlobalClient.update_bot_status(
+                                cooldown=60,
+                                text=f"{new_clan.abbreviation} on a {new_clan.war_win_streak} streak!"
+                                )
+                        else:
+                            await GlobalClient.update_bot_status(
+                                cooldown=60,
+                                text=f"{new_clan.abbreviation} with {new_clan.war_wins} War Wins."
+                                )
+                            
+                    elif war.type == ClanWarType.CWL:
+                        await GlobalClient.update_bot_status(
+                            cooldown=60,
+                            text=f"{new_clan.abbreviation} crushing CWL!"
+                            )
+                
+                if war.clan_1.is_alliance_clan and len(war.clan_1.abbreviation) > 0:
+                    await _update_bot_status(war.clan_1)
+
+                if war.clan_2.is_alliance_clan and len(war.clan_2.abbreviation) > 0:
+                    await _update_bot_status(war.clan_2)
+        except:
+            LOG.exception(f"Error in War End Status Update task.")
+    
+    @coc.WarEvents.war_attack()
+    async def ongoing_war_status_update(attack:bWarAttack,war:bClanWar):
+        try:
+            if war.state not in ['inWar']:
+                return
+            
+            time_remaining = war.end_time.int_timestamp - pendulum.now().int_timestamp
+            if time_remaining > 3600:
+
+                if war.clan_1.is_alliance_clan and len(war.clan_1.abbreviation) > 0:
+                    if war.clan_1.attacks_used > 0 and war.clan_1.result == WarResult.WINNING:
+                        await GlobalClient.update_bot_status(
+                            cooldown=360,
+                            text=f"{war.clan_1.abbreviation} {WarResult.ongoing(war.clan_1.result)} in war!"
+                            )
+                
+                if war.clan_2.is_alliance_clan and len(war.clan_2.abbreviation) > 0:
+                    if war.clan_2.attacks_used > 0 and war.clan_2.result == WarResult.WINNING:
+                        await GlobalClient.update_bot_status(
+                            cooldown=360,
+                            text=f"{war.clan_2.abbreviation} {WarResult.ongoing(war.clan_2.result)} in war!"
+                            )
+        except Exception:
+            LOG.exception(f"Error in Ongoing War task.")
+
     @coc.WarEvents.war_attack()
     async def save_war_on_new_attack(attack:bWarAttack,war:bClanWar):
         await war.save_to_database()
@@ -45,17 +123,16 @@ class DefaultWarTasks():
 
                 for clan in league_group.clans:
                     get_clan = await GlobalClient.coc_client.get_clan(clan.tag)
-                    await get_clan._sync_cache(force=True)
 
-                    all_war_participants = GlobalClient.coc_client.get_players([m.tag for m in clan.members])
+                    all_war_participants = GlobalClient.coc_client.get_players([m.tag for m in get_clan.members])
                     async for member in all_war_participants:
-                        await member._sync_cache(force=True)
+                        continue
     
     @coc.WarEvents.new_war()
     async def sync_war_participants(war:bClanWar):
         all_war_participants = GlobalClient.coc_client.get_players([m.tag for m in war.members])
         async for member in all_war_participants:
-            await member._sync_cache(force=True)
+            continue
     
     @coc.WarEvents.new_war()
     async def check_war_role(war:bClanWar):

@@ -118,7 +118,11 @@ class bClanWar(coc.ClanWar,MotorClient,AwaitLoader):
         return self._id
     
     async def load(self):        
-        await asyncio.gather(*[self.clan_1.load(),self.clan_2.load()])        
+        if self.state not in ['notInWar']:
+            await asyncio.gather(*[self.clan_1.load(),self.clan_2.load()])
+            if self.state not in ['warEnded']:
+                if not self.is_alliance_war:
+                    self.is_alliance_war = self.clan_1.is_alliance_clan or self.clan_2.is_alliance_clan
     
     @property
     def _id(self) -> Optional[str]:

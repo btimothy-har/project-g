@@ -221,7 +221,13 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ### REFRESH TASKS
     ##################################################
     async def refresh_event_tasks(self):
-        if self.cycle_id == -10:            
+        if self.cycle_id == -10:
+            self.coc_client.add_events(
+                DefaultWarTasks.check_war_role,
+                DefaultWarTasks.war_start_status_update,
+                DefaultWarTasks.war_end_status_update,
+                DefaultWarTasks.ongoing_war_status_update
+                )
             asyncio.create_task(self._raid_loop.start())
         
         elif self.cycle_id >= 0:
@@ -251,12 +257,17 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 DefaultWarTasks.save_war_on_new_attack,
                 DefaultWarTasks.save_war_on_change,
                 DefaultWarTasks.sync_clan_war_leagues,
-                DefaultWarTasks.sync_war_participants,
-                DefaultWarTasks.check_war_role
+                DefaultWarTasks.sync_war_participants
                 )
 
     async def unload_event_tasks(self):
         if self.cycle_id == -10:
+            self.coc_client.remove_events(
+                DefaultWarTasks.check_war_role,
+                DefaultWarTasks.war_start_status_update,
+                DefaultWarTasks.war_end_status_update,
+                DefaultWarTasks.ongoing_war_status_update
+                )
             await self._raid_loop.stop()
         
         elif self.cycle_id >= 0:
@@ -288,8 +299,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 DefaultWarTasks.save_war_on_new_attack,
                 DefaultWarTasks.save_war_on_change,
                 DefaultWarTasks.sync_clan_war_leagues,
-                DefaultWarTasks.sync_war_participants,
-                DefaultWarTasks.check_war_role
+                DefaultWarTasks.sync_war_participants
                 )
 
     ############################################################
