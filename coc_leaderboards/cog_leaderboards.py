@@ -343,7 +343,7 @@ class Leaderboards(commands.Cog,GlobalClient):
     ##### LOOP: UPDATE LEADERBOARDS
     #####
     ############################################################    
-    @tasks.loop(minutes=15.0)
+    @tasks.loop(minutes=10.0)
     async def update_leaderboards(self):
         if self.leaderboard_lock.locked():
             return
