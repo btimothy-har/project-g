@@ -17,6 +17,7 @@ async def clan_war_embed(
     context:Union[commands.Context,discord.Interaction],
     clan_war:bClanWar):
         
+    league_group = None
     if clan_war.type == "cwl" and clan_war.war_tag:
         league_group = await GlobalClient.coc_client.get_league_group_from_league_war(war_tag=clan_war.war_tag)
     
