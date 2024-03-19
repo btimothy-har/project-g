@@ -314,26 +314,25 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 return
             
             if self.cycle_id == 1:
-                current = list(self.coc_client._player_updates)            
                 query = {
-                    "$and": [
-                        {"_id": {"$in": current}},
-                        {"$or": [
-                            {"discord_user": {"$exists":True,"$gt":0}},
-                            {"is_member": True}
-                            ]}
-                        ]
+                    {"_cycle_id": self.cycle_id},
+                    {"discord_user": {"$exists":True,"$gt":0}},
+                    {"is_member": True}
                     }
+                
                 db_query = self.database.db__player.find(query,{'_id':1})
                 async for p in db_query:
-                    if p['_id'] in current:
-                        self.coc_client.remove_player_updates(p['_id'])
                     await self.database.db__player.update_one(
                         {"_id": p['_id']},
                         {"$unset": {"_cycle_id": 1}}
                         )
                 
-            if self.cycle_id in [0,1]:
+                query = {"_cycle_id": self.cycle_id}
+                db_query = self.database.db__player.find(query,{'_id':1})
+                async for p in db_query:
+                    await self.coc_client._player_cache_queue.put(p['_id'])
+                
+            if self.cycle_id in [0]:
                 current = list(self.coc_client._player_updates)
                 query = {
                     "$and": [
@@ -472,7 +471,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                         add_tasks.extend([self.coc_client._clan_cache_queue.put(c.tag) for c in capital_clans])
             
             if len(add_tasks) > 0:
-                await asyncio.gather(*add_tasks)                    
+                await asyncio.gather(*add_tasks)
 
     ############################################################
     #####
@@ -512,6 +511,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                     
                     player_season = await player.get_current_season()
                     await player_season.create_member_snapshot()
+
+                    if player.clan:
+                        await self.coc_client._clan_cache_queue.put(player.clan.tag)
             
             except asyncio.CancelledError:
                 return
