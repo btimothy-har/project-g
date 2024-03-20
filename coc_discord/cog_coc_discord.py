@@ -111,6 +111,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
         tasks = [_update_app_panels_start(guild) async for guild in guild_iter]
         await bounded_gather(*tasks)
 
+        self.run_war_reminders.start()
         self.update_application_panels.start()
         self.update_clan_panels.start()
         self.update_guild_clocks.start()
@@ -123,6 +124,7 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
         self.save_member_roles.stop()
         self.update_guild_clocks.stop()
         self.update_clan_loop.stop()
+        self.run_war_reminders.stop()
 
         self.coc_client.remove_events(
             FeedTasks.on_clan_donation_change,
