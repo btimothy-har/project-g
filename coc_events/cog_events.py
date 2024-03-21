@@ -1171,6 +1171,6 @@ class Events(commands.Cog,GlobalClient):
             await interaction.edit_original_response(content="Error exporting Event Participants.")
         
         await interaction.edit_original_response(
-            content="Event Participants for {get_event.name} exported.",
-            file=discord.File(rp_file)
+            content=f"Event Participants for {get_event.name} exported.",
+            attachments=[discord.File(rp_file)]
             )

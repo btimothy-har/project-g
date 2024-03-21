@@ -1,9 +1,10 @@
 import coc
-import random
+import os
 import discord
 import asyncio
 import hashlib
 import pendulum
+import xlsxwriter
 
 from typing import *
 
@@ -415,6 +416,95 @@ class LegendsTourney(commands.Cog,GlobalClient):
         player = await self.coc_client.get_player(tag)
         await self.register_participant(player,user.id)
         await ctx.send(f"Registered {player.name} for the Tournament.") 
+
+    @commands.command(name="legendexport")
+    @commands.guild_only()
+    @commands.is_owner()
+    async def command_register_participant(self,ctx:commands.Context):
+        
+        msg = await ctx.reply(content="Exporting Participants... please wait.")
+        rp_file = await self.generate_event_export()
+
+        if not rp_file:
+            await msg.edit(content="Error exporting Event Participants.")
+
+        await msg.edit(content="Event Participants exported.",attachments=[discord.File(rp_file)])
+
+    async def generate_event_export(self):
+        participant_headers = [
+            'Tag',
+            'Name',
+            'Discord User ID',
+            'Discord User',
+            'Reg Timestamp',
+            'Time in Clan',
+            'Trophies'
+            ]
+        report_file = GlobalClient.bot.coc_report_path + '/' + f'Participants - {event.name}.xlsx'
+        
+        if os.path.exists(report_file):
+            os.remove(report_file)
+
+        workbook = xlsxwriter.Workbook(report_file)
+        
+        bold = workbook.add_format({'bold':True})
+        master = workbook.add_worksheet("Master")
+
+        row = 0
+        col = 0
+        for header in participant_headers:
+            master.write(row,col,header,bold)
+            col += 1
+        
+        participants = await self.fetch_all_participants()
+        
+        a_iter = AsyncIter(participants)
+        async for player in a_iter:
+            if not player.legend_statistics:
+                continue
+            if not player.legend_statistics.previous_season:
+                continue
+
+            col = 0
+            row += 1
+
+            tourn_season = aClashSeason(self._tourney_season)
+
+            check_window_start = self.registration_timestamp if self.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
+            check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
+
+            time_spent = 0
+
+            snapshots = await aPlayerActivity.get_by_player_datetime(self.tag,check_window_start,check_window_end)
+            a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
+            ts = None
+            async for a in a_iter:
+                if not ts:
+                    if a.clan_tag in tournament_clans:
+                        ts = a._timestamp
+                if ts:
+                    if a.clan_tag in tournament_clans:
+                        time_spent += max(0,a._timestamp - ts)
+                    ts = a._timestamp
+                
+            tourn_period = tourn_season.trophy_season_end.diff(check_window_start).in_hours()
+            time_spent_hours = (time_spent//3600)
+                
+            m_data = []
+            m_data.append(player.tag)
+            m_data.append(player.name)
+            m_data.append(player.discord_user)
+            m_data.append(getattr(self.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
+            m_data.append(player.registration_timestamp.format('YYYY-MM-DD HH:mm:ss'))
+            m_data.append(f"{int(min((time_spent_hours/tourn_period)*100,100))}%")
+            m_data.append(player.legend_statistics.previous_season.trophies)
+
+            for d in m_data:
+                master.write(row,col,d)
+                col += 1
+
+        workbook.close()
+        return report_file
 
 ##################################################
 #####
