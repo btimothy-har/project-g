@@ -870,7 +870,6 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
             if war.state == 'inWar' and war.type in reminder.sub_type:
                 war_clan = war.get_clan(reminder.tag)
                 remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
-                LOG.info(f"Sending reminders for {reminder.tag} to {len(remind_members)} members.")
                 await reminder.send_reminder(war,*remind_members)
         
         async with self.war_reminder_lock:

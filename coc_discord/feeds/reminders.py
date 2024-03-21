@@ -119,6 +119,7 @@ class EventReminder(GlobalClient):
                 }
             }
         )
+        LOG.info(f"{reminder.tag} Refreshed interval_tracker: {self.interval_tracker}")
     
     async def send_reminder(self,event:Union[bClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
@@ -143,6 +144,8 @@ class EventReminder(GlobalClient):
                     except KeyError:
                         r = self.active_reminders[member.id] = MemberReminder(member)
                     r.add_account(player)
+            else:
+                LOG.info(f"Clan {self.tag}: No reminders to send. {time_remaining.total_seconds() / 3600} {self.next_reminder}")
             
             if len(self.active_reminders) > 0:
                 if self._type == 1:
