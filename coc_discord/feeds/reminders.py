@@ -119,7 +119,7 @@ class EventReminder(GlobalClient):
                 }
             }
         )
-        LOG.info(f"{reminder.tag} Refreshed interval_tracker: {self.interval_tracker}")
+        LOG.info(f"{self.tag} Refreshed interval_tracker: {self.interval_tracker}")
     
     async def send_reminder(self,event:Union[bClanWar,aRaidWeekend],*players):        
         time_remaining = event.end_time - pendulum.now()
