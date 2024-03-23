@@ -440,7 +440,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
             'Time in Clan',
             'Trophies'
             ]
-        report_file = GlobalClient.bot.coc_report_path + '/' + f'Participants - {event.name}.xlsx'
+        report_file = GlobalClient.bot.coc_report_path + '/' + f'Participants - 1L.xlsx'
         
         if os.path.exists(report_file):
             os.remove(report_file)
@@ -456,13 +456,14 @@ class LegendsTourney(commands.Cog,GlobalClient):
             master.write(row,col,header,bold)
             col += 1
         
+        league_season = await self.coc_client.get_seasons(29000022)
+        last_season = aClashSeason(pendulum.from_format(league_season[-1], 'YYYY-MM').format('M-YYYY'))
+        
         participants = await self.fetch_all_participants()
         
         a_iter = AsyncIter(participants)
         async for player in a_iter:
-            if not player.legend_statistics:
-                continue
-            if not player.legend_statistics.previous_season:
+            if self._tourney_season == last_season.id and not player.legend_statistics.previous_season:
                 continue
 
             col = 0
@@ -470,12 +471,12 @@ class LegendsTourney(commands.Cog,GlobalClient):
 
             tourn_season = aClashSeason(self._tourney_season)
 
-            check_window_start = self.registration_timestamp if self.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
+            check_window_start = player.registration_timestamp if player.registration_timestamp > tourn_season.trophy_season_start.add(days=5) else tourn_season.trophy_season_start.add(days=5)                
             check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
             time_spent = 0
 
-            snapshots = await aPlayerActivity.get_by_player_datetime(self.tag,check_window_start,check_window_end)
+            snapshots = await aPlayerActivity.get_by_player_datetime(player.tag,check_window_start.subtract(days=1),check_window_end)
             a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
             ts = None
             async for a in a_iter:
@@ -487,8 +488,8 @@ class LegendsTourney(commands.Cog,GlobalClient):
                         time_spent += max(0,a._timestamp - ts)
                     ts = a._timestamp
                 
-            tourn_period = tourn_season.trophy_season_end.diff(check_window_start).in_hours()
-            time_spent_hours = (time_spent//3600)
+            tourn_period = (tourn_season.trophy_season_end.int_timestamp - tourn_season.trophy_season_start.int_timestamp)/3600
+            time_spent_hours = (time_spent/3600)
                 
             m_data = []
             m_data.append(player.tag)
@@ -497,7 +498,12 @@ class LegendsTourney(commands.Cog,GlobalClient):
             m_data.append(getattr(self.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
             m_data.append(player.registration_timestamp.format('YYYY-MM-DD HH:mm:ss'))
             m_data.append(f"{int(min((time_spent_hours/tourn_period)*100,100))}%")
-            m_data.append(player.legend_statistics.previous_season.trophies)
+
+            if self._tourney_season == last_season.next_season().id:
+                m_data.append(player.trophies)
+
+            elif self._tourney_season == last_season.id:                
+                m_data.append(player.legend_statistics.previous_season.trophies)            
 
             for d in m_data:
                 master.write(row,col,d)
@@ -696,12 +702,12 @@ class CancelRegistrationMenu(DefaultView):
 
         if chk_registration:
             if pendulum.now() > tourn_season.trophy_season_start:
-                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=3) else tourn_season.trophy_season_start.add(days=3)                
+                check_window_start = chk_registration.registration_timestamp if chk_registration.registration_timestamp > tourn_season.trophy_season_start.add(days=5) else tourn_season.trophy_season_start.add(days=5)
                 check_window_end = tourn_season.trophy_season_end if pendulum.now() > tourn_season.trophy_season_end else pendulum.now()
 
                 time_spent = 0
 
-                snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
+                snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start.subtract(days=1),check_window_end)
                 a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
                 ts = None
                 async for a in a_iter:
@@ -713,8 +719,8 @@ class CancelRegistrationMenu(DefaultView):
                             time_spent += max(0,a._timestamp - ts)
                         ts = a._timestamp
                 
-                tourn_period = tourn_season.trophy_season_end.diff(check_window_start).in_hours()
-                time_spent_hours = (time_spent//3600)
+                tourn_period = (tourn_season.trophy_season_end.int_timestamp - tourn_season.trophy_season_start.int_timestamp)/3600
+                time_spent_hours = (time_spent/3600)
                 time_spent_str = f"You have spent **{int(min((time_spent_hours/tourn_period)*100,100))}%** of the Tournament Period in the designated clans.\n\n"
                 
             else:
