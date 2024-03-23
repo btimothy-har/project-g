@@ -867,15 +867,23 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
         
         async def send_reminders(reminder:EventReminder):
             war = await self.coc_client.get_current_war(reminder.tag)
-            if war.state == 'inWar' and war.type in reminder.sub_type:
+            if war.type in reminder.sub_type:
                 war_clan = war.get_clan(reminder.tag)
                 remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
                 await reminder.send_reminder(war,*remind_members)
         
         async with self.war_reminder_lock:
             reminders = await EventReminder.get_war_reminders()
-            tasks = [send_reminders(reminder) for reminder in reminders]
-            await bounded_gather(*tasks)
+            a_iter = AsyncIter(reminders)
+            async for reminder in a_iter:
+                try:
+                    war = await self.coc_client.get_current_war(reminder.tag)
+                    if war.type in reminder.sub_type:
+                        war_clan = war.get_clan(reminder.tag)
+                        remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
+                        await reminder.send_reminder(war,*remind_members)
+                except Exception:
+                    LOG.exception(f"Error sending War Reminder for {reminder.tag}")
     
     @tasks.loop(minutes=5)
     async def save_member_roles(self):
