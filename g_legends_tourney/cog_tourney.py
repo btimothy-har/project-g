@@ -488,7 +488,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
                         time_spent += max(0,a._timestamp - ts)
                     ts = a._timestamp
                 
-            tourn_period = (tourn_season.trophy_season_end.int_timestamp - tourn_season.trophy_season_start.int_timestamp)/3600
+            tourn_period = (tourn_season.trophy_season_end.int_timestamp - check_window_end.int_timestamp)/3600
             time_spent_hours = (time_spent/3600)
                 
             m_data = []
@@ -719,7 +719,7 @@ class CancelRegistrationMenu(DefaultView):
                             time_spent += max(0,a._timestamp - ts)
                         ts = a._timestamp
                 
-                tourn_period = (tourn_season.trophy_season_end.int_timestamp - tourn_season.trophy_season_start.int_timestamp)/3600
+                tourn_period = (tourn_season.trophy_season_end.int_timestamp - check_window_end.int_timestamp)/3600
                 time_spent_hours = (time_spent/3600)
                 time_spent_str = f"You have spent **{int(min((time_spent_hours/tourn_period)*100,100))}%** of the Tournament Period in the designated clans.\n\n"
                 
