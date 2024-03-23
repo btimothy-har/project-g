@@ -476,7 +476,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
 
             time_spent = 0
 
-            snapshots = await aPlayerActivity.get_by_player_datetime(player.tag,check_window_start.subtract(days=1),check_window_end)
+            snapshots = await aPlayerActivity.get_by_player_datetime(player.tag,check_window_start,check_window_end)
             a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
             ts = None
             async for a in a_iter:
@@ -707,7 +707,7 @@ class CancelRegistrationMenu(DefaultView):
 
                 time_spent = 0
 
-                snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start.subtract(days=1),check_window_end)
+                snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
                 a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
                 ts = None
                 async for a in a_iter:
