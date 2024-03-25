@@ -463,7 +463,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
         
         a_iter = AsyncIter(participants)
         async for player in a_iter:
-            if self._tourney_season == last_season.id and not player.legend_statistics.previous_season:
+            if self._tourney_season == last_season.id and not getattr(player.legend_statistics,'previous_season',None):
                 continue
 
             col = 0
@@ -708,6 +708,7 @@ class CancelRegistrationMenu(DefaultView):
                 time_spent = 0
 
                 snapshots = await aPlayerActivity.get_by_player_datetime(chk_registration.tag,check_window_start,check_window_end)
+                snapshot_count = len(snapshots)
                 a_iter = AsyncIter([a for a in snapshots if not a._legacy_conversion])
                 ts = None
                 async for a in a_iter:
