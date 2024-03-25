@@ -436,6 +436,7 @@ class LegendsTourney(commands.Cog,GlobalClient):
             'Name',
             'Discord User ID',
             'Discord User',
+            'Townhall',
             'Reg Timestamp',
             'Time in Clan',
             'Trophies'
@@ -494,8 +495,9 @@ class LegendsTourney(commands.Cog,GlobalClient):
             m_data = []
             m_data.append(player.tag)
             m_data.append(player.name)
-            m_data.append(player.discord_user)
+            m_data.append(str(player.discord_user))
             m_data.append(getattr(self.bot.get_user(player.discord_user),'display_name',' ') if player.discord_user else " ")
+            m_data.append(player.town_hall.level)
             m_data.append(player.registration_timestamp.format('YYYY-MM-DD HH:mm:ss'))
             m_data.append(f"{int(min((time_spent_hours/tourn_period)*100,100))}%")
 
