@@ -422,6 +422,8 @@ class Bank(commands.Cog,GlobalClient):
             
         if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
             return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+
+        return "This feature is currently disabled. Please try again later."
         
         item = await InventoryItem.get_by_id(item_id)
         if not item.in_inventory:
@@ -507,6 +509,8 @@ class Bank(commands.Cog,GlobalClient):
             
             if self.bot.user.id == 1031240380487831664 and getattr(guild,'id',0) != self.bank_guild.id:
                 return f"To proceed with redemption, the user must start this conversation from The Assassins Guild server. They may join the Guild at this invite: https://discord.gg/hUSSsFneb2"
+            
+            return "This feature is currently disabled. Please try again later."
             
             item = await InventoryItem.get_by_id(item_id)
             if not item.in_inventory:
