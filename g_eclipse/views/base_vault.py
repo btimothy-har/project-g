@@ -446,7 +446,7 @@ class BaseVaultMenu(DefaultView):
             message=(f"## Oops!\n**We currently don't have any bases for Townhall {no_base}.**\n\n" if no_base else '')
                 + base_vault_intro
                 + "\n\n"
-                + "*The Base Vault is supplied by <:RHBB:1041627382018211900> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
+                + "*The Base Vault is supplied by <:RHBB:1223194612902920234> **RH Base Building** and <:BPBB:1043081040090107968> **Blueprint Base Building**.*"
                 + "\n\u200b"
             )
         return embed

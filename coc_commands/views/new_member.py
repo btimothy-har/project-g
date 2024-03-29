@@ -403,43 +403,6 @@ class NewMemberMenu(DefaultView):
                 + "\n- Exchange your <:assassin_coin:1136977968778969189> for Gold Passes, Gems, and more in our `/shop`."
                 )
         
-        if self.guild.id == 688449973553201335:
-            intro_embed = await clash_embed(
-                context=self.ctx,
-                title="Congratulations! You're an AriX Member!",
-                message=f"We're really happy to have you with us. We *strongly encourage* you to review the information below, so you can understand everything that goes on in AriX."
-                    + f"\n\nThe **AriX Alliance** is made up of 4 active clans:"
-                    + f"\n- <:logoao9:1037988555592577054> ArmyOf9YearOlds (AO9)"
-                    + f"\n- <:logopr:1037988553390559252> Phoenix Reborn (PR)"
-                    + f"\n- <:logopa:1037988554778890270> Project AriX (PA)"
-                    + f"\n- <:logoec:1155455297423417415> Elite Coding (EC)"
-                    + f"\n\u200b",
-                show_author=False)
-            intro_embed.add_field(
-                name="**Getting Started in AriX**",
-                value="We strongly encourage you to check out the following channels to get yourself set up in the community. If you have any questions, our Leaders will be around to assist."
-                    + f"\n\n> - Read <#973472492222046258> for info regarding the AriX Alliance Server"
-                    + f" \n> - Read <#970239273456500736> for info about our Hierarchy"
-                    + f"\n> - Read <#960096690394767380> for info about our War Rules"
-                    + f"\n> - Read <#998620795116986499> for info regarding our Raid Rules"
-                    + f"\n> - Customize your AriX Profile and Experience by clicking on **Channels & Roles** at the top of the channel list"
-                    + f"\n\u200b",
-                inline=False
-                )
-            intro_embed.add_field(
-                name="**<:logo_assassinsguild:1140210741908099122> The Assassins Guild**",
-                value="The AriX Alliance is an independent member of The Assassins Guild. As a member of AriX, you're automatically a member of the Guild. You can find more information below, or in the Guild Server."
-                    + "\n\nJoin the Guild Server at the invite link below.",
-                inline=False
-                )
-        
-            try:
-                await self.member.discord_member.send(embeds=[intro_embed,ag_embed])
-                await self.member.discord_member.send(f"discord.gg/hUSSsFneb2")
-                return True
-            except:
-                return False
-        
         try:
             await self.member.discord_member.send(embeds=[ag_embed])
             return True

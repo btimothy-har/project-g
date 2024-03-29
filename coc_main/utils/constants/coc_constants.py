@@ -382,9 +382,9 @@ class WarResult:
     WON = 'won'
     TIED = 'tied'
     LOST = 'lost'
-    WINEMOJI = '<:Win:828100053079687188>'
+    WINEMOJI = '<:Win:1223195290262306878>'
     TIEEMOJI = '<:Clan:825654825509322752>'
-    LOSEEMOJI = '<:Lost:828099964076556319>'
+    LOSEEMOJI = '<:Lost:1223195313997873226>'
 
     _ongoing = {
         'winning':'winning',
@@ -403,12 +403,12 @@ class WarResult:
         'lost':'lost'
         }
     _with_emoji = {
-        'winning':'<:Win:828100053079687188> Winning',
+        'winning':'<:Win:1223195290262306878> Winning',
         'tied':'<:Clan:825654825509322752> Tied',
-        'losing':'<:Lost:828099964076556319> Losing',
-        'won':'<:Win:828100053079687188> Won',
+        'losing':'<:Lost:1223195313997873226> Losing',
+        'won':'<:Win:1223195290262306878> Won',
         'tie':'<:Clan:825654825509322752> Tied',
-        'lost':'<:Lost:828099964076556319> Lost'
+        'lost':'<:Lost:1223195313997873226> Lost'
         }
     @classmethod
     def ongoing(cls,war_result:str,with_emoji:bool=False):

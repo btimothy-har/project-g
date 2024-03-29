@@ -269,7 +269,7 @@ class PlayerProfileMenu(DefaultView):
                 value=f"**Loot**\n"
                     + f"{EmojisClash.GOLD} {numerize.numerize(player.get_achievement('Gold Grab').value,1)}\u3000{EmojisClash.ELIXIR} {numerize.numerize(player.get_achievement('Elixir Escapade').value,1)}\u3000{EmojisClash.DARKELIXIR} {numerize.numerize(player.get_achievement('Heroic Heist').value,1)}\n"
                     + f"**Clan Capital**\n"
-                    + f"{EmojisClash.CAPITALGOLD} {numerize.numerize(player.clan_capital_contributions,1)}\u3000<:CapitalRaids:1034032234572816384> {numerize.numerize(player.get_achievement('Aggressive Capitalism').value,1)}\n"
+                    + f"{EmojisClash.CAPITALGOLD} {numerize.numerize(player.clan_capital_contributions,1)}\u3000<:CapitalRaids:1223194924711673856> {numerize.numerize(player.get_achievement('Aggressive Capitalism').value,1)}\n"
                     + f"**War Stats**\n"
                     + f"{EmojisClash.STAR} {player.war_stars:,}\u3000{EmojisClash.WARLEAGUES} {player.get_achievement('War League Legend').value:,}\n"
                     + f"**Clan Games**\n"

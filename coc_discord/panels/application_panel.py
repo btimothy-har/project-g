@@ -34,7 +34,7 @@ def account_recruiting_summary(account:aPlayer):
     text = ""
     text += f"### __**{account.name}**__"
     text += f"\n**[Open In-Game: {account.tag}]({account.share_link})**"
-    text += f"\n\n<:Exp:825654249475932170> {account.exp_level}\u3000<:Clan:825654825509322752> {account.clan_description}"
+    text += f"\n\n{EmojisClash.EXP} {account.exp_level}\u3000{EmojisClash.CLAN} {account.clan_description}"
     text += f"\n{account.town_hall.emote} {account.town_hall.description}\u3000{EmojisLeagues.get(account.league.name)} {account.trophies} (best: {account.best_trophies})"
     text += f"\n{account.hero_description}" if account.town_hall.level >= 7 else ""           
     text += f"\n\n{EmojisClash.BOOKFIGHTING} {account.troop_strength} / {account.max_troop_strength} *(rushed: {account.troop_rushed_pct}%)*\n"

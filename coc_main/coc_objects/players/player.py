@@ -20,7 +20,7 @@ from ..season.season import aClashSeason
 from ..clans.clan import _PlayerClan
 
 from ...utils.constants.coc_constants import HeroAvailability, TroopAvailability, SpellAvailability, PetAvailability
-from ...utils.constants.coc_constants import EmojisHeroes, EmojisLeagues
+from ...utils.constants.coc_emojis import EmojisClash, EmojisHeroes, EmojisLeagues
 
 ##################################################
 #####
@@ -364,7 +364,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     
     @property
     def long_description(self):
-        d = f"<:Exp:825654249475932170> {self.exp_level}\u3000<:Clan:825654825509322752> {self.clan_description}"
+        d = f"{EmojisClash.EXP} {self.exp_level}\u3000{EmojisClash.CLAN} {self.clan_description}"
         d += f"\n{self.town_hall.emote} {self.town_hall.description}\u3000{EmojisLeagues.get(self.league.name)} {self.trophies} (best: {self.best_trophies})"
         if self.town_hall.level >= 7:
             d += f"\n{self.hero_description}"
@@ -406,7 +406,7 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
         if self.is_member:
             return f"{self.home_clan.emoji} {self.alliance_rank} of {self.home_clan.name}"
         else:
-            return f"<:Clan:825654825509322752> " + f"{str(self.role)} of {self.clan.name}" if self.clan else "No Clan"
+            return f"{EmojisClash.CLAN} " + f"{str(self.role)} of {self.clan.name}" if self.clan else "No Clan"
         
     @property
     def member_description_no_emoji(self):
