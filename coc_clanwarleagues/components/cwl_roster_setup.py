@@ -164,7 +164,8 @@ class CWLRosterMenu(DefaultView):
         
         self._modified_to_save = []
 
-        finalized = await self.clan.finalize_roster()
+        self.clan = await self.coc_client.get_league_clan(self.clan.tag,season=self.season)
+        finalized = await self.clan.finalize_roster()        
         if not finalized:
             await interaction.followup.send("I couldn't finalize this roster. This might be due to conflicting rosters. Double check the roster players again.",ephemeral=True)
             return await self._callback_home(interaction,button)
