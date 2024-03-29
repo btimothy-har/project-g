@@ -60,6 +60,8 @@ async def generate_cwl_roster_export(season:aClashSeason):
 
         if league_player.roster_clan_tag:
             roster_clan = await GlobalClient.coc_client.get_league_clan(league_player.roster_clan_tag,season=season)
+        else:
+            roster_clan = None
 
         col = 0
         row += 1
