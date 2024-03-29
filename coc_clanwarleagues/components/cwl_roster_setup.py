@@ -126,8 +126,8 @@ class CWLRosterMenu(DefaultView):
 
         save_iter = AsyncIter(self.modified_to_save)
         async for player in save_iter:
-            if player.roster_clan_tag:
-                await player.roster_to_clan(player.roster_clan_tag)
+            if player.roster_clan_tag == self.clan.tag:
+                await player.roster_to_clan(self.clan)
             else:
                 await player.unroster()
             self._modified_to_save.remove(player)
@@ -154,8 +154,8 @@ class CWLRosterMenu(DefaultView):
 
         save_iter = AsyncIter(self.modified_to_save)
         async for player in save_iter:
-            if player.roster_clan_tag:
-                await player.roster_to_clan(player.roster_clan_tag)
+            if player.roster_clan_tag == self.clan.tag:
+                await player.roster_to_clan(self.clan)
             else:
                 await player.unroster()
             self._modified_to_save.remove(player)
