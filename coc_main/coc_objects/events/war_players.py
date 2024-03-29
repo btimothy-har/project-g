@@ -329,7 +329,6 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
     
     async def roster_to_clan(self,clan:coc.ClanWarLeagueClan):
         async with self._lock:
-
             #check current roster: if roster closed, skip
             if self.roster_clan_tag:
                 _id = {'season':self.season.id,'tag':self.roster_clan_tag}
@@ -354,6 +353,28 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
                 )
             LOG.info(
                 f"{str(self)} was rostered in CWL: {getattr(clan,'name','No Clan')} {'(' + getattr(clan,'tag','' + ')')}."
+                )
+    
+    async def unroster(self):
+        async with self._lock:
+            #check current roster: if roster closed, skip            
+            if self.roster_clan_tag:
+                _id = {'season':self.season.id,'tag':self.roster_clan_tag}
+                search_clan = await self.database.db__war_league_clan.find_one({'_id':_id})
+                if search_clan and search_clan.get('roster_open',True) == False:
+                    return            
+                
+            self.roster_clan_tag = None
+            api_json = self._api_json()
+            api_json['roster_clan'] = self.roster_clan_tag
+            
+            await self.database.db__war_league_player.update_one(
+                {'_id':self._id},
+                {'$set':api_json},
+                upsert=True
+                )
+            LOG.info(
+                f"{str(self)} was removed from CWL."
                 )
     
     async def finalize(self,clan:coc.ClanWarLeagueClan):

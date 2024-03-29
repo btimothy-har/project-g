@@ -124,9 +124,13 @@ class CWLRosterMenu(DefaultView):
     async def _callback_save(self,interaction:discord.Interaction,button:DiscordButton):
         await interaction.response.defer()
 
-        tasks = [player.save_roster_clan() for player in self.modified_to_save]
-        await bounded_gather(*tasks)
-        self._modified_to_save = []
+        save_iter = AsyncIter(self.modified_to_save)
+        async for player in save_iter:
+            if player.roster_clan_tag:
+                await player.roster_to_clan(player.roster_clan_tag)
+            else:
+                await player.unroster()
+            self._modified_to_save.remove(player)
 
         self.all_participants = await self.coc_client.get_league_players(season=self.season,registered=True)
         await self.add_main_menu()
@@ -148,8 +152,13 @@ class CWLRosterMenu(DefaultView):
             item.disabled = True
         await interaction.edit_original_response(view=self)
 
-        tasks = [player.roster_to_clan(self.clan) for player in self.modified_to_save]
-        await bounded_gather(*tasks)
+        save_iter = AsyncIter(self.modified_to_save)
+        async for player in save_iter:
+            if player.roster_clan_tag:
+                await player.roster_to_clan(player.roster_clan_tag)
+            else:
+                await player.unroster()
+            self._modified_to_save.remove(player)
 
         finalized = await self.clan.finalize_roster()
         if not finalized:
