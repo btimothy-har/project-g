@@ -334,12 +334,14 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
                 _id = {'season':self.season.id,'tag':self.roster_clan_tag}
                 search_clan = await self.database.db__war_league_clan.find_one({'_id':_id})
                 if search_clan and search_clan.get('roster_open',True) == False:
+                    LOG.info(f"{str(self)}: Current Roster closed for {search_clan.name} ({search_clan.tag}).")
                     return
             
             #check new roster: if roster closed, skip
             _id = {'season':self.season.id,'tag':clan.tag}
             search_clan = await self.database.db__war_league_clan.find_one({'_id':_id})
             if search_clan and search_clan.get('roster_open',True) == False:
+                LOG.info(f"{str(self)}: New Roster closed for {clan.name} ({clan.tag}).")
                 return
             
             self.roster_clan_tag = clan.tag
