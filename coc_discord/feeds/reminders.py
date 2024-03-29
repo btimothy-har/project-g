@@ -102,10 +102,11 @@ class EventReminder(GlobalClient):
     async def delete(self):
         await self.database.db__clan_event_reminder.delete_one({'_id':self._id})
 
-    async def generate_reminder_text(self):
+    async def generate_reminder_text(self,members:Optional[List[MemberReminder]]=None):
         reminder_text = ""
-        members = AsyncIter(list(self.active_reminders.values()))
-        async for m in members:
+        r_members = members if members else list(self.active_reminders.values())
+        r_iter = AsyncIter(r_members)
+        async for m in r_iter:
             account_str = [f"\n{a.title}" for a in m.accounts]
             reminder_text += f"{m.member.mention}" +', '.join(account_str) + '\n\n'
         return reminder_text
@@ -160,22 +161,62 @@ class EventReminder(GlobalClient):
         reminder_text += f"(<t:{clan_war.end_time.int_timestamp}:f>)\n\n"
         reminder_text += await self.generate_reminder_text()
 
-        webhook = await get_bot_webhook(self.bot,self.channel)
-        if isinstance(self.channel,discord.Thread):
-            r_msg = await webhook.send(
-                username=clan.name,
-                avatar_url=clan.badge,
-                content=reminder_text,
-                thread=self.channel,
-                wait=True
-                )
+        if len(reminder_text) > 2000:
+            reminder_text = f"You have **NOT** used all of your War Attacks. " 
+            reminder_text += f"Clan War ends in **{EventReminder.remaining_time_str(clan_war.end_time)}** "
+            reminder_text += f"(<t:{clan_war.end_time.int_timestamp}:f>)\n\n"
+
+            half_members = list(self.active_reminders.values())[:len(self.active_reminders) // 2]
+            reminder_text += await self.generate_reminder_text(half_members)
+            remainder_text = await self.generate_reminder_text(list(self.active_reminders.values())[len(self.active_reminders) // 2:])
+
+            webhook = await get_bot_webhook(self.bot,self.channel)
+            if isinstance(self.channel,discord.Thread):
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    thread=self.channel,
+                    wait = True
+                    )
+                await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=remainder_text,
+                    thread=self.channel,
+                    wait = True
+                    )
+            else:
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    wait = True
+                    )
+                await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=remainder_text,
+                    wait = True
+                    )
+                
         else:
-            r_msg = await webhook.send(
-                username=clan.name,
-                avatar_url=clan.badge,
-                content=reminder_text,
-                wait=True
-                )
+            webhook = await get_bot_webhook(self.bot,self.channel)
+            if isinstance(self.channel,discord.Thread):
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    thread=self.channel,
+                    wait=True
+                    )
+            else:
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    wait=True
+                    )
         LOG.info(f"Clan {clan}: Sent War Reminders to {len(self.active_reminders)} players. Reminder ID: {r_msg.id}")
         self.active_reminders = {}
     
@@ -187,23 +228,63 @@ class EventReminder(GlobalClient):
         reminder_text += f"(<t:{raid_weekend.end_time.int_timestamp}:f>).\n\n"
         reminder_text += await self.generate_reminder_text()
 
-        webhook = await get_bot_webhook(self.bot,self.channel)
+        if len(reminder_text) > 2000:
+            reminder_text = f"You started your Raid Weekend but **HAVE NOT** used all your Raid Attacks. "
+            reminder_text += f"Raid Weekend ends in **{EventReminder.remaining_time_str(raid_weekend.end_time)}** "
+            reminder_text += f"(<t:{raid_weekend.end_time.int_timestamp}:f>).\n\n"
 
-        if isinstance(self.channel,discord.Thread):
-            r_msg = await webhook.send(
-                username=clan.name,
-                avatar_url=clan.badge,
-                content=reminder_text,
-                thread=self.channel,
-                wait = True
-                )
+            half_members = list(self.active_reminders.values())[:len(self.active_reminders) // 2]
+            reminder_text += await self.generate_reminder_text(half_members)
+            remainder_text = await self.generate_reminder_text(list(self.active_reminders.values())[len(self.active_reminders) // 2:])
+
+            webhook = await get_bot_webhook(self.bot,self.channel)
+            if isinstance(self.channel,discord.Thread):
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    thread=self.channel,
+                    wait = True
+                    )
+                await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=remainder_text,
+                    thread=self.channel,
+                    wait = True
+                    )
+            else:
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    wait = True
+                    )
+                await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=remainder_text,
+                    wait = True
+                    )
+        
         else:
-            r_msg = await webhook.send(
-                username=clan.name,
-                avatar_url=clan.badge,
-                content=reminder_text,
-                wait = True
-                )
+            webhook = await get_bot_webhook(self.bot,self.channel)
+
+            if isinstance(self.channel,discord.Thread):
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    thread=self.channel,
+                    wait = True
+                    )
+            else:
+                r_msg = await webhook.send(
+                    username=clan.name,
+                    avatar_url=clan.badge,
+                    content=reminder_text,
+                    wait = True
+                    )
         LOG.info(f"Clan {clan}: Sent Raid Reminders to {len(self.active_reminders)} players. Reminder ID: {r_msg.id}")
     
     @classmethod

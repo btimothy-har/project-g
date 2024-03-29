@@ -708,7 +708,8 @@ class CWLRosterMenu(DefaultView):
         def pred_not_yet_rostered(player:aPlayer):
             if self.not_yet_rostered:
                 league_player = self.get_league_player(player.tag)
-                return not league_player.roster_clan
+                if league_player.roster_clan_tag:
+                    return False
             return True
         def pred_townhall_levels(player:aPlayer):
             if len(self.th_filter) > 0:
