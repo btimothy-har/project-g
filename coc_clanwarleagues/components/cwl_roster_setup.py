@@ -733,13 +733,13 @@ class CWLRosterMenu(DefaultView):
     async def autofill_participants(self,max_participants:int):
         eligible_participants = [p for p in self.all_participants if p.league_group <= CWLLeagueGroups.from_league_name(self.clan.league) and p.league_group < 99]
         
-        unrostered_players = [p async for p in self.coc_client.get_players([p.tag for p in eligible_participants if p.roster_clan_tag is None])]
+        unrostered_players = [p async for p in self.coc_client.get_players([p.tag for p in eligible_participants if p.roster_clan_tag == None])]
         unrostered_players.sort(key=lambda p:(p.town_hall.level,p.war_elo,p.hero_strength),reverse=True)
 
         a_iter = AsyncIter(unrostered_players)
         async for p in a_iter:
             cwl_player = self.get_league_player(p.tag)
-            cwl_player.roster_clan = self.clan
+            cwl_player.roster_clan_tag = self.clan.tag
             self._modified_to_save.append(cwl_player)
 
             clan_participants = [p.tag for p in self.all_participants if p.roster_clan_tag == self.clan.tag]
