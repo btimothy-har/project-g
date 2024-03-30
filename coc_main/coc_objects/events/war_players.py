@@ -306,7 +306,7 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
                 upsert=True
                 )
             LOG.info(
-                f"{str(self)} was added by an admin to CWL with {self.roster_clan.name} ({self.roster_clan.tag})."
+                f"{str(self)} was added by an admin to CWL with {league_clan.name} ({league_clan.tag})."
                 )
     
     async def admin_remove(self):            
