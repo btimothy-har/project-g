@@ -425,7 +425,7 @@ class bWarLeagueClan(coc.ClanWarLeagueClan,BasicClan,MotorClient):
         api_json['league_role'] = self._league_role
 
         await self.database.db__war_league_clan.update_one(
-            {'_id':self.db_id},
+            {'_id':self._id},
             {'$set': api_json},
             upsert=True
             )
@@ -484,7 +484,7 @@ class bWarLeagueClan(coc.ClanWarLeagueClan,BasicClan,MotorClient):
             api_json['roster_open'] = self.roster_open
 
             await self.database.db__war_league_clan.update_one(
-                {'_id':self.db_id},
+                {'_id':self._id},
                 {'$set': api_json},
                 upsert=True)
             LOG.info(f"{str(self)} closed roster for CWL.")
