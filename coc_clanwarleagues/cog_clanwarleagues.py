@@ -1018,7 +1018,7 @@ class ClanWarLeagues(commands.Cog,GlobalClient):
         embed = await clash_embed(
             context=context,
             message=f"**{league_player.title}** has been added to CWL."
-                + f"\n\n> Clan: {league_player.roster_clan.title}"
+                + f"\n\n> Clan: {league_clan.title}"
                 + f"\n> Discord: <@{league_player.discord_user}>"
                 + (f"\n\n{original_clan.clean_name}'s Roster has been re-opened. ({len(original_clan.participants)} players remain)" if reopen else ""),
             success=True
