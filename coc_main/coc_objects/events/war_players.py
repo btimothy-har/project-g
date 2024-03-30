@@ -321,7 +321,7 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
             api_json['roster_clan'] = self.roster_clan_tag
 
             await self.database.db__war_league_player.update_one(
-                {'_id':self.db_id},
+                {'_id':self._id},
                 {'$set':api_json},
                 upsert=True
                 )
@@ -390,7 +390,7 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
             api_json['discord_user'] = self.discord_user
 
             await self.database.db__war_league_player.update_one(
-                {'_id':self.db_id},
+                {'_id':self._id},
                 {'$set':api_json},
                 upsert=True
                 )
@@ -410,7 +410,7 @@ class bWarLeaguePlayer(coc.ClanWarLeagueClanMember,BasicPlayer,MotorClient):
             api_json['elo_change'] = self.elo_change
 
             await self.database.db__war_league_player.update_one(
-                {'_id':self.db_id},
+                {'_id':self._id},
                 {'$set':api_json},
                 upsert=True
                 )
