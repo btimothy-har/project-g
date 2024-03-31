@@ -349,8 +349,12 @@ class Leaderboards(commands.Cog,GlobalClient):
             return
 
         async with self.leaderboard_lock:
+
+            LOG.info("Updating Leaderboards.")
+
             all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
 
             tasks = [lb.update_leaderboard() for lb in all_leaderboards]
             await bounded_gather(*tasks,return_exceptions=True)
-            
+
+            LOG.info("Leaderboards Updated.")

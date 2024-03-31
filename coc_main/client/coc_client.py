@@ -236,6 +236,23 @@ class ClashClient(coc.EventsClient):
         if self._use_discovery:
             await self._player_cache_queue.put(player.tag)
         return player
+    
+    async def get_members_by_season_no_clan(self,season:aClashSeason) -> List[coc.Player]:
+        if season.id not in [s.id for s in aClashSeason.tracked()]:
+            season = aClashSeason.current()
+        
+        filter_criteria = {
+            'season':season.id,
+            'is_member':True
+            }
+        query = self.coc_db.db_player_member_snapshot.find(filter_criteria,{'tag':1})
+        tags = [p['tag'] async for p in query]
+        ret_players = [p async for p in self.get_players(tags)]
+        return sorted(
+            ret_players,
+            key=lambda x:(ClanRanks.get_number(x.alliance_rank),x.town_hall.level,x.exp_level),
+            reverse=True
+            )
 
     async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[coc.Player]:
         if not season or season.id not in [s.id for s in aClashSeason.tracked()]:
