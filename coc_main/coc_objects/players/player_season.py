@@ -74,7 +74,7 @@ class aPlayerClanGames():
         'tag',
         'season',
         'clan_tag',
-        'starting_time',
+        '_starting_time',
         '_score',
         '_ending_time'
         ]
