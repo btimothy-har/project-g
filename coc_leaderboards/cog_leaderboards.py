@@ -90,6 +90,7 @@ class Leaderboards(commands.Cog,GlobalClient):
                 await asyncio.sleep(1)
                 
             await self.bot.wait_until_ready()
+            await asyncio.sleep(600)
             self.update_leaderboards.start()
         
         asyncio.create_task(start_cog())
