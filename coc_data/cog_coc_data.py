@@ -314,22 +314,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ############################################################
     @tasks.loop(hours=4)
     async def refresh_player_snapshot(self):
-
-        if self.coc_client.maintenance:
-            return
-        if self.cycle_id in [0]:
-            query = self.database.db__player.find({})
-            async for p in query:
-                try:
-                    player = await self.coc_client.get_player(p['_id'])
-                except (coc.Maintenance,coc.GatewayError):
-                    return
-                except:
-                    continue
-                else:
-                    seasons = aClashSeason.all_seasons()
-                    snapshot_tasks = [player._update_snapshots(season) for season in seasons]
-                    await asyncio.gather(*snapshot_tasks)
+        return
 
     @tasks.loop(minutes=10)    
     async def update_player_loop(self):
@@ -531,6 +516,10 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 else:            
                     self.coc_client._player_cache_queue.task_done()
                     await aPlayer._sync_cache(player)
+
+                    seasons = aClashSeason.all_seasons()
+                    snapshot_tasks = [player._update_snapshots(season) for season in seasons]
+                    await asyncio.gather(*snapshot_tasks)
 
                     if player.clan:
                         await self.coc_client._clan_cache_queue.put(player.clan.tag)
