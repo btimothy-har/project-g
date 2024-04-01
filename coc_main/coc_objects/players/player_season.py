@@ -1,9 +1,11 @@
 import pendulum
 import logging
+import asyncio
 
 from typing import *
 from numerize import numerize
 from async_property import AwaitLoader
+from collections import defaultdict
 
 from redbot.core.utils import AsyncIter
 
@@ -186,6 +188,7 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         'capital_contribution',
         'clan_games'
         ]
+    _snapshot_lock = defaultdict(asyncio.Lock)
     
     def __init__(self,tag:str,season:aClashSeason):
         self._activity_count = 0
@@ -336,54 +339,60 @@ class aPlayerSeason(MotorClient,AwaitLoader):
             'clan_games':self.clan_games.to_json()
             }
     
-    @classmethod
-    async def create_member_snapshot(cls,tag:str,season:aClashSeason):
-        if season.is_current:
-            player_season = await cls(tag,season)
+    async def save_member_snapshot(self):
+        if self.season.is_current:
+            snapshot_lock_id = f"{self.tag}-{self.season.id}"
+            lock = self._snapshot_lock[snapshot_lock_id]
 
-            await player_season.database.db_player_member_snapshot.update_one(
-                {'_id':player_season.snapshot_id},
-                {'$set':player_season.member_json()},
-                upsert=True
-                )
+            async with lock:
+                await self.database.db_player_member_snapshot.update_one(
+                    {'_id':self.snapshot_id},
+                    {'$set':self.member_json()},
+                    upsert=True
+                    )
     
     @classmethod
     async def create_stats_snapshot(cls,tag:str,season:aClashSeason):
         player_season = await cls(tag,season)
-        season_entries = await aPlayerActivity.get_by_player_season(player_season.tag,player_season.season)
-        
-        player_season._activity_count = len(season_entries)
-        
-        if player_season._activity_count > 0:
-            if player_season.home_clan:
-                a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
-                ts = None
-                async for a in a_iter:
-                    if not ts:
-                        if a.clan_tag == player_season.home_clan_tag:
+
+        snapshot_lock_id = f"{player_season.tag}-{player_season.season.id}"
+        lock = cls._snapshot_lock[snapshot_lock_id]
+
+        async with lock:
+            season_entries = await aPlayerActivity.get_by_player_season(player_season.tag,player_season.season)
+            
+            player_season._activity_count = len(season_entries)
+            
+            if player_season._activity_count > 0:
+                if player_season.home_clan:
+                    a_iter = AsyncIter([a for a in season_entries if not a._legacy_conversion])
+                    ts = None
+                    async for a in a_iter:
+                        if not ts:
+                            if a.clan_tag == player_season.home_clan_tag:
+                                ts = a._timestamp
+                        if ts:
+                            if a.clan_tag == player_season.home_clan_tag:                   
+                                player_season.time_in_home_clan += max(0,a._timestamp - ts)
                             ts = a._timestamp
-                    if ts:
-                        if a.clan_tag == player_season.home_clan_tag:                   
-                            player_season.time_in_home_clan += max(0,a._timestamp - ts)
-                        ts = a._timestamp
 
-            if player_season.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
-                player_season.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
+                if player_season.is_member and len([a.new_value for a in season_entries if a.activity == 'time_in_home_clan']) > 0:
+                    player_season.time_in_home_clan += sum([a.new_value for a in season_entries if a.activity == 'time_in_home_clan'])
 
-            player_season.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]
+                player_season.last_seen = [a.timestamp for a in season_entries if a.is_online_activity]
 
-            player_season.attack_wins.compute_stat([a for a in season_entries if a.activity == 'attack_wins'])
-            player_season.defense_wins.compute_stat([a for a in season_entries if a.activity == 'defense_wins'])
-            player_season.donations_sent.compute_stat([a for a in season_entries if a.activity == 'donations_sent'])
-            player_season.donations_rcvd.compute_stat([a for a in season_entries if a.activity == 'donations_received'])
-            player_season.loot_gold.compute_stat([a for a in season_entries if a.activity == 'loot_gold'])
-            player_season.loot_elixir.compute_stat([a for a in season_entries if a.activity == 'loot_elixir'])
-            player_season.loot_darkelixir.compute_stat([a for a in season_entries if a.activity == 'loot_darkelixir'])
-            player_season.capital_contribution.compute_stat([a for a in season_entries if a.activity == 'capital_contribution'])
-            player_season.clan_games.compute_stat([a for a in season_entries if a.activity == 'clan_games'])
-        
-            await player_season.database.db_player_seasonstats_snapshot.update_one(
-                {'_id':player_season.snapshot_id},
-                {'$set':player_season.stats_json()},
-                upsert=True
-                )
+                player_season.attack_wins.compute_stat([a for a in season_entries if a.activity == 'attack_wins'])
+                player_season.defense_wins.compute_stat([a for a in season_entries if a.activity == 'defense_wins'])
+                player_season.donations_sent.compute_stat([a for a in season_entries if a.activity == 'donations_sent'])
+                player_season.donations_rcvd.compute_stat([a for a in season_entries if a.activity == 'donations_received'])
+                player_season.loot_gold.compute_stat([a for a in season_entries if a.activity == 'loot_gold'])
+                player_season.loot_elixir.compute_stat([a for a in season_entries if a.activity == 'loot_elixir'])
+                player_season.loot_darkelixir.compute_stat([a for a in season_entries if a.activity == 'loot_darkelixir'])
+                player_season.capital_contribution.compute_stat([a for a in season_entries if a.activity == 'capital_contribution'])
+                player_season.clan_games.compute_stat([a for a in season_entries if a.activity == 'clan_games'])
+            
+                await player_season.database.db_player_seasonstats_snapshot.update_one(
+                    {'_id':player_season.snapshot_id},
+                    {'$set':player_season.stats_json()},
+                    upsert=True
+                    )

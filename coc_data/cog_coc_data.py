@@ -516,10 +516,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 else:            
                     self.coc_client._player_cache_queue.task_done()
                     await aPlayer._sync_cache(player)
-
-                    seasons = aClashSeason.all_seasons()
-                    snapshot_tasks = [player._update_snapshots(season) for season in seasons]
-                    await asyncio.gather(*snapshot_tasks)
+                    await player._update_snapshots()
 
                     if player.clan:
                         await self.coc_client._clan_cache_queue.put(player.clan.tag)
