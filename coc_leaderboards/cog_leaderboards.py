@@ -351,10 +351,16 @@ class Leaderboards(commands.Cog,GlobalClient):
         async with self.leaderboard_lock:
 
             LOG.info("Updating Leaderboards.")
+            st = pendulum.now()
 
             all_leaderboards = await DiscordLeaderboard.get_all_leaderboards()
+            
+            lb_iter = AsyncIter(all_leaderboards)
+            async for lb in lb_iter:
+                try:
+                    await lb.update_leaderboard()
+                except:
+                    LOG.exception(f"Error updating Leaderboard {lb.id}")
+                    continue
 
-            tasks = [lb.update_leaderboard() for lb in all_leaderboards]
-            await bounded_gather(*tasks,return_exceptions=True)
-
-            LOG.info("Leaderboards Updated.")
+            LOG.info(f"Leaderboards Updated. Time Taken: {pendulum.now().diff(st).in_seconds()}s.")
