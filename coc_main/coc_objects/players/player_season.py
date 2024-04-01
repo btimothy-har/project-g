@@ -255,7 +255,9 @@ class aPlayerSeason(MotorClient,AwaitLoader):
         return isinstance(other,aPlayerSeason) and self.tag == other.tag and self.season == other.season
 
     async def load(self):
-        mem_snapshot = await self.database.db_player_member_snapshot.find_one(self.snapshot_id)
+        mem_snapshot = await self.database.db_player_member_snapshot.find_one(
+            {'_id.tag':self.tag,'_id.season':self.season.id}
+            )
         
         if mem_snapshot:
             self.name = mem_snapshot.get('name',None)
@@ -264,7 +266,9 @@ class aPlayerSeason(MotorClient,AwaitLoader):
             self.home_clan_tag = mem_snapshot.get('home_clan_tag',None)
             self.home_clan = await BasicClan(tag=self.home_clan_tag) if self.home_clan_tag else None
 
-        stats_snapshot = await self.database.db_player_seasonstats_snapshot.find_one(self.snapshot_id)
+        stats_snapshot = await self.database.db_player_seasonstats_snapshot.find_one(
+            {'_id.tag':self.tag,'_id.season':self.season.id}
+            )
 
         if stats_snapshot:
             self.time_in_home_clan = stats_snapshot.get('time_in_home_clan',0)
