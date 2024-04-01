@@ -696,7 +696,7 @@ class CWLPlayerMenu(DefaultView):
     ### START LIVE CWL
     ##################################################
     async def show_live_cwl(self):
-        self.live_cwl_accounts = [a for a in await self.coc_client.get_league_players(self.season,registered=True,discord_user=self.member.user_id) if a.league_or_roster_clan]
+        self.live_cwl_accounts = [a for a in await self.coc_client.get_league_players(self.season,registered=True,discord_user=self.member.user_id)]
 
         if len(self.live_cwl_accounts) == 0:
             embed = await clash_embed(

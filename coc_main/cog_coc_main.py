@@ -220,7 +220,7 @@ class ClashOfClansMain(commands.Cog):
                 
                 try:
                     current_api_season = await self.coc_client.get_current_goldpass_season()
-                except coc.Maintenance:
+                except:
                     return
                 current_api_season_id = f"{current_api_season.start_time.time.month}-{current_api_season.start_time.time.year}"
 

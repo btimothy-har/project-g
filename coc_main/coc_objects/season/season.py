@@ -43,7 +43,7 @@ class aClashSeason(MotorClient):
         async for db_season in find_seasons:
             season = cls(db_season['_id'])
             await season.load()
-            ret_seasons.append(season)        
+            ret_seasons.append(season)
         return ret_seasons
     
     @classmethod
@@ -211,15 +211,18 @@ class aClashSeason(MotorClient):
                     's_is_current':True
                     }
                 },
-                upsert=True
-                )
+                upsert=True)
+            
+
             await self.database.d_season.update_many(
                 {'_id':{'$ne':self.id}},
                 {'$set': {
                     's_is_current':False
                     }
-                }
-                )
+                })
+            for season in list(self._cache.values()):
+                season.is_current = False
+            self.is_current = True
             LOG.info(f"Season {self.id} {self.description} set as current season.")
     
     async def open_cwl_signups(self):            
