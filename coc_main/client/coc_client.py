@@ -237,7 +237,7 @@ class ClashClient(coc.EventsClient):
             await self._player_cache_queue.put(player.tag)
         return player
     
-    async def get_members_by_season_no_clan(self,season:aClashSeason) -> List[coc.Player]:
+    async def get_members_by_season_no_clan(self,season:aClashSeason) -> List[aPlayer]:
         if season.id not in [s.id for s in aClashSeason.tracked()]:
             season = aClashSeason.current()
         
@@ -254,7 +254,7 @@ class ClashClient(coc.EventsClient):
             reverse=True
             )
 
-    async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[coc.Player]:
+    async def get_members_by_season(self,clan:coc.Clan,season:Optional[aClashSeason]=None) -> List[aPlayer]:
         if not season or season.id not in [s.id for s in aClashSeason.tracked()]:
             season = aClashSeason.current()
         

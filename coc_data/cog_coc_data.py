@@ -312,8 +312,9 @@ class ClashOfClansData(commands.Cog,GlobalClient):
     ##### DATA LOOP UPDATES
     #####
     ############################################################
-    @tasks.loop(hours=6)
+    @tasks.loop(hours=4)
     async def refresh_player_snapshot(self):
+
         if self.coc_client.maintenance:
             return
         if self.cycle_id in [0]:
@@ -780,7 +781,7 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 season = aClashSeason.current()
                 if tag in handled_tags:
                     continue
-                
+
                 await aPlayerSeason.create_member_snapshot(tag,season)
                 await aPlayerSeason.create_stats_snapshot(tag,season)
                 handled_tags.append(tag)

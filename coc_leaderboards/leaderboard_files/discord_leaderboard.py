@@ -15,6 +15,7 @@ from redbot.core.utils import AsyncIter
 
 from coc_main.client.global_client import GlobalClient
 from coc_main.coc_objects.season.season import aClashSeason
+from coc_main.coc_objects.players.player import aPlayer,aPlayerSeason
 
 from coc_main.discord.clan_link import ClanGuildLink
 
@@ -381,6 +382,7 @@ class ClanWarLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            await player._update_snapshots(season)
             stats = await player.get_season_stats(season)
 
             th_iter = AsyncIter(eligible_townhalls)
@@ -456,6 +458,7 @@ class ResourceLootLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            await player._update_snapshots(season)
             stats = await player.get_season_stats(season)
             if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
                 continue
@@ -527,6 +530,7 @@ class DonationsLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            await player._update_snapshots(season)
             stats = await player.get_season_stats(season)
             if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
                 continue
@@ -598,6 +602,7 @@ class ClanGamesLeaderboard(Leaderboard):
         m_iter = AsyncIter(members)
         
         async for player in m_iter:
+            await player._update_snapshots(season)
             stats = await player.get_season_stats(season)
 
             if parent.is_global:
