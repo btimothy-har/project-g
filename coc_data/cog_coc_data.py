@@ -768,7 +768,6 @@ class ClashOfClansData(commands.Cog,GlobalClient):
                 if tag in handled_tags:
                     continue
 
-                await aPlayerSeason.create_member_snapshot(tag,season)
                 await aPlayerSeason.create_stats_snapshot(tag,season)
                 handled_tags.append(tag)
 
