@@ -451,6 +451,10 @@ class aPlayer(coc.Player,BasicPlayer,AwaitLoader):
     def get_pet(self,name:str) -> aPet:
         pet = next((pet for pet in self._pets if pet.name == name),None)
         return aPet(pet,self.town_hall.level) if pet else None
+    
+    async def _update_snapshots(self,season:aClashSeason):
+        await aPlayerSeason.create_member_snapshot(self.tag,season)
+        await aPlayerSeason.create_stats_snapshot(self.tag,season)
 
     @classmethod
     async def _sync_cache(cls,player:'aPlayer',force:bool=False):
