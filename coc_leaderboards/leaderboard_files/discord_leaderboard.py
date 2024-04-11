@@ -382,6 +382,9 @@ class ClanWarLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            if not player.home_clan:
+                continue
+            
             stats = await player.get_season_stats(season)
 
             th_iter = AsyncIter(eligible_townhalls)
@@ -457,6 +460,9 @@ class ResourceLootLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            if not player.home_clan:
+                continue
+
             stats = await player.get_season_stats(season)
             if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
                 continue
@@ -528,6 +534,9 @@ class DonationsLeaderboard(Leaderboard):
 
         m_iter = AsyncIter(members)
         async for player in m_iter:
+            if not player.home_clan:
+                continue
+
             stats = await player.get_season_stats(season)
             if leaderboard_clans and stats.home_clan_tag not in [c.tag for c in leaderboard_clans]:
                 continue

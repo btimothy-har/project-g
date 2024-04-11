@@ -865,23 +865,20 @@ class ClashOfClansDiscord(commands.Cog,GlobalClient):
         if self.war_reminder_lock.locked():
             return
         
-        async def send_reminders(reminder:EventReminder):
-            war = await self.coc_client.get_current_war(reminder.tag)
-            if war.type in reminder.sub_type:
-                war_clan = war.get_clan(reminder.tag)
-                remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
-                await reminder.send_reminder(war,*remind_members)
-        
         async with self.war_reminder_lock:
             reminders = await EventReminder.get_war_reminders()
             a_iter = AsyncIter(reminders)
             async for reminder in a_iter:
                 try:
-                    war = await self.coc_client.get_current_war(reminder.tag)
-                    if war.type in reminder.sub_type:
-                        war_clan = war.get_clan(reminder.tag)
-                        remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
-                        await reminder.send_reminder(war,*remind_members)
+                    try:
+                        war = await self.coc_client.get_current_war(reminder.tag)
+                    except (coc.Maintenance,coc.NotFound,coc.GatewayError):
+                        continue
+                    else:
+                        if war.type in reminder.sub_type:
+                            war_clan = war.get_clan(reminder.tag)
+                            remind_members = [m for m in war_clan.members if m.unused_attacks > 0]
+                            await reminder.send_reminder(war,*remind_members)
                 except Exception:
                     LOG.exception(f"Error sending War Reminder for {reminder.tag}")
     
